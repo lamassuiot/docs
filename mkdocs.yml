@@ -1,0 +1,34 @@
+site_name: Lamassu IoT Docs
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)" 
+      scheme: default
+      primary: blue
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)" 
+      scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  # logo: https://www.lamassu.io/lamassuiot-dev.github.io/assets/brand/lamassu-brand.png
+nav:
+  - 'index.md'
+  - 'lamassu-compose.md'
+  - 'go-clients.md'
+  - 'est.md'
+  - 'ocsp.md'
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/lamassuiot
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/u/lamassuiot
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/lamassuiot
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true

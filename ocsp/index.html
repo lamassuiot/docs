@@ -318,9 +318,10 @@
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p><strong>Method 1 - GET request</strong>
-<div class="highlight"><pre><span></span><code>OCSP_REQUEST=$(openssl ocsp -CAfile Lamassu-Root-CA3-ECC384.crt -issuer Lamassu-Root-CA3-ECC384.crt -cert device-testrsa.crt -reqout - | base64 -w 0)
+<div class="highlight"><pre><span></span><code>OCSP_SERVER=http://dev.lamassu.io/api/ocsp/
 
-OCSP_SERVER=http://dev-lamassu.zpd.ikerlan.es:9098
+OCSP_REQUEST=$(openssl ocsp -CAfile Lamassu-Root-CA3-ECC384.crt -issuer Lamassu-Root-CA3-ECC384.crt -cert device-testrsa.crt -reqout - | base64 -w 0)
+
 curl --location --request GET &quot;$OCSP_SERVER/$OCSP_REQUEST&quot; &gt; ocspresponse.der
 
 openssl ocsp -respin ocspresponse.der -VAfile ../../lamassu/lamassu.crt -resp_text

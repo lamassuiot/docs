@@ -1,3 +1,3 @@
 # Welcome to Lamassu Iot Docs
 
-![Screenshot](img/lamassub&w.png)
+![Screenshot](img/lamassu-app.png)

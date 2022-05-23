@@ -13,7 +13,7 @@
     
     
       
-        <title>Using Go Clients - Lamassu IoT Docs</title>
+        <title>Lamassu APIs - Lamassu IoT Docs</title>
       
     
     
@@ -63,7 +63,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#using-go-clients" class="md-skip">
+        <a href="#lamassu-apis" class="md-skip">
           Skip to content
         </a>
       
@@ -96,7 +96,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Using Go Clients
+              Lamassu APIs
             
           </span>
         </div>
@@ -232,6 +232,21 @@
 
   
   
+  
+    <li class="md-nav__item">
+      <a href="../lamassu-compose-manage/" class="md-nav__link">
+        Managing Lamassu
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
     
   
   
@@ -243,9 +258,60 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Lamassu APIs
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
-        Using Go Clients
+        Lamassu APIs
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#using-the-apis" class="md-nav__link">
+    Using the APIs
+  </a>
+  
+    <nav class="md-nav" aria-label="Using the APIs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#through-the-api-gateway" class="md-nav__link">
+    Through the API Gateway
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal-usage" class="md-nav__link">
+    Internal usage
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -259,23 +325,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../est/" class="md-nav__link">
-        EST Protocol
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../ocsp/" class="md-nav__link">
-        OCSP Protocol
+      <a href="../protocols/" class="md-nav__link">
+        Protocols & Lamassu
       </a>
     </li>
   
@@ -301,6 +352,41 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#using-the-apis" class="md-nav__link">
+    Using the APIs
+  </a>
+  
+    <nav class="md-nav" aria-label="Using the APIs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#through-the-api-gateway" class="md-nav__link">
+    Through the API Gateway
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal-usage" class="md-nav__link">
+    Internal usage
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -313,8 +399,22 @@
                 
 
 
-<h1 id="using-go-clients">Using Go Clients</h1>
+<h1 id="lamassu-apis">Lamassu APIs</h1>
+<h2 id="using-the-apis">Using the APIs</h2>
+<p>The main 3 Open API documentation can be found on the following urls:</p>
+<ul>
+<li><a href="https://dev.lamassu.io/api/dmsenroller/v1/docs/">https://dev.lamassu.io/api/dmsenroller/v1/docs/</a></li>
+<li><a href="https://dev.lamassu.io/api/ca/v1/docs/">https://dev.lamassu.io/api/ca/v1/docs/</a></li>
+<li><a href="https://dev.lamassu.io/api/devmanager/v1/docs/">https://dev.lamassu.io/api/devmanager/v1/docs/</a></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The following endpoints defined in the Lamassu Device Manager Api specification are not correctly defined due to the limitations imposed by the Open API 3.0 schema. The current specification defines an <code>OIDC</code> security schema (meaning that a valid JWT token must be provided while requesting the API) while the implemented security schema uses the <code>mTLS</code> approach. This issue will be resolved once the specification is migrated to Open API 3.1 compliant. The affected endpoints are:
+<img alt="Screenshot" src="../img/missing-mtls-openapi.png" /></p>
+</div>
 <p>Lamassu provides easy to use GO clients for most of its APIs to help speeding up the development of applications:</p>
+<h3 id="through-the-api-gateway">Through the API Gateway</h3>
+<h3 id="internal-usage">Internal usage</h3>
 <div class="highlight"><pre><span></span><code><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w"></span>
 
 <span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w"></span>
@@ -363,7 +463,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../lamassu-compose/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Install Lamassu Compose" rel="prev">
+        <a href="../lamassu-compose-manage/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Managing Lamassu" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -372,20 +472,20 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              Install Lamassu Compose
+              Managing Lamassu
             </div>
           </div>
         </a>
       
       
         
-        <a href="../est/" class="md-footer__link md-footer__link--next" aria-label="Next: EST Protocol" rel="next">
+        <a href="../protocols/" class="md-footer__link md-footer__link--next" aria-label="Next: Protocols &amp; Lamassu" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              EST Protocol
+              Protocols & Lamassu
             </div>
           </div>
           <div class="md-footer__button md-icon">

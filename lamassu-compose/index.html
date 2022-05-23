@@ -253,8 +253,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#setup-requirements" class="md-nav__link">
-    Setup Requirements
+  <a href="#architecture" class="md-nav__link">
+    Architecture
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    Requirements
   </a>
   
 </li>
@@ -264,19 +271,19 @@
     Setup
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#manual-setup" class="md-nav__link">
-    Manual Setup
-  </a>
-  
-    <nav class="md-nav" aria-label="Manual Setup">
+    <nav class="md-nav" aria-label="Setup">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#using-the-apis" class="md-nav__link">
-    Using the APIs
+  <a href="#automatic-deployment" class="md-nav__link">
+    Automatic deployment
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-deployment" class="md-nav__link">
+    Manual deployment
   </a>
   
 </li>
@@ -287,8 +294,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#certificate-rotation" class="md-nav__link">
-    Certificate rotation
+  <a href="#deploy-aws-and-azure-pki-connectors" class="md-nav__link">
+    Deploy AWS and Azure PKI connectors
   </a>
   
 </li>
@@ -309,8 +316,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../go-clients/" class="md-nav__link">
-        Using Go Clients
+      <a href="../lamassu-compose-manage/" class="md-nav__link">
+        Managing Lamassu
       </a>
     </li>
   
@@ -324,8 +331,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../est/" class="md-nav__link">
-        EST Protocol
+      <a href="../lamassu-usage/" class="md-nav__link">
+        Lamassu APIs
       </a>
     </li>
   
@@ -339,8 +346,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../ocsp/" class="md-nav__link">
-        OCSP Protocol
+      <a href="../protocols/" class="md-nav__link">
+        Protocols & Lamassu
       </a>
     </li>
   
@@ -373,8 +380,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#setup-requirements" class="md-nav__link">
-    Setup Requirements
+  <a href="#architecture" class="md-nav__link">
+    Architecture
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    Requirements
   </a>
   
 </li>
@@ -384,19 +398,19 @@
     Setup
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#manual-setup" class="md-nav__link">
-    Manual Setup
-  </a>
-  
-    <nav class="md-nav" aria-label="Manual Setup">
+    <nav class="md-nav" aria-label="Setup">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#using-the-apis" class="md-nav__link">
-    Using the APIs
+  <a href="#automatic-deployment" class="md-nav__link">
+    Automatic deployment
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-deployment" class="md-nav__link">
+    Manual deployment
   </a>
   
 </li>
@@ -407,8 +421,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#certificate-rotation" class="md-nav__link">
-    Certificate rotation
+  <a href="#deploy-aws-and-azure-pki-connectors" class="md-nav__link">
+    Deploy AWS and Azure PKI connectors
   </a>
   
 </li>
@@ -429,11 +443,24 @@
 
 <h1 id="install-lamassu-compose">Install Lamassu Compose</h1>
 <p>Lamassu Compose is the official release containing the scripts and resources required to deploy all microservices such as the CA component, the VA component or the RA components to name a few. </p>
-<h2 id="setup-requirements">Setup Requirements</h2>
-<p>https://stedolan.github.io/jq/download/ </p>
+<h2 id="architecture">Architecture</h2>
+<p>Lamassu Compose offers a SECURE deployment of the set of microservices required to manage an industrial PKI. The architecture presented on the following image reflects the interconnection of the different services mainly using the HTTP Protocol. The use of this deployment offers the following non functional requirements by leveraging the use of an API Gateway:</p>
 <ul>
-<li><code>jq</code>. Get the latest version: https://stedolan.github.io/jq/download/ </li>
-<li><code>docker</code> and <code>docker-compose</code>: Get the latest version: https://docs.docker.com/engine/install/ubuntu/ and https://docs.docker.com/compose/install/</li>
+<li>
+<p><strong>Centralized point of access</strong>: Each microservice listens on a different port which ends up being challenging for developers and users. With the use of the API Gateway, the user will always access the same host and port address. Port <code>80</code> for HTTP connections and port <code>443</code> for HTTPS connections.</p>
+</li>
+<li>
+<p><strong>Authentication</strong>: In order to invoke any endpoint, the API Gateway enforces each request to present a JWT. Upon receiving an HTTP request, the gateway validates the presented token against the authentication server.</p>
+</li>
+<li><strong>Authorization</strong>: Another key aspect is enforcing an authorization schema. Lamassu has been configured in such way that only specific endpoints are accessible by non admin users.</li>
+<li><strong>Tracing</strong>: Logging the life of an HTTP request can be helpful during the debugging process of such complex application. The tracing aspect eases this process by injecting a unique identifier to each request that is then printed out by each microservice logs.</li>
+<li><strong>Mutual TLS authentication</strong>: As mentioned earlier the gateway acts as the traffic orchestrator knowing where each service is and redirecting the traffic accordingly. To prevent any unauthorized request as well as protecting the communications channel between the Gateway itself and the upstream service, the API Gateway initiates a mutual TLS connection to ensure such thing.</li>
+</ul>
+<p><img alt="Screenshot" src="../img/base-architecture.png" /></p>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li><code>jq</code>. Get the latest version: <a href="https://stedolan.github.io/jq/download/">https://stedolan.github.io/jq/download/</a></li>
+<li><code>docker</code> and <code>docker-compose</code>: Get the latest version: <a href="https://docs.docker.com/engine/install/ubuntu/">https://docs.docker.com/engine/install/ubuntu/</a> and <a href="https://docs.docker.com/compose/install/">https://docs.docker.com/compose/install/</a></li>
 <li>Have a working DNS server able to resolve the domain used during the installation process or add the following content to the <code>/etc/hosts</code> file, replacing the <code>dev.lamassu.io</code> domain with your own:
     <div class="highlight"><pre><span></span><code>127.0.0.1  dev.lamassu.io 
 127.0.0.1  vault.dev.lamassu.io 
@@ -443,6 +470,7 @@
 </code></pre></div></li>
 </ul>
 <h2 id="setup">Setup</h2>
+<h3 id="automatic-deployment">Automatic deployment</h3>
 <ol>
 <li>
 <p>Clone the repository and get into the directory: 
@@ -516,7 +544,7 @@ Role: operator
 </ul>
 </li>
 </ol>
-<h2 id="manual-setup">Manual Setup</h2>
+<h3 id="manual-deployment">Manual deployment</h3>
 <p>To launch Lamassu follow the next steps:</p>
 <ol>
 <li>
@@ -569,9 +597,9 @@ export LAMASSU_OCSP_DOCKER_IMAGE=lamasuiot/lamassu-ocsp:latest
     - Healthchecking
     - Securely expose services using TLS</p>
 <p>The different APIs exposed through the gateway have been configured to ONLY accept request originates inside the platform via a mTLS authentication:</p>
-<div class="highlight"><pre><span></span><code>┌────────────────┐                         ┌───────────────┐                        ┌─────────────┐
-│ Client/Browser │ ------&lt;downstream&gt;----- │    Gateway    │ ------&lt;upstream&gt;------ │     API     │
-└────────────────┘          TLS            └───────────────┘          mTLS          └─────────────┘
+<div class="highlight"><pre><span></span><code>┌──────────────┐                ┌───────────────┐              ┌─────────────┐
+│Client/Browser│ -&lt;downstream&gt;- │    Gateway    │ -&lt;upstream&gt;- │     API     │
+└──────────────┘       TLS      └───────────────┘      mTLS    └─────────────┘
 </code></pre></div>
 <ol>
 <li>
@@ -746,39 +774,7 @@ docker-compose up -d dms-default
 </ol>
 </li>
 </ol>
-<h3 id="using-the-apis">Using the APIs</h3>
-<p>The main 3 Open API documentation can be found on the following urls:</p>
-<ul>
-<li>
-<p>https://dev.lamassu.io/api/ca/v1/docs/</p>
-</li>
-<li>
-<p>https://dev.lamassu.io/api/dmsenroller/v1/docs/</p>
-</li>
-<li>
-<p>https://dev.lamassu.io/api/devmanager/v1/docs/</p>
-</li>
-</ul>
-<p>⚠️ The following endpoints defined in the Lamassu Device Manager Api specification are not correctly defined due to the limitations imposed by the Open API 3.0 schema. The current specification defines an <code>OIDC</code> security schema (meaning that a valid JWT token must be provided while requesting the API) while the implemented security schema uses the <code>mTLS</code> approach. This issue will be resolved once the specification is Open API 3.1 compliant. The affected endpoints are:</p>
-<p><img src="assets/missing-mtls-openapi.png" alt="Lamassu App" title="Lamassu" /></p>
-<h2 id="certificate-rotation">Certificate rotation</h2>
-<p>By default, all self-signed certificates (both upstream and downstream) have a lifespan of 365 days. At that point it will be necessary to regenerate the expired certificates:</p>
-<ol>
-<li>
-<p>Regenerate the certificates:
-    <div class="highlight"><pre><span></span><code>cd tls-certificates
-./gen-upstream-certs.sh
-./gen-downstream-certs.sh
-cd ..
-</code></pre></div></p>
-</li>
-<li>
-<p>Reboot all services:
-    <div class="highlight"><pre><span></span><code>docker-compose down
-docker-compose up -d
-</code></pre></div></p>
-</li>
-</ol>
+<h2 id="deploy-aws-and-azure-pki-connectors">Deploy AWS and Azure PKI connectors</h2>
 
               
             </article>
@@ -808,13 +804,13 @@ docker-compose up -d
       
       
         
-        <a href="../go-clients/" class="md-footer__link md-footer__link--next" aria-label="Next: Using Go Clients" rel="next">
+        <a href="../lamassu-compose-manage/" class="md-footer__link md-footer__link--next" aria-label="Next: Managing Lamassu" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Using Go Clients
+              Managing Lamassu
             </div>
           </div>
           <div class="md-footer__button md-icon">

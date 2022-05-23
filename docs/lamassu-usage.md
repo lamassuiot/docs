@@ -13,46 +13,48 @@ The main 3 Open API documentation can be found on the following urls:
     The following endpoints defined in the Lamassu Device Manager Api specification are not correctly defined due to the limitations imposed by the Open API 3.0 schema. The current specification defines an `OIDC` security schema (meaning that a valid JWT token must be provided while requesting the API) while the implemented security schema uses the `mTLS` approach. This issue will be resolved once the specification is migrated to Open API 3.1 compliant. The affected endpoints are:
     ![Screenshot](img/missing-mtls-openapi.png)
 
-Lamassu provides easy to use GO clients for most of its APIs to help speeding up the development of applications:
+Lamassu provides easy to use GO clients for most of its APIs to help speeding up the development of third-party applications. Before using thees clients, it is important to identify the path taken by the request. Unless the application using the GO clients (or any other http client such as `curl`) is deployed within the same docker network, the request will be [handled by the API Gateway component](#through-the-api-gateway). Otherwise check the [internal usage](#internal-usage) section.
 
 ### Through the API Gateway
+=== "Go"
 
-### Internal usage
+    ``` go
+    package main
 
+    import (
+    "net/url"
+    lamassuCAClient "github.com/lamassuiot/lamassuiot/pkg/ca/client"
+    caDTO "github.com/lamassuiot/lamassuiot/pkg/ca/common/dto"
+    "github.com/lamassuiot/lamassuiot/pkg/utils/client"
+    )
 
-``` go
-package main
-
-import (
-"net/url"
-lamassuCAClient "github.com/lamassuiot/lamassuiot/pkg/ca/client"
-caDTO "github.com/lamassuiot/lamassuiot/pkg/ca/common/dto"
-"github.com/lamassuiot/lamassuiot/pkg/utils/client"
-)
-
-function main (){
-    lamassuGatewayURL := "dev.lamassu.io"
-    apiCAFile := "path/to/apigw.crt"
-    
-    caClient := lamassuCAClient.NewLamassuCAClient(client.ClientConfiguration{
-        URL: &url.URL{
-            Scheme: "https",
-            Host:   lamassuGatewayURL,
-            Path:   "/api/ca/",
-        },
-        AuthMethod: client.JWT,
-        AuthMethodConfig: &client.JWTConfig{
-            Username: "enroller",
-            Password: "enroller",
+    function main (){
+        lamassuGatewayURL := "dev.lamassu.io"
+        apiCAFile := "path/to/apigw.crt"
+        
+        caClient := lamassuCAClient.NewLamassuCAClient(client.ClientConfiguration{
             URL: &url.URL{
                 Scheme: "https",
-                Host:   "auth." + lamassuGatewayURL,
+                Host:   lamassuGatewayURL,
+                Path:   "/api/ca/",
+            },
+            AuthMethod: client.JWT,
+            AuthMethodConfig: &client.JWTConfig{
+                Username: "enroller",
+                Password: "enroller",
+                URL: &url.URL{
+                    Scheme: "https",
+                    Host:   "auth." + lamassuGatewayURL,
+                },
+                CACertificate: apiCAFile,
             },
             CACertificate: apiCAFile,
-        },
-        CACertificate: apiCAFile,
-    })
-    
-    ca, err = caClient.CreateCA(context.Background(), caDTO.Pki, caName, caDTO.PrivateKeyMetadata{KeyType: "rsa", KeyBits: 2048}, caDTO.Subject{CN: caName}, 365*time.Hour, 30*time.Hour)
-}
-```
+        })
+        
+        ca, err = caClient.CreateCA(context.Background(), caDTO.Pki, caName, caDTO.PrivateKeyMetadata{KeyType: "rsa", KeyBits: 2048}, caDTO.Subject{CN: caName}, 365*time.Hour, 30*time.Hour)
+    }
+    ```
+=== "Curl"
+
+
+### Internal usage

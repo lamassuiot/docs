@@ -2,6 +2,8 @@
 
 ## OCSP
 
+<https://datatracker.ietf.org/doc/html/rfc6960>
+
 === "OpenSSL"
     **Method 1 - GET request**
     ```
@@ -106,3 +108,5 @@
     ```
 
 ## EST
+
+<https://datatracker.ietf.org/doc/html/rfc7030>

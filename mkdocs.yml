@@ -1,19 +1,22 @@
 site_name: Lamassu IoT Docs
 theme:
+  logo: img/lamassu.svg
+  favicon: img/favicon.png
   name: material
   palette:
     - media: "(prefers-color-scheme: light)" 
-      scheme: default
-      primary: blue
+      scheme: lamassu
       toggle:
         icon: material/toggle-switch-off-outline
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)" 
       scheme: slate
+      accent: deep orange
       toggle:
         icon: material/toggle-switch
         name: Switch to light mode
-  # logo: https://www.lamassu.io/lamassuiot-dev.github.io/assets/brand/lamassu-brand.png
+extra_css:
+  - css/scheme.css
 nav:
   - 'index.md'
   - 'lamassu-compose.md'
@@ -34,3 +37,4 @@ markdown_extensions:
       alternate_style: true
   - admonition
   - pymdownx.details
+  - pymdownx.tilde

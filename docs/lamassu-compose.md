@@ -89,20 +89,20 @@ Lamassu Compose offers a SECURE deployment of the set of microservices required 
 8. Final notes:
     
     🚀 You are ready to go 🚀
-    
-    Note the following things:
 
-    -   Keycloak is your auth provider. During the `install.sh` the service is provisioned with 2 users with different roles:
-        ```
-        Username: enroller
-        Password: enroller
-        Role: admin
-        ```
-        ```
-        Username: operator
-        Password: operator
-        Role: operator
-        ```
+    !!! note
+
+        Keycloak is your auth provider. During the `install.sh` the service is provisioned with 2 users with different roles:
+            ```
+            Username: enroller
+            Password: enroller
+            Role: admin
+            ```
+            ```
+            Username: operator
+            Password: operator
+            Role: operator
+            ```
         You can change those credentials (or create new users) using keycloak's UI available at: `https://auth.<DOMAIN>`
 
 ### Manual deployment 

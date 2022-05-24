@@ -1,24 +1,42 @@
 # Protocols & Lamassu
 
+Lamassu supports a set of standards to perform some of its key functionalities such as enrolling devices as well as validating the status of a given certificate. This section aims to describe those protocols as well as explaining how them with practical examples.
+
 ## OCSP
 
-<https://datatracker.ietf.org/doc/html/rfc6960>
+The [Online Certificate Status Protocol](https://datatracker.ietf.org/doc/html/rfc6960) or OCSP for short, is a protocol used to determine the current status of a digital certificate without requiring the use of Certificate Revocation Lists (CRLs).
 
+As defined by the standard, there are two possible methods that can be used to perform the http request:
+
+| Method | Path                                                                              | Headers                                 | Body payload                                        | Used when                                                   |
+| ------ | --------------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
+| `GET`  | `{url}/{url-encoding of base-64 encoding of the DER encoding of the OCSPRequest}` | :material-close:                        | :material-close:                                    | Recommended when the encoded request is less than 255 bytes |
+| `PUT`  | `{url}`                                                                           | Content-Type: `application/ocsp-reques` | Binary value of the DER encoding of the OCSPRequest | Can always be used                                          |
+
+### GET Request
 === "OpenSSL"
-    **Method 1 - GET request**
-    ```
-    OCSP_SERVER=http://dev.lamassu.io/api/ocsp/
-
-    OCSP_REQUEST=$(openssl ocsp -CAfile Lamassu-Root-CA3-ECC384.crt -issuer Lamassu-Root-CA3-ECC384.crt -cert device-testrsa.crt -reqout - | base64 -w 0)
     
-    curl --location --request GET "$OCSP_SERVER/$OCSP_REQUEST" > ocspresponse.der
-
-    openssl ocsp -respin ocspresponse.der -VAfile ../../lamassu/lamassu.crt -resp_text
+    Define the OCSP server endpoint as well as the 
     ```
-
-    **Method 2 - POST request**
+    export OCSP_SERVER=dev.lamassu.io:443 
+    export CA_CERTIFICATE=issuer_ca.crt 
+    export DEVICE_CERTIFICATE=device.crt
     ```
-    A
+    
+    Obtain the Root certificate used by the server
+    ```
+    openssl s_client -connect $OCSP_SERVER  2>/dev/null </dev/null |  sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > root-ca.pem
+    ```
+    
+    Create the OCSP Request
+    ```
+    OCSP_REQUEST=$(openssl ocsp -CAfile $CA_CERTIFICATE -issuer $CA_CERTIFICATE -cert $DEVICE_CERTIFICATE -reqout - | base64 -w 0)
+    ```
+    
+    Check the status of the certificate
+    ```
+    curl --location --request GET "$OCSP_SERVER/api/ocsp/$OCSP_REQUEST" > ocspresponse.der 
+    openssl ocsp -respin ocspresponse.der -VAfile root-ca.pem -resp_text    ```
     ```
 
 === "Go"
@@ -106,6 +124,8 @@
     }
 
     ```
+### POST Request
+
 
 ## EST
 

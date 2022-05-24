@@ -19,9 +19,9 @@ extra_css:
   - css/scheme.css
 nav:
   - 'index.md'
-  - 'lamassu-compose.md'
-  - 'lamassu-compose-manage.md'
-  - 'lamassu-usage.md'
+  - 'setup.md'
+  - 'manage.md'
+  - 'usage.md'
   - 'protocols.md'
 extra:
   social:
@@ -38,3 +38,8 @@ markdown_extensions:
   - admonition
   - pymdownx.details
   - pymdownx.tilde
+  - tables
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg

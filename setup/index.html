@@ -316,7 +316,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lamassu-compose-manage/" class="md-nav__link">
+      <a href="../manage/" class="md-nav__link">
         Managing Lamassu
       </a>
     </li>
@@ -331,7 +331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lamassu-usage/" class="md-nav__link">
+      <a href="../usage/" class="md-nav__link">
         Lamassu APIs
       </a>
     </li>
@@ -748,14 +748,14 @@ export TOKEN=$(curl -k --location --request POST &quot;https://$AUTH_ADDR/auth/r
 </code></pre></div></li>
 <li>
 <p>Then, register a new DMS named Lamassu-Default-DMS:</p>
-<p><strong>Note: while registering new DMS instances with non admin users, it is necessary to register the DMS using the user's username as the common name, otherwise, the user won't see its DMSs</strong> <br />
-<div class="highlight"><pre><span></span><code>export ENROLL_ADDR=$DOMAIN/api/dmsenroller
-
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>while registering new DMS instances with non admin users, it is necessary to register the DMS using the user's username as the common name, otherwise, the user won't see its DMSs    </p>
+</div>
+<p><div class="highlight"><pre><span></span><code>export ENROLL_ADDR=$DOMAIN/api/dmsenroller
 export DMS_REGISTER_RESPONSE=$(curl -k --location --request POST &quot;https://$ENROLL_ADDR/v1/Lamassu-Default-DMS/form&quot; --header &quot;Authorization: Bearer ${TOKEN}&quot; --header &#39;Content-Type: application/json&#39; --data-raw &quot;{\&quot;url\&quot;:\&quot;https://${DOMAIN}:5000\&quot;, \&quot; subject\&quot;:{ \&quot;common_name\&quot;: \&quot;Lamassu-Default-DMS\&quot;,\&quot;country\&quot;: \&quot;\&quot;,\&quot;locality\&quot;: \&quot;\&quot;,\&quot;organization\&quot;: \&quot;\&quot;,\&quot;organization_unit\&quot;: \&quot;\&quot;,\&quot;state\&quot;: \&quot;\&quot;},\&quot;key_metadata\&quot;:{\&quot;bits\&quot;: 3072,\&quot;type\&quot;: \&quot;rsa\&quot;}}&quot;)
 
-
 echo $DMS_REGISTER_RESPONSE | jq -r .priv_key | sed &#39;s/\\n/\n/g&#39; | sed -Ez &#39;$ s/\n+$//&#39; | base64 -d &gt; lamassu-default-dms/config/dms.key
-
 export DMS_ID=$(echo $DMS_REGISTER_RESPONSE | jq -r .dms.id)
 </code></pre></div>
     3. Enroll the new DMS
@@ -804,7 +804,7 @@ docker-compose up -d dms-default
       
       
         
-        <a href="../lamassu-compose-manage/" class="md-footer__link md-footer__link--next" aria-label="Next: Managing Lamassu" rel="next">
+        <a href="../manage/" class="md-footer__link md-footer__link--next" aria-label="Next: Managing Lamassu" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">

@@ -11,7 +11,7 @@ As defined by the standard, there are two possible methods that can be used to p
 | Method | Path                                                                              | Headers                                 | Body payload                                        | Used when                                                   |
 | ------ | --------------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
 | `GET`  | `{url}/{url-encoding of base-64 encoding of the DER encoding of the OCSPRequest}` | :material-close:                        | :material-close:                                    | Recommended when the encoded request is less than 255 bytes |
-| `PUT`  | `{url}`                                                                           | Content-Type: `application/ocsp-reques` | Binary value of the DER encoding of the OCSPRequest | Can always be used                                          |
+| `PUT`  | `{url}`                                                                           | Content-Type: `application/ocsp-request` | Binary value of the DER encoding of the OCSPRequest | Can always be used                                          |
 
 ### GET Request
 === "OpenSSL"

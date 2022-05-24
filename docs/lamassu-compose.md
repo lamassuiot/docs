@@ -46,16 +46,16 @@ Lamassu Compose offers a SECURE deployment of the set of microservices required 
 
 4. Define the docker images tags to be used by exporting the following variables
     ```
-    export LAMASSU_GATEWAY_DOCKER_IMAGE=lamasuiot/lamassu-gateway:latest
-    export LAMASSU_UI_DOCKER_IMAGE=lamasuiot/lamassu-ui:latest
-    export LAMASSU_DB_DOCKER_IMAGE=lamasuiot/lamassu-db:latest
-    export LAMASSU_AUTH_DOCKER_IMAGE=lamasuiot/lamassu-auth:latest
-    export LAMASSU_CA_DOCKER_IMAGE=lamasuiot/lamassu-ca:latest
-    export LAMASSU_DMS_ENROLLER_DOCKER_IMAGE=lamasuiot/lamassu-dms-enroller:latest
-    export LAMASSU_DEVICE_MANAGER_DOCKER_IMAGE=lamasuiot/lamassu-device-manager:latest
-    export LAMASSU_RABBITMQ_DOCKER_IMAGE=lamasuiot/lamassu-rabbitmq:latest
-    export LAMASSU_CLOUD_PROXY_DOCKER_IMAGE=lamasuiot/lamassu-cloud-proxy:latest
-    export LAMASSU_OCSP_DOCKER_IMAGE=lamasuiot/lamassu-ocsp:latest
+    export LAMASSU_GATEWAY_DOCKER_IMAGE=lamassuiot/lamassu-gateway:latest
+    export LAMASSU_UI_DOCKER_IMAGE=lamassuiot/lamassu-ui:latest
+    export LAMASSU_DB_DOCKER_IMAGE=lamassuiot/lamassu-db:latest
+    export LAMASSU_AUTH_DOCKER_IMAGE=lamassuiot/lamassu-auth:latest
+    export LAMASSU_CA_DOCKER_IMAGE=lamassuiot/lamassu-ca:latest
+    export LAMASSU_DMS_ENROLLER_DOCKER_IMAGE=lamassuiot/lamassu-dms-enroller:latest
+    export LAMASSU_DEVICE_MANAGER_DOCKER_IMAGE=lamassuiot/lamassu-device-manager:latest
+    export LAMASSU_RABBITMQ_DOCKER_IMAGE=lamassuiot/lamassu-rabbitmq:latest
+    export LAMASSU_CLOUD_PROXY_DOCKER_IMAGE=lamassuiot/lamassu-cloud-proxy:latest
+    export LAMASSU_OCSP_DOCKER_IMAGE=lamassuiot/lamassu-ocsp:latest
     ```
 
 5. Run the following command to replace `.env` file with the values defined variables previously:
@@ -129,16 +129,16 @@ To launch Lamassu follow the next steps:
 
     3. Define the docker images tags to be used by exporting the following variables
         ```
-        export LAMASSU_GATEWAY_DOCKER_IMAGE=lamasuiot/lamassu-gateway:latest
-        export LAMASSU_UI_DOCKER_IMAGE=lamasuiot/lamassu-ui:latest
-        export LAMASSU_DB_DOCKER_IMAGE=lamasuiot/lamassu-db:latest
-        export LAMASSU_AUTH_DOCKER_IMAGE=lamasuiot/lamassu-auth:latest
-        export LAMASSU_CA_DOCKER_IMAGE=lamasuiot/lamassu-ca:latest
-        export LAMASSU_DMS_ENROLLER_DOCKER_IMAGE=lamasuiot/lamassu-dms-enroller:latest
-        export LAMASSU_DEVICE_MANAGER_DOCKER_IMAGE=lamasuiot/lamassu-device-manager:latest
-        export LAMASSU_RABBITMQ_DOCKER_IMAGE=lamasuiot/lamassu-rabbitmq:latest
-        export LAMASSU_CLOUD_PROXY_DOCKER_IMAGE=lamasuiot/lamassu-cloud-proxy:latest
-        export LAMASSU_OCSP_DOCKER_IMAGE=lamasuiot/lamassu-ocsp:latest
+        export LAMASSU_GATEWAY_DOCKER_IMAGE=lamassuiot/lamassu-gateway:latest
+        export LAMASSU_UI_DOCKER_IMAGE=lamassuiot/lamassu-ui:latest
+        export LAMASSU_DB_DOCKER_IMAGE=lamassuiot/lamassu-db:latest
+        export LAMASSU_AUTH_DOCKER_IMAGE=lamassuiot/lamassu-auth:latest
+        export LAMASSU_CA_DOCKER_IMAGE=lamassuiot/lamassu-ca:latest
+        export LAMASSU_DMS_ENROLLER_DOCKER_IMAGE=lamassuiot/lamassu-dms-enroller:latest
+        export LAMASSU_DEVICE_MANAGER_DOCKER_IMAGE=lamassuiot/lamassu-device-manager:latest
+        export LAMASSU_RABBITMQ_DOCKER_IMAGE=lamassuiot/lamassu-rabbitmq:latest
+        export LAMASSU_CLOUD_PROXY_DOCKER_IMAGE=lamassuiot/lamassu-cloud-proxy:latest
+        export LAMASSU_OCSP_DOCKER_IMAGE=lamassuiot/lamassu-ocsp:latest
         ```
 
     4. Run the following command to replace `.env` file with the values defined variables previously:

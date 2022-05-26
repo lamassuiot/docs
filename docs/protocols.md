@@ -1,4 +1,4 @@
-# Protocols & Lamassu
+# Protocols
 
 Lamassu supports a set of standards to perform some of its key functionalities such as enrolling devices as well as validating the status of a given certificate. This section aims to describe those protocols as well as explaining how them with practical examples.
 
@@ -11,7 +11,7 @@ As defined by the standard, there are two possible methods that can be used to p
 | Method | Path                                                                              | Headers                                 | Body payload                                        | Used when                                                   |
 | ------ | --------------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
 | `GET`  | `{url}/{url-encoding of base-64 encoding of the DER encoding of the OCSPRequest}` | :material-close:                        | :material-close:                                    | Recommended when the encoded request is less than 255 bytes |
-| `PUT`  | `{url}`                                                                           | Content-Type: `application/ocsp-reques` | Binary value of the DER encoding of the OCSPRequest | Can always be used                                          |
+| `POST`  | `{url}`                                                                           | Content-Type: `application/ocsp-reques` | Binary value of the DER encoding of the OCSPRequest | Can always be used                                          |
 
 ### GET Request
 === "OpenSSL"
@@ -36,7 +36,7 @@ As defined by the standard, there are two possible methods that can be used to p
     Check the status of the certificate
     ```
     curl --location --request GET "$OCSP_SERVER/api/ocsp/$OCSP_REQUEST" > ocspresponse.der 
-    openssl ocsp -respin ocspresponse.der -VAfile root-ca.pem -resp_text    ```
+    openssl ocsp -respin ocspresponse.der -VAfile root-ca.pem -resp_text
     ```
 
 === "Go"
@@ -122,11 +122,26 @@ As defined by the standard, there are two possible methods that can be used to p
         fmt.Println(ocspResponse.Status == ocsp.Revoked)
         fmt.Println(ocspResponse.RevokedAt)
     }
-
     ```
 ### POST Request
 
 
 ## EST
 
-<https://datatracker.ietf.org/doc/html/rfc7030>
+The core mechanism to obtain valid certificates for your devices is using the enrollment process described by the EST protocol. EST or [Enrollment over Secure Transport](https://datatracker.ietf.org/doc/html/rfc7030) establishes a set of standardized endpoints. The following table sums up all endpoints defined by the EST protocol and wether or not are supported by the current implementation.
+
+| Operation                       | Operation Path                             | Required by RFC7030 | Supported        |
+| ------------------------------- | ------------------------------------------ | ------------------- | ---------------- |
+| Distribution of CA Certificates | /api/devmanager/.well-known/cacerts        | :material-check:    | :material-check: |
+| Enrollment of Clients           | /api/devmanager/.well-known/simpleenroll   | :material-check:    | :material-check: |
+| Re-enrollment of Clients        | /api/devmanager/.well-known/simplereenroll | :material-check:    | :material-check: |
+| Full CMC                        | /api/devmanager/.well-known/fullcmc        | :material-close:    | :material-close: |
+| Server-Side Key Generation      | /api/devmanager/.well-known/serverkeygen   | :material-close:    | :material-alert: |
+| CSR Attributes                  | /api/devmanager/.well-known/csrattrs       | :material-close:    | :material-close: |
+
+### Distribution of CA Certificates
+
+### Enrollment of Devices  
+
+
+### Re-enrollment of Devices 

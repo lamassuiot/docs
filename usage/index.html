@@ -13,7 +13,7 @@
     
     
       
-        <title>Lamassu APIs - Lamassu IoT Docs</title>
+        <title>Getting Started - Lamassu IoT Docs</title>
       
     
     
@@ -65,7 +65,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#lamassu-apis" class="md-skip">
+        <a href="#getting-started" class="md-skip">
           Skip to content
         </a>
       
@@ -97,7 +97,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Lamassu APIs
+              Getting Started
             
           </span>
         </div>
@@ -232,21 +232,6 @@
 
   
   
-  
-    <li class="md-nav__item">
-      <a href="../manage/" class="md-nav__link">
-        Managing Lamassu
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
     
   
   
@@ -259,12 +244,12 @@
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
-          Lamassu APIs
+          Getting Started
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        Lamassu APIs
+        Getting Started
       </a>
       
         
@@ -281,6 +266,40 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    Overview
+  </a>
+  
+    <nav class="md-nav" aria-label="Overview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-new-certification-authority" class="md-nav__link">
+    Create a new Certification Authority
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#register-a-new-device-manufacturing-system" class="md-nav__link">
+    Register a new Device Manufacturing System
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#provision-your-devices-with-x509-certificates" class="md-nav__link">
+    Provision your devices with x509 Certificates
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#using-the-apis" class="md-nav__link">
@@ -326,7 +345,22 @@
   
     <li class="md-nav__item">
       <a href="../protocols/" class="md-nav__link">
-        Protocols & Lamassu
+        Protocols
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../manage/" class="md-nav__link">
+        Managing Lamassu
       </a>
     </li>
   
@@ -357,6 +391,40 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    Overview
+  </a>
+  
+    <nav class="md-nav" aria-label="Overview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-new-certification-authority" class="md-nav__link">
+    Create a new Certification Authority
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#register-a-new-device-manufacturing-system" class="md-nav__link">
+    Register a new Device Manufacturing System
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#provision-your-devices-with-x509-certificates" class="md-nav__link">
+    Provision your devices with x509 Certificates
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#using-the-apis" class="md-nav__link">
@@ -399,7 +467,40 @@
                 
 
 
-<h1 id="lamassu-apis">Lamassu APIs</h1>
+<h1 id="getting-started">Getting Started</h1>
+<p>Before jumping any further, please check out the <a href="/setup">installation process</a> to deploy all Lamassu services. This section will guide you through the basic functionalities provided by our PKI to start provisioning your devices.</p>
+<h2 id="overview">Overview</h2>
+<h3 id="create-a-new-certification-authority">Create a new Certification Authority</h3>
+<p>The first step to provision your devices with digital certificates is to create the Certification Authority. The role of a CA is to issue and manage all the certificates. To create a new CA, fill the following form taking into account the following things:</p>
+<ul>
+<li>Lamassu supports both <code>RSA</code> and <code>EC</code> based CAs.</li>
+<li>The CA name MUST be unique.</li>
+<li>The CA expiration time must be greater than the lifespan of the issued certs.</li>
+</ul>
+<p><img alt="" src="../img/ca-registration.png" />
+<img alt="" src="../img/ca-info.png" /> </p>
+<h3 id="register-a-new-device-manufacturing-system">Register a new Device Manufacturing System</h3>
+<p>Lamassu is a PKI designed for the industrial and iot sector. To better integrate this PKI in real life manufacturing system, Lamassu delegates the issuance of device certificate to the factory itself. First lets dive into the Device Manufacturing System <em>(DMS for short)</em> registration step by step. After that, a couple of examples will demonstrate how to start enrolling your devices using the <a href="https://github.com/lamassuiot/lamassu-virtual-dms">Lamassu's Virtual DMS software</a> as well as using the UI.</p>
+<p>Device manufacturing process tend to be highly automated. Provisioning the devices with digital identities should not slow down the fabrication process. Lamassu addresses this challenge introducing the DMS concept as core.</p>
+<p>One of the factories operators stars the process by generating a DMS registration request contained in a Certificate Signing Request also referred as CSR. This CSR is then sent to the DMS Enroller service to be approved by one of the PKI Administrators:</p>
+<figure>
+<p><img alt="" src="../img/dms-step1.png" /></p>
+</figure>
+<p>The Administrator then decides if the request is approved or denied. If it decision is to approve the DMS registration request, the Administrator must specify which CAs will that particular DSM be entitled to issue certificates with:</p>
+<figure>
+<p><img alt="" src="../img/dms-step2.png" /></p>
+</figure>
+<p>Once, and only if, the DMS registration request is approved, then the Operator must retrieve the signed CSR and pass it to the DMS software that will be in charge off requesting the issuance of new digital certificates for the manufactured devices:</p>
+<figure>
+<p><img alt="" src="../img/dms-step3.png" /></p>
+</figure>
+<p>Finally, the DMS is able to request new x509 certificates for its manufactured devices. The DMS may be assisted by additional tools to obtain the manufactured device unique identifier. </p>
+<figure>
+<p><img alt="" src="../img/dms-step4.png" /></p>
+</figure>
+<h3 id="provision-your-devices-with-x509-certificates">Provision your devices with x509 Certificates</h3>
+<p>The enrollment process is the way to go to obtain a certificate issued by one of the provisioned CAs. As described in the RFC document, Lamassu requires the authentication of the client requesting the enrollment using a certificate as well as the private key of an issued DMS to perform a mutual TLS connection. By using this type of TLS connection, the client is able to authenticate the server, and also, the server is able to authenticate the client.</p>
+<p>Although the <code>/api/devmanager/.well-known/cacerts</code> endpoint returns the list containing all the manged CAs by the PKI, each DMS is entitled to request the issuance of a certificate with an authorized CA. For instance, the PKI may have the following CAs: <code>CA1</code>, <code>CA2</code>, <code>CA3</code> and <code>CA4</code>. The <code>/api/devmanager/.well-known/cacerts</code> would return all four CAs. Then, a new DMS is registered. the PKI administrator approves the DMS registration by authorizing such DMS to issue certificates with <code>CA1</code> and <code>CA4</code>. This process is known as the <em>DMS registration process</em>. Once the DMS is completely registered, it can now start performing the EST enrollment process. </p>
 <h2 id="using-the-apis">Using the APIs</h2>
 <p>The main 3 Open API documentation can be found on the following urls:</p>
 <ul>
@@ -470,7 +571,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../manage/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Managing Lamassu" rel="prev">
+        <a href="../setup/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Install Lamassu Compose" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -479,20 +580,20 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              Managing Lamassu
+              Install Lamassu Compose
             </div>
           </div>
         </a>
       
       
         
-        <a href="../protocols/" class="md-footer__link md-footer__link--next" aria-label="Next: Protocols &amp; Lamassu" rel="next">
+        <a href="../protocols/" class="md-footer__link md-footer__link--next" aria-label="Next: Protocols" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Protocols & Lamassu
+              Protocols
             </div>
           </div>
           <div class="md-footer__button md-icon">

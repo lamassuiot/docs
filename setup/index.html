@@ -316,23 +316,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../manage/" class="md-nav__link">
-        Managing Lamassu
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../usage/" class="md-nav__link">
-        Lamassu APIs
+        Getting Started
       </a>
     </li>
   
@@ -347,7 +332,22 @@
   
     <li class="md-nav__item">
       <a href="../protocols/" class="md-nav__link">
-        Protocols & Lamassu
+        Protocols
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../manage/" class="md-nav__link">
+        Managing Lamassu
       </a>
     </li>
   
@@ -513,7 +513,7 @@ export LAMASSU_OCSP_DOCKER_IMAGE=lamassuiot/lamassu-ocsp:latest
 </code></pre></div></p>
 </li>
 <li>
-<p>(OPTIONAL) Import your certificates:</p>
+<p><em>OPTIONAL</em>: Import your certificates:</p>
 <p>The <code>install.sh</code> script also generates self-signed for the downstream certificates. It is possible to provide other valid certificates by replacing the following files:
 <div class="highlight"><pre><span></span><code>├── upstream
 │   └── ...
@@ -597,10 +597,9 @@ export LAMASSU_OCSP_DOCKER_IMAGE=lamassuiot/lamassu-ocsp:latest
     - Healthchecking
     - Securely expose services using TLS</p>
 <p>The different APIs exposed through the gateway have been configured to ONLY accept request originates inside the platform via a mTLS authentication:</p>
-<div class="highlight"><pre><span></span><code>┌──────────────┐                ┌───────────────┐              ┌─────────────┐
-│Client/Browser│ -&lt;downstream&gt;- │    Gateway    │ -&lt;upstream&gt;- │     API     │
-└──────────────┘       TLS      └───────────────┘      mTLS    └─────────────┘
-</code></pre></div>
+<p><figure markdown>
+    <img alt="" src="../img/tls.png" />
+</figure></p>
 <ol>
 <li>
 <p>Generate the upstream certificates. </p>
@@ -762,7 +761,7 @@ export DMS_ID=$(echo $DMS_REGISTER_RESPONSE | jq -r .dms.id)
 <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$ENROLL_ADDR/v1/$DMS_ID&quot; --header &quot;Authorization: Bearer $TOKEN&quot; --header &#39;Content-Type: application/json&#39; --data-raw &#39;{&quot;status&quot;: &quot;APPROVED&quot;}&#39;
 </code></pre></div>
     4. Get issued DMS Cert
-<div class="highlight"><pre><span></span><code>curl -k --location --request GET &quot;https://$ENROLL_ADDR/v1/$DMS_ID/crt&quot; --header &quot;Authorization: Bearer $TOKEN&quot; | base64 -d &gt; lamassu-default-dms/config/dms.crt
+<div class="highlight"><pre><span></span><code>curl -k --location --request GET &quot;https://$ENROLL_ADDR/v1/$DMS  _ID/crt&quot; --header &quot;Authorization: Bearer $TOKEN&quot; | base64 -d &gt; lamassu-default-dms/config/dms.crt
 </code></pre></div></p>
 </li>
 <li>
@@ -804,13 +803,13 @@ docker-compose up -d dms-default
       
       
         
-        <a href="../manage/" class="md-footer__link md-footer__link--next" aria-label="Next: Managing Lamassu" rel="next">
+        <a href="../usage/" class="md-footer__link md-footer__link--next" aria-label="Next: Getting Started" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Managing Lamassu
+              Getting Started
             </div>
           </div>
           <div class="md-footer__button md-icon">

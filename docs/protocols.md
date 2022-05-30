@@ -143,5 +143,4 @@ The core mechanism to obtain valid certificates for your devices is using the en
 
 ### Enrollment of Devices  
 
-
 ### Re-enrollment of Devices 

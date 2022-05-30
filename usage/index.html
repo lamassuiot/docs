@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../img/favicon.png">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.14">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.16">
     
     
       
@@ -17,7 +17,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.3de6f41f.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.1c3799f8.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.cc9b2e1e.min.css">
@@ -498,9 +498,107 @@
 <figure>
 <p><img alt="" src="../img/dms-step4.png" /></p>
 </figure>
+<p>Let's register a new DMS instance:</p>
+<ol>
+<li>
+<p><strong>Operator</strong> - Authenticate the user:
+  <div class="highlight"><pre><span></span><code>OPERATOR_USERNAME=operator
+OPERATOR_PASSWORD=operator
+DOMAIN=dev.lamassu.io
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>OPERATOR_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$OPERATOR_USERNAME&quot; --data-urlencode &quot;password=$OPERATOR_PASSWORD&quot; | jq -r .access_token)
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Operator</strong> - Request the registration for a new DMS instance:
+  <div class="highlight"><pre><span></span><code>DMS_NAME=MyDMS
+DMS_SUBJECT_COUNTRY=ES
+DMS_SUBJECT_STATE=Gipuzkoa
+DMS_SUBJECT_LOCALITY=Donostia
+DMS_SUBJECT_ORGANIZATION=Lamassu
+DMS_SUBJECT_ORGANIZATION_UNIT=IoT
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>DMS_REG_RESPONSE=$(curl -k --location --request POST &quot;https://$DOMAIN/api/dmsenroller/v1/$DMS_NAME/form&quot; \
+--header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; \
+--data-raw &quot;{\&quot;key_metadata\&quot;: {\&quot;bits\&quot;:3072, \&quot;type\&quot;:\&quot;RSA\&quot;}, \&quot;subject\&quot;:{\&quot;common_name\&quot;:\&quot;$DMS_NAME\&quot;, \&quot;country\&quot;:\&quot;$DMS_SUBJECT_COUNTRY\&quot;,\&quot;locality\&quot;:\&quot;$DMS_SUBJECT_LOCALITY\&quot;,\&quot;organization\&quot;:\&quot;$DMS_SUBJECT_ORGANIZATION\&quot;,\&quot;org\&quot;:\&quot;$DMS_SUBJECT_ORGANIZATION_UNIT\&quot;,\&quot;state\&quot;:\&quot;$DMS_SUBJECT_STATE\&quot;}}&quot;)
+DMS_ID=$(echo $DMS_REG_RESPONSE | jq -r .dms.id)
+echo $DMS_REG_RESPONSE | jq -r .priv_key | base64 -d &gt; dms.key
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Admin</strong> - Authenticate the admin user
+  <div class="highlight"><pre><span></span><code>ENROLLER_USERNAME=enroller
+ENROLLER_PASSWORD=enroller
+DOMAIN=dev.lamassu.io
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>ENROLLER_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$ENROLLER_USERNAME&quot; --data-urlencode &quot;password=$ENROLLER_PASSWORD&quot; | jq -r .access_token)
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Admin</strong> - Authorize the enrollment with all the provisioned CAs
+  <div class="highlight"><pre><span></span><code>AUTHORIZED_CAS=$(curl -k &quot;https://$DOMAIN/api/ca/v1/pki&quot; --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; | jq .[].name | jq -s)
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsenroller/v1/$DMS_ID&quot; \
+--header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; \
+--data-raw &quot;{\&quot;authorized_cas\&quot;:$AUTHORIZED_CAS, \&quot;status\&quot;:\&quot;APPROVED\&quot;}&quot;
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Operator</strong> - Get the DMS certificate:
+  <div class="highlight"><pre><span></span><code>curl -k &quot;https://$DOMAIN/api/dmsenroller/v1/$DMS_ID&quot; --header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; | jq -r .crt | base64 -d &gt; dms.crt 
+</code></pre></div></p>
+</li>
+</ol>
 <h3 id="provision-your-devices-with-x509-certificates">Provision your devices with x509 Certificates</h3>
 <p>The enrollment process is the way to go to obtain a certificate issued by one of the provisioned CAs. As described in the RFC document, Lamassu requires the authentication of the client requesting the enrollment using a certificate as well as the private key of an issued DMS to perform a mutual TLS connection. By using this type of TLS connection, the client is able to authenticate the server, and also, the server is able to authenticate the client.</p>
-<p>Although the <code>/api/devmanager/.well-known/cacerts</code> endpoint returns the list containing all the manged CAs by the PKI, each DMS is entitled to request the issuance of a certificate with an authorized CA. For instance, the PKI may have the following CAs: <code>CA1</code>, <code>CA2</code>, <code>CA3</code> and <code>CA4</code>. The <code>/api/devmanager/.well-known/cacerts</code> would return all four CAs. Then, a new DMS is registered. the PKI administrator approves the DMS registration by authorizing such DMS to issue certificates with <code>CA1</code> and <code>CA4</code>. This process is known as the <em>DMS registration process</em>. Once the DMS is completely registered, it can now start performing the EST enrollment process. </p>
+<p>Although the <code>/api/devmanager/.well-known/cacerts</code> endpoint returns the list containing all the manged CAs by the PKI, each DMS is entitled to request the issuance of a certificate with an authorized CA. For instance, the PKI may have the following CAs: <code>CA1</code>, <code>CA2</code>, <code>CA3</code> and <code>CA4</code>. The <code>/api/devmanager/.well-known/cacerts</code> would return all four CAs. Then, a new DMS is registered. the PKI administrator approves the DMS registration by authorizing such DMS to issue certificates with <code>CA1</code> and <code>CA4</code>. This process is known as the <em>DMS registration process</em>. Once the DMS is completely registered, it can now start performing the EST enrollment process. Check out the <a href="#register-a-new-device-manufacturing-system">previous section</a> to understand what a DMS does.</p>
+<p>Let's first obtain the CA list for a particular DMS:</p>
+<ol>
+<li>
+<p>First, authenticate and obtain a valid JWT
+  <div class="highlight"><pre><span></span><code>OPERATOR_USERNAME=operator
+OPERATOR_PASSWORD=operator
+DOMAIN=dev.lamassu.io
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>OPERATOR_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$OPERATOR_USERNAME&quot; --data-urlencode &quot;password=$OPERATOR_PASSWORD&quot; | jq -r .access_token)
+</code></pre></div></p>
+</li>
+<li>
+<p>Obtain the CA list:
+  <div class="highlight"><pre><span></span><code>ENTITLED_CAS=$(curl -k --location --request GET &quot;https://$DOMAIN/api/dmsenroller/v1/$DMS_ID&quot; --header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; | jq .authorized_cas)
+</code></pre></div></p>
+</li>
+<li>
+<p>Select one of the entitled the CAs from the previous list:</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You can manually spefify the <code>SELECTED_CA</code>. Otherwise you can enroll the device with the first entitled CA using the following command.</p>
+</div>
+<div class="highlight"><pre><span></span><code>SELECTED_CA=$(echo $ENTITLED_CAS | jq .[0] -r)
+</code></pre></div>
+</li>
+<li>
+<p>Generate the device CSR:
+  <div class="highlight"><pre><span></span><code>DEVICE_ID=mytestdevice-123
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>openssl req -new -newkey rsa:2048 -nodes -keyout device.key -out device.csr -subj &quot;/CN=$DEVICE_ID&quot;
+</code></pre></div></p>
+</li>
+<li>
+<p>Enroll the device:
+  <div class="highlight"><pre><span></span><code>DMS_CRT_PATH=path/to/dms_crt
+DMS_KEY_PATH=path/to/dms_key
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443 2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+
+curl https://$DOMAIN/api/devmanager/.well-known/est/$SELECTED_CA/simpleenroll --cert $DMS_CRT_PATH --key $DMS_KEY_PATH -s -o device-cert.p7 --cacert root-ca.pem  --data-binary @device.csr -H &quot;Content-Type: application/pkcs10&quot; 
+
+openssl base64 -d -in device-cert.p7 | openssl pkcs7 -inform DER -outform PEM -print_certs -out device-cert.pem 
+
+openssl x509 -text -in device-cert.pem
+</code></pre></div></p>
+</li>
+</ol>
 <h2 id="using-the-apis">Using the APIs</h2>
 <p>The main 3 Open API documentation can be found on the following urls:</p>
 <ul>
@@ -657,7 +755,7 @@
     <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.c2e1ee47.min.js"></script>
+      <script src="../assets/javascripts/bundle.3a4b43e5.min.js"></script>
       
     
   </body>

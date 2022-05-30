@@ -129,4 +129,89 @@ As defined by the standard, there are two possible methods that can be used to p
 
 ## EST
 
+### CA Certificates
+=== "GlobalSign"
+
+    Install GlobalSign Est Client
+        ```
+        go install github.com/globalsign/est/cmd/estclient@latest
+        ```
+
+    Define the DOMAIN as well as the
+        ```
+        export DOMAIN=dev.lamassu.io 
+        ```
+    Obtain the Root certificate used by the server
+        ```
+        openssl s_client -connect $OCSP_SERVER  2>/dev/null </dev/null |  sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > root-ca.pem
+        ```
+    Obtaining CAs certificates
+        ```
+        estclient cacerts -server $DOMAIN/api/devmanager -explicit root-ca.pem -out cacerts.pem
+        ```
+
+=== "Go"
+
+    ```go
+    package main
+
+    import (
+        "context"
+        "crypto/x509"
+        "encoding/pem"
+        "fmt"
+        "io/ioutil"
+        "os"
+
+        "github.com/lamassuiot/lamassuiot/pkg/est/client"
+    )
+
+    func main() {
+        estServerAddr := "dev.lamassu.io/api/devmanager"
+        servercrt := "server.crt"
+        clientcrt := "dms.crt"
+        clientkey := "dms.key"
+
+        caCert, err := ioutil.ReadFile(servercrt)
+        if err != nil {
+            fmt.Println(err)
+            os.Exit(1)
+        }
+        caCertPool := x509.NewCertPool()
+        caCertPool.AppendCertsFromPEM(caCert)
+
+        certContent, err := ioutil.ReadFile(clientcrt)
+        if err != nil {
+            fmt.Println(err)
+            os.Exit(1)
+        }
+        cpb, _ := pem.Decode(certContent)
+
+        crt, err := x509.ParseCertificate(cpb.Bytes)
+        if err != nil {
+            fmt.Println(err)
+            os.Exit(1)
+        }
+
+        key, err := ioutil.ReadFile(clientkey)
+        if err != nil {
+            fmt.Println(err)
+            os.Exit(1)
+        }
+
+        estClient, err := client.NewLamassuEstClient(estServerAddr, caCertPool, crt, key, nil)
+        if err != nil {
+            fmt.Println(err)
+            os.Exit(1)
+        }
+        cas, err := estClient.CACerts(context.Background())
+        if err != nil {
+            fmt.Println(err)
+            os.Exit(1)
+        }
+    }
+
+        ```
+
+
 <https://datatracker.ietf.org/doc/html/rfc7030>

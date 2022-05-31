@@ -318,8 +318,29 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ca-certificates" class="md-nav__link">
-    CA Certificates
+  <a href="#distribution-of-ca-certificates" class="md-nav__link">
+    Distribution of CA Certificates
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enrollment-of-devices" class="md-nav__link">
+    Enrollment of Devices
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-enrollment-of-devices" class="md-nav__link">
+    Re-enrollment of Devices
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#server-key-generation-of-devices" class="md-nav__link">
+    Server Key Generation of Devices
   </a>
   
 </li>
@@ -444,8 +465,29 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ca-certificates" class="md-nav__link">
-    CA Certificates
+  <a href="#distribution-of-ca-certificates" class="md-nav__link">
+    Distribution of CA Certificates
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enrollment-of-devices" class="md-nav__link">
+    Enrollment of Devices
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-enrollment-of-devices" class="md-nav__link">
+    Re-enrollment of Devices
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#server-key-generation-of-devices" class="md-nav__link">
+    Server Key Generation of Devices
   </a>
   
 </li>
@@ -517,7 +559,7 @@ export DEVICE_CERTIFICATE=device.crt
 <div class="highlight"><pre><span></span><code>OCSP_REQUEST=$(openssl ocsp -CAfile $CA_CERTIFICATE -issuer $CA_CERTIFICATE -cert $DEVICE_CERTIFICATE -reqout - | base64 -w 0)
 </code></pre></div></p>
 <p>Check the status of the certificate
-<div class="highlight"><pre><span></span><code>curl --location --request GET &quot;$OCSP_SERVER/api/ocsp/$OCSP_REQUEST&quot; &gt; ocspresponse.der 
+<div class="highlight"><pre><span></span><code>curl --location --request GET &quot;https://$OCSP_SERVER/api/ocsp/$OCSP_REQUEST&quot; &gt; ocspresponse.der 
 openssl ocsp -respin ocspresponse.der -VAfile root-ca.pem -resp_text
 </code></pre></div></p>
 </div>
@@ -608,9 +650,159 @@ openssl ocsp -respin ocspresponse.der -VAfile root-ca.pem -resp_text
 </div>
 </div>
 <h3 id="post-request">POST Request</h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">OpenSSL</label><label for="__tabbed_2_2">Go</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Define the OCSP server endpoint as well as the 
+<div class="highlight"><pre><span></span><code>export OCSP_SERVER=dev.lamassu.io:443 
+export CA_CERTIFICATE=issuer_ca.crt 
+export DEVICE_CERTIFICATE=device.crt
+</code></pre></div></p>
+<p>Obtain the Root certificate used by the server
+<div class="highlight"><pre><span></span><code>openssl s_client -connect $OCSP_SERVER  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+</code></pre></div></p>
+<p>Create the OCSP Request
+<div class="highlight"><pre><span></span><code>openssl ocsp -issuer ca.crt -cert dev.crt -reqout - &gt; ocsp-request-post.der
+</code></pre></div></p>
+<p>Check the status of the certificate
+<div class="highlight"><pre><span></span><code>curl --location --request POST &quot;https://$DOMAIN/api/ocsp/&quot; --header &#39;Content-Type: application/ocsp-request&#39; --data-binary &#39;@ocsp-request-post.der&#39; &gt; ocsp-response-post.der -k
+openssl ocsp -respin ocsp-response-post.der -VAfile root-ca.pem -resp_text
+</code></pre></div></p>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w"></span>
+
+<span class="w">    </span><span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;bytes&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;crypto/x509&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;encoding/pem&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;fmt&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;io/ioutil&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;net/http&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;os&quot;</span><span class="w"></span>
+
+<span class="w">        </span><span class="s">&quot;github.com/lamassuiot/lamassuiot/pkg/ocsp/server/crypto/ocsp&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="kd">func</span><span class="w"> </span><span class="nx">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">ocspServer</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;http://localhost:9098&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">issuerCA</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;ca.crt&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">certificateToCheck</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;device.crt&quot;</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">caPEM</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">issuerCA</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Could not load CA certificate&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">caPemBlock</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="nx">caPEM</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">ca</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">ParseCertificate</span><span class="p">(</span><span class="nx">caPemBlock</span><span class="p">.</span><span class="nx">Bytes</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">devicePEM</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">certificateToCheck</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Could not load Device certificate&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">devicePemBlock</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="nx">devicePEM</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">device</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">ParseCertificate</span><span class="p">(</span><span class="nx">devicePemBlock</span><span class="p">.</span><span class="nx">Bytes</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">ocspRequestBytes</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ocsp</span><span class="p">.</span><span class="nx">CreateRequest</span><span class="p">(</span><span class="nx">device</span><span class="p">,</span><span class="w"> </span><span class="nx">ca</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">ocsp</span><span class="p">.</span><span class="nx">RequestOptions</span><span class="p">{})</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">resp</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">http</span><span class="p">.</span><span class="nx">Post</span><span class="p">(</span><span class="nx">ocspServer</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;application/ocsp-request&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">bytes</span><span class="p">.</span><span class="nx">NewReader</span><span class="p">(</span><span class="nx">ocspRequestBytes</span><span class="p">))</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">resp</span><span class="p">.</span><span class="nx">StatusCode</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="nx">http</span><span class="p">.</span><span class="nx">StatusOK</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">body</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadAll</span><span class="p">(</span><span class="nx">resp</span><span class="p">.</span><span class="nx">Body</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Body</span><span class="p">.</span><span class="nx">Close</span><span class="p">()</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">ocspResponse</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ocsp</span><span class="p">.</span><span class="nx">ParseResponse</span><span class="p">(</span><span class="nx">body</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Could not parse OCSP response &quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">ocspResponse</span><span class="p">.</span><span class="nx">Status</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nx">ocsp</span><span class="p">.</span><span class="nx">Good</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">ocspResponse</span><span class="p">.</span><span class="nx">Status</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nx">ocsp</span><span class="p">.</span><span class="nx">Revoked</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">ocspResponse</span><span class="p">.</span><span class="nx">RevokedAt</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+</code></pre></div>
+</div>
+</div>
+</div>
 <h2 id="est">EST</h2>
-<h3 id="ca-certificates">CA Certificates</h3>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">GlobalSign</label><label for="__tabbed_2_2">Go</label></div>
+<p>The core mechanism to obtain valid certificates for your devices is using the enrollment process described by the EST protocol. EST or <a href="https://datatracker.ietf.org/doc/html/rfc7030">Enrollment over Secure Transport</a> establishes a set of standardized endpoints. The following table sums up all endpoints defined by the EST protocol and wether or not are supported by the current implementation.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Operation Path</th>
+<th>Required by RFC7030</th>
+<th>Supported</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Distribution of CA Certificates</td>
+<td>/api/devmanager/.well-known/cacerts</td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7Z"/></svg></span></td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7Z"/></svg></span></td>
+</tr>
+<tr>
+<td>Enrollment of Clients</td>
+<td>/api/devmanager/.well-known/simpleenroll</td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7Z"/></svg></span></td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7Z"/></svg></span></td>
+</tr>
+<tr>
+<td>Re-enrollment of Clients</td>
+<td>/api/devmanager/.well-known/simplereenroll</td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7Z"/></svg></span></td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7Z"/></svg></span></td>
+</tr>
+<tr>
+<td>Full CMC</td>
+<td>/api/devmanager/.well-known/fullcmc</td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg></span></td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg></span></td>
+</tr>
+<tr>
+<td>Server-Side Key Generation</td>
+<td>/api/devmanager/.well-known/serverkeygen</td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg></span></td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span></td>
+</tr>
+<tr>
+<td>CSR Attributes</td>
+<td>/api/devmanager/.well-known/csrattrs</td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg></span></td>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg></span></td>
+</tr>
+</tbody>
+</table>
+<h3 id="distribution-of-ca-certificates">Distribution of CA Certificates</h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:3"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><input id="__tabbed_3_3" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">GlobalSign</label><label for="__tabbed_3_2">Go</label><label for="__tabbed_3_3">Curl</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Install GlobalSign Est Client
@@ -620,7 +812,7 @@ openssl ocsp -respin ocspresponse.der -VAfile root-ca.pem -resp_text
     <div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io 
 </code></pre></div>
 Obtain the Root certificate used by the server
-    <div class="highlight"><pre><span></span><code>openssl s_client -connect $OCSP_SERVER  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+    <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
 </code></pre></div>
 Obtaining CAs certificates
     <div class="highlight"><pre><span></span><code>estclient cacerts -server $DOMAIN/api/devmanager -explicit root-ca.pem -out cacerts.pem
@@ -685,6 +877,411 @@ Obtaining CAs certificates
 <span class="w">    </span><span class="p">}</span><span class="w"></span>
 <span class="p">}</span><span class="w"></span>
 </code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Define the DOMAIN as well as the
+    <div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io 
+</code></pre></div>
+Obtain the Root certificate used by the server
+    <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+</code></pre></div>
+Obtaining CAs certificates
+    <div class="highlight"><pre><span></span><code>curl https://$DOMAIN/api/devmanager/.well-known/est/cacerts -o cacerts.p7 --cacert root-ca.pem
+openssl base64 -d -in cacerts.p7 | openssl pkcs7 -inform DER -outform PEM -print_certs -out cacerts.pem 
+</code></pre></div></p>
+</div>
+</div>
+</div>
+<h3 id="enrollment-of-devices">Enrollment of Devices</h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="4:3"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><input id="__tabbed_4_3" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">GlobalSign</label><label for="__tabbed_4_2">Go</label><label for="__tabbed_4_3">Curl</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Install GlobalSign Est Client
+    <div class="highlight"><pre><span></span><code>go install github.com/globalsign/est/cmd/estclient@latest
+</code></pre></div></p>
+<p>Define environment variables as well as the</p>
+<div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io
+export CA_NAME=Test-CA
+export DEVICE_ID=$(uuidgen)
+export DMS_CERT=dms.crt
+export DMS_KEY=dms.key  
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The name of the CA has to be that of a CA that has the DMS as Authorized_CAs.</p>
+</div>
+<p>Obtain the Root certificate used by the server
+    <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+</code></pre></div>
+Enrolling with an existing private key
+    <div class="highlight"><pre><span></span><code>openssl genrsa 4096 &gt; key.pem
+estclient csr -key key.pem -cn $DEVICE_ID -out csr.pem
+estclient enroll -server $DOMAIN/api/devmanager -explicit root-ca.pem -csr csr.pem -aps $CA_NAME -key $DMS_KEY -certs $DMS_CERT -out cert.pem  
+</code></pre></div></p>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w"></span>
+
+<span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;context&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;crypto/x509&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;encoding/pem&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;fmt&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;io/ioutil&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;os&quot;</span><span class="w"></span>
+
+<span class="w">    </span><span class="s">&quot;github.com/lamassuiot/lamassuiot/pkg/est/client&quot;</span><span class="w"></span>
+<span class="p">)</span><span class="w"></span>
+
+<span class="kd">func</span><span class="w"> </span><span class="nx">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nx">estServerAddr</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;dev.lamassu.io/api/devmanager&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nx">servercrt</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;server.crt&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nx">dmscrt</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;dms.crt&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nx">dmskey</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;dms.key&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nx">devicecsr</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;device.csr&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nx">devicecrt</span><span class="o">:=</span><span class="s">&quot;device.crt&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nx">ca_name</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;Test-CA&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nx">caCert</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">servercrt</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nx">caCertPool</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">NewCertPool</span><span class="p">()</span><span class="w"></span>
+<span class="w">    </span><span class="nx">caCertPool</span><span class="p">.</span><span class="nx">AppendCertsFromPEM</span><span class="p">(</span><span class="nx">caCert</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">certContent</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">dmscrt</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nx">cpb</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="nx">certContent</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">crt</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">ParseCertificate</span><span class="p">(</span><span class="nx">cpb</span><span class="p">.</span><span class="nx">Bytes</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">certContent</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">devicecsr</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nx">cpb</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="nx">certContent</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">csr</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">ParseCertificateRequest</span><span class="p">(</span><span class="nx">cpb</span><span class="p">.</span><span class="nx">Bytes</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">dmskey</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">estClient</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">NewLamassuEstClient</span><span class="p">(</span><span class="nx">estServerAddr</span><span class="p">,</span><span class="w"> </span><span class="nx">caCertPool</span><span class="p">,</span><span class="w"> </span><span class="nx">crt</span><span class="p">,</span><span class="w"> </span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">cert</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">estClient</span><span class="p">.</span><span class="nx">Enroll</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">(),</span><span class="w"> </span><span class="nx">ca_name</span><span class="p">,</span><span class="w"> </span><span class="nx">csr</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nx">b</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Block</span><span class="p">{</span><span class="nx">Type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;CERTIFICATE&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">Bytes</span><span class="p">:</span><span class="w"> </span><span class="nx">cert</span><span class="p">.</span><span class="nx">Raw</span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nx">certPEM</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">EncodeToMemory</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">b</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">WriteFile</span><span class="p">(</span><span class="nx">devicecrt</span><span class="p">,</span><span class="w"> </span><span class="nx">certPEM</span><span class="p">,</span><span class="w"> </span><span class="mo">0777</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Define environment variables as well as the</p>
+<div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io
+export CA_NAME=Test-CA
+export DEVICE_ID=$(uuidgen)
+export DMS_CERT=dms.crt
+export DMS_KEY=dms.key  
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The name of the CA has to be that of a CA that has the DMS as Authorized_CAs.</p>
+</div>
+<p>Obtain the Root certificate used by the server
+    <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+</code></pre></div>
+Create device CSR and private Key
+    <div class="highlight"><pre><span></span><code>openssl req -new -newkey rsa:2048 -nodes -keyout device.key -out device.csr -subj &quot;/CN=$DEVICE_ID&quot;
+
+sed &#39;/CERTIFICATE/d&#39; device.csr &gt; device_enroll.csr   
+</code></pre></div></p>
+<p>Enrolling with an existing private key
+    <div class="highlight"><pre><span></span><code>curl https://$DOMAIN/api/devmanager/.well-known/est/$CA_NAME/simpleenroll --cert $DMS_CRT --key $DMS_KEY -s -o cert.p7 --cacert root-ca.pem  --data-binary @device_enroll.csr -H &quot;Content-Type: application/pkcs10&quot;
+
+openssl base64 -d -in cert.p7 | openssl pkcs7 -inform DER -outform PEM -print_certs -out cert.pem   
+</code></pre></div></p>
+</div>
+</div>
+</div>
+<h3 id="re-enrollment-of-devices">Re-enrollment of Devices</h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="5:3"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><input id="__tabbed_5_3" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">GlobalSign</label><label for="__tabbed_5_2">Go</label><label for="__tabbed_5_3">Curl</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Install GlobalSign Est Client
+    <div class="highlight"><pre><span></span><code>go install github.com/globalsign/est/cmd/estclient@latest
+</code></pre></div></p>
+<p>Define environment variables as well as the</p>
+<div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io
+export DEVICE_CRT=device.crt
+export DEVICE_KEY=device.key  
+</code></pre></div>
+<p>Obtain the Root certificate used by the server
+    <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+</code></pre></div>
+Reenrolling
+    <div class="highlight"><pre><span></span><code>estclient reenroll -server $DOMAIN/api/devmanager -explicit root-ca.pem -key $DEVICE_KEY -certs $DEVICE_CRT -out newcert.pem
+</code></pre></div></p>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w"></span>
+
+<span class="w">    </span><span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;context&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;crypto/x509&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;encoding/pem&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;fmt&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;io/ioutil&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;os&quot;</span><span class="w"></span>
+
+<span class="w">        </span><span class="s">&quot;github.com/lamassuiot/lamassuiot/pkg/est/client&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="kd">func</span><span class="w"> </span><span class="nx">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">estServerAddr</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;dev.lamassu.io/api/devmanager&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">servercrt</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;server.crt&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">devicecrt</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;device.crt&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">devicekey</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;device.key&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">devicecsr</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;device.csr&quot;</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">caCert</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">servercrt</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">caCertPool</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">NewCertPool</span><span class="p">()</span><span class="w"></span>
+<span class="w">        </span><span class="nx">caCertPool</span><span class="p">.</span><span class="nx">AppendCertsFromPEM</span><span class="p">(</span><span class="nx">caCert</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">certContent</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">devicecrt</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">cpb</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="nx">certContent</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">crt</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">ParseCertificate</span><span class="p">(</span><span class="nx">cpb</span><span class="p">.</span><span class="nx">Bytes</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">certContent</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">devicecsr</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">cpb</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="nx">certContent</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">csr</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">ParseCertificateRequest</span><span class="p">(</span><span class="nx">cpb</span><span class="p">.</span><span class="nx">Bytes</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">devicekey</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">estClient</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">NewLamassuEstClient</span><span class="p">(</span><span class="nx">estServerAddr</span><span class="p">,</span><span class="w"> </span><span class="nx">caCertPool</span><span class="p">,</span><span class="w"> </span><span class="nx">crt</span><span class="p">,</span><span class="w"> </span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">cert</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">estClient</span><span class="p">.</span><span class="nx">Reenroll</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">(),</span><span class="w"> </span><span class="nx">csr</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">b</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Block</span><span class="p">{</span><span class="nx">Type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;CERTIFICATE&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">Bytes</span><span class="p">:</span><span class="w"> </span><span class="nx">cert</span><span class="p">.</span><span class="nx">Raw</span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">certPEM</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">EncodeToMemory</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">b</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">WriteFile</span><span class="p">(</span><span class="nx">devicecrt</span><span class="p">,</span><span class="w"> </span><span class="nx">certPEM</span><span class="p">,</span><span class="w"> </span><span class="mo">0777</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Define environment variables as well as the</p>
+<div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io
+export DEVICE_CRT=device.crt
+export DEVICE_KEY=device.key
+exprot DEVICE_CSR=device.csr  
+</code></pre></div>
+<p>Obtain the Root certificate used by the server
+    <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+</code></pre></div>
+Create device enroll CSR
+    <div class="highlight"><pre><span></span><code>sed &#39;/CERTIFICATE/d&#39; device.csr &gt; device_enroll.csr   
+</code></pre></div>
+Reenrolling
+    <div class="highlight"><pre><span></span><code>curl https://$DOMAIN/api/devmanager/.well-known/est/simplereenroll --cert $DEVICE_CRT --key $DEVICE_KEY -s -o newcert.p7 --cacert root-ca.pem --data-binary @device_enroll.csr -H &quot;Content-Type: application/pkcs10&quot;
+
+openssl base64 -d -in newcert.p7 | openssl pkcs7 -inform DER -outform PEM -print_certs -out $DEVICE_CRT
+</code></pre></div></p>
+</div>
+</div>
+</div>
+<h3 id="server-key-generation-of-devices">Server Key Generation of Devices</h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="6:3"><input checked="checked" id="__tabbed_6_1" name="__tabbed_6" type="radio" /><input id="__tabbed_6_2" name="__tabbed_6" type="radio" /><input id="__tabbed_6_3" name="__tabbed_6" type="radio" /><div class="tabbed-labels"><label for="__tabbed_6_1">GlobalSign</label><label for="__tabbed_6_2">Go</label><label for="__tabbed_6_3">Curl</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Install GlobalSign Est Client
+    <div class="highlight"><pre><span></span><code>go install github.com/globalsign/est/cmd/estclient@latest
+</code></pre></div></p>
+<p>Define environment variables as well as the</p>
+<div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io
+export CA_NAME=Test-CA
+export DEVICE_ID=$(uuidgen)
+export DMS_CERT=dms.crt
+export DMS_KEY=dms.key  
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The name of the CA has to be that of a CA that has the DMS as Authorized_CAs.</p>
+</div>
+<p>Obtain the Root certificate used by the server
+    <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+</code></pre></div>
+Enrolling with a server-generated private key
+    <div class="highlight"><pre><span></span><code>openssl genrsa 4096 &gt; key.pem
+estclient csr -key key.pem -cn $DEVICE_ID -out csr.pem
+estclient serverkeygen -server $DOMAIN/api/devmanager -explicit root-ca.pem -csr csr.pem -aps $CA_NAME -key $DMS_KEY -certs $DMS_CERT -out device.crt -keyout device.key
+</code></pre></div></p>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w"></span>
+
+<span class="w">    </span><span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;context&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;crypto/x509&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;encoding/pem&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;fmt&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;io/ioutil&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;os&quot;</span><span class="w"></span>
+
+<span class="w">        </span><span class="s">&quot;github.com/lamassuiot/lamassuiot/pkg/est/client&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="kd">func</span><span class="w"> </span><span class="nx">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">estServerAddr</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;dev.lamassu.io/api/devmanager&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">servercrt</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;server.crt&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">dmscrt</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;dms.crt&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">dmskey</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;dms.key&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">devicecrt</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;device.crt&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">devicekey</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;device.key&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">devicecsr</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;device.csr&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">ca_name</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;Test-CA&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nx">caCert</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">servercrt</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">caCertPool</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">NewCertPool</span><span class="p">()</span><span class="w"></span>
+<span class="w">        </span><span class="nx">caCertPool</span><span class="p">.</span><span class="nx">AppendCertsFromPEM</span><span class="p">(</span><span class="nx">caCert</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">certContent</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">dmscrt</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">cpb</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="nx">certContent</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">crt</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">ParseCertificate</span><span class="p">(</span><span class="nx">cpb</span><span class="p">.</span><span class="nx">Bytes</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">certContent</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">devicecsr</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">cpb</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Decode</span><span class="p">(</span><span class="nx">certContent</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">csr</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">x509</span><span class="p">.</span><span class="nx">ParseCertificateRequest</span><span class="p">(</span><span class="nx">cpb</span><span class="p">.</span><span class="nx">Bytes</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">dmskey</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">estClient</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">NewLamassuEstClient</span><span class="p">(</span><span class="nx">estServerAddr</span><span class="p">,</span><span class="w"> </span><span class="nx">caCertPool</span><span class="p">,</span><span class="w"> </span><span class="nx">crt</span><span class="p">,</span><span class="w"> </span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">cert</span><span class="p">,</span><span class="w"> </span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">estClient</span><span class="p">.</span><span class="nx">ServerKeyGen</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">(),</span><span class="w"> </span><span class="nx">ca_name</span><span class="p">,</span><span class="w"> </span><span class="nx">csr</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="nx">os</span><span class="p">.</span><span class="nx">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">b</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Block</span><span class="p">{</span><span class="nx">Type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;CERTIFICATE&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">Bytes</span><span class="p">:</span><span class="w"> </span><span class="nx">cert</span><span class="p">.</span><span class="nx">Raw</span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">certPEM</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">EncodeToMemory</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">b</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">WriteFile</span><span class="p">(</span><span class="nx">devicecrt</span><span class="p">,</span><span class="w"> </span><span class="nx">certPEM</span><span class="p">,</span><span class="w"> </span><span class="mo">0777</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">b</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">Block</span><span class="p">{</span><span class="nx">Type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;PRIVATE KEY&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">Bytes</span><span class="p">:</span><span class="w"> </span><span class="nx">key</span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nx">keyPEM</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pem</span><span class="p">.</span><span class="nx">EncodeToMemory</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">b</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="nx">ioutil</span><span class="p">.</span><span class="nx">WriteFile</span><span class="p">(</span><span class="nx">devicekey</span><span class="p">,</span><span class="w"> </span><span class="nx">keyPEM</span><span class="p">,</span><span class="w"> </span><span class="mo">0777</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Define environment variables as well as the</p>
+<div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io
+export CA_NAME=Test-CA
+export DEVICE_ID=$(uuidgen)
+export DMS_CERT=dms.crt
+export DMS_KEY=dms.key  
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The name of the CA has to be that of a CA that has the DMS as Authorized_CAs.</p>
+</div>
+<p>Obtain the Root certificate used by the server
+    <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443  2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
+</code></pre></div>
+Create device CSR and private Key
+    <div class="highlight"><pre><span></span><code>openssl req -new -newkey rsa:2048 -nodes -keyout device.key -out device.csr -subj &quot;/CN=$DEVICE_ID&quot;
+
+sed &#39;/CERTIFICATE/d&#39; device.csr &gt; device_enroll.csr   
+</code></pre></div>
+Enrolling with a server-generated private key
+    <div class="highlight"><pre><span></span><code>curl https://$DOMAIN/api/devmanager/.well-known/est/$CA_NAME/serverkeygen --cert $DMS_CERT --key $DMS_KEY -s -o cert.p7 --cacert root-ca.pem  --data-binary @device_enroll.csr -H &quot;Content-Type: application/pkcs10&quot;
+
+cat cert.p7 | sed -ne &#39;/application\/pkcs7-mime/,/-estServerKeyGenBoundary/p&#39; |  sed &#39;/-/d&#39; &gt; crt.p7
+
+openssl base64 -d -in crt.p7 | openssl pkcs7 -inform DER -outform PEM -print_certs -out device.pem
+</code></pre></div></p>
 </div>
 </div>
 </div>

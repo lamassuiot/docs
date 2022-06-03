@@ -41,14 +41,14 @@ In case of not using the Virtual-DMS to register the devices, in the directory w
     ├── devices_certificates
     │   ├── device-<DMS_NAME>-<DEVICE_ID>
     │   │   ├── certificates
-    │   │   │   ├── <CERT_SN>.crt   <----- Provide your certificate
+    │   │   │   ├── <CERT_SN>.crt   <----- Provide your Device certificate
     │   │   │   └── ...
-    │   │   ├── <DEVICE_ID>.csr     <----- Provide your certificate request
-    │   │   └── <DEVICE_ID>.key     <----- Provide your private key
+    │   │   ├── <DEVICE_ID>.csr     <----- Provide your Device certificate request
+    │   │   └── <DEVICE_ID>.key     <----- Provide your Device private key
     │   └── ...
     └── dms_certificates
-        ├── dms-<DMS_ID>.crt     <----- Provide your certificate
-        └── dms-<DMS_ID>.key     <----- Provide your private key
+        ├── dms-<DMS_ID>.crt     <----- Provide your DMS certificate
+        └── dms-<DMS_ID>.key     <----- Provide your DMS private key
 ```
 4. Run the Lamassu-Virtua-Device UI:
     ```

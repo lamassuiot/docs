@@ -68,7 +68,7 @@ Lamassu Compose offers a SECURE deployment of the set of microservices required 
     bash install.sh
     ```
 
-7. (OPTIONAL) Import your certificates:
+7. *OPTIONAL*: Import your certificates:
 
     The `install.sh` script also generates self-signed for the downstream certificates. It is possible to provide other valid certificates by replacing the following files:
     ```
@@ -159,11 +159,9 @@ To launch Lamassu follow the next steps:
 
     The different APIs exposed through the gateway have been configured to ONLY accept request originates inside the platform via a mTLS authentication:
 
-    ```
-    ┌──────────────┐                ┌───────────────┐              ┌─────────────┐
-    │Client/Browser│ -<downstream>- │    Gateway    │ -<upstream>- │     API     │
-    └──────────────┘       TLS      └───────────────┘      mTLS    └─────────────┘
-    ```
+    <figure markdown>
+        ![](img/tls.png)
+    </figure>
 
     1. Generate the upstream certificates. 
 
@@ -320,7 +318,7 @@ To launch Lamassu follow the next steps:
         ```
     4. Get issued DMS Cert
         ```
-        curl -k --location --request GET "https://$ENROLL_ADDR/v1/$DMS_ID/crt" --header "Authorization: Bearer $TOKEN" | base64 -d > lamassu-default-dms/config/dms.crt
+        curl -k --location --request GET "https://$ENROLL_ADDR/v1/$DMS  _ID/crt" --header "Authorization: Bearer $TOKEN" | base64 -d > lamassu-default-dms/config/dms.crt
         ```
     
     6. And finally, start the DMS "server":

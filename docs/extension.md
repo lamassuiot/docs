@@ -21,9 +21,9 @@ Extending the PKI is a core principal for Lamassu. There are multiple ways to cu
 ## The AMQP Queue
 
 
-To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (`Lamassu CA`, `Lamassu DeviceManager` and `Lamassu DMS Enroller`) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core compoent registers an update opperation, it then published a special crafted event message to the `lamassu_events` queue.
+To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (`Lamassu CA`, `Lamassu DeviceManager` and `Lamassu DMS Enroller`) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the `lamassu_events` queue.
 
-![Screenshot](img/architecture.png#only-light)
+![Screenshot](img/architecture-aws.png#only-light)
 
 Each publish event follows the [https://cloudevents.io/](Cloud Event) syntaxis.
 
@@ -33,6 +33,9 @@ Each publish event follows the [https://cloudevents.io/](Cloud Event) syntaxis.
 ![Cloud events logo](docs/img/cloud-events_logo.png)
 ### Events
 The list of events and the structure is defined in this section. 
+
+This asynchronous messages are send via Amazon Simple Queue Service.
+Amazon SQS offers the possibility of establishing a message queue to store messages while they wait to be processed by different computers that are connected to the Internet. These messages can contain notifications for applications or lists of commands to be executed by applications, either in the cloud or on the Internet, allowing you to create automated workflows.
 
 #### Atributes
 
@@ -190,9 +193,41 @@ The list of events and the structure is defined in this section.
 ```
 
 #### io.lamassu.iotcore.cert.status.update
+```json 
+{
+    "specversion":"1.0",
+    "id":"0814bee304159b19:0814bee304159b19:0000000000000000:1",
+    "source":"lamassu/ca",
+    "type":"io.lamassu.cert.update",
+	"datacontenttype":"application/json",
+	"time":"2022-03-31T07:17:36.907957488Z",
+    "data":{
+        "name":"CA2",
+        "status": "REVOKED",
+        "serial_number":"23-f9-3e-b0-9c-0e-f7-6b-1d-d9-0f-a2-22-47-93-45-23-53-f1-03"
+    }    
+}
+```
 
 #### io.lamassu.iotcore.ca.status.update
 
+
+```json 
+{
+    "specversion":"1.0",
+    "id":"0814bee304159b19:0814bee304159b19:0000000000000000:1",
+    "source":"lamassu/ca",
+    "type":"io.lamassu.cert.update",
+	"datacontenttype":"application/json",
+	"time":"2022-03-31T07:17:36.907957488Z",
+    "data":{
+        "ca_id":"1",
+        "ca_name":"CA2",
+        "status": "REVOKED",
+        "ca_serial_number":"23-f9-3e-b0-9c-0e-f7-6b-1d-d9-0f-a2-22-47-93-45-23-53-f1-03"
+    }    
+}
+```
 
 ### References
 

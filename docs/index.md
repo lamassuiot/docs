@@ -7,3 +7,4 @@ Lamassu is an IoT first PKI designed for industrial scenarios. Public key infras
 
 ![Screenshot](img/lamassu-app-light.png#only-light)
 ![Screenshot](img/lamassu-app-dark.png#only-dark)
+

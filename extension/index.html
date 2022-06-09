@@ -235,6 +235,21 @@
   
   
     <li class="md-nav__item">
+      <a href="../ui/" class="md-nav__link">
+        Lamassu UI
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../usage/" class="md-nav__link">
         Getting Started
       </a>
@@ -321,11 +336,11 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cloud-events" class="md-nav__link">
-    Cloud Events
+  <a href="#aws-iot-core" class="md-nav__link">
+    AWS IoT Core
   </a>
   
-    <nav class="md-nav" aria-label="Cloud Events">
+    <nav class="md-nav" aria-label="AWS IoT Core">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -495,11 +510,11 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cloud-events" class="md-nav__link">
-    Cloud Events
+  <a href="#aws-iot-core" class="md-nav__link">
+    AWS IoT Core
   </a>
   
-    <nav class="md-nav" aria-label="Cloud Events">
+    <nav class="md-nav" aria-label="AWS IoT Core">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -633,7 +648,7 @@
 <p>To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (<code>Lamassu CA</code>, <code>Lamassu DeviceManager</code> and <code>Lamassu DMS Enroller</code>) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the <code>lamassu_events</code> queue.</p>
 <p><img alt="Screenshot" src="../img/architecture-aws.png#only-light" /></p>
 <p>Each publish event follows the <a href="Cloud Event">https://cloudevents.io/</a> syntaxis.</p>
-<h2 id="cloud-events">Cloud Events</h2>
+<h2 id="aws-iot-core">AWS IoT Core</h2>
 <h3 id="events">Events</h3>
 <p>The list of events and the structure is defined in this section. </p>
 <p>This asynchronous messages are send via Amazon Simple Queue Service.

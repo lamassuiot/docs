@@ -176,7 +176,16 @@ To create a device, we will need to fill the following form taking into account:
 - A device identification must be provided.
 - A DMS must be assigned.
 
-![Screenshot](img/device-register.PNG#only-light)
+![Screenshot](img/device-register.png#only-light)
+
+Each device can have certificates signed by different authorised CAs.
+
+![Screenshot](img/device-slots.png#only-light)
+
+The certificates of each device as well as the cloud-connectors will be showned.
+
+![Screenshot](img/device-info.png#only-light)
+
 
 ## Using the APIs
 

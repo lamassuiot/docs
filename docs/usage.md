@@ -43,6 +43,11 @@ Finally, the DMS is able to request new x509 certificates for its manufactured d
   ![](img/dms-step4.png)
 </figure>
 
+!!! note
+    Envoy is used as an API gateway in this project. Currently Envoy is written to use Boring SSl as the TLS provider. It does not support secp224r1 signing method, which is used to create ECDSA224 keys.
+    Therefore, enroll and reenroll methods will return a error when using this key. 
+
+
 Let's register a new DMS instance:
 
 1. **Operator** - Authenticate the user:
@@ -97,21 +102,6 @@ Let's register a new DMS instance:
   curl -k "https://$DOMAIN/api/dmsenroller/v1/$DMS_ID" --header "Authorization: Bearer $OPERATOR_TOKEN" | jq -r .crt | base64 -d > dms.crt 
   ```
 
-#### Registration of a DMS using the UI
-Using the UI, creating a new DMS is as simple as filling the following form. 
-
-![Screenshot](img/dms-registration.png#only-light)
-
-
-Once the DMS has been created successfully, a prompt showing the generated private key will be shown. It is encouraged to download it just after the creation as this prompt will be shown only once.
-![Screenshot](img/pk.png#only-light)
-
-The status of the new created DMS will be Pending approval, to approve it, we must select at least one CA from the list of registered CAs. The selected CAs will be the authorised ones to sign certificates from now on. 
-
-![Screenshot](img/dms-authroization-cas.png#only-light)
-
-
-![Screenshot](img/dms-list.png#only-light)
 
 ### Provision your devices with x509 Certificates
 
@@ -167,24 +157,6 @@ Let's first obtain the CA list for a particular DMS:
   
   openssl x509 -text -in device-cert.pem
   ```
-
-#### Registration of a device using the UI
-
-
-To create a device, we will need to fill the following form taking into account:
-
-- A device identification must be provided.
-- A DMS must be assigned.
-
-![Screenshot](img/device-register.png#only-light)
-
-Each device can have certificates signed by different authorised CAs.
-
-![Screenshot](img/device-slots.png#only-light)
-
-The certificates of each device as well as the cloud-connectors will be showned.
-
-![Screenshot](img/device-info.png#only-light)
 
 
 ## Using the APIs
@@ -242,5 +214,15 @@ Lamassu provides easy to use GO clients for most of its APIs to help speeding up
     }
     ```
 === "Curl"
-
+    Define the DOMAIN, TOKEN and CA_NAME
+        ```
+        export AUTH_ADDR=auth.$DOMAIN 
+        export TOKEN=$(curl -k --location --request POST "https://$AUTH_ADDR/auth/realms/lamassu/protocol/openid-connect/token" --header 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'grant_type=password' --data-urlencode 'client_id=frontend' --data-urlencode 'username=enroller' --data-urlencode 'password=enroller' | jq -r .access_token)
+        export CA_ADDR=$DOMAIN/api/ca
+        export CA_NAME=$(uuidgen)
+        ```
+    Creting CA
+        ```
+        export CREATE_CA_RESP=$(curl -k -s --location --request POST "https://$CA_ADDR/v1/pki/$CA_NAME" --header "Authorization: Bearer ${TOKEN}" --header 'Content-Type: application/json' --data-raw "{\"ca_ttl\": 262800, \"enroller_ttl\": 175200, \"subject\":{ \"common_name\": \"$CA_NAME\",\"country\": \"ES\",\"locality\": \"Arrasate\",\"organization\": \"LKS Next, S. Coop\",\"state\": \"Gipuzkoa\"},\"key_metadata\":{\"bits\": 4096,\"type\": \"RSA\"}}")
+        ```
 ### Internal usage

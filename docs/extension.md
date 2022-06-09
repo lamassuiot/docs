@@ -20,7 +20,6 @@ Extending the PKI is a core principal for Lamassu. There are multiple ways to cu
 
 ## The AMQP Queue
 
-
 To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (`Lamassu CA`, `Lamassu DeviceManager` and `Lamassu DMS Enroller`) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the `lamassu_events` queue.
 
 ![Screenshot](img/architecture-aws.png#only-light)
@@ -28,9 +27,8 @@ To get developers up to speed with new updates releated with Lamassu, a AMQP-bas
 Each publish event follows the [https://cloudevents.io/](Cloud Event) syntaxis.
 
 
-## Cloud Events
+## AWS IoT Core
 
-![Cloud events logo](docs/img/cloud-events_logo.png)
 ### Events
 The list of events and the structure is defined in this section. 
 

@@ -97,6 +97,22 @@ Let's register a new DMS instance:
   curl -k "https://$DOMAIN/api/dmsenroller/v1/$DMS_ID" --header "Authorization: Bearer $OPERATOR_TOKEN" | jq -r .crt | base64 -d > dms.crt 
   ```
 
+#### Registration of a DMS using the UI
+Using the UI, creating a new DMS is as simple as filling the following form. 
+
+![Screenshot](img/dms-registration.png#only-light)
+
+
+Once the DMS has been created successfully, a prompt showing the generated private key will be shown. It is encouraged to download it just after the creation as this prompt will be shown only once.
+![Screenshot](img/pk.png#only-light)
+
+The status of the new created DMS will be Pending approval, to approve it, we must select at least one CA from the list of registered CAs. The selected CAs will be the authorised ones to sign certificates from now on. 
+
+![Screenshot](img/dms-authroization-cas.png#only-light)
+
+
+![Screenshot](img/dms-list.png#only-light)
+
 ### Provision your devices with x509 Certificates
 
 The enrollment process is the way to go to obtain a certificate issued by one of the provisioned CAs. As described in the RFC document, Lamassu requires the authentication of the client requesting the enrollment using a certificate as well as the private key of an issued DMS to perform a mutual TLS connection. By using this type of TLS connection, the client is able to authenticate the server, and also, the server is able to authenticate the client.
@@ -151,6 +167,16 @@ Let's first obtain the CA list for a particular DMS:
   
   openssl x509 -text -in device-cert.pem
   ```
+
+#### Registration of a device using the UI
+
+
+To create a device, we will need to fill the following form taking into account:
+
+- A device identification must be provided.
+- A DMS must be assigned.
+
+![Screenshot](img/device-register.PNG#only-light)
 
 ## Using the APIs
 

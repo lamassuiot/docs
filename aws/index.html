@@ -13,7 +13,7 @@
     
     
       
-        <title>Lamassu Virtual Device - Lamassu IoT Docs</title>
+        <title>AWS Services used by Lamassu - Lamassu IoT Docs</title>
       
     
     
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#lamassu-virtual-device" class="md-skip">
+        <a href="#aws-services-used-by-lamassu" class="md-skip">
           Skip to content
         </a>
       
@@ -98,7 +98,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Lamassu Virtual Device
+              AWS Services used by Lamassu
             
           </span>
         </div>
@@ -293,11 +293,80 @@
 
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../aws/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          AWS Services used by Lamassu
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         AWS Services used by Lamassu
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-amqp-queue" class="md-nav__link">
+    The AMQP Queue
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-lambda" class="md-nav__link">
+    AWS Lambda
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-iot-core" class="md-nav__link">
+    AWS IoT Core
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-cloud-formation" class="md-nav__link">
+    AWS Cloud Formation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    References
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -338,52 +407,11 @@
 
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Lamassu Virtual Device
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../virtualDevice/" class="md-nav__link">
         Lamassu Virtual Device
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#lamassu-virtual-device-pages" class="md-nav__link">
-    Lamassu Virtual device pages
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -415,8 +443,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#lamassu-virtual-device-pages" class="md-nav__link">
-    Lamassu Virtual device pages
+  <a href="#the-amqp-queue" class="md-nav__link">
+    The AMQP Queue
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-lambda" class="md-nav__link">
+    AWS Lambda
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-iot-core" class="md-nav__link">
+    AWS IoT Core
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-cloud-formation" class="md-nav__link">
+    AWS Cloud Formation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    References
   </a>
   
 </li>
@@ -435,67 +491,23 @@
                 
 
 
-<h1 id="lamassu-virtual-device">Lamassu Virtual Device</h1>
-<p>To launch Lamassu-Virtual-Device follow the next steps:</p>
-<ol>
-<li>Clone the repository and get into the directory: <code>https://github.com/lamassuiot/lamassu-virtual-device.git &amp;&amp; cd lamassu-virtual-device</code>.</li>
-<li>Change the configuration variables of the <code>config.json</code> file.</li>
-</ol>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;certificates_dir&quot;: &quot;&lt;DEVICES_CERTIFICATES&gt;&quot;, // Folder where device certificates are stored
-    &quot;devmanager&quot;: {
-        &quot;est_server&quot;: &quot;&lt;DEVICE_MANAGER_SERVER&gt;&quot;, // Device Manager Server Endpoint
-        &quot;cert&quot;:&quot;&lt;DEVMANAGER_CERT&gt;&quot; // Public certificate to connect to the device-manager
-    },
-    &quot;aws&quot;:{
-        &quot;iot_core_ca_file&quot;: &quot;&lt;AWS_CA_CERT&gt;&quot;, // AWS IoT Core CA Certificate
-        &quot;iot_core_endpoint&quot;: &quot;&lt;AWS_ENDPOINT&gt;&quot;, // AWS IoT Core endpoint
-        &quot;test_lambda&quot;: &quot;&lt;LAMBDA&gt;&quot; // Lambda name
-    }
-}
-</code></pre></div>
-3. <code>config.json</code> file with default values</p>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;certificates_dir&quot;: &quot;/home/$USER/virtual-dms-data/devices_certificates&quot;,
-    &quot;devmanager&quot;: {
-        &quot;est_server&quot;: &quot;dev.lamassu.io/api/devmanager&quot;,
-        &quot;cert&quot;:&quot;&lt;DEVMANAGER_CERT&gt;&quot;
-    },
-    &quot;aws&quot;:{
-        &quot;iot_core_ca_file&quot;: &quot;&lt;AWS_CA_CERT&gt;&quot;,
-        &quot;iot_core_endpoint&quot;: &quot;&lt;AWS_ENDPOINT&gt;&quot;,
-        &quot;test_lambda&quot;: &quot;&lt;LAMBDA&gt;&quot;
-    }
-}
-</code></pre></div>
-In case of not using the Virtual-DMS to register the devices, in the directory where the certificates are stored the certificates and keys must be created with the following format:
-<div class="highlight"><pre><span></span><code>    ├── devices_certificates
-    │   ├── device-&lt;DMS_NAME&gt;-&lt;DEVICE_ID&gt;
-    │   │   ├── certificates
-    │   │   │   ├── &lt;CERT_SN&gt;.crt   &lt;----- Provide your Device certificate
-    │   │   │   └── ...
-    │   │   ├── &lt;DEVICE_ID&gt;.csr     &lt;----- Provide your Device certificate request
-    │   │   └── &lt;DEVICE_ID&gt;.key     &lt;----- Provide your Device private key
-    │   └── ...
-    └── dms_certificates
-        ├── dms-&lt;DMS_ID&gt;.crt     &lt;----- Provide your DMS certificate
-        └── dms-&lt;DMS_ID&gt;.key     &lt;----- Provide your DMS private key
-</code></pre></div>
-4. Run the Lamassu-Virtua-Device UI:
-    <div class="highlight"><pre><span></span><code>go run cmd/main.go
-</code></pre></div></p>
-<h2 id="lamassu-virtual-device-pages">Lamassu Virtual device pages</h2>
-<p>Lamassu Virtual Device has the following pages:</p>
+<h1 id="aws-services-used-by-lamassu">AWS Services used by Lamassu</h1>
+<p><img alt="Screenshot" src="../img/architecture-aws.png#only-light" /></p>
+<h2 id="the-amqp-queue">The AMQP Queue</h2>
+<p>To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (<code>Lamassu CA</code>, <code>Lamassu DeviceManager</code> and <code>Lamassu DMS Enroller</code>) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the <code>lamassu_events</code> queue.</p>
+<p>Each publish event follows the <a href="Cloud Event">https://cloudevents.io/</a> syntaxis.</p>
+<p>The asynchronous messages then synchronize with the especified cloud-provider. </p>
+<h2 id="aws-lambda">AWS Lambda</h2>
+<p>AWS Lambda is a serverless, event-driven compute service that lets you run code for virtually any type of application or backend service without provisioning or managing servers.</p>
+<h2 id="aws-iot-core">AWS IoT Core</h2>
+<p>AWS IoT provides the cloud services that connect IoT devices to other devices and services in the AWS Cloud. AWS IoT provides device software that can help integrate IoT devices into solutions based on AWS IoT. If devices can connect to AWS IoT, AWS IoT can connect them to cloud services provided by AWS.</p>
+<h2 id="aws-cloud-formation">AWS Cloud Formation</h2>
+<p>AWS CloudFormation is a service that helps you model and set up your AWS resources so that you can spend less time managing those resources and more time focusing on your applications that run in AWS. You create a template that describes all the AWS resources that you want, and CloudFormation takes care of provisioning and configuring those resources for you. You don't need to individually create and configure AWS resources and figure out what's dependent on what; CloudFormation handles that. The following scenarios demonstrate how CloudFormation can help.</p>
+<h2 id="references">References</h2>
 <ul>
-<li>Device Information View: a page showing each device's information. Choose from the dropdown the DeviceId and the Serial Number of the Certificateof to visualize the details.</li>
-</ul>
-<p><img alt="Device Information View" src="../img/device-info.png" /></p>
-<ul>
-<li>AWS Integration: a page to check AWS connectivity</li>
-</ul>
-<p><img alt="AWS" src="../img/aws.png" /></p>
-<ul>
-<li>Reenroll: each device has the option to reenroll</li>
+<li>AWS Lambda web page: <a href="https://aws.amazon.com/lambda/?nc1=h_ls">AWS Lambda</a></li>
+<li>AWS IoT Core web page: <a href="https://aws.amazon.com/es/iot-core/">AWS IoT Core</a></li>
+<li>AWS Cloud Formation web page: <a href="https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html">AWS Cloud Formation</a></li>
 </ul>
 
               
@@ -512,7 +524,7 @@ In case of not using the Virtual-DMS to register the devices, in the directory w
     <nav class="md-footer__inner md-grid" aria-label="Footer" >
       
         
-        <a href="../virtualDMS/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Lamassu Virtual DMS" rel="prev">
+        <a href="../extension/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Extending Lamassu" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -521,11 +533,26 @@ In case of not using the Virtual-DMS to register the devices, in the directory w
               <span class="md-footer__direction">
                 Previous
               </span>
-              Lamassu Virtual DMS
+              Extending Lamassu
             </div>
           </div>
         </a>
       
+      
+        
+        <a href="../azure/" class="md-footer__link md-footer__link--next" aria-label="Next: Azure Services used by Lamassu" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              Azure Services used by Lamassu
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+          </div>
+        </a>
       
     </nav>
   

@@ -317,21 +317,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../ui/" class="md-nav__link">
-        Lamassu UI
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../usage/" class="md-nav__link">
         Getting Started
       </a>
@@ -379,6 +364,36 @@
     <li class="md-nav__item">
       <a href="../extension/" class="md-nav__link">
         Extending Lamassu
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aws/" class="md-nav__link">
+        AWS Services used by Lamassu
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../azure/" class="md-nav__link">
+        Azure Services used by Lamassu
       </a>
     </li>
   
@@ -513,9 +528,15 @@
 <li>
 <p><strong>Authentication</strong>: In order to invoke any endpoint, the API Gateway enforces each request to present a JWT. Upon receiving an HTTP request, the gateway validates the presented token against the authentication server.</p>
 </li>
-<li><strong>Authorization</strong>: Another key aspect is enforcing an authorization schema. Lamassu has been configured in such way that only specific endpoints are accessible by non admin users.</li>
-<li><strong>Tracing</strong>: Logging the life of an HTTP request can be helpful during the debugging process of such complex application. The tracing aspect eases this process by injecting a unique identifier to each request that is then printed out by each microservice logs.</li>
-<li><strong>Mutual TLS authentication</strong>: As mentioned earlier the gateway acts as the traffic orchestrator knowing where each service is and redirecting the traffic accordingly. To prevent any unauthorized request as well as protecting the communications channel between the Gateway itself and the upstream service, the API Gateway initiates a mutual TLS connection to ensure such thing.</li>
+<li>
+<p><strong>Authorization</strong>: Another key aspect is enforcing an authorization schema. Lamassu has been configured in such way that only specific endpoints are accessible by non admin users.</p>
+</li>
+<li>
+<p><strong>Tracing</strong>: Logging the life of an HTTP request can be helpful during the debugging process of such complex application. The tracing aspect eases this process by injecting a unique identifier to each request that is then printed out by each microservice logs.</p>
+</li>
+<li>
+<p><strong>Mutual TLS authentication</strong>: As mentioned earlier the gateway acts as the traffic orchestrator knowing where each service is and redirecting the traffic accordingly. To prevent any unauthorized request as well as protecting the communications channel between the Gateway itself and the upstream service, the API Gateway initiates a mutual TLS connection to ensure such thing.</p>
+</li>
 </ul>
 <p><img alt="Screenshot" src="../img/base-architecture.png" /></p>
 <h2 id="requirements">Requirements</h2>
@@ -866,13 +887,13 @@ docker-compose up -d dms-default
       
       
         
-        <a href="../ui/" class="md-footer__link md-footer__link--next" aria-label="Next: Lamassu UI" rel="next">
+        <a href="../usage/" class="md-footer__link md-footer__link--next" aria-label="Next: Getting Started" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Lamassu UI
+              Getting Started
             </div>
           </div>
           <div class="md-footer__button md-icon">

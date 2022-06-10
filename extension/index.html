@@ -377,33 +377,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#configuring-aws-connector" class="md-nav__link">
-    Configuring AWS connector
-  </a>
-  
-    <nav class="md-nav" aria-label="Configuring AWS connector">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prerequisites_1" class="md-nav__link">
-    Prerequisites
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#usage_1" class="md-nav__link">
-    Usage
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#cloud-events" class="md-nav__link">
     Cloud-Events
   </a>
@@ -628,33 +601,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#configuring-aws-connector" class="md-nav__link">
-    Configuring AWS connector
-  </a>
-  
-    <nav class="md-nav" aria-label="Configuring AWS connector">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prerequisites_1" class="md-nav__link">
-    Prerequisites
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#usage_1" class="md-nav__link">
-    Usage
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#cloud-events" class="md-nav__link">
     Cloud-Events
   </a>
@@ -821,69 +767,6 @@ aws lambda update-event-source-mapping --uuid $(cat outputs.json | jq -r .Lamass
 <li><code>cdk diff</code>        compare deployed stack with current state</li>
 <li><code>cdk synth</code>       emits the synthesized CloudFormation template</li>
 </ul>
-<h3 id="configuring-aws-connector">Configuring AWS connector</h3>
-<h4 id="prerequisites_1">Prerequisites</h4>
-<ol>
-<li><strong><em>Option 1</em></strong>: Install go. <a href="https://go.dev/doc/install">(Go installation guide)</a></li>
-<li><strong><em>Option 2</em></strong>: run the AWS connector in Docker. <a href="https://docs.docker.com/engine/install/">(Docker installation guide)</a></li>
-</ol>
-<h4 id="usage_1">Usage</h4>
-<p>Needed environment variables:</p>
-<div class="highlight"><pre><span></span><code># AWS credentials
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_DEFAULT_REGION=
-
-# AWS ATS root certificate
-AWS_CA_BUNDLE=awsRootCA.pem
-
-# RabbitMQ configuration: port, host and certificates
-AMQP_PORT=5671
-AMQP_HOST=dev-lamassu.zpd.ikerlan.es
-AMQP_SERVER_CA_CERT=/ca.crt
-AMQP_CLIENT_CERT=/tls.crt
-AMQP_CLIENT_KEY=/tls.key
-
-# Lamassu CA configuration
-LAMASSU_CA_ADDRESS=https://lamassu-ca:8087
-LAMASSU_CA_CERT_FILE=//ca.crt
-LAMASSU_CA_CLIENT_CERT_FILE=tls.crt
-LAMASSU_CA_CLIENT_KEY_FILE=tls.key
-
-# Consul configuration
-CONSUL_PROTOCOL=https
-CONSUL_HOST=consul-server
-CONSUL_PORT=8501
-CONSUL_CA=/ca.crt
-
-# AWS Connector configuration
-CONNECTOR_PORT=8989
-CONNECTOR_TYPE=aws
-CONNECTOR_PROTOCOL=http
-CONNECTOR_NAME=aws-connector-ikerlan
-
-# Configuration for jaeger tracing
-JAEGER_SERVICE_NAME=aws-connector
-JAEGER_AGENT_HOST=jaeger
-JAEGER_AGENT_PORT=&quot;6831&quot;
-JAEGER_SAMPLER_TYPE=const
-JAEGER_SAMPLER_PARAM=&quot;1&quot;
-JAEGER_REPORTER_LOG_SPANS=&quot;false&quot;
-</code></pre></div>
-<blockquote>
-<p><img alt="⚠" class="twemoji" src="https://twemoji.maxcdn.com/v/latest/svg/26a0.svg" title=":warning:" /> <strong><em>Remember to change env variables depending where you run AWS connector</em></strong></p>
-</blockquote>
-<p><strong><em>Option 1</em></strong>: Running AWS Connector</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span> aws-connector
-go run cmd/main.go
-</code></pre></div>
-<p><strong><em>Option 2</em></strong>: Running the connector on Docker:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span> aws-connector
-docker-compose up -d
-</code></pre></div>
-<blockquote>
-<p><strong><em>*NOTE</em></strong>*: It is better to run it on Docker.</p>
-</blockquote>
 <h3 id="cloud-events">Cloud-Events</h3>
 <p>To extend Lamassu to AWS cloud, whenever a opperation is triggered, an asynchronous messages are send via Amazon Simple Queue Service.
 Amazon SQS offers the possibility of establishing a message queue to store messages while they wait to be processed by different computers that are connected to the Internet. These messages can contain notifications for applications or lists of commands to be executed by applications, either in the cloud or on the Internet, allowing you to create automated workflows.</p>

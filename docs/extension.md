@@ -1,7 +1,5 @@
 # Extending Lamassu
 
-
-
 A PKI has three types of core compoents: `CAs`, `RAs` and `VAs`. Each PKI implementation must have an instance of those compoennts (at least) to be considered a mature digital identity provider.
 
 * `Certificate authority (CA)` - Issues an entity's certificate and acts as a trusted component within a private PKI. Any certificate issued by the CA is trusted by all entities that trust the CA. The exact role of a CA will depend on its position within a CA hierarchy.
@@ -16,30 +14,195 @@ Lamassu is no stranger to those concepts. In fact, Lamassu goes one step further
 * `Local registration authority (LRA)` -  is an optional part of a public key infrastructure that maintains users' identities from which certification authorities can issue Digital Certificates.
 
 
-Extending the PKI is a core principal for Lamassu. There are multiple ways to customize Lamassu to the required needs by just modifying one of the core components or by developing and adding new ones. This section will describe some decissions that have been addopted to provide an extensible PKI that is able to integrate with some cloud providers such as `AWS IoT Core` or `Azure IoT Hub`.
-
-## The AMQP Queue
-
-To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (`Lamassu CA`, `Lamassu DeviceManager` and `Lamassu DMS Enroller`) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the `lamassu_events` queue.
-
-![Screenshot](img/architecture-aws.png#only-light)
-
-Each publish event follows the [https://cloudevents.io/](Cloud Event) syntaxis.
+Extending the PKI is a core principal for Lamassu. There are multiple ways to customize Lamassu to the required needs by just modifying one of the core components or by developing and adding new ones. This section will describe some decissions that have been addopted to provide an extensible PKI that is able to integrate with some cloud providers such as [AWS IoT Core](aws.md) or `Azure IoT Hub`.
 
 
-## AWS IoT Core
+![Screenshot](img/architecture-full.png)
 
-### Events
-The list of events and the structure is defined in this section. 
+## Rabbit MQ
 
-This asynchronous messages are send via Amazon Simple Queue Service.
+RabbitMQ serves as an intermediary for efficient communication between Lamassu UI and Cloud-Proxy. The messages are published to broker's queue via amqp (Advanced Message Queuing Protocol).
+
+## Cloud Proxy
+A proxy server acts as a gateway between you and the internet, and verifies and forwards incoming client requests to other servers for further communication.
+
+## AWS Services used by Lamassu
+For further detail, see [AWS Services used by Lamassu](aws.md)
+
+- AWS SQS 
+- AWS Lambda
+- AWS IoT Core
+- AWS Cloud Formation
+
+
+
+### Infraestructure Deployment
+
+
+To deploy the structure in AWS to proper function with Lamassu, `AWS CDK` is used.
+The AWS Cloud Development Kit (AWS CDK) is an open-source software development framework to define your cloud application resources using familiar programming languages.
+
+#### Directory layout
+
+`/bin/lamassu-cdk.ts` app entry point. It creates objects of classes defined in /lib.
+
+`/lib` it contains all the stacks for our project, were AWS resources are defined.
+
+`cdk.json` file tells the CDK Toolkit how to execute your app.
+
+#### Prerequisites
+
+Install nodejs 14.X, npm and jq.
+
+```
+sudo apt install jq nodejs npm
+```
+
+Install aws-cdk with npm:
+```
+npm install -g aws-cdk@1.x
+```
+
+Verify cdk is installed:
+```
+cdk --version
+```
+
+Install AWS cli and configure credentials:
+
+1. Install AWS CLI: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+2. Configure AWS CLI:
+```
+aws configure
+```
+Provide your AWS access key ID, secret access key, and default region when prompted. You can also configure `.aws/credentials` file in your home directory instead.
+
+
+#### Usage
+
+
+> **NOTE**: As some AWS features used in this project are still not implemented in AWS CDK, some of the steps are done via CLI.
+
+
+Go to cdk project home directory:
+
+```
+cd lamassu-cdk
+```
+
+**Option 1**: Execute deploy script:
+
+```
+bash deploy-lamassu.sh
+```
+
+**Option 2**: Execute it step by step:
+
+```
+npm i
+
+npm i --prefix resources/sqsFilterLambda 
+
+cdk deploy --outputs-file outputs.json
+aws lambda update-event-source-mapping --uuid $(cat outputs.json | jq -r .LamassuCdkStack.EventSourceMappingUUID) --filter-criteria file://filter-criteria.json
+```
+
+Remove Lamassu resources:
+
+```
+cdk destroy LamassuCdkStack
+```
+
+#### Useful commands
+
+ * `npm run build`   compile typescript to js
+ * `npm run watch`   watch for changes and compile
+ * `npm run test`    perform the jest unit tests
+ * `cdk deploy`      deploy this stack to your default AWS account/region
+ * `cdk diff`        compare deployed stack with current state
+ * `cdk synth`       emits the synthesized CloudFormation template
+
+
+### Configuring AWS connector
+
+#### Prerequisites
+
+1. ***Option 1***: Install go. [(Go installation guide)](https://go.dev/doc/install)
+2. ***Option 2***: run the AWS connector in Docker. [(Docker installation guide)](https://docs.docker.com/engine/install/)
+
+#### Usage
+
+Needed environment variables:
+
+```env
+# AWS credentials
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=
+
+# AWS ATS root certificate
+AWS_CA_BUNDLE=awsRootCA.pem
+
+# RabbitMQ configuration: port, host and certificates
+AMQP_PORT=5671
+AMQP_HOST=dev-lamassu.zpd.ikerlan.es
+AMQP_SERVER_CA_CERT=/ca.crt
+AMQP_CLIENT_CERT=/tls.crt
+AMQP_CLIENT_KEY=/tls.key
+
+# Lamassu CA configuration
+LAMASSU_CA_ADDRESS=https://lamassu-ca:8087
+LAMASSU_CA_CERT_FILE=//ca.crt
+LAMASSU_CA_CLIENT_CERT_FILE=tls.crt
+LAMASSU_CA_CLIENT_KEY_FILE=tls.key
+
+# Consul configuration
+CONSUL_PROTOCOL=https
+CONSUL_HOST=consul-server
+CONSUL_PORT=8501
+CONSUL_CA=/ca.crt
+
+# AWS Connector configuration
+CONNECTOR_PORT=8989
+CONNECTOR_TYPE=aws
+CONNECTOR_PROTOCOL=http
+CONNECTOR_NAME=aws-connector-ikerlan
+
+# Configuration for jaeger tracing
+JAEGER_SERVICE_NAME=aws-connector
+JAEGER_AGENT_HOST=jaeger
+JAEGER_AGENT_PORT="6831"
+JAEGER_SAMPLER_TYPE=const
+JAEGER_SAMPLER_PARAM="1"
+JAEGER_REPORTER_LOG_SPANS="false"
+```
+> :warning: ***Remember to change env variables depending where you run AWS connector***
+
+***Option 1***: Running AWS Connector
+
+```bash
+cd aws-connector
+go run cmd/main.go
+```
+
+***Option 2***: Running the connector on Docker:
+
+```bash
+cd aws-connector
+docker-compose up -d
+```
+
+> ****NOTE****: It is better to run it on Docker.
+
+### Cloud-Events
+
+To extend Lamassu to AWS cloud, whenever a opperation is triggered, an asynchronous messages are send via Amazon Simple Queue Service.
 Amazon SQS offers the possibility of establishing a message queue to store messages while they wait to be processed by different computers that are connected to the Internet. These messages can contain notifications for applications or lists of commands to be executed by applications, either in the cloud or on the Internet, allowing you to create automated workflows.
 
-#### Atributes
+The messages arrive at AWS cloud via  `lamassu-aws-connector`. The connector uses two queues, one for request `lamassu-command` and another for responses, `lamassu-response`.
 
-* Required cloudevents attributes: ID, Source, SpecVersion and Type
+Whenever the connector receives a message, an event-driven compute service, AWS Lambda, mappes the operation to the corresponding lambda . AWS  is a serverless, event-driven compute service that lets you run code for virtually any type of application or backend service without provisioning or managing servers. The Lambda will communicate with `AWS IoT Core`.
 
-* Optional cloudevents attributes: DataContentType, DataSchema, Subject and Time
 
 | **Event Type**                                                          | **Source**                            | **Description** |
 |-------------------------------------------------------------------------|---------------------------------------|-----------------|
@@ -127,28 +290,6 @@ Amazon SQS offers the possibility of establishing a message queue to store messa
     }    
 }
 ```
-####  io.lamassu.iotcore.ca.registration.request-code      
-```json 
-{
-    "specversion":"1.0",
-    "id":"0814bee304159b19:0814bee304159b19:0000000000000000:1",
-    "source":"lamassu/ca",
-    "type":"io.lamassu.cert.update",
-	"datacontenttype":"application/json",
-	"time":"2022-03-31T07:17:36.907957488Z",
-    "data":{
-        "ca_name":"CA2",
-        "serial_number":"23-f9-3e-b0-9c-0e-f7-6b-1d-d9-0f-a2-22-47-93-45-23-53-f1-03",
-        "registration_code": "",
-        "ca_cert": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURtekNDQW9PZ0F3SUJBZ0lVQkNLeHJGbzhYZmY0aktYUHkrVkswdlhmOHpVd0RRWUpLb1pJaHZjTkFRRUwKQlFBd1hURUxNQWtHQTFVRUJoTUNSVk14RVRBUEJnTlZCQWdNQ0VkSlVGVmFTMDlCTVJFd0R3WURWUVFIREFoQgpVbEpCVTBGVVJURU1NQW9HQTFVRUNnd0RTVXRNTVF3d0NnWURWUVFMREFOYVVFUXhEREFLQmdOVkJBTU1BME5CCk1qQWVGdzB5TWpBek16RXdOalU1TlRWYUZ3MHlNekF6TXpFd05qVTVOVFZhTUYweEN6QUpCZ05WQkFZVEFrVlQKTVJFd0R3WURWUVFJREFoSFNWQlZXa3RQUVRFUk1BOEdBMVVFQnd3SVFWSlNRVk5CVkVVeEREQUtCZ05WQkFvTQpBMGxMVERFTU1Bb0dBMVVFQ3d3RFdsQkVNUXd3Q2dZRFZRUUREQU5EUVRJd2dnRWlNQTBHQ1NxR1NJYjNEUUVCCkFRVUFBNElCRHdBd2dnRUtBb0lCQVFETWFUOWo0bHB4RzdHVjRKdkRyMnFGWXNPUkpVN083cWUxd2k2SzNCZmIKZk4ySWw1dDdGK2tSc25BWnFnM3R3T25Hb1Q2czZVZUhZc1hxTDJzMURlbUZzM3dtRGFhZUJJVldzRlZUKzV1WQpYWWZaZVVBdC9FRStWMWRXaFdwcUtHYk9LeWhFcVQ1Rm1jU2psTitQeUpkV1RVSEFZcUtNcTZPSnJmdFFIMUtJCnFoazZseVFRTzNla3RwZXBCWUxjSU8yazg3Rm5WZ0o5RWFlektmUG1EVDRXaitMOUNmb1pZTnFSOTNjcFM1ZzEKMWRYenl5ZUEvV3Zmbk5vdm5rbDdFQk9oNHI0NFhVOFVWbWkrUWtqQWdyTklpRlRIUHp4OGtpS0dvVkZDQ1A3OQo4Y0NzM1JxTVJhYk9BdENOemFWRzdnNXNlRVJLOXVOMk1vY1FuWkdKQzF4REFnTUJBQUdqVXpCUk1CMEdBMVVkCkRnUVdCQlJacFhvRThBSE9HL0tMVkhDU3hmZ2xsOEl3TVRBZkJnTlZIU01FR0RBV2dCUlpwWG9FOEFIT0cvS0wKVkhDU3hmZ2xsOEl3TVRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCVAp4akQzcjd6L3dQVHBFbUdnN25xd3hoRXB3cHJjMDR1VWxFUjRFdUl4UlVWSjh0TDNnRzdrbVBhK0RsbHpVdkl1ClhNWlpFMUJwck9QbTYzb3V4cThJb0dXZW5DYWIzUU95V1o2YTBPcllXNmJYcnROdzJuTFdKd2UvbGM1a0ViTnYKNjdNVmM4emovcFY5TXFuTmxsMWc2THN3V0kreFBqaXNqSFl5MnlMVGlRcHk2WC8yK3B1VDZHRHBIK3pCenRUagpqVTh3Um1WZWloeHFZNTBrVGcreGRmaUE0OWhMM3VkcHRmU0VXd1BSQW9zUHVTT1NTTndHM1ZGQjAvcjRTWWROCjE1TWM3SEpuMlR3OEttbkRYMTVzL3hYMWROaW51RmVZMklCUzQzZkZmT1Viczd5SXc1eFF3a0JjMm5PQVlJdDgKSUhtQm1MRVArWktmNms5Q1JIc2kKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQ==",
-        
-    }    
-}
-```
-
-#### io.lamassu.iotcore.config.response
-```
-```
 
 #### io.lamassu.iotcore.thing.config.response
 
@@ -167,7 +308,7 @@ Amazon SQS offers the possibility of establishing a message queue to store messa
             "certificates":[
                 {
                     "status":"ACTIVE",
-                    "arn":"arn:aws:iot:eu-west-1:************:cert/3d5621f7822da199cfa20dfb89f36e7d4d7cba915a61952202fb57428dd0a48c",
+                    "arn":"arn:aws:iot:eu-west-1:345876576284:cert/3d5621f7822da199cfa20dfb89f36e7d4d7cba915a61952202fb57428dd0a48c",
                     "id":"3d5621f7822da199cfa20dfb89f36e7d4d7cba915a61952202fb57428dd0a48c",
                     "update_date":"2022-03-31T11:58:28.405Z"
                 }
@@ -180,7 +321,7 @@ Amazon SQS offers the possibility of establishing a message queue to store messa
             "certificates":[
                 {
                     "status":"REVOKED",
-                    "arn":"arn:aws:iot:eu-west-1::************::cert/b749a584b26e74662ea529bb58caadec96e822e6d436a7237a0ff5805e971563",
+                    "arn":"arn:aws:iot:eu-west-1:345876576284:cert/b749a584b26e74662ea529bb58caadec96e822e6d436a7237a0ff5805e971563",
                     "id":"b749a584b26e74662ea529bb58caadec96e822e6d436a7237a0ff5805e971563",
                     "update_date":"2022-03-29T16:37:18.527Z"
                 }
@@ -190,45 +331,20 @@ Amazon SQS offers the possibility of establishing a message queue to store messa
 }
 ```
 
-#### io.lamassu.iotcore.cert.status.update
-```json 
-{
-    "specversion":"1.0",
-    "id":"0814bee304159b19:0814bee304159b19:0000000000000000:1",
-    "source":"lamassu/ca",
-    "type":"io.lamassu.cert.update",
-	"datacontenttype":"application/json",
-	"time":"2022-03-31T07:17:36.907957488Z",
-    "data":{
-        "name":"CA2",
-        "status": "REVOKED",
-        "serial_number":"23-f9-3e-b0-9c-0e-f7-6b-1d-d9-0f-a2-22-47-93-45-23-53-f1-03"
-    }    
-}
-```
 
-#### io.lamassu.iotcore.ca.status.update
+## Azure Services used by Lamassu
 
+For further detail, see [Azure Services used by Lamassu](azure.md)
 
-```json 
-{
-    "specversion":"1.0",
-    "id":"0814bee304159b19:0814bee304159b19:0000000000000000:1",
-    "source":"lamassu/ca",
-    "type":"io.lamassu.cert.update",
-	"datacontenttype":"application/json",
-	"time":"2022-03-31T07:17:36.907957488Z",
-    "data":{
-        "ca_id":"1",
-        "ca_name":"CA2",
-        "status": "REVOKED",
-        "ca_serial_number":"23-f9-3e-b0-9c-0e-f7-6b-1d-d9-0f-a2-22-47-93-45-23-53-f1-03"
-    }    
-}
-```
+- Azure functions
+- Azure storage queue
+- Azure DPS
+- Azure Iot Hub
+ 
 
-### References
+## References
 
 * Cloud Events web page: [Cloud events](https://cloudevents.io/)
 * Cloud Events github: [Cloud events GITHUB](https://github.com/cloudevents)
 * Clud Events SDK for Go: [Cloud Events SDK for GO](https://github.com/cloudevents/sdk-go)
+* Gokit, building microservices in go: [(Gokit)](https://gokit.io/faq/)

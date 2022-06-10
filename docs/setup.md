@@ -9,8 +9,11 @@ Lamassu Compose offers a SECURE deployment of the set of microservices required 
 - **Centralized point of access**: Each microservice listens on a different port which ends up being challenging for developers and users. With the use of the API Gateway, the user will always access the same host and port address. Port ```80``` for HTTP connections and port ```443``` for HTTPS connections.
 
 - **Authentication**: In order to invoke any endpoint, the API Gateway enforces each request to present a JWT. Upon receiving an HTTP request, the gateway validates the presented token against the authentication server.
+
 - **Authorization**: Another key aspect is enforcing an authorization schema. Lamassu has been configured in such way that only specific endpoints are accessible by non admin users.
+
 - **Tracing**: Logging the life of an HTTP request can be helpful during the debugging process of such complex application. The tracing aspect eases this process by injecting a unique identifier to each request that is then printed out by each microservice logs.
+
 - **Mutual TLS authentication**: As mentioned earlier the gateway acts as the traffic orchestrator knowing where each service is and redirecting the traffic accordingly. To prevent any unauthorized request as well as protecting the communications channel between the Gateway itself and the upstream service, the API Gateway initiates a mutual TLS connection to ensure such thing.
 
 ![Screenshot](img/base-architecture.png)

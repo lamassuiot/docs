@@ -13,7 +13,7 @@
     
     
       
-        <title>Lamassu Virtual Device - Lamassu IoT Docs</title>
+        <title>JITP (Just In Time Provisioning) - Lamassu IoT Docs</title>
       
     
     
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#lamassu-virtual-device" class="md-skip">
+        <a href="#jitp-just-in-time-provisioning" class="md-skip">
           Skip to content
         </a>
       
@@ -98,7 +98,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Lamassu Virtual Device
+              JITP (Just In Time Provisioning)
             
           </span>
         </div>
@@ -323,11 +323,80 @@
 
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../jitp/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          JITP (Just In Time Provisioning)
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         JITP (Just In Time Provisioning)
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    Overview
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    Prerequisites
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flow" class="md-nav__link">
+    Flow
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    Usage
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    References
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -353,52 +422,11 @@
 
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Lamassu Virtual Device
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../virtualDevice/" class="md-nav__link">
         Lamassu Virtual Device
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#lamassu-virtual-device-pages" class="md-nav__link">
-    Lamassu Virtual device pages
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -445,8 +473,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#lamassu-virtual-device-pages" class="md-nav__link">
-    Lamassu Virtual device pages
+  <a href="#overview" class="md-nav__link">
+    Overview
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    Prerequisites
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flow" class="md-nav__link">
+    Flow
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    Usage
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    References
   </a>
   
 </li>
@@ -465,67 +521,70 @@
                 
 
 
-<h1 id="lamassu-virtual-device">Lamassu Virtual Device</h1>
-<p>To launch Lamassu-Virtual-Device follow the next steps:</p>
+<h1 id="jitp-just-in-time-provisioning">JITP (Just In Time Provisioning)</h1>
+<h2 id="overview">Overview</h2>
+<p>You can have your devices provisioned when they first attempt to connect to AWS IoT with <strong><em>just-in-time provisioning (JITP)</em></strong>. To provision the device, you must enable automatic registration and associate a provisioning template with the CA certificate used to sign the device certificate.</p>
+<p>When a device attempts to connect to AWS IoT by using a certificate signed by a registered CA certificate, AWS IoT loads the template from the CA certificate and uses it to register the thing. The JITP workflow first registers a certificate with a status value of PENDING_ACTIVATION. When the device provisioning flow is complete, the status of the certificate is changed to ACTIVE.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>To perform the tests in we need the following prerequisites:</p>
+<ul>
+<li>Install jq and mosquitto-clients
+<div class="highlight"><pre><span></span><code>apt install jq
+apt install mosquitto-clients
+</code></pre></div></li>
+<li>Configure AWS CLI: <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code> and <code>REGION</code> must be configured. <a href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html">Configure AWS CLI</a></li>
+</ul>
+<h2 id="flow">Flow</h2>
 <ol>
-<li>Clone the repository and get into the directory: <code>https://github.com/lamassuiot/lamassu-virtual-device.git &amp;&amp; cd lamassu-virtual-device</code>.</li>
-<li>Change the configuration variables of the <code>config.json</code> file.</li>
+<li>First we need to create a certificate authority and upload it to AWS.</li>
+<li>Attach a JITP template to the CA in AWS IoT Core. </li>
+<li>Enable auto-registration for that CA in AWS</li>
+<li>Issue a certificate with that CA.</li>
+<li>Load the certificate in the device</li>
+<li>Connect to the IoT Core Enpoint using that certificate.</li>
 </ol>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;certificates_dir&quot;: &quot;&lt;DEVICES_CERTIFICATES&gt;&quot;, // Folder where device certificates are stored
-    &quot;devmanager&quot;: {
-        &quot;est_server&quot;: &quot;&lt;DEVICE_MANAGER_SERVER&gt;&quot;, // Device Manager Server Endpoint
-        &quot;cert&quot;:&quot;&lt;DEVMANAGER_CERT&gt;&quot; // Public certificate to connect to the device-manager
-    },
-    &quot;aws&quot;:{
-        &quot;iot_core_ca_file&quot;: &quot;&lt;AWS_CA_CERT&gt;&quot;, // AWS IoT Core CA Certificate
-        &quot;iot_core_endpoint&quot;: &quot;&lt;AWS_ENDPOINT&gt;&quot;, // AWS IoT Core endpoint
-        &quot;test_lambda&quot;: &quot;&lt;LAMBDA&gt;&quot; // Lambda name
-    }
-}
+<blockquote>
+<p><strong><em>NOTE</em></strong>* : For more information about each step, visit <a href="docs/jitp/detailed_jitp.md">Detailed flow</a></p>
+</blockquote>
+<p>The device will automatically register in AWS IoT Core with the corresponding certificate and the certificate would be attached to the policy stated in the JITP template. Now the device can interact with AWS.</p>
+<blockquote>
+<p><img alt="⚠" class="twemoji" src="https://twemoji.maxcdn.com/v/latest/svg/26a0.svg" title=":warning:" /> <strong><em>NOTE</em></strong>* : Device fails to connect to AWS on first attempt. </p>
+</blockquote>
+<h2 id="usage">Usage</h2>
+<p>Steps to reproduce:</p>
+<ol>
+<li>Create a CA certificate in AWS.
+ <div class="highlight"><pre><span></span><code>bash jitp_demo.sh
 </code></pre></div>
-3. <code>config.json</code> file with default values</p>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;certificates_dir&quot;: &quot;/home/$USER/virtual-dms-data/devices_certificates&quot;,
-    &quot;devmanager&quot;: {
-        &quot;est_server&quot;: &quot;dev.lamassu.io/api/devmanager&quot;,
-        &quot;cert&quot;:&quot;&lt;DEVMANAGER_CERT&gt;&quot;
-    },
-    &quot;aws&quot;:{
-        &quot;iot_core_ca_file&quot;: &quot;&lt;AWS_CA_CERT&gt;&quot;,
-        &quot;iot_core_endpoint&quot;: &quot;&lt;AWS_ENDPOINT&gt;&quot;,
-        &quot;test_lambda&quot;: &quot;&lt;LAMBDA&gt;&quot;
-    }
-}
+ Fill the following inputs and check that your CA has been correctly created in AWS IoT Core.</li>
+</ol>
+<div class="highlight"><pre><span></span><code>   Introduce CA name: 
+   Introduce demo device name:
+   Introduce AWS Policy Name <span class="o">(</span>Must be unique <span class="k">in</span> AWS<span class="o">)</span>:
 </code></pre></div>
-In case of not using the Virtual-DMS to register the devices, in the directory where the certificates are stored the certificates and keys must be created with the following format:
-<div class="highlight"><pre><span></span><code>    ├── devices_certificates
-    │   ├── device-&lt;DMS_NAME&gt;-&lt;DEVICE_ID&gt;
-    │   │   ├── certificates
-    │   │   │   ├── &lt;CERT_SN&gt;.crt   &lt;----- Provide your Device certificate
-    │   │   │   └── ...
-    │   │   ├── &lt;DEVICE_ID&gt;.csr     &lt;----- Provide your Device certificate request
-    │   │   └── &lt;DEVICE_ID&gt;.key     &lt;----- Provide your Device private key
-    │   └── ...
-    └── dms_certificates
-        ├── dms-&lt;DMS_ID&gt;.crt     &lt;----- Provide your DMS certificate
-        └── dms-&lt;DMS_ID&gt;.key     &lt;----- Provide your DMS private key
+<p>This script covers steps 1 to 4 in JITP flow.</p>
+<ol>
+<li>As a result of <code>jitp_demo.sh</code> script some test certificates have been created under <code>test/certs</code> folder. You can execute <code>test/go/main.go</code> or <code>test/bash/mosquitto.sh</code> to test connection to AWS IoT Core.<blockquote>
+<p><img alt="⚠" class="twemoji" src="https://twemoji.maxcdn.com/v/latest/svg/26a0.svg" title=":warning:" /> <strong>If you are using mosquitto.sh</strong>: you need to change -i flag to be equal to the certificate common name and -t flag (topic) must be "<strong>common_name</strong>/<em>" for the device to connect to AWS. For example, if CN=demodev:
+<div class="highlight"><pre><span></span><code>mosquitto_pub --cafile ../certs/awsRootCA.pem  <span class="se">\</span>
+            --cert ../certs/deviceCertAndCACert.crt <span class="se">\</span>
+            --key ../certs/deviceCert.key <span class="se">\</span>
+            -h a3hczhtwc7h4es-ats.iot.eu-west-1.amazonaws.com <span class="se">\</span>
+            -p <span class="m">8883</span> -q <span class="m">1</span> <span class="se">\</span>
+            -t demodev -i demodev -m <span class="s2">&quot;hello&quot;</span> -d 
 </code></pre></div>
-4. Run the Lamassu-Virtua-Device UI:
-    <div class="highlight"><pre><span></span><code>go run cmd/main.go
+<img alt="⚠" class="twemoji" src="https://twemoji.maxcdn.com/v/latest/svg/26a0.svg" title=":warning:" /> </em><em>If you are using go main.go</em>*: you need to change device Id and topic. Lines 103 and 118.
+<div class="highlight"><pre><span></span><code><span class="nx">opts</span><span class="p">.</span><span class="nx">SetClientID</span><span class="p">(</span><span class="s">&quot;demodev&quot;</span><span class="p">).</span><span class="nx">SetTLSConfig</span><span class="p">(</span><span class="nx">tlsconfig</span><span class="p">)</span><span class="w"></span>
+<span class="o">...</span><span class="w"></span>
+<span class="nx">c</span><span class="p">.</span><span class="nx">Publish</span><span class="p">(</span><span class="s">&quot;demodev/hello&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nx">text</span><span class="p">)</span><span class="w"></span>
 </code></pre></div></p>
-<h2 id="lamassu-virtual-device-pages">Lamassu Virtual device pages</h2>
-<p>Lamassu Virtual Device has the following pages:</p>
+</blockquote>
+</li>
+</ol>
+<h2 id="references">References</h2>
 <ul>
-<li>Device Information View: a page showing each device's information. Choose from the dropdown the DeviceId and the Serial Number of the Certificateof to visualize the details.</li>
-</ul>
-<p><img alt="Device Information View" src="../img/device-info.png" /></p>
-<ul>
-<li>AWS Integration: a page to check AWS connectivity</li>
-</ul>
-<p><img alt="AWS" src="../img/aws.png" /></p>
-<ul>
-<li>Reenroll: each device has the option to reenroll</li>
+<li><strong><em>AWS JITP example</em></strong>: <a href="https://aws.amazon.com/es/blogs/iot/setting-up-just-in-time-provisioning-with-aws-iot-core/">JITP demo example</a></li>
+<li><strong><em>JITP official documentation</em></strong>: <a href="https://docs.aws.amazon.com/iot/latest/developerguide/jit-provisioning.html">JITP documentation</a></li>
 </ul>
 
               
@@ -542,7 +601,7 @@ In case of not using the Virtual-DMS to register the devices, in the directory w
     <nav class="md-footer__inner md-grid" aria-label="Footer" >
       
         
-        <a href="../virtualDMS/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Lamassu Virtual DMS" rel="prev">
+        <a href="../azure/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Azure Services used by Lamassu" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -551,20 +610,20 @@ In case of not using the Virtual-DMS to register the devices, in the directory w
               <span class="md-footer__direction">
                 Previous
               </span>
-              Lamassu Virtual DMS
+              Azure Services used by Lamassu
             </div>
           </div>
         </a>
       
       
         
-        <a href="../pkcs/" class="md-footer__link md-footer__link--next" aria-label="Next: PKCS 11" rel="next">
+        <a href="../virtualDMS/" class="md-footer__link md-footer__link--next" aria-label="Next: Lamassu Virtual DMS" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              PKCS 11
+              Lamassu Virtual DMS
             </div>
           </div>
           <div class="md-footer__button md-icon">

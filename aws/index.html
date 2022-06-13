@@ -394,6 +394,21 @@
   
   
     <li class="md-nav__item">
+      <a href="../jitp/" class="md-nav__link">
+        JITP (Just In Time Provisioning)
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../virtualDMS/" class="md-nav__link">
         Lamassu Virtual DMS
       </a>
@@ -515,9 +530,9 @@
 <h2 id="aws-sqs">AWS SQS</h2>
 <p>To extend Lamassu to AWS cloud, whenever a opperation is triggered, an asynchronous messages are send via Amazon Simple Queue Service.
 Amazon SQS offers the possibility of establishing a message queue to store messages while they wait to be processed by different computers that are connected to the Internet. These messages can contain notifications for applications or lists of commands to be executed by applications, either in the cloud or on the Internet, allowing you to create automated workflows.</p>
-<p>The messages arrive at AWS cloud via  <code>lamassu-aws-connector</code>. The connector uses two queues, one for request <code>lamassu-command</code> and another for responses, <code>lamassu-response</code>.</p>
+<p>The messages arrive at AWS cloud via  <code>lamassu-aws-connector</code>. The connector will send a request to a the SDK to communicate with AWS Cloud. </p>
 <h2 id="aws-cloud-formation">AWS Cloud Formation</h2>
-<p><a href="https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html">AWS Cloud Formation</a> is a service that helps to model and  <a href="/docs/extension.md#aws-infraestructure-deployment">set up</a> AWS resources to spend less time managing resources. You create a template that describes all the AWS resources that you want, and CloudFormation takes care of provisioning and configuring those resources for you. You don't need to individually create and configure AWS resources and figure out what's dependent on what. </p>
+<p><a href="https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html">AWS Cloud Formation</a> is a service that helps to model and  <a href="/docs/extension.md#aws-infraestructure-deployment">set up</a> AWS resources to spend less time managing resources. First, we need to create a template that describes the AWS resources that we want, then, CloudFormation takes care of provisioning and configuring those resources. There is no need to individually create and configure AWS resources and figure out what's dependent on what. </p>
 <h2 id="references">References</h2>
 <ul>
 <li>AWS Lambda web page: <a href="https://aws.amazon.com/lambda/?nc1=h_ls">AWS Lambda</a></li>

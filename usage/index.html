@@ -311,6 +311,13 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#deployment" class="md-nav__link">
+    Deployment
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#create-a-new-certification-authority_1" class="md-nav__link">
     Create a new Certification Authority
   </a>
@@ -480,6 +487,21 @@
   
   
     <li class="md-nav__item">
+      <a href="../jitp/" class="md-nav__link">
+        JITP (Just In Time Provisioning)
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../virtualDMS/" class="md-nav__link">
         Lamassu Virtual DMS
       </a>
@@ -584,6 +606,13 @@
   
     <nav class="md-nav" aria-label="Using the UI">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deployment" class="md-nav__link">
+    Deployment
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#create-a-new-certification-authority_1" class="md-nav__link">
@@ -691,7 +720,7 @@
 <p><img alt="" src="../img/ca-registration.png" />
 <img alt="" src="../img/ca-info.png" /> </p>
 <h3 id="register-a-new-device-manufacturing-system">Register a new Device Manufacturing System</h3>
-<p>Lamassu is a PKI designed for the industrial and iot sector. To better integrate this PKI in real life manufacturing system, Lamassu delegates the issuance of device certificate to the factory itself. First lets dive into the Device Manufacturing System <em>(DMS for short)</em> registration step by step. After that, a couple of examples will demonstrate how to start enrolling your devices using the <a href="https://github.com/lamassuiot/lamassu-virtual-dms">Lamassu's Virtual DMS software</a> as well as using the UI.</p>
+<p>Lamassu is a PKI designed for the industrial and IoT sector. To better integrate this PKI in real life manufacturing system, Lamassu delegates the issuance of device certificate to the factory itself. First lets dive into the Device Manufacturing System <em>(DMS for short)</em> registration step by step. After that, a couple of examples will demonstrate how to start enrolling your devices using the <a href="https://github.com/lamassuiot/lamassu-virtual-dms">Lamassu's Virtual DMS software</a> as well as using the UI.</p>
 <p>Device manufacturing process tend to be highly automated. Provisioning the devices with digital identities should not slow down the fabrication process. Lamassu addresses this challenge introducing the DMS concept as core.</p>
 <p>One of the factories operators stars the process by generating a DMS registration request contained in a Certificate Signing Request also referred as CSR. This CSR is then sent to the DMS Enroller service to be approved by one of the PKI Administrators:</p>
 <figure>
@@ -816,8 +845,11 @@ openssl x509 -text -in device-cert.pem
 </li>
 </ol>
 <h2 id="using-the-ui">Using the UI</h2>
-<p>The UI is an easy manageable tool designed to ease the burdens to non-technical users in using Lamassu PKI.</p>
+<p>The UI is an easy manageable tool designed to ease the burdens to non-technical users in using Lamassu PKI. This project was bootstrapped with <a href="https://github.com/facebook/create-react-app">Create React App</a>.</p>
+<p>You can learn more in the <a href="https://facebook.github.io/create-react-app/docs/getting-started">Create React App documentation</a>.</p>
 <p><img alt="Screenshot" src="../img/lamassu-app.png#only-light" /></p>
+<h3 id="deployment">Deployment</h3>
+<p>This section has moved here: <a href="https://facebook.github.io/create-react-app/docs/deployment">https://facebook.github.io/create-react-app/docs/deployment</a></p>
 <h3 id="create-a-new-certification-authority_1">Create a new Certification Authority</h3>
 <p>There are two methos of creating a new CA from the UI.</p>
 <p>The first one, filling the following form taking into account the following things:</p>

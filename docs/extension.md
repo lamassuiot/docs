@@ -23,9 +23,6 @@ Extending the PKI is a core principal for Lamassu. There are multiple ways to cu
 
 To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (`Lamassu CA`, `Lamassu DeviceManager` and `Lamassu DMS Enroller`) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the `lamassu_events` queue.
 
-Each publish event follows the [https://cloudevents.io/](Cloud Event) syntaxis.
-
-The asynchronous messages then synchronize with the especified cloud-provider. 
 
 
 ## Cloud Proxy
@@ -136,7 +133,11 @@ cdk destroy LamassuCdkStack
 
 ## AWS Cloud-Events
 
-Whenever the connector receives a message, an event-driven compute service, AWS Lambda, mappes the operation to the corresponding lambda . AWS  is a serverless, event-driven compute service that lets you run code for virtually any type of application or backend service without provisioning or managing servers. The Lambda will communicate with `AWS IoT Core`.
+Events triggered by `Lamassu DeviceManager` and `Lamassu DMS Enroller` send a petition directly to AWS using `AWS SDK`. 
+
+Events published by `Lamassu CA` component, are treated differently, each event follows the [https://cloudevents.io/](Cloud Event) syntaxis. The asynchronous messages then synchronize with the especified cloud-provider. 
+
+Whenever the connector receives a message from `Lamassu CA` core-component, an event-driven compute service, AWS Lambda, mappes the operation to the corresponding lambda . AWS  is a serverless, event-driven compute service that lets you run code for virtually any type of application or backend service without provisioning or managing servers. The Lambda will communicate with `AWS IoT Core`.
 
 
 | **Event Type**                                                          | **Source**                            | **Description** |
@@ -145,12 +146,8 @@ Whenever the connector receives a message, an event-driven compute service, AWS 
 | io.lamassu.ca.import                                                    | lamassu/ca                            |                 |
 | io.lamassu.ca.update                                                    | lamassu/ca                            |                 |
 | io.lamassu.cert.update                                                  | lamassu/ca                            |                 |
-| [io.lamassu.iotcore.config.request](#io.lamassu.iotcore.config.request) | lamassu/aws-connector/${connector-id} |                 |
 | io.lamassu.iotcore.config.response                                      | aws/lambda                            |                 |
-| io.lamassu.iotcore.ca.registration.request-code                         | lamassu/aws-connector/${connector-id} |                 |
 | io.lamassu.iotcore.ca.registration.response-code                        | aws/lambda                            |                 |
-| io.lamassu.iotcore.ca.registration.signed-code                          | lamassu/aws-connector/${connector-id} |                 |
-| io.lamassu.iotcore.ca.policy.attach                                     | lamassu/aws-connector/${connector-id} |                 |
 | io.lamassu.iotcore.cert.update-status                                   | aws/cloud-trail                       |                 |
 | io.lamassu.iotcore.thing.config.request                                 | aws/lambda                            |                 |
 
@@ -226,6 +223,7 @@ Whenever the connector receives a message, an event-driven compute service, AWS 
 }
 ```
 
+
 ### io.lamassu.iotcore.thing.config.response
 
 ```json 
@@ -265,10 +263,6 @@ Whenever the connector receives a message, an event-driven compute service, AWS 
     ]
 }
 ```
-
-
-
- 
 
 ## References
 

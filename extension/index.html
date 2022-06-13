@@ -717,8 +717,6 @@
 <p><img alt="Screenshot" src="../img/architecture-full.png" /></p>
 <h2 id="the-amqp-queue">The AMQP Queue</h2>
 <p>To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (<code>Lamassu CA</code>, <code>Lamassu DeviceManager</code> and <code>Lamassu DMS Enroller</code>) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the <code>lamassu_events</code> queue.</p>
-<p>Each publish event follows the <a href="Cloud Event">https://cloudevents.io/</a> syntaxis.</p>
-<p>The asynchronous messages then synchronize with the especified cloud-provider. </p>
 <h2 id="cloud-proxy">Cloud Proxy</h2>
 <p>A proxy server acts as a gateway between the service and the internet, and verifies and forwards incoming client requests to other servers for further communication.</p>
 <h3 id="aws-services-used-by-lamassu">AWS Services used by Lamassu</h3>
@@ -790,7 +788,9 @@ aws lambda update-event-source-mapping --uuid $(cat outputs.json | jq -r .Lamass
 <li><code>cdk synth</code>       emits the synthesized CloudFormation template</li>
 </ul>
 <h2 id="aws-cloud-events">AWS Cloud-Events</h2>
-<p>Whenever the connector receives a message, an event-driven compute service, AWS Lambda, mappes the operation to the corresponding lambda . AWS  is a serverless, event-driven compute service that lets you run code for virtually any type of application or backend service without provisioning or managing servers. The Lambda will communicate with <code>AWS IoT Core</code>.</p>
+<p>Events triggered by <code>Lamassu DeviceManager</code> and <code>Lamassu DMS Enroller</code> send a petition directly to AWS using <code>AWS SDK</code>. </p>
+<p>Events published by <code>Lamassu CA</code> component, are treated differently, each event follows the <a href="Cloud Event">https://cloudevents.io/</a> syntaxis. The asynchronous messages then synchronize with the especified cloud-provider. </p>
+<p>Whenever the connector receives a message from <code>Lamassu CA</code> core-component, an event-driven compute service, AWS Lambda, mappes the operation to the corresponding lambda . AWS  is a serverless, event-driven compute service that lets you run code for virtually any type of application or backend service without provisioning or managing servers. The Lambda will communicate with <code>AWS IoT Core</code>.</p>
 <table>
 <thead>
 <tr>
@@ -821,33 +821,13 @@ aws lambda update-event-source-mapping --uuid $(cat outputs.json | jq -r .Lamass
 <td></td>
 </tr>
 <tr>
-<td><a href="#io.lamassu.iotcore.config.request">io.lamassu.iotcore.config.request</a></td>
-<td>lamassu/aws-connector/${connector-id}</td>
-<td></td>
-</tr>
-<tr>
 <td>io.lamassu.iotcore.config.response</td>
 <td>aws/lambda</td>
 <td></td>
 </tr>
 <tr>
-<td>io.lamassu.iotcore.ca.registration.request-code</td>
-<td>lamassu/aws-connector/${connector-id}</td>
-<td></td>
-</tr>
-<tr>
 <td>io.lamassu.iotcore.ca.registration.response-code</td>
 <td>aws/lambda</td>
-<td></td>
-</tr>
-<tr>
-<td>io.lamassu.iotcore.ca.registration.signed-code</td>
-<td>lamassu/aws-connector/${connector-id}</td>
-<td></td>
-</tr>
-<tr>
-<td>io.lamassu.iotcore.ca.policy.attach</td>
-<td>lamassu/aws-connector/${connector-id}</td>
 <td></td>
 </tr>
 <tr>

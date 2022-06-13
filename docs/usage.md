@@ -17,7 +17,7 @@ The first step to provision your devices with digital certificates is to create 
 
 ### Register a new Device Manufacturing System
 
-Lamassu is a PKI designed for the industrial and iot sector. To better integrate this PKI in real life manufacturing system, Lamassu delegates the issuance of device certificate to the factory itself. First lets dive into the Device Manufacturing System *(DMS for short)* registration step by step. After that, a couple of examples will demonstrate how to start enrolling your devices using the [Lamassu's Virtual DMS software](https://github.com/lamassuiot/lamassu-virtual-dms) as well as using the UI.
+Lamassu is a PKI designed for the industrial and IoT sector. To better integrate this PKI in real life manufacturing system, Lamassu delegates the issuance of device certificate to the factory itself. First lets dive into the Device Manufacturing System *(DMS for short)* registration step by step. After that, a couple of examples will demonstrate how to start enrolling your devices using the [Lamassu's Virtual DMS software](https://github.com/lamassuiot/lamassu-virtual-dms) as well as using the UI.
 
 Device manufacturing process tend to be highly automated. Provisioning the devices with digital identities should not slow down the fabrication process. Lamassu addresses this challenge introducing the DMS concept as core.
 
@@ -160,10 +160,16 @@ Let's first obtain the CA list for a particular DMS:
 
 ## Using the UI
 
-The UI is an easy manageable tool designed to ease the burdens to non-technical users in using Lamassu PKI.
+The UI is an easy manageable tool designed to ease the burdens to non-technical users in using Lamassu PKI. This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+
 
 ![Screenshot](img/lamassu-app.png#only-light)
 
+### Deployment
+
+This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
 
 ### Create a new Certification Authority
 

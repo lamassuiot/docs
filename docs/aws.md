@@ -17,12 +17,13 @@
 To extend Lamassu to AWS cloud, whenever a opperation is triggered, an asynchronous messages are send via Amazon Simple Queue Service.
 Amazon SQS offers the possibility of establishing a message queue to store messages while they wait to be processed by different computers that are connected to the Internet. These messages can contain notifications for applications or lists of commands to be executed by applications, either in the cloud or on the Internet, allowing you to create automated workflows.
 
-The messages arrive at AWS cloud via  `lamassu-aws-connector`. The connector uses two queues, one for request `lamassu-command` and another for responses, `lamassu-response`.
+The messages arrive at AWS cloud via  `lamassu-aws-connector`. The connector will send a request to a the SDK to communicate with AWS Cloud. 
+
 
 
 ## AWS Cloud Formation
 
-[AWS Cloud Formation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html) is a service that helps to model and  [set up](/docs/extension.md#aws-infraestructure-deployment) AWS resources to spend less time managing resources. You create a template that describes all the AWS resources that you want, and CloudFormation takes care of provisioning and configuring those resources for you. You don't need to individually create and configure AWS resources and figure out what's dependent on what. 
+[AWS Cloud Formation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html) is a service that helps to model and  [set up](/docs/extension.md#aws-infraestructure-deployment) AWS resources to spend less time managing resources. First, we need to create a template that describes the AWS resources that we want, then, CloudFormation takes care of provisioning and configuring those resources. There is no need to individually create and configure AWS resources and figure out what's dependent on what. 
 
 
 ## References

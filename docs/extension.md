@@ -14,35 +14,45 @@ Lamassu is no stranger to those concepts. In fact, Lamassu goes one step further
 * `Local registration authority (LRA)` -  is an optional part of a public key infrastructure that maintains users' identities from which certification authorities can issue Digital Certificates.
 
 
-Extending the PKI is a core principal for Lamassu. There are multiple ways to customize Lamassu to the required needs by just modifying one of the core components or by developing and adding new ones. This section will describe some decissions that have been addopted to provide an extensible PKI that is able to integrate with some cloud providers such as [AWS IoT Core](aws.md) or `Azure IoT Hub`.
+Extending the PKI is a core principal for Lamassu. There are multiple ways to customize Lamassu to the required needs by just modifying one of the core components or by developing and adding new ones. This section will describe some decissions that have been addopted to provide an extensible PKI that is able to integrate with some cloud providers such as [AWS IoT Core](/docs/aws.md#aws-iot-core) or [Azure IoT Hub](/docs/azure.md#azure-iot-hub-dps).
 
 
 ![Screenshot](img/architecture-full.png)
 
-## Rabbit MQ
+## The AMQP Queue
 
-RabbitMQ serves as an intermediary for efficient communication between Lamassu UI and Cloud-Proxy. The messages are published to broker's queue via amqp (Advanced Message Queuing Protocol).
+To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (`Lamassu CA`, `Lamassu DeviceManager` and `Lamassu DMS Enroller`) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the `lamassu_events` queue.
+
+Each publish event follows the [https://cloudevents.io/](Cloud Event) syntaxis.
+
+The asynchronous messages then synchronize with the especified cloud-provider. 
+
 
 ## Cloud Proxy
-A proxy server acts as a gateway between you and the internet, and verifies and forwards incoming client requests to other servers for further communication.
+A proxy server acts as a gateway between the service and the internet, and verifies and forwards incoming client requests to other servers for further communication.
 
-## AWS Services used by Lamassu
-For further detail, see [AWS Services used by Lamassu](aws.md)
+### AWS Services used by Lamassu
 
-- AWS SQS 
-- AWS Lambda
-- AWS IoT Core
-- AWS Cloud Formation
-
+- [AWS Lambda](aws.md#aws-lambda)
+- [AWS IoT Core](aws.md#aws-iot-core)
+- [AWS SQS](aws.md#aws-sqs)
+- [AWS Cloud Formation](aws.md#aws-cloud-formation)
 
 
-### Infraestructure Deployment
+### Azure Services used by Lamassu
+
+- [Azure functions](azure.md#azure-functions)
+- [Azure storage queue](azure.md#azure-queue-storage)
+- [Azure Iot Hub DPS](azure.md#azure-iot-hub-dps)
+
+
+##  AWS Infraestructure Deployment
 
 
 To deploy the structure in AWS to proper function with Lamassu, `AWS CDK` is used.
 The AWS Cloud Development Kit (AWS CDK) is an open-source software development framework to define your cloud application resources using familiar programming languages.
 
-#### Directory layout
+### Directory layout
 
 `/bin/lamassu-cdk.ts` app entry point. It creates objects of classes defined in /lib.
 
@@ -50,7 +60,7 @@ The AWS Cloud Development Kit (AWS CDK) is an open-source software development f
 
 `cdk.json` file tells the CDK Toolkit how to execute your app.
 
-#### Prerequisites
+### Prerequisites
 
 Install nodejs 14.X, npm and jq.
 
@@ -78,7 +88,7 @@ aws configure
 Provide your AWS access key ID, secret access key, and default region when prompted. You can also configure `.aws/credentials` file in your home directory instead.
 
 
-#### Usage
+### Usage
 
 
 > **NOTE**: As some AWS features used in this project are still not implemented in AWS CDK, some of the steps are done via CLI.
@@ -113,7 +123,7 @@ Remove Lamassu resources:
 cdk destroy LamassuCdkStack
 ```
 
-#### Useful commands
+### Useful commands
 
  * `npm run build`   compile typescript to js
  * `npm run watch`   watch for changes and compile
@@ -124,12 +134,7 @@ cdk destroy LamassuCdkStack
 
 
 
-### Cloud-Events
-
-To extend Lamassu to AWS cloud, whenever a opperation is triggered, an asynchronous messages are send via Amazon Simple Queue Service.
-Amazon SQS offers the possibility of establishing a message queue to store messages while they wait to be processed by different computers that are connected to the Internet. These messages can contain notifications for applications or lists of commands to be executed by applications, either in the cloud or on the Internet, allowing you to create automated workflows.
-
-The messages arrive at AWS cloud via  `lamassu-aws-connector`. The connector uses two queues, one for request `lamassu-command` and another for responses, `lamassu-response`.
+## AWS Cloud-Events
 
 Whenever the connector receives a message, an event-driven compute service, AWS Lambda, mappes the operation to the corresponding lambda . AWS  is a serverless, event-driven compute service that lets you run code for virtually any type of application or backend service without provisioning or managing servers. The Lambda will communicate with `AWS IoT Core`.
 
@@ -149,7 +154,7 @@ Whenever the connector receives a message, an event-driven compute service, AWS 
 | io.lamassu.iotcore.cert.update-status                                   | aws/cloud-trail                       |                 |
 | io.lamassu.iotcore.thing.config.request                                 | aws/lambda                            |                 |
 
-#### io.lamassu.ca.create
+### io.lamassu.ca.create
 
 ```json 
 {
@@ -168,7 +173,7 @@ Whenever the connector receives a message, an event-driven compute service, AWS 
 }
 ```
 
-#### io.lamassu.ca.import
+### io.lamassu.ca.import
 
 ```json 
 {
@@ -186,7 +191,7 @@ Whenever the connector receives a message, an event-driven compute service, AWS 
 }
 ```
 
-#### io.lamassu.ca.update
+### io.lamassu.ca.update
 
 ```json 
 {
@@ -203,7 +208,7 @@ Whenever the connector receives a message, an event-driven compute service, AWS 
 }
 ```
 
-#### io.lamassu.cert.update
+### io.lamassu.cert.update
 
 ```json 
 {
@@ -221,7 +226,7 @@ Whenever the connector receives a message, an event-driven compute service, AWS 
 }
 ```
 
-#### io.lamassu.iotcore.thing.config.response
+### io.lamassu.iotcore.thing.config.response
 
 ```json 
 {
@@ -262,14 +267,7 @@ Whenever the connector receives a message, an event-driven compute service, AWS 
 ```
 
 
-## Azure Services used by Lamassu
 
-For further detail, see [Azure Services used by Lamassu](azure.md)
-
-- Azure functions
-- Azure storage queue
-- Azure DPS
-- Azure Iot Hub
  
 
 ## References

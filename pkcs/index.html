@@ -13,7 +13,7 @@
     
     
       
-        <title>Lamassu Virtual Device - Lamassu IoT Docs</title>
+        <title>PKCS 11 - Lamassu IoT Docs</title>
       
     
     
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#lamassu-virtual-device" class="md-skip">
+        <a href="#pkcs-11" class="md-skip">
           Skip to content
         </a>
       
@@ -98,7 +98,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Lamassu Virtual Device
+              PKCS 11
             
           </span>
         </div>
@@ -338,6 +338,21 @@
 
   
   
+  
+    <li class="md-nav__item">
+      <a href="../virtualDevice/" class="md-nav__link">
+        Lamassu Virtual Device
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
     
   
   
@@ -350,12 +365,12 @@
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
-          Lamassu Virtual Device
+          PKCS 11
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        Lamassu Virtual Device
+        PKCS 11
       </a>
       
         
@@ -374,9 +389,77 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#lamassu-virtual-device-pages" class="md-nav__link">
-    Lamassu Virtual device pages
+  <a href="#softhsm" class="md-nav__link">
+    SoftHSM
   </a>
+  
+    <nav class="md-nav" aria-label="SoftHSM">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    Testing
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    Installation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#poc-setup" class="md-nav__link">
+    PoC setup
+  </a>
+  
+    <nav class="md-nav" aria-label="PoC setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regenerate-presharedkey-testpsk" class="md-nav__link">
+    Regenerate PreSharedKey test.psk
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hsm-server-build" class="md-nav__link">
+    HSM Server Build
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pkc11-client-build" class="md-nav__link">
+    PKC11 Client Build
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hsm-server-run" class="md-nav__link">
+    HSM Server Run
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pkc11-client-run" class="md-nav__link">
+    PKC11 Client Run
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -384,21 +467,6 @@
   
 </nav>
       
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../pkcs/" class="md-nav__link">
-        PKCS 11
-      </a>
     </li>
   
 
@@ -430,9 +498,77 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#lamassu-virtual-device-pages" class="md-nav__link">
-    Lamassu Virtual device pages
+  <a href="#softhsm" class="md-nav__link">
+    SoftHSM
   </a>
+  
+    <nav class="md-nav" aria-label="SoftHSM">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    Testing
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    Installation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#poc-setup" class="md-nav__link">
+    PoC setup
+  </a>
+  
+    <nav class="md-nav" aria-label="PoC setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regenerate-presharedkey-testpsk" class="md-nav__link">
+    Regenerate PreSharedKey test.psk
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hsm-server-build" class="md-nav__link">
+    HSM Server Build
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pkc11-client-build" class="md-nav__link">
+    PKC11 Client Build
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hsm-server-run" class="md-nav__link">
+    HSM Server Run
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pkc11-client-run" class="md-nav__link">
+    PKC11 Client Run
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -450,68 +586,111 @@
                 
 
 
-<h1 id="lamassu-virtual-device">Lamassu Virtual Device</h1>
-<p>To launch Lamassu-Virtual-Device follow the next steps:</p>
-<ol>
-<li>Clone the repository and get into the directory: <code>https://github.com/lamassuiot/lamassu-virtual-device.git &amp;&amp; cd lamassu-virtual-device</code>.</li>
-<li>Change the configuration variables of the <code>config.json</code> file.</li>
-</ol>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;certificates_dir&quot;: &quot;&lt;DEVICES_CERTIFICATES&gt;&quot;, // Folder where device certificates are stored
-    &quot;devmanager&quot;: {
-        &quot;est_server&quot;: &quot;&lt;DEVICE_MANAGER_SERVER&gt;&quot;, // Device Manager Server Endpoint
-        &quot;cert&quot;:&quot;&lt;DEVMANAGER_CERT&gt;&quot; // Public certificate to connect to the device-manager
-    },
-    &quot;aws&quot;:{
-        &quot;iot_core_ca_file&quot;: &quot;&lt;AWS_CA_CERT&gt;&quot;, // AWS IoT Core CA Certificate
-        &quot;iot_core_endpoint&quot;: &quot;&lt;AWS_ENDPOINT&gt;&quot;, // AWS IoT Core endpoint
-        &quot;test_lambda&quot;: &quot;&lt;LAMBDA&gt;&quot; // Lambda name
-    }
-}
+<h1 id="pkcs-11">PKCS 11</h1>
+<p>Lamassu has a Go implementation of the PKCS 11 standard. It has been tested with SoftHSM.SoftHSM is an implementation of a cryptographic store accessible through a PKCS #11 interface.</p>
+<p>This is an implementation of the standard Golang crypto interfaces that
+uses <a href="http://docs.oasis-open.org/pkcs11/pkcs11-base/v2.40/errata01/os/pkcs11-base-v2.40-errata01-os-complete.html">PKCS#11</a> as a backend. The supported features are:</p>
+<ul>
+<li>Generation and retrieval of RSA, DSA and ECDSA keys.</li>
+<li>Importing and retrieval of x509 certificates</li>
+<li>PKCS#1 v1.5 signing.</li>
+<li>PKCS#1 PSS signing.</li>
+<li>PKCS#1 v1.5 decryption</li>
+<li>PKCS#1 OAEP decryption</li>
+<li>ECDSA signing.</li>
+<li>DSA signing.</li>
+<li>Random number generation.</li>
+<li>AES and DES3 encryption and decryption.</li>
+<li>HMAC support.</li>
+</ul>
+<p>Signing is done through the
+<a href="https://golang.org/pkg/crypto/#Signer">crypto.Signer</a> interface and
+decryption through
+<a href="https://golang.org/pkg/crypto/#Decrypter">crypto.Decrypter</a>.</p>
+<p>To verify signatures or encrypt messages, retrieve the public key and do it in software.</p>
+<p>See <a href="https://godoc.org/github.com/ThalesIgnite/crypto11">the documentation</a> for details of various limitations,
+especially regarding symmetric crypto.</p>
+<h2 id="softhsm">SoftHSM</h2>
+<ul>
+<li>
+<p>Make it use a custom configuration file <code>export SOFTHSM_CONF=$PWD/softhsm.conf</code></p>
+</li>
+<li>
+<p>Then use <code>softhsm</code> to init it</p>
+<div class="highlight"><pre><span></span><code>softhsm --init-token --slot 0 --label test --pin 1234
 </code></pre></div>
-3. <code>config.json</code> file with default values</p>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;certificates_dir&quot;: &quot;/home/$USER/virtual-dms-data/devices_certificates&quot;,
-    &quot;devmanager&quot;: {
-        &quot;est_server&quot;: &quot;dev.lamassu.io/api/devmanager&quot;,
-        &quot;cert&quot;:&quot;&lt;DEVMANAGER_CERT&gt;&quot;
-    },
-    &quot;aws&quot;:{
-        &quot;iot_core_ca_file&quot;: &quot;&lt;AWS_CA_CERT&gt;&quot;,
-        &quot;iot_core_endpoint&quot;: &quot;&lt;AWS_ENDPOINT&gt;&quot;,
-        &quot;test_lambda&quot;: &quot;&lt;LAMBDA&gt;&quot;
-    }
-}
+</li>
+<li>
+<p>Then use <code>libsofthsm2.so</code> as the pkcs11 module:</p>
+<div class="highlight"><pre><span></span><code><span class="nx">p</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pkcs11</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="s">&quot;/usr/lib/softhsm/libsofthsm2.so&quot;</span><span class="p">)</span><span class="w"></span>
 </code></pre></div>
-In case of not using the Virtual-DMS to register the devices, in the directory where the certificates are stored the certificates and keys must be created with the following format:
-<div class="highlight"><pre><span></span><code>    ├── devices_certificates
-    │   ├── device-&lt;DMS_NAME&gt;-&lt;DEVICE_ID&gt;
-    │   │   ├── certificates
-    │   │   │   ├── &lt;CERT_SN&gt;.crt   &lt;----- Provide your Device certificate
-    │   │   │   └── ...
-    │   │   ├── &lt;DEVICE_ID&gt;.csr     &lt;----- Provide your Device certificate request
-    │   │   └── &lt;DEVICE_ID&gt;.key     &lt;----- Provide your Device private key
-    │   └── ...
-    └── dms_certificates
-        ├── dms-&lt;DMS_ID&gt;.crt     &lt;----- Provide your DMS certificate
-        └── dms-&lt;DMS_ID&gt;.key     &lt;----- Provide your DMS private key
-</code></pre></div>
-4. Run the Lamassu-Virtua-Device UI:
-    <div class="highlight"><pre><span></span><code>go run cmd/main.go
+</li>
+</ul>
+<h3 id="testing">Testing</h3>
+<p>To set up a slot:
+<div class="highlight"><pre><span></span><code>    $ cat softhsm2.conf
+    directories.tokendir = /home/rjk/go/src/github.com/ThalesIgnite/crypto11/tokens
+    objectstore.backend = file
+    log.level = INFO
+    $ mkdir tokens
+    $ export SOFTHSM2_CONF=`pwd`/softhsm2.conf
+    $ softhsm2-util --init-token --slot 0 --label test
+    === SO PIN (4-255 characters) ===
+    Please enter SO PIN: ********
+    Please reenter SO PIN: ********
+    === User PIN (4-255 characters) ===
+    Please enter user PIN: ********
+    Please reenter user PIN: ********
+    The token has been initialized.
 </code></pre></div></p>
-<h2 id="lamassu-virtual-device-pages">Lamassu Virtual device pages</h2>
-<p>Lamassu Virtual Device has the following pages:</p>
+<p>The configuration looks like this:
+<div class="highlight"><pre><span></span><code>    $ cat config
+    {
+      &quot;Path&quot; : &quot;/usr/lib/softhsm/libsofthsm2.so&quot;,
+      &quot;TokenLabel&quot;: &quot;test&quot;,
+      &quot;Pin&quot; : &quot;password&quot;
+    }
+</code></pre></div></p>
+<h2 id="installation">Installation</h2>
+<p>Since v1.0.0, crypto11 requires Go v1.11+. Install the library by running:</p>
+<div class="highlight"><pre><span></span><code>go get github.com/ThalesIgnite/crypto11
+</code></pre></div>
+<p>The crypto11 library needs to be configured with information about your PKCS#11 installation. This is either done programmatically
+(see the <code>Config</code> struct in <a href="https://godoc.org/github.com/ThalesIgnite/crypto11">the documentation</a>) or via a configuration
+file. The configuration file is a JSON representation of the <code>Config</code> struct.</p>
+<p>A minimal configuration file looks like this:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">&quot;Path&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/usr/lib/softhsm/libsofthsm2.so&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">&quot;TokenLabel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;token1&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">&quot;Pin&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;password&quot;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
 <ul>
-<li>Device Information View: a page showing each device's information. Choose from the dropdown the DeviceId and the Serial Number of the Certificateof to visualize the details.</li>
+<li><code>Path</code> points to the library from your PKCS#11 vendor.</li>
+<li><code>TokenLabel</code> is the <code>CKA_LABEL</code> of the token you wish to use.</li>
+<li><code>Pin</code> is the password for the <code>CKU_USER</code> user.</li>
 </ul>
-<p><img alt="Device Information View" src="../img/device-info.png" /></p>
-<ul>
-<li>AWS Integration: a page to check AWS connectivity</li>
-</ul>
-<p><img alt="AWS" src="../img/aws.png" /></p>
-<ul>
-<li>Reenroll: each device has the option to reenroll</li>
-</ul>
+<h2 id="poc-setup">PoC setup</h2>
+<h3 id="regenerate-presharedkey-testpsk">Regenerate PreSharedKey test.psk</h3>
+<div class="highlight"><pre><span></span><code>psk=$(openssl rand -base64 18 | xxd -p)
+echo &quot;test:$psk&quot; &gt; test.psk
+</code></pre></div>
+<h3 id="hsm-server-build">HSM Server Build</h3>
+<div class="highlight"><pre><span></span><code>docker build -f softhsm-v2.Dockerfile -t softhsmv2 . 
+</code></pre></div>
+<h3 id="pkc11-client-build">PKC11 Client Build</h3>
+<div class="highlight"><pre><span></span><code>docker build -f pkcs11-client.Dockerfile -t pkcs11-client .
+</code></pre></div>
+<h3 id="hsm-server-run">HSM Server Run</h3>
+<div class="highlight"><pre><span></span><code>docker run -it -p 5657:5657 --name hsm softhsmv2
+</code></pre></div>
+<h3 id="pkc11-client-run">PKC11 Client Run</h3>
+<p><div class="highlight"><pre><span></span><code>docker run -it --link=hsm:hsm pkcs11-client bash
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>./pkcs11-go-client -module=/usr/local/lib/libpkcs11-proxy.so -pin=1234
+./crypto11-go-client -module /usr/local/lib/libpkcs11-proxy.so -token-label=lamassuHSM -pin=1234
+pkcs11-tool --module=/usr/local/lib/libpkcs11-proxy.so -L
+</code></pre></div></p>
 
               
             </article>
@@ -527,7 +706,7 @@ In case of not using the Virtual-DMS to register the devices, in the directory w
     <nav class="md-footer__inner md-grid" aria-label="Footer" >
       
         
-        <a href="../virtualDMS/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Lamassu Virtual DMS" rel="prev">
+        <a href="../virtualDevice/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Lamassu Virtual Device" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -536,26 +715,11 @@ In case of not using the Virtual-DMS to register the devices, in the directory w
               <span class="md-footer__direction">
                 Previous
               </span>
-              Lamassu Virtual DMS
+              Lamassu Virtual Device
             </div>
           </div>
         </a>
       
-      
-        
-        <a href="../pkcs/" class="md-footer__link md-footer__link--next" aria-label="Next: PKCS 11" rel="next">
-          <div class="md-footer__title">
-            <div class="md-ellipsis">
-              <span class="md-footer__direction">
-                Next
-              </span>
-              PKCS 11
-            </div>
-          </div>
-          <div class="md-footer__button md-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
-          </div>
-        </a>
       
     </nav>
   

@@ -292,7 +292,20 @@ Lamassu provides easy to use GO clients for most of its APIs to help speeding up
         ```
         export CREATE_CA_RESP=$(curl -k -s --location --request POST "https://$CA_ADDR/v1/pki/$CA_NAME" --header "Authorization: Bearer ${TOKEN}" --header 'Content-Type: application/json' --data-raw "{\"ca_ttl\": 262800, \"enroller_ttl\": 175200, \"subject\":{ \"common_name\": \"$CA_NAME\",\"country\": \"ES\",\"locality\": \"Arrasate\",\"organization\": \"LKS Next, S. Coop\",\"state\": \"Gipuzkoa\"},\"key_metadata\":{\"bits\": 4096,\"type\": \"RSA\"}}")
         ```
-### Internal usage
+
+
+## Running Unit tests
+
+```
+#For pretty printing
+go install github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@v2.3.1
+
+
+go test -json -v ./pkg/ca/server/api/service/ | gotestfmt
+go test -json -v ./pkg/dms-enroller/server/api/service/ | gotestfmt
+go test -json -v ./pkg/device-manager/server/api/service/ | gotestfmt
+```
+
 
 
 #### Filtering, Sorting and Pagination

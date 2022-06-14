@@ -14,7 +14,7 @@ Lamassu is no stranger to those concepts. In fact, Lamassu goes one step further
 * `Local registration authority (LRA)` -  is an optional part of a public key infrastructure that maintains users' identities from which certification authorities can issue Digital Certificates.
 
 
-Extending the PKI is a core principal for Lamassu. There are multiple ways to customize Lamassu to the required needs by just modifying one of the core components or by developing and adding new ones. This section will describe some decissions that have been addopted to provide an extensible PKI that is able to integrate with some cloud providers such as [AWS IoT Core](/docs/aws.md#aws-iot-core) or [Azure IoT Hub](/docs/azure.md#azure-iot-hub-dps).
+Extending the PKI is a core principal for Lamassu. There are multiple ways to customize Lamassu to the required needs by just modifying one of the core components or by developing and adding new ones. This section will describe some decissions that have been addopted to provide an extensible PKI that is able to integrate with some cloud providers such as [AWS IoT Core](/docs/aws.md#aws-iot-core) or [Azure IoT Hub](/docs/azure.md#azure-iot-hub).
 
 
 ![Screenshot](img/architecture-full.png)
@@ -40,7 +40,9 @@ A proxy server acts as a gateway between the service and the internet, and verif
 
 - [Azure functions](azure.md#azure-functions)
 - [Azure storage queue](azure.md#azure-queue-storage)
+- [Azure Iot Hub](azure.md#azure-iot-hub)
 - [Azure Iot Hub DPS](azure.md#azure-iot-hub-dps)
+
 
 
 ##  AWS Infraestructure Deployment

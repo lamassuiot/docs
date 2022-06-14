@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../img/favicon.png">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.3.3">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.16">
     
     
       
@@ -17,12 +17,11 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.4a0965b7.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.1c3799f8.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.cbb835fc.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.cc9b2e1e.min.css">
         
-      
       
     
     
@@ -295,37 +294,24 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#deploy-aws-and-azure-pki-connectors" class="md-nav__link">
-    Deploy AWS and Azure PKI connectors
+  <a href="#deploy-aws-iot-core-connectors" class="md-nav__link">
+    Deploy AWS IoT Core connectors
   </a>
   
-    <nav class="md-nav" aria-label="Deploy AWS and Azure PKI connectors">
+    <nav class="md-nav" aria-label="Deploy AWS IoT Core connectors">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#configuring-aws-connector" class="md-nav__link">
-    Configuring AWS connector
-  </a>
-  
-    <nav class="md-nav" aria-label="Configuring AWS connector">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+  <a href="#requirements_1" class="md-nav__link">
+    Requirements
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
-    Usage
+  <a href="#deployment" class="md-nav__link">
+    Deployment
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -560,37 +546,24 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#deploy-aws-and-azure-pki-connectors" class="md-nav__link">
-    Deploy AWS and Azure PKI connectors
+  <a href="#deploy-aws-iot-core-connectors" class="md-nav__link">
+    Deploy AWS IoT Core connectors
   </a>
   
-    <nav class="md-nav" aria-label="Deploy AWS and Azure PKI connectors">
+    <nav class="md-nav" aria-label="Deploy AWS IoT Core connectors">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#configuring-aws-connector" class="md-nav__link">
-    Configuring AWS connector
-  </a>
-  
-    <nav class="md-nav" aria-label="Configuring AWS connector">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+  <a href="#requirements_1" class="md-nav__link">
+    Requirements
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
-    Usage
+  <a href="#deployment" class="md-nav__link">
+    Deployment
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -951,74 +924,67 @@ docker-compose up -d dms-default
 </ol>
 </li>
 </ol>
-<h2 id="deploy-aws-and-azure-pki-connectors">Deploy AWS and Azure PKI connectors</h2>
-<h3 id="configuring-aws-connector">Configuring AWS connector</h3>
-<h4 id="prerequisites">Prerequisites</h4>
+<h2 id="deploy-aws-iot-core-connectors">Deploy AWS IoT Core connectors</h2>
+<h3 id="requirements_1">Requirements</h3>
+<p>In order tu run the connector, you must have:</p>
+<ul>
+<li>
+<p>NodeJS: <a href="https://nodejs.org/en/">https://nodejs.org/en/</a></p>
+</li>
+<li>
+<p>AWS CDK v1: <a href="https://docs.aws.amazon.com/cdk/v1/guide/cli.html">https://docs.aws.amazon.com/cdk/v1/guide/cli.html</a></p>
+</li>
+</ul>
+<h3 id="deployment">Deployment</h3>
 <ol>
-<li><strong><em>Option 1</em></strong>: Install go. <a href="https://go.dev/doc/install">(Go installation guide)</a></li>
-<li><strong><em>Option 2</em></strong>: run the AWS connector in Docker. <a href="https://docs.docker.com/engine/install/">(Docker installation guide)</a></li>
+<li>
+<p>Download the AWS Connector source code:
+    <div class="highlight"><pre><span></span><code>git clone https://github.com/lamassuiot/lamassu-aws-connector.git
+</code></pre></div></p>
+</li>
+<li>
+<p>Configure the AWS Credentials. Those values will be used by the Lamassu AWS Connector as well as the CDK.
+    <div class="highlight"><pre><span></span><code>export AWS_ACCESS_KEY_ID=&lt;AWS_ACCESS_KEY_ID&gt;
+export AWS_SECRET_ACCESS_KEY=&lt;AWS_SECRET_ACCESS_KEY&gt;
+export AWS_ACCOUNT_ID=&lt;AWS_ACCOUNT_ID&gt;
+export AWS_DEFAULT_REGION=&lt;AWS_DEFAULT_REGION&gt;
+</code></pre></div></p>
+</li>
+<li>
+<p>Provide a friendly name for the Lamassu AWS Connector. This name will be displayed in the UI
+    <div class="highlight"><pre><span></span><code>export CONNECTOR_NAME=Lamassu IoT AWS Account
+</code></pre></div></p>
+</li>
+<li>
+<p>Substitute the aws-connector <code>.env</code> file:
+    <div class="highlight"><pre><span></span><code>envsubst &lt; .env | tee .env
+</code></pre></div></p>
+</li>
+<li>
+<p>Generate the TLS certificates used by the connector. You must have access to the main CA certificate and private key that where generated during Lamassu installation. 
+    <div class="highlight"><pre><span></span><code>export INTERNAL_CA_CERT=&lt;CHANGE_TO_LAMASSU_INSTALLATION_PATH&gt;/tls-certificates/upstream/ca.crt
+export INTERNAL_CA_KEY=&lt;CHANGE_TO_LAMASSU_INSTALLATION_PATH&gt;/tls-certificates/upstream/ca.key
+</code></pre></div>
+    After defining those variables, run the following OpenSSL commands:
+    <div class="highlight"><pre><span></span><code>openssl genrsa -out aws.key 4096
+openssl req -new -key aws-connector.key -out aws-connector.csr -subj &quot;/CN=aws-connector&quot; 
+openssl x509 -req -extfile &lt;(printf &quot;subjectAltName=DNS:aws-connector&quot;) -in upstream/$1/tls.csr -days 365 -CA $INTERNAL_CA_CERT -CAkey $INTERNAL_CA_KEY -CAcreateserial -out aws.crt
+</code></pre></div></p>
+</li>
+<li>
+<p>Deploy the required AWS services by using the CDK:
+    <div class="highlight"><pre><span></span><code>cdk deploy
+</code></pre></div></p>
+</li>
+<li>
+<p>Start the connector:
+    <div class="highlight"><pre><span></span><code>docker-compose up -d
+</code></pre></div></p>
+</li>
 </ol>
-<h4 id="usage">Usage</h4>
-<p>Needed environment variables:</p>
-<div class="highlight"><pre><span></span><code># AWS credentials
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_DEFAULT_REGION=
-
-# AWS ATS root certificate
-AWS_CA_BUNDLE=awsRootCA.pem
-
-# RabbitMQ configuration: port, host and certificates
-AMQP_PORT=5671
-AMQP_HOST=dev-lamassu.zpd.ikerlan.es
-AMQP_SERVER_CA_CERT=/ca.crt
-AMQP_CLIENT_CERT=/tls.crt
-AMQP_CLIENT_KEY=/tls.key
-
-# Lamassu CA configuration
-LAMASSU_CA_ADDRESS=https://lamassu-ca:8087
-LAMASSU_CA_CERT_FILE=//ca.crt
-LAMASSU_CA_CLIENT_CERT_FILE=tls.crt
-LAMASSU_CA_CLIENT_KEY_FILE=tls.key
-
-# Consul configuration
-CONSUL_PROTOCOL=https
-CONSUL_HOST=consul-server
-CONSUL_PORT=8501
-CONSUL_CA=/ca.crt
-
-# AWS Connector configuration
-CONNECTOR_PORT=8989
-CONNECTOR_TYPE=aws
-CONNECTOR_PROTOCOL=http
-CONNECTOR_NAME=aws-connector-ikerlan
-
-# Configuration for jaeger tracing
-JAEGER_SERVICE_NAME=aws-connector
-JAEGER_AGENT_HOST=jaeger
-JAEGER_AGENT_PORT=&quot;6831&quot;
-JAEGER_SAMPLER_TYPE=const
-JAEGER_SAMPLER_PARAM=&quot;1&quot;
-JAEGER_REPORTER_LOG_SPANS=&quot;false&quot;
-</code></pre></div>
-<blockquote>
-<p><img alt="⚠" class="twemoji" src="https://twemoji.maxcdn.com/v/latest/svg/26a0.svg" title=":warning:" /> <strong><em>Remember to change env variables depending where you run AWS connector</em></strong></p>
-</blockquote>
-<p><strong><em>Option 1</em></strong>: Running AWS Connector</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span> aws-connector
-go run cmd/main.go
-</code></pre></div>
-<p><strong><em>Option 2</em></strong>: Running the connector on Docker:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span> aws-connector
-docker-compose up -d
-</code></pre></div>
-<blockquote>
-<p><strong><em>*NOTE</em></strong>*: It is better to run it on Docker.</p>
-</blockquote>
 
               
             </article>
-            
           </div>
         </div>
         
@@ -1026,8 +992,7 @@ docker-compose up -d
       
         <footer class="md-footer">
   
-    
-    <nav class="md-footer__inner md-grid" aria-label="Footer" >
+    <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
         <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: Welcome to Lamassu Iot Docs" rel="prev">
@@ -1113,10 +1078,10 @@ docker-compose up -d
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.b028fd86.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.f758a944.min.js"></script>
+      <script src="../assets/javascripts/bundle.3a4b43e5.min.js"></script>
       
     
   </body>

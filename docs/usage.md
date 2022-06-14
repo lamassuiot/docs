@@ -17,7 +17,7 @@ The first step to provision your devices with digital certificates is to create 
 
 ### Register a new Device Manufacturing System
 
-Lamassu is a PKI designed for the industrial and iot sector. To better integrate this PKI in real life manufacturing system, Lamassu delegates the issuance of device certificate to the factory itself. First lets dive into the Device Manufacturing System *(DMS for short)* registration step by step. After that, a couple of examples will demonstrate how to start enrolling your devices using the [Lamassu's Virtual DMS software](https://github.com/lamassuiot/lamassu-virtual-dms) as well as using the UI.
+Lamassu is a PKI designed for the industrial and IoT sector. To better integrate this PKI in real life manufacturing system, Lamassu delegates the issuance of device certificate to the factory itself. First lets dive into the Device Manufacturing System *(DMS for short)* registration step by step. After that, a couple of examples will demonstrate how to start enrolling your devices using the [Lamassu's Virtual DMS software](https://github.com/lamassuiot/lamassu-virtual-dms) as well as using the UI.
 
 Device manufacturing process tend to be highly automated. Provisioning the devices with digital identities should not slow down the fabrication process. Lamassu addresses this challenge introducing the DMS concept as core.
 
@@ -42,6 +42,11 @@ Finally, the DMS is able to request new x509 certificates for its manufactured d
 <figure markdown>
   ![](img/dms-step4.png)
 </figure>
+
+!!! note
+    Envoy is used as an API gateway in this project. Currently Envoy is written to use Boring SSl as the TLS provider. It does not support secp224r1 signing method, which is used to create ECDSA224 keys.
+    Therefore, enroll and reenroll methods will return a error when using this key. 
+
 
 Let's register a new DMS instance:
 
@@ -96,6 +101,7 @@ Let's register a new DMS instance:
   ```
   curl -k "https://$DOMAIN/api/dmsenroller/v1/$DMS_ID" --header "Authorization: Bearer $OPERATOR_TOKEN" | jq -r .crt | base64 -d > dms.crt 
   ```
+
 
 ### Provision your devices with x509 Certificates
 
@@ -152,6 +158,74 @@ Let's first obtain the CA list for a particular DMS:
   openssl x509 -text -in device-cert.pem
   ```
 
+## Using the UI
+
+The UI is an easy manageable tool designed to ease the burdens to non-technical users in using Lamassu PKI. This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+
+
+![Screenshot](img/lamassu-app.png#only-light)
+
+### Deployment
+
+This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+
+### Create a new Certification Authority
+
+There are two methos of creating a new CA from the UI.
+
+The first one, filling the following form taking into account the following things:
+
+- Lamassu supports both `RSA` and `EC` based CAs.
+- The CA name MUST be unique.
+- The CA expiration time must be greater than the lifespan of the issued certs.
+
+![](img/ca-registration.png)
+![](img/ca-info.png) 
+
+The other one, will be importing it. A Certificate and a Private Key will be required.
+
+![](img/ca-import.png) 
+
+
+### Registration of a DMS using the UI
+
+Using the UI, creating a new DMS is as simple as filling the following form. 
+
+![Screenshot](img/dms-registration.png#only-light)
+
+
+Once the DMS has been created successfully, a prompt showing the generated private key will be shown. It is encouraged to download it just after the creation as this prompt will be shown only once.
+
+![Screenshot](img/pk.png#only-light)
+
+The status of the new created DMS will be `Pending Approval`, to approve it, we must select at least one CA from the list of registered CAs. The selected CAs will be the authorised ones to sign certificates from now on. 
+
+![Screenshot](img/dms-authroization-cas.png#only-light)
+
+
+![Screenshot](img/dms-list.png#only-light)
+
+### Registration of a device using the UI
+
+
+To create a device, we will need to fill the following form taking into account:
+
+- A device identification must be provided.
+- A DMS must be assigned.
+
+![Screenshot](img/device-register.png#only-light)
+
+Each device can have certificates signed by different authorised CAs.
+
+![Screenshot](img/device-slots.png#only-light)
+
+The certificates of each device as well as the cloud-connectors will be showned.
+
+![Screenshot](img/device-info.png#only-light)
+
+
 ## Using the APIs
 
 The main 3 Open API documentation can be found on the following urls:
@@ -207,5 +281,58 @@ Lamassu provides easy to use GO clients for most of its APIs to help speeding up
     }
     ```
 === "Curl"
+    Define the DOMAIN, TOKEN and CA_NAME
+        ```
+        export AUTH_ADDR=auth.$DOMAIN 
+        export TOKEN=$(curl -k --location --request POST "https://$AUTH_ADDR/auth/realms/lamassu/protocol/openid-connect/token" --header 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'grant_type=password' --data-urlencode 'client_id=frontend' --data-urlencode 'username=enroller' --data-urlencode 'password=enroller' | jq -r .access_token)
+        export CA_ADDR=$DOMAIN/api/ca
+        export CA_NAME=$(uuidgen)
+        ```
+    Creting CA
+        ```
+        export CREATE_CA_RESP=$(curl -k -s --location --request POST "https://$CA_ADDR/v1/pki/$CA_NAME" --header "Authorization: Bearer ${TOKEN}" --header 'Content-Type: application/json' --data-raw "{\"ca_ttl\": 262800, \"enroller_ttl\": 175200, \"subject\":{ \"common_name\": \"$CA_NAME\",\"country\": \"ES\",\"locality\": \"Arrasate\",\"organization\": \"LKS Next, S. Coop\",\"state\": \"Gipuzkoa\"},\"key_metadata\":{\"bits\": 4096,\"type\": \"RSA\"}}")
+        ```
 
-### Internal usage
+
+## Running Unit tests
+
+```
+#For pretty printing
+go install github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@v2.3.1
+
+
+go test -json -v ./pkg/ca/server/api/service/ | gotestfmt
+go test -json -v ./pkg/dms-enroller/server/api/service/ | gotestfmt
+go test -json -v ./pkg/device-manager/server/api/service/ | gotestfmt
+```
+
+
+
+#### Filtering, Sorting and Pagination
+
+Lamassu API supports filtering, sorting and pagination.
+
+The filter can be form by the following parameters, being each of them optional:
+
+- `filter= attribute[operator]=value`
+- `sort_by=attribute.[asc|desc]`
+- `limit=value` . Limits the maximun number of results of the query
+- `offset=value` . In addition to `limit`, implements pagination. It defines the index of the first value from the resulting query.
+
+!!! Example
+       
+
+    ```
+     /v1/devices?filter=id[contains]=device_id&sort_by=id.asc&limit=100&offset=15
+
+     /v1?filter=id[contains]=dms_id&sort_by=id.desc
+    ```
+
+##### Operators
+
+Depending of the data type of the parameters, the supported operators will vary.
+
+- Strings : `equals`, `notequals`, `contains`, `notcontains`
+- Dates: `before`, `after`, `is`, `isnot`
+- Enums: `is`, `isnot`
+- Numbers: `lessthan`, `greaterthan`, `lessorequal`, `gretaerorequal`, `equal`, `notequal`

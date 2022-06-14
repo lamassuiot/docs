@@ -88,6 +88,7 @@ If the Virtual-DMS is not used to create the DMS, in the directory where the cer
 
 1. Create the DMS, once the DMS is created, the Auto_Enroll of the devices is done.
 
-![virtualDMSUI](img/CreateDMS.PNG)
+![virtualDMSUI](img/CreateDMS.png)
 2. Make the Auto_Enroll of the devices indicating the ID of a DMS.
-![virtualDMSUI](img/AutoEnroll.PNG)
+
+![virtualDMSUI](img/AutoEnroll.png)

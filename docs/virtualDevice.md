@@ -61,11 +61,11 @@ Lamassu Virtual Device has the following pages:
 
 - Device Information View: a page showing each device's information. Choose from the dropdown the DeviceId and the Serial Number of the Certificateof to visualize the details.
 
-![Device Information View](img/DeviceInfo.PNG)
+![Device Information View](img/device-info.png)
 
 - AWS Integration: a page to check AWS connectivity
 
-![AWS](img/aws.PNG)
+![AWS](img/aws.png)
 
 - Reenroll: each device has the option to reenroll
 

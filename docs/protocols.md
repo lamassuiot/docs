@@ -762,5 +762,3 @@ The core mechanism to obtain valid certificates for your devices is using the en
         openssl base64 -d -in crt.p7 | openssl pkcs7 -inform DER -outform PEM -print_certs -out device.pem
 
         ```
-<https://datatracker.ietf.org/doc/html/rfc7030>
-

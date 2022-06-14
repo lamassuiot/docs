@@ -358,12 +358,17 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#internal-usage" class="md-nav__link">
-    Internal usage
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-unit-tests" class="md-nav__link">
+    Running Unit tests
   </a>
   
-    <nav class="md-nav" aria-label="Internal usage">
+    <nav class="md-nav" aria-label="Running Unit tests">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -378,11 +383,6 @@
   <a href="#operators" class="md-nav__link">
     Operators
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -655,12 +655,17 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#internal-usage" class="md-nav__link">
-    Internal usage
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-unit-tests" class="md-nav__link">
+    Running Unit tests
   </a>
   
-    <nav class="md-nav" aria-label="Internal usage">
+    <nav class="md-nav" aria-label="Running Unit tests">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -675,11 +680,6 @@
   <a href="#operators" class="md-nav__link">
     Operators
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -947,7 +947,15 @@ Creting CA
 </div>
 </div>
 </div>
-<h3 id="internal-usage">Internal usage</h3>
+<h2 id="running-unit-tests">Running Unit tests</h2>
+<div class="highlight"><pre><span></span><code>#For pretty printing
+go install github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@v2.3.1
+
+
+go test -json -v ./pkg/ca/server/api/service/ | gotestfmt
+go test -json -v ./pkg/dms-enroller/server/api/service/ | gotestfmt
+go test -json -v ./pkg/device-manager/server/api/service/ | gotestfmt
+</code></pre></div>
 <h4 id="filtering-sorting-and-pagination">Filtering, Sorting and Pagination</h4>
 <p>Lamassu API supports filtering, sorting and pagination.</p>
 <p>The filter can be form by the following parameters, being each of them optional:</p>

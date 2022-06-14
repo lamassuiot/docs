@@ -387,6 +387,61 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#detailed-jitpd" class="md-nav__link">
+    Detailed JITPD
+  </a>
+  
+    <nav class="md-nav" aria-label="Detailed JITPD">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-create-ca-in-aws-iot-core" class="md-nav__link">
+    Step 1: Create CA in AWS Iot Core
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-create-jitp-role" class="md-nav__link">
+    Step 2: Create JITP Role
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-attach-a-jitp-template-to-ca-on-iot-core" class="md-nav__link">
+    Step 3: Attach a JITP template to CA on IoT Core
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-issue-a-device-certificate-with-that-ca" class="md-nav__link">
+    Step 4: Issue a device certificate with that CA.
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-load-the-certificate-in-the-device" class="md-nav__link">
+    Step 5: Load the certificate in the device
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-connect-to-the-iot-core-enpoint-using-that-certificate" class="md-nav__link">
+    Step 6: Connect to the IoT Core Enpoint using that certificate.
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#references" class="md-nav__link">
     References
   </a>
@@ -501,6 +556,61 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#detailed-jitpd" class="md-nav__link">
+    Detailed JITPD
+  </a>
+  
+    <nav class="md-nav" aria-label="Detailed JITPD">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-create-ca-in-aws-iot-core" class="md-nav__link">
+    Step 1: Create CA in AWS Iot Core
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-create-jitp-role" class="md-nav__link">
+    Step 2: Create JITP Role
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-attach-a-jitp-template-to-ca-on-iot-core" class="md-nav__link">
+    Step 3: Attach a JITP template to CA on IoT Core
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-issue-a-device-certificate-with-that-ca" class="md-nav__link">
+    Step 4: Issue a device certificate with that CA.
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-load-the-certificate-in-the-device" class="md-nav__link">
+    Step 5: Load the certificate in the device
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-connect-to-the-iot-core-enpoint-using-that-certificate" class="md-nav__link">
+    Step 6: Connect to the IoT Core Enpoint using that certificate.
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#references" class="md-nav__link">
     References
   </a>
@@ -526,7 +636,7 @@
 <p>You can have your devices provisioned when they first attempt to connect to AWS IoT with <strong><em>just-in-time provisioning (JITP)</em></strong>. To provision the device, you must enable automatic registration and associate a provisioning template with the CA certificate used to sign the device certificate.</p>
 <p>When a device attempts to connect to AWS IoT by using a certificate signed by a registered CA certificate, AWS IoT loads the template from the CA certificate and uses it to register the thing. The JITP workflow first registers a certificate with a status value of PENDING_ACTIVATION. When the device provisioning flow is complete, the status of the certificate is changed to ACTIVE.</p>
 <h2 id="prerequisites">Prerequisites</h2>
-<p>To perform the tests in we need the following prerequisites:</p>
+<p>To perform the tests, we need the following prerequisites:</p>
 <ul>
 <li>Install jq and mosquitto-clients
 <div class="highlight"><pre><span></span><code>apt install jq
@@ -536,16 +646,13 @@ apt install mosquitto-clients
 </ul>
 <h2 id="flow">Flow</h2>
 <ol>
-<li>First we need to create a certificate authority and upload it to AWS.</li>
+<li>Create a certificate authority and upload it to AWS.</li>
 <li>Attach a JITP template to the CA in AWS IoT Core. </li>
-<li>Enable auto-registration for that CA in AWS</li>
+<li>Enable auto-registration for that CA in AWS.</li>
 <li>Issue a certificate with that CA.</li>
 <li>Load the certificate in the device</li>
 <li>Connect to the IoT Core Enpoint using that certificate.</li>
 </ol>
-<blockquote>
-<p><strong><em>NOTE</em></strong>* : For more information about each step, visit <a href="docs/jitp/detailed_jitp.md">Detailed flow</a></p>
-</blockquote>
 <p>The device will automatically register in AWS IoT Core with the corresponding certificate and the certificate would be attached to the policy stated in the JITP template. Now the device can interact with AWS.</p>
 <blockquote>
 <p><img alt="⚠" class="twemoji" src="https://twemoji.maxcdn.com/v/latest/svg/26a0.svg" title=":warning:" /> <strong><em>NOTE</em></strong>* : Device fails to connect to AWS on first attempt. </p>
@@ -581,6 +688,171 @@ apt install mosquitto-clients
 </blockquote>
 </li>
 </ol>
+<h2 id="detailed-jitpd">Detailed JITPD</h2>
+<h3 id="step-1-create-ca-in-aws-iot-core">Step 1: Create CA in AWS Iot Core</h3>
+<hr />
+<p>AWS IoT Core requires to upload a verification certificate to be uploaded to register a CA certificate. A verification certificate is a certificate signed by that CA, this way we proof the CA we are uploading is ours.</p>
+<p>First we have to create a test CA certificate using openssl. For that we create a test OpenSSL config file: 
+<div class="highlight"><pre><span></span><code>mkdir openssl
+touch openssl/deviceRootCA_openssl.conf
+</code></pre></div>
+deviceRootCA_openssl.conf:
+<div class="highlight"><pre><span></span><code>tee openssl/deviceRootCA_openssl.conf <span class="s">&lt;&lt;EOF</span>
+<span class="s">[ req ]</span>
+<span class="s">distinguished_name       = req_distinguished_name</span>
+<span class="s">extensions               = v3_ca</span>
+<span class="s">req_extensions           = v3_ca</span>
+
+<span class="s">[ v3_ca ]</span>
+<span class="s">basicConstraints         = CA:TRUE</span>
+
+<span class="s">[ req_distinguished_name ]</span>
+<span class="s">countryName              = Country Name (2 letter code)</span>
+<span class="s">countryName_default      = IN</span>
+<span class="s">countryName_min          = 2</span>
+<span class="s">countryName_max          = 2</span>
+<span class="s">organizationName         = Organization Name (eg, company)</span>
+<span class="s">organizationName_default = AMZ</span>
+<span class="s">EOF</span>
+</code></pre></div></p>
+<p>Now create a folder to store the certificates that will be issued:
+<div class="highlight"><pre><span></span><code>mkdir -p test/certs
+</code></pre></div>
+Generate device CA private key:
+<div class="highlight"><pre><span></span><code>openssl genrsa -out test/certs/deviceRootCA.key <span class="m">2048</span> 
+<span class="sb">````</span>
+Create CSR <span class="k">for</span> device root:
+
+<span class="sb">```</span>bash
+openssl req -new -sha256 -key test/certs/deviceRootCA.key -nodes -out test/certs/deviceRootCA.csr -config openssl/deviceRootCA_openssl.conf -subj <span class="s2">&quot;/C=ES/O=testCAName&quot;</span> 
+</code></pre></div>
+Creating CA certificate:
+<div class="highlight"><pre><span></span><code>openssl x509 -req -days <span class="m">3650</span> -extfile openssl/deviceRootCA_openssl.conf -extensions v3_ca -in test/certs/deviceRootCA.csr -signkey test/certs/deviceRootCA.key -out test/certs/deviceRootCA.pem 
+</code></pre></div></p>
+<p>Getting CA registration code from your AWS region:
+<div class="highlight"><pre><span></span><code><span class="nb">export</span> <span class="nv">region</span><span class="o">=</span>&lt;your AWS region&gt;
+<span class="nb">export</span> <span class="nv">reg_code</span><span class="o">=</span><span class="k">$(</span>aws iot get-registration-code --region <span class="nv">$region</span> <span class="p">|</span> jq -r .registrationCode<span class="k">)</span> 
+</code></pre></div>
+Generation private key for CA verification certificate:
+<div class="highlight"><pre><span></span><code>openssl genrsa -out test/certs/verificationCert.key <span class="m">2048</span> 
+</code></pre></div>
+Generating CSR for CA verification certificate:
+<div class="highlight"><pre><span></span><code>openssl req -new -key test/certs/verificationCert.key -out test/certs/verificationCert.csr -subj <span class="s2">&quot;/C=ES/ST=Gipuzkoa/L=Arrasate/O=testCAName/OU=Lamassu/CN=</span><span class="nv">$reg_code</span><span class="s2">&quot;</span>
+</code></pre></div>
+Generating CA verification certificate:
+<div class="highlight"><pre><span></span><code>openssl x509 -req -in test/certs/verificationCert.csr -CA test/certs/deviceRootCA.pem -CAkey test/certs/deviceRootCA.key -CAcreateserial -out test/certs/verificationCert.crt -days <span class="m">500</span> -sha256 
+</code></pre></div>
+Once the CA certificate is created and the verification certificate is signed we can upload the CA to AWS IoT Core:
+<div class="highlight"><pre><span></span><code><span class="nb">export</span> <span class="nv">certificate_id</span><span class="o">=</span><span class="k">$(</span>aws iot register-ca-certificate --ca-certificate file://test/certs/deviceRootCA.pem  --verification-cert file://test/certs/verificationCert.crt --set-as- <span class="p">|</span> jq -r .certificateId<span class="k">)</span> 
+</code></pre></div></p>
+<h3 id="step-2-create-jitp-role">Step 2: Create JITP Role</h3>
+<hr />
+<p>To create service Role for JITP follow the following link: <a href="https://aws.amazon.com/es/blogs/iot/setting-up-just-in-time-provisioning-with-aws-iot-core/">JITP Role</a></p>
+<h3 id="step-3-attach-a-jitp-template-to-ca-on-iot-core">Step 3: Attach a JITP template to CA on IoT Core</h3>
+<hr />
+<p>Attach the registration configuration file to the CA uploaded in the previous step.
+First create a policy:
+<div class="highlight"><pre><span></span><code>mkdir templates
+touch templates/policy.json
+</code></pre></div>
+Export AWS account number
+<div class="highlight"><pre><span></span><code><span class="nb">export</span> <span class="nv">aws_account</span><span class="o">=</span>&lt;your account number&gt;
+</code></pre></div>
+templates/policy.json
+<div class="highlight"><pre><span></span><code>tee templates/policy.json <span class="s">&lt;&lt;EOF</span>
+<span class="s">{</span>
+<span class="s">  &quot;Version&quot;: &quot;2012-10-17&quot;,</span>
+<span class="s">  &quot;Statement&quot;: [</span>
+<span class="s">    {</span>
+<span class="s">      &quot;Effect&quot;: &quot;Allow&quot;,</span>
+<span class="s">      &quot;Action&quot;: [</span>
+<span class="s">        &quot;iot:Connect&quot;</span>
+<span class="s">      ],</span>
+<span class="s">      &quot;Resource&quot;: [</span>
+<span class="s">        &quot;arn:aws:iot:eu-west-1:$aws_account:client/${iot:Connection.Thing.ThingName}&quot;</span>
+<span class="s">      ]</span>
+<span class="s">    },</span>
+<span class="s">    {</span>
+<span class="s">      &quot;Effect&quot;: &quot;Allow&quot;,</span>
+<span class="s">      &quot;Action&quot;: [</span>
+<span class="s">        &quot;iot:Publish&quot;,</span>
+<span class="s">        &quot;iot:Receive&quot;</span>
+<span class="s">      ],</span>
+<span class="s">      &quot;Resource&quot;: [</span>
+<span class="s">        &quot;arn:aws:iot:eu-west-1:$aws_account:topic/${iot:Connection.Thing.ThingName}/*&quot;</span>
+<span class="s">      ]</span>
+<span class="s">    },</span>
+<span class="s">    {</span>
+<span class="s">      &quot;Effect&quot;: &quot;Allow&quot;,</span>
+<span class="s">      &quot;Action&quot;: [</span>
+<span class="s">        &quot;iot:Subscribe&quot;</span>
+<span class="s">      ],</span>
+<span class="s">      &quot;Resource&quot;: [</span>
+<span class="s">        &quot;arn:aws:iot:eu-west-1:$aws_account:topicfilter/${iot:Connection.Thing.ThingName}/*&quot;</span>
+<span class="s">      ]</span>
+<span class="s">    }</span>
+<span class="s">  ]</span>
+<span class="s">}</span>
+<span class="s">EOF</span>
+</code></pre></div></p>
+<p>Register policy in AWS:
+<div class="highlight"><pre><span></span><code>aws iot create-policy --policy-name lamassu-test-policy --policy-document file://templates/policy.json
+</code></pre></div></p>
+<p>Create the JITP template:
+templates/jitp_template.json
+<div class="highlight"><pre><span></span><code>tee templates/jitp_template.json <span class="s">&lt;&lt;EOF</span>
+<span class="s">{</span>
+<span class="s">&quot;templateBody&quot; : &quot;{ \&quot;Parameters\&quot; : { \&quot;AWS::IoT::Certificate::CommonName\&quot;: { \&quot;Type\&quot;: \&quot;String\&quot; }, \&quot;AWS::IoT::Certificate::SerialNumber\&quot;: {  \&quot;Type\&quot;: \&quot;String\&quot; }, \&quot;AWS::IoT::Certificate::Id\&quot;: { \&quot;Type\&quot;: \&quot;String\&quot; } }, \&quot;Resources\&quot;: { \&quot;thing\&quot;: { \&quot;Type\&quot;: \&quot;AWS::IoT::Thing\&quot;, \&quot;Properties\&quot;: { \&quot;ThingName\&quot;: {\&quot;Ref\&quot;: \&quot;AWS::IoT::Certificate::CommonName\&quot;  }, \&quot;AttributePayload\&quot;: {} }}, \&quot;certificate\&quot;: { \&quot;Type\&quot;: \&quot;AWS::IoT::Certificate\&quot;, \&quot;Properties\&quot;: { \&quot;CertificateId\&quot;: {\&quot;Ref\&quot;: \&quot;AWS::IoT::Certificate::Id\&quot; }, \&quot;Status\&quot;: \&quot;ACTIVE\&quot; }}, \&quot;policy\&quot;: { \&quot;Type\&quot;: \&quot;AWS::IoT::Policy\&quot;, \&quot;Properties\&quot;: { \&quot;PolicyName\&quot;: \&quot;lamassu-test-policy\&quot; } }}}&quot;,</span>
+<span class="s">&quot;roleArn&quot;:&quot;arn:aws:iam::$aws_account:role/JITPRole&quot;</span>
+<span class="s">}</span>
+<span class="s">EOF</span>
+</code></pre></div></p>
+<blockquote>
+<p><strong><em>NOTE</em></strong>: If policy name is changed it must be also changed in JITP template templateBody field.</p>
+</blockquote>
+<p>Update the CA certificate created in Step 1.</p>
+<div class="highlight"><pre><span></span><code>aws iot update-ca-certificate --certificate-id <span class="nv">$certificate_id</span> --new-auto-registration-status ENABLE --registration-config file://templates/jitp_template.json
+</code></pre></div>
+<h3 id="step-4-issue-a-device-certificate-with-that-ca">Step 4: Issue a device certificate with that CA.</h3>
+<hr />
+<p>Generate device private key:
+<div class="highlight"><pre><span></span><code>openssl genrsa -out test/certs/deviceCert.key <span class="m">2048</span> 
+</code></pre></div></p>
+<p>Generating CSR for device:
+<div class="highlight"><pre><span></span><code>openssl req -new -key test/certs/deviceCert.key -out test/certs/deviceCert.csr -subj <span class="s2">&quot;/C=ES/ST=Gipuzkoa/L=Arrasate/O=testCAName/OU=Lamassu/CN=testdeviceLamassu&quot;</span>
+</code></pre></div></p>
+<p>Generating device certificate:
+<div class="highlight"><pre><span></span><code>openssl x509 -req -in test/certs/deviceCert.csr -CA test/certs/deviceRootCA.pem -CAkey test/certs/deviceRootCA.key -CAcreateserial -out test/certs/deviceCert.crt -days <span class="m">365</span> -sha256 
+</code></pre></div></p>
+<p>Create certificate chain for the device:
+<div class="highlight"><pre><span></span><code>cat test/certs/deviceCert.crt test/certs/deviceRootCA.pem &gt; test/certs/deviceCertAndCACert.crt
+</code></pre></div></p>
+<p>Downloading AWS Root CA certificate, it is needed to check IoT Core endpoint certificate:
+<div class="highlight"><pre><span></span><code>wget https://www.amazontrust.com/repository/AmazonRootCA1.pem -O test/certs/awsRootCA.pem
+</code></pre></div></p>
+<h3 id="step-5-load-the-certificate-in-the-device">Step 5: Load the certificate in the device</h3>
+<hr />
+<p>If a test device is used, you need to the following files into it:
+* test/certs/awsRootCA.
+* test/certs/deviceCertAndCACert.crt
+* test/certs/deviceCert.crt
+* test/certs/deviceCert.key</p>
+<h2 id="step-6-connect-to-the-iot-core-enpoint-using-that-certificate">Step 6: Connect to the IoT Core Enpoint using that certificate.</h2>
+<hr />
+<p>First, get the IoT Core Endpoint:
+<div class="highlight"><pre><span></span><code><span class="nb">export</span> <span class="nv">iot_endpoint</span><span class="o">=</span><span class="k">$(</span>aws iot describe-endpoint --endpoint-type iot:Data-ATS <span class="p">|</span> jq -r .endpointAddress<span class="k">)</span>
+</code></pre></div>
+Test connection to IoT Core:
+ <code>bash
+mosquitto_pub --cafile test/certs/awsRootCA.pem  \
+              --cert test/certs/deviceCertAndCACert.crt \
+              --key test/certs/deviceCert.key \
+              -h $iot_endpoint \
+              -p 8883 -q 1 \
+              -t testdeviceLamassu -i testdeviceLamassu -m "hello JITP" -d</code></p>
+<blockquote>
+<p><strong><em>NOTE</em></strong>: Topic should start with device common name \<common name>/* and device ID (-i flag) should be equal to certificate common name.</p>
+</blockquote>
 <h2 id="references">References</h2>
 <ul>
 <li><strong><em>AWS JITP example</em></strong>: <a href="https://aws.amazon.com/es/blogs/iot/setting-up-just-in-time-provisioning-with-aws-iot-core/">JITP demo example</a></li>

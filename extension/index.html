@@ -646,7 +646,7 @@
 <ul>
 <li><code>Local registration authority (LRA)</code> -  is an optional part of a public key infrastructure that maintains users' identities from which certification authorities can issue Digital Certificates.</li>
 </ul>
-<p>Extending the PKI is a core principal for Lamassu. There are multiple ways to customize Lamassu to the required needs by just modifying one of the core components or by developing and adding new ones. This section will describe some decissions that have been addopted to provide an extensible PKI that is able to integrate with some cloud providers such as <a href="/docs/aws.md#aws-iot-core">AWS IoT Core</a> or <a href="/docs/azure.md#azure-iot-hub-dps">Azure IoT Hub</a>.</p>
+<p>Extending the PKI is a core principal for Lamassu. There are multiple ways to customize Lamassu to the required needs by just modifying one of the core components or by developing and adding new ones. This section will describe some decissions that have been addopted to provide an extensible PKI that is able to integrate with some cloud providers such as <a href="/docs/aws.md#aws-iot-core">AWS IoT Core</a> or <a href="/docs/azure.md#azure-iot-hub">Azure IoT Hub</a>.</p>
 <p><img alt="Screenshot" src="../img/architecture-full.png" /></p>
 <h2 id="the-amqp-queue">The AMQP Queue</h2>
 <p>To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (<code>Lamassu CA</code>, <code>Lamassu DeviceManager</code> and <code>Lamassu DMS Enroller</code>) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the <code>lamassu_events</code> queue.</p>
@@ -663,6 +663,7 @@
 <ul>
 <li><a href="../azure/#azure-functions">Azure functions</a></li>
 <li><a href="../azure/#azure-queue-storage">Azure storage queue</a></li>
+<li><a href="../azure/#azure-iot-hub">Azure Iot Hub</a></li>
 <li><a href="../azure/#azure-iot-hub-dps">Azure Iot Hub DPS</a></li>
 </ul>
 <h2 id="aws-infraestructure-deployment">AWS Infraestructure Deployment</h2>

@@ -294,51 +294,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../aws/" class="md-nav__link">
-        AWS Services used by Lamassu
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../azure/" class="md-nav__link">
-        Azure Services used by Lamassu
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../jitp/" class="md-nav__link">
-        JITP (Just In Time Provisioning)
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../virtualDMS/" class="md-nav__link">
         Lamassu Virtual DMS
       </a>
@@ -363,40 +318,9 @@
         
       
       
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Lamassu Virtual Device
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
       <a href="./" class="md-nav__link md-nav__link--active">
         Lamassu Virtual Device
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#lamassu-virtual-device-pages" class="md-nav__link">
-    Lamassu Virtual device pages
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
       
     </li>
   
@@ -437,21 +361,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#lamassu-virtual-device-pages" class="md-nav__link">
-    Lamassu Virtual device pages
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -465,67 +374,48 @@
 
 
 <h1 id="lamassu-virtual-device">Lamassu Virtual Device</h1>
-<p>To launch Lamassu-Virtual-Device follow the next steps:</p>
+<p><img alt="Virtual Device" src="../img/vdevice-info.png" /></p>
+<p>It is recommended to follow this directory layout when deploying different Lamassu tools:
+    <div class="highlight"><pre><span></span><code>$HOME/
+     ├── lamassu-compose
+     ├── lamassu-virtual-device
+     └── lamassu-virtual-dms
+</code></pre></div>
+Make sure to define the following variable with the absolute path</p>
+<div class="highlight"><pre><span></span><code>LAMASSU_COMPOSE_DIR=$HOME/lamassu-compose
+LAMASSU_VDMS_DIR=$HOME/lamassu-virtual-dms
+</code></pre></div>
 <ol>
-<li>Clone the repository and get into the directory: <code>https://github.com/lamassuiot/lamassu-virtual-device.git &amp;&amp; cd lamassu-virtual-device</code>.</li>
-<li>Change the configuration variables of the <code>config.json</code> file.</li>
-</ol>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;certificates_dir&quot;: &quot;&lt;DEVICES_CERTIFICATES&gt;&quot;, // Folder where device certificates are stored
-    &quot;devmanager&quot;: {
-        &quot;est_server&quot;: &quot;&lt;DEVICE_MANAGER_SERVER&gt;&quot;, // Device Manager Server Endpoint
-        &quot;cert&quot;:&quot;&lt;DEVMANAGER_CERT&gt;&quot; // Public certificate to connect to the device-manager
-    },
-    &quot;aws&quot;:{
-        &quot;iot_core_ca_file&quot;: &quot;&lt;AWS_CA_CERT&gt;&quot;, // AWS IoT Core CA Certificate
-        &quot;iot_core_endpoint&quot;: &quot;&lt;AWS_ENDPOINT&gt;&quot;, // AWS IoT Core endpoint
-        &quot;test_lambda&quot;: &quot;&lt;LAMBDA&gt;&quot; // Lambda name
-    }
-}
-</code></pre></div>
-3. <code>config.json</code> file with default values</p>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;certificates_dir&quot;: &quot;/home/$USER/virtual-dms-data/devices_certificates&quot;,
-    &quot;devmanager&quot;: {
-        &quot;est_server&quot;: &quot;dev.lamassu.io/api/devmanager&quot;,
-        &quot;cert&quot;:&quot;&lt;DEVMANAGER_CERT&gt;&quot;
-    },
-    &quot;aws&quot;:{
-        &quot;iot_core_ca_file&quot;: &quot;&lt;AWS_CA_CERT&gt;&quot;,
-        &quot;iot_core_endpoint&quot;: &quot;&lt;AWS_ENDPOINT&gt;&quot;,
-        &quot;test_lambda&quot;: &quot;&lt;LAMBDA&gt;&quot;
-    }
-}
-</code></pre></div>
-In case of not using the Virtual-DMS to register the devices, in the directory where the certificates are stored the certificates and keys must be created with the following format:
-<div class="highlight"><pre><span></span><code>    ├── devices_certificates
-    │   ├── device-&lt;DMS_NAME&gt;-&lt;DEVICE_ID&gt;
-    │   │   ├── certificates
-    │   │   │   ├── &lt;CERT_SN&gt;.crt   &lt;----- Provide your Device certificate
-    │   │   │   └── ...
-    │   │   ├── &lt;DEVICE_ID&gt;.csr     &lt;----- Provide your Device certificate request
-    │   │   └── &lt;DEVICE_ID&gt;.key     &lt;----- Provide your Device private key
-    │   └── ...
-    └── dms_certificates
-        ├── dms-&lt;DMS_ID&gt;.crt     &lt;----- Provide your DMS certificate
-        └── dms-&lt;DMS_ID&gt;.key     &lt;----- Provide your DMS private key
-</code></pre></div>
-4. Run the Lamassu-Virtua-Device UI:
-    <div class="highlight"><pre><span></span><code>go run cmd/main.go
+<li>
+<p>Clone the repository and get into the directory: 
+    <div class="highlight"><pre><span></span><code>git clone https://github.com/lamassuiot/lamassu-virtual-device.git
+cd lamassu-virtual-device
 </code></pre></div></p>
-<h2 id="lamassu-virtual-device-pages">Lamassu Virtual device pages</h2>
-<p>Lamassu Virtual Device has the following pages:</p>
-<ul>
-<li>Device Information View: a page showing each device's information. Choose from the dropdown the DeviceId and the Serial Number of the Certificateof to visualize the details.</li>
-</ul>
-<p><img alt="Device Information View" src="../img/device-info.png" /></p>
-<ul>
-<li>AWS Integration: a page to check AWS connectivity</li>
-</ul>
-<p><img alt="AWS" src="img/aws.png" /></p>
-<ul>
-<li>Reenroll: each device has the option to reenroll</li>
-</ul>
+</li>
+<li>
+<p>Basic Virtual Device configuration:</p>
+<p>2.1 Specify the directory where enrolled device certificates (and keys) are stored:
+    <div class="highlight"><pre><span></span><code>export VDEV_DEVICE_CERTIFICATES_DIR=$LAMASSU_VDMS_DIR/devices_certificates
+</code></pre></div>
+2.2 Specify the URL pointing to the EST server:
+    <div class="highlight"><pre><span></span><code>export VDEV_EST_SERVER_URL=dev.lamassu.io/api/devmanager
+</code></pre></div>
+2.3 Specify the public certificate used by the EST server:
+    <div class="highlight"><pre><span></span><code>export VDEV_EST_SERVER_CERT=$LAMASSU_COMPOSE_DIR/tls-certificates/downstream/tls.crt
+</code></pre></div></p>
+</li>
+<li>
+<p><em>Optional</em> - Configure the device to connect to AWS IoT core:
+    3.1 Define the AWS IoT core endpoint to be used. Replace the <code>xxxxxx</code> with the appropriated value as well as the AWS Region to be used: 
+        <div class="highlight"><pre><span></span><code>VDEV_AWS_IOT_CORE_ENDPOINT=xxxxxx-ats.iot.eu-west-1.amazonaws.com
+</code></pre></div></p>
+</li>
+<li>
+<p>Run the Virtual Device:
+    <div class="highlight"><pre><span></span><code>./run.sh
+</code></pre></div></p>
+</li>
+</ol>
 
               
             </article>

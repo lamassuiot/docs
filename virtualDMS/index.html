@@ -292,51 +292,6 @@
 
   
   
-  
-    <li class="md-nav__item">
-      <a href="../aws/" class="md-nav__link">
-        AWS Services used by Lamassu
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../azure/" class="md-nav__link">
-        Azure Services used by Lamassu
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../jitp/" class="md-nav__link">
-        JITP (Just In Time Provisioning)
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
     
   
   
@@ -348,40 +303,9 @@
         
       
       
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Lamassu Virtual DMS
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
       <a href="./" class="md-nav__link md-nav__link--active">
         Lamassu Virtual DMS
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#lamassu-virtual-dms-operating-modes" class="md-nav__link">
-    Lamassu Virtual DMS operating modes
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
       
     </li>
   
@@ -437,21 +361,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#lamassu-virtual-dms-operating-modes" class="md-nav__link">
-    Lamassu Virtual DMS operating modes
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -465,87 +374,46 @@
 
 
 <h1 id="lamassu-virtual-dms">Lamassu Virtual DMS</h1>
-<p>To launch Lamassu-Virtual-DMS follow the next steps:</p>
+<p><img alt="virtualDMSUI" src="../img/dms-enroll.png" /></p>
+<p>It is recommended to follow this directory layout when deploying different Lamassu tools:
+    <div class="highlight"><pre><span></span><code>$HOME/
+     ├── lamassu-compose
+     ├── lamassu-virtual-device
+     └── lamassu-virtual-dms
+</code></pre></div>
+Make sure to define the following variable with the absolute path</p>
+<div class="highlight"><pre><span></span><code>LAMASSU_COMPOSE_DIR=$HOME/lamassu-compose
+</code></pre></div>
 <ol>
-<li>Clone the repository and get into the directory: <code>https://github.com/lamassuiot/lamassu-virtual-dms.git &amp;&amp; cd lamassu-virtual-dms</code>.</li>
-<li>Change the configuration variables of the <code>config.json</code> file.</li>
-</ol>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;dms&quot;: {
-        &quot;device_store&quot;: &quot;&lt;DEVICES_STORE&gt;&quot;, // Folder where device certificates are stored
-        &quot;dms_store&quot;: &quot;&lt;DMS_STORE&gt;&quot;, // Folder where DMS certificates are stored
-        &quot;endpoint&quot;:&quot;&lt;DMS_SERVER&gt;&quot;, // DMS server endpoint
-        &quot;dms_name&quot;:&quot;&lt;DEFAULT_DMS&gt;&quot;, // DMS Name
-        &quot;common_name&quot;:&quot;&lt;DEFAULT_DMS&gt;&quot;, // Common_name to create the CSR
-        &quot;country&quot;:&quot;&lt;COUNTRY&gt;&quot;, // Country to create the CSR
-        &quot;locality&quot;:&quot;&lt;LOCALITY&gt;&quot;, // Locality to create the CSR
-        &quot;organization&quot;:&quot;&lt;ORGANIZATION&gt;&quot;, // Organization to create the CSR
-        &quot;organization_unit&quot;:&quot;&lt;ORGANIZATION_UNIT&gt;&quot;, // Organization_unit to create the CSR
-        &quot;state&quot;:&quot;&lt;STATE&gt;&quot; // State to create the CSR
-
-
-    },
-    &quot;devmanager&quot;:{
-        &quot;devcrt&quot;: &quot;&lt;DEV_CERTIFICATE&gt;&quot;, // Public certificate to connect to the device-manager
-        &quot;addr&quot;: &quot;&lt;DEVMANAGER_SERVER&gt;&quot; //Device Manager Server Endpoint
-    },
-    &quot;auth&quot;:{
-        &quot;endpoint&quot;:&quot;&lt;AUTH_SERVER&gt;&quot;, // Authentication Server endpoint
-        &quot;username&quot;:&quot;&lt;PASSWORD&gt;&quot;, // User name to connect to the authentication server
-        &quot;password&quot;:&quot;&lt;PASSWORD&gt;&quot; // Password to connect to the authentication server
-
-    }
-}
-</code></pre></div>
-3. Create directories to store DMS and device certificates</p>
-<p><div class="highlight"><pre><span></span><code>    mkdir -p /home/$USER/virtual-dms-data/devices_certificates
-    mkdir -p /home/$USER/virtual-dms-data/dms_certificates
-</code></pre></div>
-4. <code>config.json</code> file with default values</p>
-<p><div class="highlight"><pre><span></span><code>{
-    &quot;dms&quot;: {
-        &quot;device_store&quot;: &quot;/home/$USER/virtual-dms-data/devices_certificates&quot;,
-        &quot;dms_store&quot;: &quot;/home/$USER/virtual-dms-data/dms_certificates&quot;,
-        &quot;endpoint&quot;:&quot;dev.lamassu.io/api/dmsenroller&quot;,
-        &quot;dms_name&quot;:&quot;Virtual DMS&quot;,
-        &quot;common_name&quot;:&quot;Virtual DMS&quot;,
-        &quot;country&quot;:&quot;ES&quot;,
-        &quot;locality&quot;:&quot;Mondragon&quot;,
-        &quot;organization&quot;:&quot;LKS&quot;,
-        &quot;organization_unit&quot;:&quot;LKS PKI&quot;,
-        &quot;state&quot;:&quot;Guipuzcoa&quot;
-
-
-    },
-    &quot;devmanager&quot;:{
-        &quot;devcrt&quot;: &quot;&lt;DEV_CERTIFICATE&gt;&quot;,
-        &quot;addr&quot;: &quot;dev.lamassu.io/api/devmanager&quot;
-    },
-    &quot;auth&quot;:{
-        &quot;endpoint&quot;:&quot;auth.dev.lamassu.io&quot;,
-        &quot;username&quot;:&quot;enroller&quot;,
-        &quot;password&quot;:&quot;enroller&quot;
-    }
-}
-</code></pre></div>
-5. Run the Lamassu-Default-DMS UI:
-    <div class="highlight"><pre><span></span><code>go run cmd/main.go
+<li>
+<p>Clone the repository and get into the directory: 
+    <div class="highlight"><pre><span></span><code>git clone https://github.com/lamassuiot/lamassu-virtual-dms.git 
+cd lamassu-virtual-dms
 </code></pre></div></p>
-<h2 id="lamassu-virtual-dms-operating-modes">Lamassu Virtual DMS operating modes</h2>
-<p>The virtual DMS has two modes of operation, on the one hand, there is the mode of creating a DMS and once the DMS is created and approved, the devices are automatically enrolled using the DMS. On the other hand, if a DMS has already been created and approved, devices can be directly enrolled without having to create a DMS. In the second case it is necessary to make sure that the certificate and the DMS key are in the directory where the DMS certificates are stored.</p>
-<p>If the Virtual-DMS is not used to create the DMS, in the directory where the certificates are stored, the certificates and keys must be created with the following format:
-<div class="highlight"><pre><span></span><code>    ├── devices_certificates
-    │   └── ...
-    └── dms_certificates
-        ├── dms-&lt;DMS_ID&gt;.crt     &lt;----- Provide your certificate
-        └── dms-&lt;DMS_ID&gt;.key     &lt;----- Provide your private key
+</li>
+<li>
+<p>Basic Virtual DMS configuration:</p>
+<p>2.2 Configure the domain used by lamassu:
+<div class="highlight"><pre><span></span><code>export VDMS_DOMAIN=dev.lamassu.io
 </code></pre></div></p>
-<ol>
-<li>Create the DMS, once the DMS is created, the Auto_Enroll of the devices is done.</li>
+<p>2.2 Provide the operator credentials to be used while creating a new DMS instance:
+<div class="highlight"><pre><span></span><code>export VDMS_USERNAME=enroller
+export VDMS_PASSWORD=enroller
+</code></pre></div></p>
+<p>2.3 Specify the default values while creating a new DMS instance:
+<div class="highlight"><pre><span></span><code>export VDMS_COUNTRY=ES
+export VDMS_STATE=gipuzkoa
+export VDMS_LOCALITY=donostia
+export VDMS_ORGANIZATION=lamassu
+export VDMS_ORGANIZATION_UNIT=iot
+</code></pre></div></p>
+</li>
+<li>
+<p>Run the DMS application:
+    <div class="highlight"><pre><span></span><code>run.sh
+</code></pre></div></p>
+</li>
 </ol>
-<p><img alt="virtualDMSUI" src="img/CreateDMS.png" />
-2. Make the Auto_Enroll of the devices indicating the ID of a DMS.</p>
-<p><img alt="virtualDMSUI" src="img/AutoEnroll.png" /></p>
 
               
             </article>
@@ -559,7 +427,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../jitp/" class="md-footer__link md-footer__link--prev" aria-label="Previous: JITP (Just In Time Provisioning)" rel="prev">
+        <a href="../extension/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Extending Lamassu" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -568,7 +436,7 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              JITP (Just In Time Provisioning)
+              Extending Lamassu
             </div>
           </div>
         </a>

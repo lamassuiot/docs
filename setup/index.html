@@ -396,51 +396,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../aws/" class="md-nav__link">
-        AWS Services used by Lamassu
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../azure/" class="md-nav__link">
-        Azure Services used by Lamassu
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../jitp/" class="md-nav__link">
-        JITP (Just In Time Provisioning)
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../virtualDMS/" class="md-nav__link">
         Lamassu Virtual DMS
       </a>
@@ -966,14 +921,16 @@ export AWS_DEFAULT_REGION=&lt;AWS_DEFAULT_REGION&gt;
 export INTERNAL_CA_KEY=&lt;CHANGE_TO_LAMASSU_INSTALLATION_PATH&gt;/tls-certificates/upstream/ca.key
 </code></pre></div>
     After defining those variables, run the following OpenSSL commands:
-    <div class="highlight"><pre><span></span><code>openssl genrsa -out aws.key 4096
+    <div class="highlight"><pre><span></span><code>openssl genrsa -out aws-connector.key 4096
 openssl req -new -key aws-connector.key -out aws-connector.csr -subj &quot;/CN=aws-connector&quot; 
-openssl x509 -req -extfile &lt;(printf &quot;subjectAltName=DNS:aws-connector&quot;) -in upstream/$1/tls.csr -days 365 -CA $INTERNAL_CA_CERT -CAkey $INTERNAL_CA_KEY -CAcreateserial -out aws.crt
+openssl x509 -req -extfile &lt;(printf &quot;subjectAltName=DNS:aws-connector&quot;) -in aws-connector.csr -days 365 -CA $INTERNAL_CA_CERT -CAkey $INTERNAL_CA_KEY -CAcreateserial -out aws.crt
 </code></pre></div></p>
 </li>
 <li>
 <p>Deploy the required AWS services by using the CDK:
-    <div class="highlight"><pre><span></span><code>cdk deploy
+    <div class="highlight"><pre><span></span><code>cd aws-connector
+npm i
+cdk deploy
 </code></pre></div></p>
 </li>
 <li>

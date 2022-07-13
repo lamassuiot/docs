@@ -13,7 +13,7 @@
     
     
       
-        <title>Lamassu Virtual Device - Lamassu IoT Docs</title>
+        <title>Lamassu Virtual DMS - Lamassu IoT Docs</title>
       
     
     
@@ -65,7 +65,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#lamassu-virtual-device" class="md-skip">
+        <a href="#lamassu-virtual-dms" class="md-skip">
           Skip to content
         </a>
       
@@ -97,7 +97,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Lamassu Virtual Device
+              Lamassu Virtual DMS
             
           </span>
         </div>
@@ -292,21 +292,6 @@
 
   
   
-  
-    <li class="md-nav__item">
-      <a href="../virtualDMS/" class="md-nav__link">
-        Lamassu Virtual DMS
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
     
   
   
@@ -319,9 +304,24 @@
       
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        Lamassu Virtual Device
+        Lamassu Virtual DMS
       </a>
       
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../virtual-device/" class="md-nav__link">
+        Lamassu Virtual Device
+      </a>
     </li>
   
 
@@ -373,8 +373,8 @@
                 
 
 
-<h1 id="lamassu-virtual-device">Lamassu Virtual Device</h1>
-<p><img alt="Virtual Device" src="../img/vdevice-info.png" /></p>
+<h1 id="lamassu-virtual-dms">Lamassu Virtual DMS</h1>
+<p><img alt="virtualDMSUI" src="../img/dms-enroll.png" /></p>
 <p>It is recommended to follow this directory layout when deploying different Lamassu tools:
     <div class="highlight"><pre><span></span><code>$HOME/
      ├── lamassu-compose
@@ -383,36 +383,37 @@
 </code></pre></div>
 Make sure to define the following variable with the absolute path</p>
 <div class="highlight"><pre><span></span><code>LAMASSU_COMPOSE_DIR=$HOME/lamassu-compose
-LAMASSU_VDMS_DIR=$HOME/lamassu-virtual-dms
 </code></pre></div>
 <ol>
 <li>
 <p>Clone the repository and get into the directory: 
-    <div class="highlight"><pre><span></span><code>git clone https://github.com/lamassuiot/lamassu-virtual-device.git
-cd lamassu-virtual-device
+    <div class="highlight"><pre><span></span><code>git clone https://github.com/lamassuiot/lamassu-virtual-dms.git 
+cd lamassu-virtual-dms
 </code></pre></div></p>
 </li>
 <li>
-<p>Basic Virtual Device configuration:</p>
-<p>2.1 Specify the directory where enrolled device certificates (and keys) are stored:
-    <div class="highlight"><pre><span></span><code>export VDEV_DEVICE_CERTIFICATES_DIR=$LAMASSU_VDMS_DIR/devices_certificates
-</code></pre></div>
-2.2 Specify the URL pointing to the EST server:
-    <div class="highlight"><pre><span></span><code>export VDEV_EST_SERVER_URL=dev.lamassu.io/api/devmanager
-</code></pre></div>
-2.3 Specify the public certificate used by the EST server:
-    <div class="highlight"><pre><span></span><code>export VDEV_EST_SERVER_CERT=$LAMASSU_COMPOSE_DIR/tls-certificates/downstream/tls.crt
+<p>Basic Virtual DMS configuration:</p>
+<p>2.1 Locate the the public certificate used by the EST server:
+<div class="highlight"><pre><span></span><code>export VDMS_EST_SERVER_CERT=$LAMASSU_COMPOSE_DIR/tls-certificates/downstream/tls.crt
+</code></pre></div></p>
+<p>2.2 Configure the domain used by lamassu:
+<div class="highlight"><pre><span></span><code>export VDMS_DOMAIN=dev.lamassu.io
+</code></pre></div></p>
+<p>2.3 Provide the operator credentials to be used while creating a new DMS instance:
+<div class="highlight"><pre><span></span><code>export VDMS_USERNAME=enroller
+export VDMS_PASSWORD=enroller
+</code></pre></div></p>
+<p>2.4 Specify the default values while creating a new DMS instance:
+<div class="highlight"><pre><span></span><code>export VDMS_COUNTRY=ES
+export VDMS_STATE=gipuzkoa
+export VDMS_LOCALITY=donostia
+export VDMS_ORGANIZATION=lamassu
+export VDMS_ORGANIZATION_UNIT=iot
 </code></pre></div></p>
 </li>
 <li>
-<p><em>Optional</em> - Configure the device to connect to AWS IoT core:
-    3.1 Define the AWS IoT core endpoint to be used. Replace the <code>xxxxxx</code> with the appropriated value as well as the AWS Region to be used: 
-        <div class="highlight"><pre><span></span><code>VDEV_AWS_IOT_CORE_ENDPOINT=xxxxxx-ats.iot.eu-west-1.amazonaws.com
-</code></pre></div></p>
-</li>
-<li>
-<p>Run the Virtual Device:
-    <div class="highlight"><pre><span></span><code>./run.sh
+<p>Run the DMS application:
+    <div class="highlight"><pre><span></span><code>run.sh
 </code></pre></div></p>
 </li>
 </ol>
@@ -429,7 +430,7 @@ cd lamassu-virtual-device
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../virtualDMS/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Lamassu Virtual DMS" rel="prev">
+        <a href="../extension/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Extending Lamassu" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -438,20 +439,20 @@ cd lamassu-virtual-device
               <span class="md-footer__direction">
                 Previous
               </span>
-              Lamassu Virtual DMS
+              Extending Lamassu
             </div>
           </div>
         </a>
       
       
         
-        <a href="../pkcs/" class="md-footer__link md-footer__link--next" aria-label="Next: PKCS 11" rel="next">
+        <a href="../virtual-device/" class="md-footer__link md-footer__link--next" aria-label="Next: Lamassu Virtual Device" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              PKCS 11
+              Lamassu Virtual Device
             </div>
           </div>
           <div class="md-footer__button md-icon">

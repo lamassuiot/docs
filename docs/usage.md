@@ -1,4 +1,4 @@
-# Getting Started
+# Getting Started with Lamassu
 
 Before jumping any further, please check out the [installation process](/setup) to deploy all Lamassu services. This section will guide you through the basic functionalities provided by our PKI to start provisioning your devices.
 

@@ -1,8 +1,8 @@
-# Install Lamassu Compose
+# Setup with Lamassu Compose
 
 Lamassu Compose is the official release containing the scripts and resources required to deploy all microservices such as the CA component, the VA component or the RA components to name a few. 
 
-## Architecture
+## Extended Architecture
 
 Lamassu Compose offers a SECURE deployment of the set of microservices required to manage an industrial PKI. The architecture presented on the following image reflects the interconnection of the different services mainly using the HTTP Protocol. The use of this deployment offers the following non functional requirements by leveraging the use of an API Gateway:
 
@@ -16,7 +16,7 @@ Lamassu Compose offers a SECURE deployment of the set of microservices required 
 
 - **Mutual TLS authentication**: As mentioned earlier the gateway acts as the traffic orchestrator knowing where each service is and redirecting the traffic accordingly. To prevent any unauthorized request as well as protecting the communications channel between the Gateway itself and the upstream service, the API Gateway initiates a mutual TLS connection to ensure such thing.
 
-![Screenshot](img/base-architecture.png)
+![Screenshot](img/architecture.svg)
 
 ## Requirements
 - `jq`. Get the latest version: <https://stedolan.github.io/jq/download/>
@@ -371,13 +371,15 @@ In order tu run the connector, you must have:
     ```
     After defining those variables, run the following OpenSSL commands:
     ```
-    openssl genrsa -out aws.key 4096
+    openssl genrsa -out aws-connector.key 4096
     openssl req -new -key aws-connector.key -out aws-connector.csr -subj "/CN=aws-connector" 
-    openssl x509 -req -extfile <(printf "subjectAltName=DNS:aws-connector") -in upstream/$1/tls.csr -days 365 -CA $INTERNAL_CA_CERT -CAkey $INTERNAL_CA_KEY -CAcreateserial -out aws.crt
+    openssl x509 -req -extfile <(printf "subjectAltName=DNS:aws-connector") -in aws-connector.csr -days 365 -CA $INTERNAL_CA_CERT -CAkey $INTERNAL_CA_KEY -CAcreateserial -out aws.crt
     ```
 
 6. Deploy the required AWS services by using the CDK:
     ```
+    cd aws-connector
+    npm i
     cdk deploy
     ```
 

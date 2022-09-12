@@ -13,7 +13,7 @@
     
     
       
-        <title>Extending Lamassu - Lamassu IoT Docs</title>
+        <title>Architecture - Lamassu IoT Docs</title>
       
     
     
@@ -65,7 +65,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#extending-lamassu" class="md-skip">
+        <a href="#architecture" class="md-skip">
           Skip to content
         </a>
       
@@ -97,7 +97,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Extending Lamassu
+              Architecture
             
           </span>
         </div>
@@ -217,10 +217,121 @@
 
   
   
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Architecture
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        Architecture
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#core-services" class="md-nav__link">
+    Core Services
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Services">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ca" class="md-nav__link">
+    CA
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dms-manager" class="md-nav__link">
+    DMS Manager
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device-manager" class="md-nav__link">
+    Device manager
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloud-proxy" class="md-nav__link">
+    Cloud Proxy
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alerts" class="md-nav__link">
+    Alerts
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ocsp" class="md-nav__link">
+    OCSP
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cloud-providers-add-ons" class="md-nav__link">
+    Cloud Providers Add-ons
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
   
     <li class="md-nav__item">
       <a href="../setup/" class="md-nav__link">
-        Install Lamassu Compose
+        Setup with Lamassu Compose
       </a>
     </li>
   
@@ -235,7 +346,7 @@
   
     <li class="md-nav__item">
       <a href="../usage/" class="md-nav__link">
-        Getting Started
+        Getting Started with Lamassu
       </a>
     </li>
   
@@ -277,122 +388,6 @@
 
   
   
-    
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Extending Lamassu
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        Extending Lamassu
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-amqp-queue" class="md-nav__link">
-    The AMQP Queue
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#connecting-lamassu-with-cloud-providers-iot-platforms" class="md-nav__link">
-    Connecting Lamassu with cloud providers IoT platforms
-  </a>
-  
-    <nav class="md-nav" aria-label="Connecting Lamassu with cloud providers IoT platforms">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#aws" class="md-nav__link">
-    AWS
-  </a>
-  
-    <nav class="md-nav" aria-label="AWS">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#aws-services" class="md-nav__link">
-    AWS Services
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    Installation
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#azure" class="md-nav__link">
-    Azure
-  </a>
-  
-    <nav class="md-nav" aria-label="Azure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#azure-services" class="md-nav__link">
-    Azure Services
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
   
     <li class="md-nav__item">
       <a href="../virtual-dms/" class="md-nav__link">
@@ -412,21 +407,6 @@
     <li class="md-nav__item">
       <a href="../virtual-device/" class="md-nav__link">
         Lamassu Virtual Device
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../pkcs/" class="md-nav__link">
-        PKCS 11
       </a>
     </li>
   
@@ -459,69 +439,64 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-amqp-queue" class="md-nav__link">
-    The AMQP Queue
+  <a href="#core-services" class="md-nav__link">
+    Core Services
   </a>
+  
+    <nav class="md-nav" aria-label="Core Services">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ca" class="md-nav__link">
+    CA
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dms-manager" class="md-nav__link">
+    DMS Manager
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device-manager" class="md-nav__link">
+    Device manager
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloud-proxy" class="md-nav__link">
+    Cloud Proxy
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alerts" class="md-nav__link">
+    Alerts
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ocsp" class="md-nav__link">
+    OCSP
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#connecting-lamassu-with-cloud-providers-iot-platforms" class="md-nav__link">
-    Connecting Lamassu with cloud providers IoT platforms
+  <a href="#cloud-providers-add-ons" class="md-nav__link">
+    Cloud Providers Add-ons
   </a>
-  
-    <nav class="md-nav" aria-label="Connecting Lamassu with cloud providers IoT platforms">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#aws" class="md-nav__link">
-    AWS
-  </a>
-  
-    <nav class="md-nav" aria-label="AWS">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#aws-services" class="md-nav__link">
-    AWS Services
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    Installation
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#azure" class="md-nav__link">
-    Azure
-  </a>
-  
-    <nav class="md-nav" aria-label="Azure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#azure-services" class="md-nav__link">
-    Azure Services
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -539,48 +514,175 @@
                 
 
 
-<h1 id="extending-lamassu">Extending Lamassu</h1>
-<p>A PKI has three types of core compoents: <code>CAs</code>, <code>RAs</code> and <code>VAs</code>. Each PKI implementation must have an instance of those compoennts (at least) to be considered a mature digital identity provider.</p>
+<h1 id="architecture">Architecture</h1>
+<h2 id="core-services">Core Services</h2>
+<figure>
+<p><img alt="Screenshot" src="../img/architecture/architecture.svg" /></p>
+</figure>
+<p>Lamassu has been designed to be modular and keep the core services as simple as possible encapsulating on each service a set of well defined responsibilities. The core services are those that bring the main functionalities of a modern PKI for industrial IoT use cases. The core services are:</p>
+<h3 id="ca">CA</h3>
+<p>The Certificate Authority is the service in charge of issuing and managing the life cycle of the certificate. This service manages two different types of certificates:</p>
 <ul>
-<li>
-<p><code>Certificate authority (CA)</code> - Issues an entity's certificate and acts as a trusted component within a private PKI. Any certificate issued by the CA is trusted by all entities that trust the CA. The exact role of a CA will depend on its position within a CA hierarchy.</p>
-</li>
-<li>
-<p><code>Registration authority (RA)</code> - Receives certificate signing requests and verifies the identity of an end entity. The RA will approve a request before the certificate can be issued by the CA. This is a very important stage of the process and it often involves a procedure to enrol end entities into the PKI.</p>
-</li>
-<li>
-<p><code>Validation authority (VA)</code> - A VA allows an entity to check that a certificate has not been revoked. The VA role is often carried out by an online facility hosted by an organisation who operates the PKI. A validation authority will often use OCSP or CRL to advertise revoked certificates.</p>
-</li>
+<li><strong>PKI Certificates</strong>: This kind of certificates are used by regular end entities such as the devices that connect to the PKI.</li>
+<li><strong>Internal Certificates</strong>: In contrast with the previous type of certificates, these certificate authorities have a more restricted use. Their creation should be limited to the most trusted entities of the PKI. For instance, DMS certificates are issued by an internal CA named <em>LAMASSU-DMS-MANAGER</em> that is created on boot up. For the moment this is the only internal CA that is supported by Lamassu, but we are exploring the possibility of managing the certificates used by the services themselves.</li>
 </ul>
-<p>Lamassu is no stranger to those concepts. In fact, Lamassu goes one step further by implementing <code>LRAs</code> or Local Registration Authorities also named DMSs.</p>
+<p>On top of the regular functionalities that can be performed on this service such as creating new CAs, issuing or revoking certificates, this service is in charge of maintaining an accurate state of the managed entities (both CA certificates and regular certificates). In order to do so, a periodic task is scheduled once a day to check the status of validity of all certificates.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This feature does not perform well on deployments that have issued many certificates as it is performed on a sequential single threaded process. We are working on a solution to improve this.</p>
+</div>
+<p>There are 4 different status that a certificate can have:</p>
+<figure>
+<p><img alt="Screenshot" class="center" src="../img/architecture/ca-status.png" style="width:225px" /></p>
+</figure>
+<p>The <em>Active</em> state indicates that a certificate is valid and can be trusted by end entities. The <em>Expired</em> state indicates that a certificate has reached its expiration date and is no longer valid and cannot be trusted anymore. The <em>Revoked</em> state is used by PKI admins when a security incident or unexpected situations arise and the certificate or CA certificate is no longer trusted. Recently a new state has been added to the CA service, the <em>About to expire</em> state. This state indicates, as the name suggests, that the certificate will expire shortly. The current threshold is set to 30 days and cannot be configured. This state doesn't affect the validity of the certificate, but it is used to notify the PKI admins that the certificate is about to expire and they should take action.</p>
+<p>The CA service uses a relational database to store the issued certificates and basic information regarding the provisioned CAs. To configure the database connection, set the following environment variables:</p>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POSTGRES_HOSTNAME</td>
+<td>Hostname or address to connect to a running postgres database</td>
+</tr>
+<tr>
+<td>POSTGRES_PORT</td>
+<td>Port for the postgres instance</td>
+</tr>
+<tr>
+<td>POSTGRES_DATABASE</td>
+<td>Database to use</td>
+</tr>
+<tr>
+<td>POSTGRES_USERNAME</td>
+<td>Username credentials</td>
+</tr>
+<tr>
+<td>POSTGRES_PASSWORD</td>
+<td>Password credentials</td>
+</tr>
+</tbody>
+</table>
+<p>This service has been redesigned to support multiple <strong>crypto engines</strong> backends. Originally the only supported engine was the one provided by Hashicorp Vault, but the new redesign implementation allows for a more flexible <em>golang like</em> approach, that is by using the <code>crypto.Signer</code> interface. Any new crypto engine can be added by implementing this interface. </p>
+<p>To provision the CA service with a crypto engine set the following environment variable:</p>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ENGINE</td>
+<td><code>pkcs11</code> | <code>gopem</code> | <code>vault</code></td>
+</tr>
+</tbody>
+</table>
+<p>The current supported crypto engines are:</p>
 <ul>
-<li><code>Local registration authority (LRA)</code> -  is an optional part of a public key infrastructure that maintains users' identities from which certification authorities can issue Digital Certificates.</li>
+<li><strong>pkcs11</strong>: To Use the HSM crypto engine, define the following environment variables before launching the CA service:</li>
 </ul>
-<p>Extending the PKI is a core principal for Lamassu. There are multiple ways to customize Lamassu to the required needs by just modifying one of the core components or by developing and adding new ones. This section will describe some decissions that have been addopted to provide an extensible PKI that is able to integrate with some cloud providers such as <a href="/docs/aws.md#aws-iot-core">AWS IoT Core</a> or <a href="/docs/azure.md#azure-iot-hub">Azure IoT Hub</a>.</p>
-<p><img alt="Screenshot" src="../img/architecture-full.png" /></p>
-<h2 id="the-amqp-queue">The AMQP Queue</h2>
-<p>To get developers up to speed with new updates releated with Lamassu, a AMQP-based Queue service is deployed to provide real-time events. The core components (<code>Lamassu CA</code>, <code>Lamassu DeviceManager</code> and <code>Lamassu DMS Enroller</code>) publish new event messages if an update opperation is triggered. Update opperations are any tpye of function that end up modifying data in any way. Once a core component registers an update opperation, it then published a special crafted event message to the <code>lamassu_events</code> queue.</p>
-<h2 id="connecting-lamassu-with-cloud-providers-iot-platforms">Connecting Lamassu with cloud providers IoT platforms</h2>
-<p>A proxy server acts as a gateway between the service and the internet, and verifies and forwards incoming client requests to other servers for further communication.</p>
-<h3 id="aws">AWS</h3>
-<h4 id="aws-services">AWS Services</h4>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PKCS11_DRIVER</td>
+<td>Path to the PKCS11 driver file</td>
+</tr>
+<tr>
+<td>PKCS11_LABEL</td>
+<td>Label used by the token to be used</td>
+</tr>
+<tr>
+<td>PKCS11_PIN</td>
+<td>PIN code to login and operate the token</td>
+</tr>
+</tbody>
+</table>
 <ul>
-<li><a href="../aws/#aws-lambda">AWS Lambda</a></li>
-<li><a href="../aws/#aws-iot-core">AWS IoT Core</a></li>
-<li><a href="../aws/#aws-sqs">AWS SQS</a></li>
-<li><a href="../aws/#aws-cloud-formation">AWS Cloud Formation</a></li>
+<li><strong>gopem</strong> - Files</li>
 </ul>
-<h4 id="installation">Installation</h4>
-<p>To deploy the structure in AWS to proper function with Lamassu, <code>AWS CDK</code> is used.
-The AWS Cloud Development Kit (AWS CDK) is an open-source software development framework to define your cloud application resources using familiar programming languages.</p>
-<h3 id="azure">Azure</h3>
-<h4 id="azure-services">Azure Services</h4>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GOPEM_DATA</td>
+<td>Directory where the generated private keys belonging to each CA are stored</td>
+</tr>
+</tbody>
+</table>
+<p>Although this new design is easier to maintain and operate, we are also keeping the previous implementation of the Hashicorp Vault that does not follow the new interface. The reason being that in order to provide a Vault implementation that follows the new interface, the Enterprise Vault license is required. This is a limitation that we are working on to overcome with the new crypto engine design. The new standard deployment deprecates the use of Vault as the main backend and instead a Software HSM known as <a href="https://github.com/opendnssec/SoftHSMv2">SoftHSM v2</a>.</p>
 <ul>
-<li><a href="../azure/#azure-functions">Azure functions</a></li>
-<li><a href="../azure/#azure-queue-storage">Azure storage queue</a></li>
-<li><a href="../azure/#azure-iot-hub">Azure Iot Hub</a></li>
-<li><a href="../azure/#azure-iot-hub-dps">Azure Iot Hub DPS</a></li>
+<li><strong>vault</strong> - Hashicorp Vault</li>
 </ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VAULT_ADDRESS</td>
+<td>Protocol, hostname and port to a vault instance: <code>https://vault:8200</code></td>
+</tr>
+<tr>
+<td>VAULT_ROLE_ID</td>
+<td>Role ID used by the CA service to login to vault</td>
+</tr>
+<tr>
+<td>VAULT_SECRET_ID</td>
+<td>Secret ID used by the CA service to login to vault</td>
+</tr>
+<tr>
+<td>VAULT_CA</td>
+<td>Path to the CA certificate file for <code>https</code> connections</td>
+</tr>
+<tr>
+<td>VAULT_UNSEAL_KEY_FILE</td>
+<td>Path to the unseal vault keys</td>
+</tr>
+<tr>
+<td>VAULT_PKI_CA_PATH</td>
+<td>Prefix to use while creating new PKI vault secrets</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dms-manager">DMS Manager</h3>
+<p>The DMS Manager is the service in charge of managing the Registration Authority of the PKI. Instead of having a centralized Registration Authority, Lamassu uses a decentralized approach to be easily integrated by Device Manufacturing Systems. This way, each DMS has the authority to request the issuance of a certificate for a device being manufactured. Instead of relying on just one registration authority, Lamassu delegates the authorization of the issuance to the <a href="https://csrc.nist.gov/glossary/term/local_registration_authority">Local Registration Authority or LRA</a>.</p>
+<p>Each DMS is entitled to authorize the issuance of a certificate to a subset of CAs of the entire PKI defined by the administrator. Each DMS has a list of authorized CAs that may be used during the enrollment process. Once an enrollment process is initiated, the PKI will check that the provided DMS certificate is authorized to issue certificates for the requested CA. The authorization list can be updated to add newly created CAs or remove CAs that are no longer needed.</p>
+<p>The DMS certificates that are used to authenticate the DMS are issued by an internal CA named <em>LAMASSU-DMS-MANAGER</em>. This CA is created by default when the PKI is deployed as stated earlier.</p>
+<h3 id="device-manager">Device manager</h3>
+<p>At its core, the device manager is the main entry point for the enrollment process. It implements the EST protocol that must be used to obtain new certificates. On top of that, this service manages the registration of new devices and to keep a track of the device status. Similar to the CA service, the device manager also schedules a periodic task to check the status of the devices. This task is launched once a day to check the status of validity of all certificates associated by each device.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This feature does not perform well on deployments that have issued many certificates as it is performed on a sequential single threaded process. We are working on a solution to improve this.</p>
+</div>
+<p>There are 5 different status a device can have:</p>
+<figure>
+<p><img alt="Screenshot" class="center" src="../img/architecture/device-status.png" style="width:225px" /></p>
+</figure>
+<p>The <em>Pending Provisioning</em> state reflects that a device entity has been created but no certificate has been issued yet. The <em>Fully Provisioned</em> state indicates that a device has all the device slots with active certificates. The <em>With warnings</em> state indicates that a device has one or more slots with certificates that are either expired or have been revoked. The <em>Requires Action</em> state indicates that a device has one or more slots with certificates that are about to expire. The <em>Decommissioned</em> state indicates that a device has been decommissioned and no longer needs to be tracked by the PKI.</p>
+<h3 id="cloud-proxy">Cloud Proxy</h3>
+<h3 id="alerts">Alerts</h3>
+<h3 id="ocsp">OCSP</h3>
+<h2 id="cloud-providers-add-ons">Cloud Providers Add-ons</h2>
 
               
             </article>
@@ -594,7 +696,7 @@ The AWS Cloud Development Kit (AWS CDK) is an open-source software development f
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../manage/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Managing Lamassu" rel="prev">
+        <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: Welcome to Lamassu Iot Docs" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -603,20 +705,20 @@ The AWS Cloud Development Kit (AWS CDK) is an open-source software development f
               <span class="md-footer__direction">
                 Previous
               </span>
-              Managing Lamassu
+              Welcome to Lamassu Iot Docs
             </div>
           </div>
         </a>
       
       
         
-        <a href="../virtual-dms/" class="md-footer__link md-footer__link--next" aria-label="Next: Lamassu Virtual DMS" rel="next">
+        <a href="../setup/" class="md-footer__link md-footer__link--next" aria-label="Next: Setup with Lamassu Compose" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Lamassu Virtual DMS
+              Setup with Lamassu Compose
             </div>
           </div>
           <div class="md-footer__button md-icon">

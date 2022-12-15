@@ -97,7 +97,7 @@ The DMS Manager service uses a relational database to store the list of authoris
 
 | Environment Variable | Description                                          |
 | -------------------- | ---------------------------------------------------- |
-| LAMASSU_CA_ADDRESS   | Lamassu CA service name and port : `lamassu-ca:8087` |
+| LAMASSU_CA_ADDRESS   | Lamassu CA service name and port : `ca:8087` |
 | LAMASSU_CA_CERT_FILE | Path to the internal CA                              |
 
 ### Device manager
@@ -130,14 +130,14 @@ The Device Manager service uses a relational database to store the information o
 
 | Environment Variable | Description                                          |
 | -------------------- | ---------------------------------------------------- |
-| LAMASSU_CA_ADDRESS   | Lamassu CA service name and port : `lamassu-ca:8087` |
+| LAMASSU_CA_ADDRESS   | Lamassu CA service name and port: `ca:8087` |
 | LAMASSU_CA_CERT_FILE | Path to the internal CA                              |
 
 - **DMS** - The Device Manager service uses a DMS Client to update the status of the certificates associated to the devices
 
 | Environment Variable          | Description                                                     |
 | ----------------------------- | --------------------------------------------------------------- |
-| LAMASSU_DMS_MANAGER_ADDRESS   | Lamassu DMS service name and port : `lamassu-dms-enroller:8085` |
+| LAMASSU_DMS_MANAGER_ADDRESS   | Lamassu DMS service name and port: `dms-manager:8085` |
 | LAMASSU_DMS_MANAGER_CERT_FILE | Path to the internal DMS                                        |
 
 - **Other** - Other configuration variables
@@ -173,7 +173,7 @@ The Cloud Proxy service uses a relational database, to store the information of 
 
 | Environment Variable | Description                                          |
 | -------------------- | ---------------------------------------------------- |
-| LAMASSU_CA_ADDRESS   | Lamassu CA service name and port : `lamassu-ca:8087` |
+| LAMASSU_CA_ADDRESS   | Lamassu CA service name and port: `lamassu-ca:8087` |
 | LAMASSU_CA_CERT_FILE | Path to the internal CA                              |
 
 ### Alerts
@@ -205,7 +205,7 @@ Alerts service uses a relational database, to store the information of subscript
 | SMTP_ENABLE_SSL      | Boolean value to enable or disable SSL connection              |
 | SMTP_USERNAME        | Username credentials                                           |
 | SMTP_PASSWORD        | Password credentials                                           |
-| SMTP_HOST            | Hostname or address to SMTP server : `25`                      |
+| SMTP_HOST            | Hostname or address to SMTP server: `25`                      |
 | SMTP_PORT            | Port for the SMTP instance                                     |
 
 - **Templates** - Alerts service allows custom configuration to send SMTP mails, such as:
@@ -223,14 +223,32 @@ OCSP service's response must be signed with a public private key, so the followi
 
 | Environment Variable | Description                                          |
 | -------------------- | ---------------------------------------------------- |
-| SIGNER_CERT          | Lamassu CA service name and port : `lamassu-ca:8087` |
+| SIGNER_CERT          | Lamassu CA service name and port: `ca:8087` |
 | SIGNER_KEY           | Path to the internal CA                              |
 
 - **CA** - The Device Manager service uses a Lamassu CA Client to update the status of the certificates associated to the devices
 
 | Environment Variable | Description                                          |
 | -------------------- | ---------------------------------------------------- |
-| LAMASSU_CA_ADDRESS   | Lamassu CA service name and port : `lamassu-ca:8087` |
+| LAMASSU_CA_ADDRESS   | Lamassu CA service name and port: `ca:8087` |
 | LAMASSU_CA_CERT_FILE | Path to the internal CA                              |
+
+
+## Lamassu Compose 
+
+Lamassu Compose offers a SECURE deployment of the set of microservices required to manage an industrial PKI. The architecture presented on the following image reflects the interconnection of the different services mainly using the HTTP Protocol. The use of this deployment offers the following non functional requirements by leveraging the use of an API Gateway:
+
+- **Centralized point of access**: Each microservice listens on a different port which ends up being challenging for developers and users. With the use of the API Gateway, the user will always access the same host and port address. Port ```80``` for HTTP connections and port ```443``` for HTTPS connections.
+
+- **Authentication**: In order to invoke any endpoint, the API Gateway enforces each request to present a JWT. Upon receiving an HTTP request, the gateway validates the presented token against the authentication server.
+
+- **Authorization**: Another key aspect is enforcing an authorization schema. Lamassu has been configured in such way that only specific endpoints are accessible by non admin users.
+
+- **Tracing**: Logging the life of an HTTP request can be helpful during the debugging process of such complex application. The tracing aspect eases this process by injecting a unique identifier to each request that is then printed out by each microservice logs.
+
+- **Mutual TLS authentication**: As mentioned earlier the gateway acts as the traffic orchestrator knowing where each service is and redirecting the traffic accordingly. To prevent any unauthorized request as well as protecting the communications channel between the Gateway itself and the upstream service, the API Gateway initiates a mutual TLS connection to ensure such thing.
+
+![Screenshot](img/architecture.svg)
+
 
 ## Cloud Providers Add-ons

@@ -879,15 +879,17 @@ DOMAIN=dev.lamassu.io
 <li><strong>IsCloudDMS</strong>: It is a boolean parameter. In this case it always has the same value <strong>true</strong>.</li>
 <li><strong>CaName</strong>: The CA through which the device certificate is to be issued. It has the same function as the Authorized CAs.</li>
 </ul>
-<p>In this case, by passing the CA name as a parameter, it is not necessary to approve the DMS once it has been created.
-1. <strong>Operator</strong> - Authenticate the user:
+<p>In this case, by passing the CA name as a parameter, it is not necessary to approve the DMS once it has been created.</p>
+<ol>
+<li>
+<p><strong>Operator</strong> - Authenticate the user:
   <div class="highlight"><pre><span></span><code>OPERATOR_USERNAME=operator
 OPERATOR_PASSWORD=operator
 DOMAIN=dev.lamassu.io
 </code></pre></div>
   <div class="highlight"><pre><span></span><code>OPERATOR_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$OPERATOR_USERNAME&quot; --data-urlencode &quot;password=$OPERATOR_PASSWORD&quot; | jq -r .access_token)
 </code></pre></div></p>
-<ol>
+</li>
 <li>
 <p><strong>Admin</strong> - Authenticate the admin user
   <div class="highlight"><pre><span></span><code>ENROLLER_USERNAME=enroller

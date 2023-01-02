@@ -902,10 +902,8 @@ DOMAIN=dev.lamassu.io
 </code></pre></div></p>
 </li>
 <li>
-<p><strong>Operator</strong> - Request the registration for a new DMS instance:</p>
-</li>
-</ol>
-<p><div class="highlight"><pre><span></span><code>DMS_NAME=MyDMS
+<p><strong>Operator</strong> - Request the registration for a new DMS instance:
+  <div class="highlight"><pre><span></span><code>DMS_NAME=MyDMS
 DMS_SUBJECT_COUNTRY=ES
 DMS_SUBJECT_STATE=Gipuzkoa
 DMS_SUBJECT_LOCALITY=Donostia
@@ -920,10 +918,12 @@ DMS_SUBJECT_ORGANIZATION_UNIT=IoT
 DMS_NAME=$(echo $DMS_REG_RESPONSE | jq -r .dms.name)
 echo $DMS_REG_RESPONSE | jq -r .private_key | base64 -d &gt; dms.key
 </code></pre></div></p>
-<ol>
-<li><strong>Operator</strong> - Get the DMS certificate:
+</li>
+<li>
+<p><strong>Operator</strong> - Get the DMS certificate:
   <div class="highlight"><pre><span></span><code>curl -k &quot;https://$DOMAIN/api/dmsenroller/v1/$DMS_NAME&quot; --header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; | jq -r .certificate | base64 -d &gt; dms.crt 
-</code></pre></div></li>
+</code></pre></div></p>
+</li>
 </ol>
 <h3 id="provision-your-devices-with-x509-certificates">Provision your devices with x509 Certificates</h3>
 <p>The enrollment process is the way to go to obtain a certificate issued by one of the provisioned CAs. As described in the RFC document, Lamassu requires the authentication of the client requesting the enrollment using a certificate as well as the private key of an issued DMS to perform a mutual TLS connection. By using this type of TLS connection, the client is able to authenticate the server, and also, the server is able to authenticate the client.</p>

@@ -861,7 +861,7 @@ DOMAIN=dev.lamassu.io
 --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; \
 --data-raw &quot;{\&quot;status\&quot;:\&quot;APPROVED\&quot;}&quot;
 </code></pre></div>
-    <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/auth&quot; \
+  <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/auth&quot; \
 --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; \
 --data-raw &quot;{\&quot;authorized_cas\&quot;:$AUTHORIZED_CAS}&quot;
 </code></pre></div></p>

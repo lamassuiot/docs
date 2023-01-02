@@ -985,11 +985,11 @@ openssl x509 -text -in device-cert.pem
 <ol>
 <li>
 <p>First, authenticate and obtain a valid JWT
-  <div class="highlight"><pre><span></span><code>OPERATOR_USERNAME=operator
-OPERATOR_PASSWORD=operator
+  <div class="highlight"><pre><span></span><code>ENROLLER_USERNAME=enroller
+ENROLLER_PASSWORD=enroller
 DOMAIN=dev.lamassu.io
 </code></pre></div>
-  <div class="highlight"><pre><span></span><code>OPERATOR_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$OPERATOR_USERNAME&quot; --data-urlencode &quot;password=$OPERATOR_PASSWORD&quot; | jq -r .access_token)
+  <div class="highlight"><pre><span></span><code>ENROLLER_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$ENROLLER_USERNAME&quot; --data-urlencode &quot;password=$ENROLLER_PASSWORD&quot; | jq -r .access_token)
 </code></pre></div></p>
 </li>
 <li>
@@ -1024,16 +1024,11 @@ DOMAIN=dev.lamassu.io
 </li>
 <li>
 <p><strong>Admin</strong> - Get Bootstrap Certificate
-  <div class="highlight"><pre><span></span><code>ENROLLER_USERNAME=enroller
-ENROLLER_PASSWORD=enroller
-DOMAIN=dev.lamassu.io
-</code></pre></div>
   <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443 2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
 
 CSR_B64=$(openssl base64 -in bootstrap.csr -e)
 
-BOOTSTRAP_CERT=$(curl -k --location --request POST &quot;https://$DOMAIN/api/ca/v1/pki/$BOOTSTRAP_CA/sign&quot; --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; \
---data-raw &quot;{\&quot;certificate_request\&quot;:$CSR_B64, \&quot;common_name\&quot;:\&quot;bootstrap\&quot;,\&quot;sign_verbatim\&quot;:true})
+BOOTSTRAP_CERT=$(curl -k --location --request POST &quot;https://$DOMAIN/api/ca/v1/pki/$BOOTSTRAP_CA/sign&quot; --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; --data-raw &quot;{\&quot;certificate_request\&quot;:$CSR_B64, \&quot;common_name\&quot;:\&quot;bootstrap\&quot;,\&quot;sign_verbatim\&quot;:true}&quot;)
 
 echo $BOOTSTRAP_CERT | jq -r .certificate | base64 -d &gt; bootstrap.crt 
 </code></pre></div></p>

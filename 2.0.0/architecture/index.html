@@ -737,7 +737,6 @@
 <p>Each DMS is entitled to authorize the issuance of a certificate to a subset of CAs of the entire PKI defined by the administrator. Each DMS has a list of authorized CAs that may be used during the enrollment process. Once an enrollment process is initiated, the PKI will check that the provided DMS certificate is authorized to issue certificates for the requested CA. The authorization list can be updated to add newly created CAs or remove CAs that are no longer needed.</p>
 <p>The DMS certificates that are used to authenticate the DMS are issued by an internal CA named <em>LAMASSU-DMS-MANAGER</em>. This CA is created by default when the PKI is deployed as stated earlier.</p>
 <p>In Lamassu there are two different types of DMS <strong>Manual DMS</strong> and <strong>Cloud Hosted DMS</strong>. In the Manual DMS the communications between the Device and the DMS does not follow a standard and is done according to the needs/requirements of the device, instead, in the Cloud Hosted DMS the communication between the device and the DMS is done using the EST protocol. On the other hand, in Cloud Hosted DMS mode the device to communicate with the DMS and to be able to request a Certificate must have a Bootstrap certificate. By means of this certificate the DMS authorizes or rejects the device's request. In Manual DMS mode the authorization is done manually by the operator.</p>
-<p>Translated with www.DeepL.com/Translator (free version)</p>
 <figure>
 <p><img alt="Screenshot" src="../img/dms-mode.png" /></p>
 </figure>

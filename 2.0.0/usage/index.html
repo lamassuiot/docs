@@ -860,17 +860,17 @@ DOMAIN=dev.lamassu.io
   <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/status&quot; \
 --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; \
 --data-raw &quot;{\&quot;status\&quot;:\&quot;APPROVED\&quot;}&quot;
-</code></pre></div></p>
-</li>
-</ol>
-<div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/auth&quot; \
+</code></pre></div>
+    <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/auth&quot; \
 --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; \
 --data-raw &quot;{\&quot;authorized_cas\&quot;:$AUTHORIZED_CAS}&quot;
-</code></pre></div>
-<ol>
-<li><strong>Operator</strong> - Get the DMS certificate:
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Operator</strong> - Get the DMS certificate:
   <div class="highlight"><pre><span></span><code>curl -k &quot;https://$DOMAIN/api/dmsenroller/v1/$DMS_NAME&quot; --header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; | jq -r .certificate | base64 -d &gt; dms.crt 
-</code></pre></div></li>
+</code></pre></div></p>
+</li>
 </ol>
 <h4 id="cloud-hosted-dms">Cloud Hosted DMS</h4>
 <p>Al crear un Cloud Hosted DMS el Payload de la petición tiene tres parámetros más:

@@ -873,21 +873,22 @@ DOMAIN=dev.lamassu.io
 </li>
 </ol>
 <h4 id="cloud-hosted-dms">Cloud Hosted DMS</h4>
-<p>Al crear un Cloud Hosted DMS el Payload de la petición tiene tres parámetros más:</p>
+<p>When creating a Cloud Hosted DMS the Payload of the request has three more parameters:</p>
 <ul>
 <li><strong>BootstrapCAs</strong>: Bootstrap CAs, i.e. the Bootstrap certificate used by the device has to be issued by one of these CAs, in case it is not issued by any of these CAs the device request will not be authorized.</li>
 <li><strong>IsCloudDMS</strong>: It is a boolean parameter. In this case it always has the same value <strong>true</strong>.</li>
-<li><strong>CaName</strong>: The CA through which the device certificate is to be issued. It has the same function as the Authorized CAs.</li>
-</ul>
-<p>asdadas
-1. <strong>Operator</strong> - Authenticate the user:
+<li>
+<p><strong>CaName</strong>: The CA through which the device certificate is to be issued. It has the same function as the Authorized CAs.</p>
+</li>
+<li>
+<p><strong>Operator</strong> - Authenticate the user:
   <div class="highlight"><pre><span></span><code>OPERATOR_USERNAME=operator
 OPERATOR_PASSWORD=operator
 DOMAIN=dev.lamassu.io
 </code></pre></div>
   <div class="highlight"><pre><span></span><code>OPERATOR_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$OPERATOR_USERNAME&quot; --data-urlencode &quot;password=$OPERATOR_PASSWORD&quot; | jq -r .access_token)
 </code></pre></div></p>
-<ol>
+</li>
 <li>
 <p><strong>Admin</strong> - Authenticate the admin user
   <div class="highlight"><pre><span></span><code>ENROLLER_USERNAME=enroller
@@ -925,7 +926,7 @@ echo $DMS_REG_RESPONSE | jq -r .private_key | base64 -d &gt; dms.key
   <div class="highlight"><pre><span></span><code>curl -k &quot;https://$DOMAIN/api/dmsenroller/v1/$DMS_NAME&quot; --header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; | jq -r .certificate | base64 -d &gt; dms.crt 
 </code></pre></div></p>
 </li>
-</ol>
+</ul>
 <h3 id="provision-your-devices-with-x509-certificates">Provision your devices with x509 Certificates</h3>
 <p>The enrollment process is the way to go to obtain a certificate issued by one of the provisioned CAs. As described in the RFC document, Lamassu requires the authentication of the client requesting the enrollment using a certificate as well as the private key of an issued DMS to perform a mutual TLS connection. By using this type of TLS connection, the client is able to authenticate the server, and also, the server is able to authenticate the client.</p>
 <p>Although the <code>/api/devmanager/.well-known/cacerts</code> endpoint returns the list containing all the manged CAs by the PKI, each DMS is entitled to request the issuance of a certificate with an authorized CA. For instance, the PKI may have the following CAs: <code>CA1</code>, <code>CA2</code>, <code>CA3</code> and <code>CA4</code>. The <code>/api/devmanager/.well-known/cacerts</code> would return all four CAs. Then, a new DMS is registered. the PKI administrator approves the DMS registration by authorizing such DMS to issue certificates with <code>CA1</code> and <code>CA4</code>. This process is known as the <em>DMS registration process</em>. Once the DMS is completely registered, it can now start performing the EST enrollment process. Check out the <a href="#register-a-new-device-manufacturing-system">previous section</a> to understand what a DMS does.</p>

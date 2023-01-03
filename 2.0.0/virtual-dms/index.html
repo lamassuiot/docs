@@ -417,45 +417,66 @@
 <p>It is recommended to follow this directory layout when deploying different Lamassu tools:
     <div class="highlight"><pre><span></span><code>$HOME/
      ├── lamassu-compose
-     ├── lamassu-virtual-device
-     └── lamassu-virtual-dms
-</code></pre></div>
-Make sure to define the following variable with the absolute path</p>
-<div class="highlight"><pre><span></span><code>LAMASSU_COMPOSE_DIR=$HOME/lamassu-compose
-</code></pre></div>
+     ├── lamassu-simulation-tools
+</code></pre></div></p>
 <ol>
 <li>
 <p>Clone the repository and get into the directory: 
-    <div class="highlight"><pre><span></span><code>git clone https://github.com/lamassuiot/lamassu-virtual-dms.git 
-cd lamassu-virtual-dms
+    <div class="highlight"><pre><span></span><code>git clone https://github.com/lamassuiot/lamassu-simulation-tools.git 
+cd lamassu-simulation-tools
 </code></pre></div></p>
 </li>
 <li>
-<p>Basic Virtual DMS configuration:</p>
-<p>2.1 Locate the the public certificate used by the EST server:
-<div class="highlight"><pre><span></span><code>export VDMS_EST_SERVER_CERT=$LAMASSU_COMPOSE_DIR/tls-certificates/downstream/tls.crt
-</code></pre></div></p>
-<p>2.2 Configure the domain used by lamassu:
-<div class="highlight"><pre><span></span><code>export VDMS_DOMAIN=dev.lamassu.io
-</code></pre></div></p>
-<p>2.3 Provide the operator credentials to be used while creating a new DMS instance:
-<div class="highlight"><pre><span></span><code>export VDMS_USERNAME=enroller
-export VDMS_PASSWORD=enroller
-</code></pre></div></p>
-<p>2.4 Specify the default values while creating a new DMS instance:
-<div class="highlight"><pre><span></span><code>export VDMS_COUNTRY=ES
-export VDMS_STATE=gipuzkoa
-export VDMS_LOCALITY=donostia
-export VDMS_ORGANIZATION=lamassu
-export VDMS_ORGANIZATION_UNIT=iot
+<p>Basic Virtual DMS configuration:
+    <div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io
+export LAMASSU_GATEWAY=https://${DOMAIN}
+envsubst &lt; .env | tee .env  &gt; /dev/null
 </code></pre></div></p>
 </li>
 <li>
 <p>Run the DMS application:
-    <div class="highlight"><pre><span></span><code>run.sh
+    <div class="highlight"><pre><span></span><code>docker-compose up -d vdms
+</code></pre></div>
+When deploying the docker container with the virtual DMS, the DMS is accessible at <a href="http://DOMAIN:7002">http://DOMAIN:7002</a>.</p>
+</li>
+</ol>
+<p>When accessing the Web interface, it is necessary to enter both the access credentials for the Operator user and the name of the DMS to be created.</p>
+<ul>
+<li><strong>Operator Username</strong>: operator</li>
+<li><strong>Operator Password</strong>: operator</li>
+<li><strong>DMMS Name</strong>: VirtualDMS</li>
+</ul>
+<p>When pressing the <strong>Register</strong> button the administrator has to approve the DMS, until the DMS is approved the VDMS cannot be used.</p>
+<p><img alt="virtualDMSRegister" src="../img/vdms.png" /></p>
+<ol>
+<li>
+<p><strong>Admin</strong> - Authenticate the admin user
+  <div class="highlight"><pre><span></span><code>ENROLLER_USERNAME=enroller
+ENROLLER_PASSWORD=enroller
+DOMAIN=dev.lamassu.io
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>ENROLLER_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$ENROLLER_USERNAME&quot; --data-urlencode &quot;password=$ENROLLER_PASSWORD&quot; | jq -r .access_token)
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Admin</strong> - Authorize the enrollment with all the provisioned CAs
+  <div class="highlight"><pre><span></span><code>export DMS_NAME=VirtualDMS
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>AUTHORIZED_CAS=$(curl -k &quot;https://$DOMAIN/api/ca/v1/pki&quot; --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; | jq .cas[].name | jq -s)
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/status&quot; \
+--header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; \
+--data-raw &quot;{\&quot;status\&quot;:\&quot;APPROVED\&quot;}&quot;
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/auth&quot; \
+--header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; \
+--data-raw &quot;{\&quot;authorized_cas\&quot;:$AUTHORIZED_CAS}&quot;
 </code></pre></div></p>
 </li>
 </ol>
+<p>Once approved, the DMS is operational and waiting for requests from the devices. In the Web interface you can select the CA through which you want to sign the device certificates <strong>Enroll Devices with CA</strong>.</p>
+<p><img alt="virtualDMSUI" src="../img/vdmsUI.png" /></p>
+<p>When a request is received from a device the operator must approve the request and forward the request to Lamassu. Once Lamassu has issued the certificate, the same operator must transfer the certificate to the device. For this purpose, when a request is received in the Virtual DMS, the information of the request and a button to authorize the request appear in the Virtual DMS. On the other hand, when Lamassu issues the certificate, the message with the information of the certificate and a button to transfer the certificate to the device also appear in the Virtual DMS.</p>
 
 
 

@@ -1013,7 +1013,7 @@ DOMAIN=dev.lamassu.io
 <p>Select one of the entitled the CAs from the previous list:</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>You can manually spefify the <code>SELECTED_CA</code>. Otherwise you can enroll the device with the first entitled CA using the following command.</p>
+<p>You can manually spefify the <code>BOOTSTRAP_CA</code>. </p>
 </div>
 <div class="highlight"><pre><span></span><code>BOOTSTRAP_CA=$(echo $ENTITLED_CAS | jq .[0] -r)
 </code></pre></div>

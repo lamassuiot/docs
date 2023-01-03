@@ -881,11 +881,11 @@ DOMAIN=dev.lamassu.io
 </li>
 <li>
 <p><strong>Operator</strong> - Authenticate the user:
-  <div class="highlight"><pre><span></span><code>OPERATOR_USERNAME=operator
+    <div class="highlight"><pre><span></span><code>OPERATOR_USERNAME=operator
 OPERATOR_PASSWORD=operator
 DOMAIN=dev.lamassu.io
 </code></pre></div>
-  <div class="highlight"><pre><span></span><code>OPERATOR_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$OPERATOR_USERNAME&quot; --data-urlencode &quot;password=$OPERATOR_PASSWORD&quot; | jq -r .access_token)
+    <div class="highlight"><pre><span></span><code>OPERATOR_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$OPERATOR_USERNAME&quot; --data-urlencode &quot;password=$OPERATOR_PASSWORD&quot; | jq -r .access_token)
 </code></pre></div></p>
 </li>
 <li>

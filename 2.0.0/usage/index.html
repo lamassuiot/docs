@@ -874,18 +874,16 @@ DOMAIN=dev.lamassu.io
 </ol>
 <h4 id="cloud-hosted-dms">Cloud Hosted DMS</h4>
 <p>When creating a Cloud Hosted DMS the Payload of the request has three more parameters:</p>
-<ul>
-<li><strong>BootstrapCAs</strong>: Bootstrap CAs, i.e. the Bootstrap certificate used by the device has to be issued by one of these CAs, in case it is not issued by any of these CAs the device request will not be authorized.</li>
-<li>
-<p><strong>IsCloudDMS</strong>: It is a boolean parameter. In this case it always has the same value <strong>true</strong>.</p>
-</li>
+<p><strong>BootstrapCAs</strong>: Bootstrap CAs, i.e. the Bootstrap certificate used by the device has to be issued by one of these CAs, in case it is not issued by any of these CAs the device request will not be authorized.
+<strong>IsCloudDMS</strong>: It is a boolean parameter. In this case it always has the same value <strong>true</strong>.</p>
+<ol>
 <li>
 <p><strong>Operator</strong> - Authenticate the user:
-    <div class="highlight"><pre><span></span><code>OPERATOR_USERNAME=operator
+  <div class="highlight"><pre><span></span><code>OPERATOR_USERNAME=operator
 OPERATOR_PASSWORD=operator
 DOMAIN=dev.lamassu.io
 </code></pre></div>
-    <div class="highlight"><pre><span></span><code>OPERATOR_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$OPERATOR_USERNAME&quot; --data-urlencode &quot;password=$OPERATOR_PASSWORD&quot; | jq -r .access_token)
+  <div class="highlight"><pre><span></span><code>OPERATOR_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$OPERATOR_USERNAME&quot; --data-urlencode &quot;password=$OPERATOR_PASSWORD&quot; | jq -r .access_token)
 </code></pre></div></p>
 </li>
 <li>
@@ -912,7 +910,7 @@ DMS_SUBJECT_ORGANIZATION=Lamassu
 DMS_SUBJECT_ORGANIZATION_UNIT=IoT
 </code></pre></div></p>
 </li>
-</ul>
+</ol>
 <div class="highlight"><pre><span></span><code>DMS_REG_RESPONSE=$(curl -k --location --request POST &quot;https://$DOMAIN/api/dmsmanager/v1/&quot; \
 --header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; \
 --data-raw &quot;{\&quot;key_metadata\&quot;: {\&quot;bits\&quot;:3072, \&quot;type\&quot;:\&quot;RSA\&quot;}, \&quot;subject\&quot;:{\&quot;common_name\&quot;:\&quot;$DMS_NAME\&quot;, \&quot;country\&quot;:\&quot;$DMS_SUBJECT_COUNTRY\&quot;,\&quot;locality\&quot;:\&quot;$DMS_SUBJECT_LOCALITY\&quot;,\&quot;organization\&quot;:\&quot;$DMS_SUBJECT_ORGANIZATION\&quot;,\&quot;organization_unit\&quot;:\&quot;$DMS_SUBJECT_ORGANIZATION_UNIT\&quot;,\&quot;state\&quot;:\&quot;$DMS_SUBJECT_STATE\&quot;}, \&quot;host_cloud_dms\&quot;:true, \&quot;bootstrap_cas\&quot;:$CAS }&quot;)

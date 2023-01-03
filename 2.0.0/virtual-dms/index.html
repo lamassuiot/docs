@@ -544,6 +544,10 @@ DOMAIN=dev.lamassu.io
 <h2 id="virtual-device">Virtual Device</h2>
 <p>When deploying the docker container with the virtual DMS, the DMS is accessible at <a href="http://dev.lamassu.io:7001">http://dev.lamassu.io:7001</a>.</p>
 <p><img alt="virtualDeviceUI" src="../img/vdeviceUI.png" /></p>
+<p>When accessing the Virtual Device Web interface for the first time, only the <strong>ISSUE FIRST IDENTITY</strong> option appears as available, this button is used to request a certificate from the device. This request is sent to the DMS and if the request is approved an identity is generated for the device. Once an identity is generated in the Web interface you can see the most relevant information, <strong>Certificate Serial Number</strong>, <strong>Issuer Certificate Authority</strong> and <strong>Expiration Date</strong>.</p>
+<p><img alt="virtualDeviceFirstIdentity" src="../img/vdeviceIdentity.png" /></p>
+<p>When a device has a valid identity and its status is <strong>PROVISIONED</strong> the identity can be renewed using the <strong>RENEW IDENTITY</strong> button, i.e. requesting a new certificate. This is usually done when the active identity is about to expire.</p>
+<p>On the other hand, in case you want to register a new device using the <strong>GENERATE SERIAL NUMBER</strong> button you can generate a new serial number simulating a new device. To register it, press the <strong>ISSUE FIRTS IDENTITY</strong> button as explained in the previous steps.</p>
 
 
 

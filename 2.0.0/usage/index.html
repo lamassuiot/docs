@@ -837,7 +837,7 @@ DMS_SUBJECT_LOCALITY=Donostia
 DMS_SUBJECT_ORGANIZATION=Lamassu
 DMS_SUBJECT_ORGANIZATION_UNIT=IoT
 </code></pre></div>
-  <div class="highlight"><pre><span></span><code>DMS_REG_RESPONSE=$(curl -k --location --request POST &quot;https://$DOMAIN/api/dmsmanager/v1&quot; \
+  <div class="highlight"><pre><span></span><code>DMS_REG_RESPONSE=$(curl -k --location --request POST &quot;https://$DOMAIN/api/dmsmanager/v1/&quot; \
 --header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; \
 --data-raw &quot;{\&quot;key_metadata\&quot;: {\&quot;bits\&quot;:3072, \&quot;type\&quot;:\&quot;RSA\&quot;}, \&quot;subject\&quot;:{\&quot;common_name\&quot;:\&quot;$DMS_NAME\&quot;, \&quot;country\&quot;:\&quot;$DMS_SUBJECT_COUNTRY\&quot;,\&quot;locality\&quot;:\&quot;$DMS_SUBJECT_LOCALITY\&quot;,\&quot;organization\&quot;:\&quot;$DMS_SUBJECT_ORGANIZATION\&quot;,\&quot;organization_unit\&quot;:\&quot;$DMS_SUBJECT_ORGANIZATION_UNIT\&quot;,\&quot;state\&quot;:\&quot;$DMS_SUBJECT_STATE\&quot;}}&quot;)
 DMS_NAME=$(echo $DMS_REG_RESPONSE | jq -r .dms.name)
@@ -1026,9 +1026,9 @@ DOMAIN=dev.lamassu.io
 <p><strong>Admin</strong> - Get Bootstrap Certificate
   <div class="highlight"><pre><span></span><code>openssl s_client -connect $DOMAIN:443 2&gt;/dev/null &lt;/dev/null |  sed -ne &#39;/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p&#39; &gt; root-ca.pem
 
-CSR_B64=$(openssl base64 -in bootstrap.csr -e)
+CSR_B64=$(openssl base64 -in bootstrap.csr -e | tr -d [:space:])
 
-BOOTSTRAP_CERT=$(curl -k --location --request POST &quot;https://$DOMAIN/api/ca/v1/pki/$BOOTSTRAP_CA/sign&quot; --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; --data-raw &quot;{\&quot;certificate_request\&quot;:$CSR_B64, \&quot;common_name\&quot;:\&quot;bootstrap\&quot;,\&quot;sign_verbatim\&quot;:true}&quot;)
+BOOTSTRAP_CERT=$(curl -k --location --request POST &quot;https://$DOMAIN/api/ca/v1/pki/$BOOTSTRAP_CA/sign&quot; --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; --data-raw &quot;{\&quot;certificate_request\&quot;:\&quot;$CSR_B64\&quot;, \&quot;common_name\&quot;:\&quot;bootstrap\&quot;,\&quot;sign_verbatim\&quot;:true}&quot;)
 
 echo $BOOTSTRAP_CERT | jq -r .certificate | base64 -d &gt; bootstrap.crt 
 </code></pre></div></p>

@@ -13,7 +13,7 @@
     
     
       
-        <title>Lamassu Virtual DMS - Lamassu IoT Docs</title>
+        <title>Lamassu Simulation Tools - Lamassu IoT Docs</title>
       
     
     
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#lamassu-virtual-dms" class="md-skip">
+        <a href="#lamassu-simulation-tools" class="md-skip">
           Skip to content
         </a>
       
@@ -104,7 +104,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Lamassu Virtual DMS
+              Lamassu Simulation Tools
             
           </span>
         </div>
@@ -351,9 +351,40 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Lamassu Simulation Tools
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
-        Lamassu Virtual DMS
+        Lamassu Simulation Tools
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#lamassu-virtual-dms" class="md-nav__link">
+    Lamassu Virtual DMS
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -394,6 +425,21 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#lamassu-virtual-dms" class="md-nav__link">
+    Lamassu Virtual DMS
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -412,8 +458,7 @@
   </a>
 
 
-<h1 id="lamassu-virtual-dms">Lamassu Virtual DMS</h1>
-<p><img alt="virtualDMSUI" src="../img/dms-enroll.png" /></p>
+<h1 id="lamassu-simulation-tools">Lamassu Simulation Tools</h1>
 <p>It is recommended to follow this directory layout when deploying different Lamassu tools:
     <div class="highlight"><pre><span></span><code>$HOME/
      ├── lamassu-compose
@@ -427,24 +472,29 @@ cd lamassu-simulation-tools
 </code></pre></div></p>
 </li>
 <li>
-<p>Basic Virtual DMS configuration:
+<p>Basic configuration:
     <div class="highlight"><pre><span></span><code>export DOMAIN=dev.lamassu.io
 export LAMASSU_GATEWAY=https://${DOMAIN}
+export AWS_IOT_ENDPOINT=
+export AZURE_IOT_HUB_ENDPOINT=
+export AZURE_DPS_ENDPOINT=
+export AZURE_SCOPE_ID=
 envsubst &lt; .env | tee .env  &gt; /dev/null
 </code></pre></div></p>
 </li>
 <li>
-<p>Run the DMS application:
-    <div class="highlight"><pre><span></span><code>docker-compose up -d vdms
-</code></pre></div>
-When deploying the docker container with the virtual DMS, the DMS is accessible at <a href="http://DOMAIN:7002">http://DOMAIN:7002</a>.</p>
+<p>Run the VDMS and VDevice applications:
+    <div class="highlight"><pre><span></span><code>docker-compose up -d
+</code></pre></div></p>
 </li>
 </ol>
+<h2 id="lamassu-virtual-dms">Lamassu Virtual DMS</h2>
+<p>When deploying the docker container with the virtual DMS, the DMS is accessible at <a href="http://DOMAIN:7002">http://DOMAIN:7002</a>.</p>
 <p>When accessing the Web interface, it is necessary to enter both the access credentials for the Operator user and the name of the DMS to be created.</p>
 <ul>
 <li><strong>Operator Username</strong>: operator</li>
 <li><strong>Operator Password</strong>: operator</li>
-<li><strong>DMMS Name</strong>: VirtualDMS</li>
+<li><strong>DMS Name</strong>: VirtualDMS</li>
 </ul>
 <p>When pressing the <strong>Register</strong> button the administrator has to approve the DMS, until the DMS is approved the VDMS cannot be used.</p>
 <p><img alt="virtualDMSRegister" src="../img/vdms.png" /></p>

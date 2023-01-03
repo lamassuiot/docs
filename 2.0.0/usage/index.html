@@ -911,22 +911,19 @@ DMS_SUBJECT_STATE=Gipuzkoa
 DMS_SUBJECT_LOCALITY=Donostia
 DMS_SUBJECT_ORGANIZATION=Lamassu
 DMS_SUBJECT_ORGANIZATION_UNIT=IoT
-</code></pre></div></p>
-</li>
-</ol>
-<p><div class="highlight"><pre><span></span><code>DMS_REG_RESPONSE=$(curl -k --location --request POST &quot;https://$DOMAIN/api/dmsmanager/v1/&quot; \
+</code></pre></div>
+  <div class="highlight"><pre><span></span><code>DMS_REG_RESPONSE=$(curl -k --location --request POST &quot;https://$DOMAIN/api/dmsmanager/v1/&quot; \
 --header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; \
 --data-raw &quot;{\&quot;key_metadata\&quot;: {\&quot;bits\&quot;:3072, \&quot;type\&quot;:\&quot;RSA\&quot;}, \&quot;subject\&quot;:{\&quot;common_name\&quot;:\&quot;$DMS_NAME\&quot;, \&quot;country\&quot;:\&quot;$DMS_SUBJECT_COUNTRY\&quot;,\&quot;locality\&quot;:\&quot;$DMS_SUBJECT_LOCALITY\&quot;,\&quot;organization\&quot;:\&quot;$DMS_SUBJECT_ORGANIZATION\&quot;,\&quot;organization_unit\&quot;:\&quot;$DMS_SUBJECT_ORGANIZATION_UNIT\&quot;,\&quot;state\&quot;:\&quot;$DMS_SUBJECT_STATE\&quot;}, \&quot;host_cloud_dms\&quot;:true, \&quot;bootstrap_cas\&quot;:$CAS }&quot;)
 
 DMS_NAME=$(echo $DMS_REG_RESPONSE | jq -r .dms.name)
 echo $DMS_REG_RESPONSE | jq -r .private_key | base64 -d &gt; dms.key
-</code></pre></div>
-5. <strong>Admin</strong> - Authenticate the admin user
-  <div class="highlight"><pre><span></span><code>ENROLLER_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$ENROLLER_USERNAME&quot; --data-urlencode &quot;password=$ENROLLER_PASSWORD&quot; | jq -r .access_token)
 </code></pre></div></p>
-<ol>
-<li>
-<p><strong>Admin</strong> - Authorize the enrollment with all the provisioned CAs
+</li>
+<li><strong>Admin</strong> - Authenticate the admin user
+  <div class="highlight"><pre><span></span><code>ENROLLER_TOKEN=$(curl -k -s --location --request POST &quot;https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token&quot; --header &#39;Content-Type: application/x-www-form-urlencoded&#39; --data-urlencode &#39;grant_type=password&#39; --data-urlencode &#39;client_id=frontend&#39; --data-urlencode &quot;username=$ENROLLER_USERNAME&quot; --data-urlencode &quot;password=$ENROLLER_PASSWORD&quot; | jq -r .access_token)
+</code></pre></div></li>
+<li><strong>Admin</strong> - Authorize the enrollment with all the provisioned CAs
   <div class="highlight"><pre><span></span><code>AUTHORIZED_CAS=$(curl -k &quot;https://$DOMAIN/api/ca/v1/pki&quot; --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; | jq .cas[].name | jq -s)
 </code></pre></div>
   <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/status&quot; \
@@ -937,14 +934,11 @@ echo $DMS_REG_RESPONSE | jq -r .private_key | base64 -d &gt; dms.key
 </code></pre></div>
   <div class="highlight"><pre><span></span><code>curl -k --location --request PUT &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/auth&quot; \
 --header &quot;Authorization: Bearer $ENROLLER_TOKEN&quot; \
---data-raw &quot;{\&quot;authorized_cas\&quot;:[$AUTHORIZED_CA]}&quot;
-</code></pre></div></p>
-</li>
-<li>
-<p><strong>Operator</strong> - Get the DMS certificate:
+--data-raw &quot;{\&quot;authorized_cas\&quot;:[\&quot;$AUTHORIZED_CA\&quot;]}&quot;
+</code></pre></div></li>
+<li><strong>Operator</strong> - Get the DMS certificate:
   <div class="highlight"><pre><span></span><code>curl -k &quot;https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME&quot; --header &quot;Authorization: Bearer $OPERATOR_TOKEN&quot; | jq -r .certificate | base64 -d &gt; dms.crt 
-</code></pre></div></p>
-</li>
+</code></pre></div></li>
 </ol>
 <h3 id="provision-your-devices-with-x509-certificates">Provision your devices with x509 Certificates</h3>
 <p>The enrollment process is the way to go to obtain a certificate issued by one of the provisioned CAs. As described in the RFC document, Lamassu requires the authentication of the client requesting the enrollment using a certificate as well as the private key of an issued DMS to perform a mutual TLS connection. By using this type of TLS connection, the client is able to authenticate the server, and also, the server is able to authenticate the client.</p>

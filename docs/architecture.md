@@ -83,6 +83,12 @@ Each DMS is entitled to authorize the issuance of a certificate to a subset of C
 
 The DMS certificates that are used to authenticate the DMS are issued by an internal CA named _LAMASSU-DMS-MANAGER_. This CA is created by default when the PKI is deployed as stated earlier.
 
+In Lamassu there are two different types of DMS **Manual DMS** and **Cloud Hosted DMS**. In the Manual DMS the communications between the Device and the DMS does not follow a standard and is done according to the needs/requirements of the device, instead, in the Cloud Hosted DMS the communication between the device and the DMS is done using the EST protocol. On the other hand, in Cloud Hosted DMS mode the device to communicate with the DMS and to be able to request a Certificate must have a Bootstrap certificate. By means of this certificate the DMS authorizes or rejects the device's request. In Manual DMS mode the authorization is done manually by the operator.
+
+<figure markdown="1">
+![Screenshot](img/dms-mode.png)
+</figure>
+
 The DMS Manager service uses a relational database to store the list of authorised CAs and basic information regarding the provisioned DMS certificates. To configure the database connection, set the following environment variables:
 
 | Environment Variable | Description                                                   |
@@ -248,7 +254,7 @@ Lamassu Compose offers a SECURE deployment of the set of microservices required 
 
 - **Mutual TLS authentication**: As mentioned earlier the gateway acts as the traffic orchestrator knowing where each service is and redirecting the traffic accordingly. To prevent any unauthorized request as well as protecting the communications channel between the Gateway itself and the upstream service, the API Gateway initiates a mutual TLS connection to ensure such thing.
 
-![Screenshot](img/architecture.svg)
+![Screenshot](img/architecture/architecture.svg)
 
 
 ## Cloud Providers Add-ons

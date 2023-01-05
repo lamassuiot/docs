@@ -50,6 +50,8 @@ Finally, the DMS is able to request new x509 certificates for its manufactured d
 
 Let's register a new DMS instance:
 
+#### Manual DMS
+
 1. **Operator** - Authenticate the user:
   ```
   OPERATOR_USERNAME=operator
@@ -70,11 +72,11 @@ Let's register a new DMS instance:
   DMS_SUBJECT_ORGANIZATION_UNIT=IoT
   ```
   ```
-  DMS_REG_RESPONSE=$(curl -k --location --request POST "https://$DOMAIN/api/dmsenroller/v1/$DMS_NAME/form" \
+  DMS_REG_RESPONSE=$(curl -k --location --request POST "https://$DOMAIN/api/dmsmanager/v1/" \
   --header "Authorization: Bearer $OPERATOR_TOKEN" \
-  --data-raw "{\"key_metadata\": {\"bits\":3072, \"type\":\"RSA\"}, \"subject\":{\"common_name\":\"$DMS_NAME\", \"country\":\"$DMS_SUBJECT_COUNTRY\",\"locality\":\"$DMS_SUBJECT_LOCALITY\",\"organization\":\"$DMS_SUBJECT_ORGANIZATION\",\"org\":\"$DMS_SUBJECT_ORGANIZATION_UNIT\",\"state\":\"$DMS_SUBJECT_STATE\"}}")
-  DMS_ID=$(echo $DMS_REG_RESPONSE | jq -r .dms.id)
-  echo $DMS_REG_RESPONSE | jq -r .priv_key | base64 -d > dms.key
+  --data-raw "{\"key_metadata\": {\"bits\":3072, \"type\":\"RSA\"}, \"subject\":{\"common_name\":\"$DMS_NAME\", \"country\":\"$DMS_SUBJECT_COUNTRY\",\"locality\":\"$DMS_SUBJECT_LOCALITY\",\"organization\":\"$DMS_SUBJECT_ORGANIZATION\",\"organization_unit\":\"$DMS_SUBJECT_ORGANIZATION_UNIT\",\"state\":\"$DMS_SUBJECT_STATE\"}}")
+  DMS_NAME=$(echo $DMS_REG_RESPONSE | jq -r .dms.name)
+  echo $DMS_REG_RESPONSE | jq -r .private_key | base64 -d > dms.key
   ```
   
 3. **Admin** - Authenticate the admin user
@@ -89,19 +91,99 @@ Let's register a new DMS instance:
 
 4. **Admin** - Authorize the enrollment with all the provisioned CAs
   ```
-  AUTHORIZED_CAS=$(curl -k "https://$DOMAIN/api/ca/v1/pki" --header "Authorization: Bearer $ENROLLER_TOKEN" | jq .[].name | jq -s)
+  AUTHORIZED_CAS=$(curl -k "https://$DOMAIN/api/ca/v1/pki" --header "Authorization: Bearer $ENROLLER_TOKEN" | jq .cas[].name | jq -s)
   ```
   ```
-  curl -k --location --request PUT "https://$DOMAIN/api/dmsenroller/v1/$DMS_ID" \
+  curl -k --location --request PUT "https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/status" \
   --header "Authorization: Bearer $ENROLLER_TOKEN" \
-  --data-raw "{\"authorized_cas\":$AUTHORIZED_CAS, \"status\":\"APPROVED\"}"
+  --data-raw "{\"status\":\"APPROVED\"}"
+  ```
+  ```
+  curl -k --location --request PUT "https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/auth" \
+  --header "Authorization: Bearer $ENROLLER_TOKEN" \
+  --data-raw "{\"authorized_cas\":$AUTHORIZED_CAS}"
   ```
 
-2. **Operator** - Get the DMS certificate:
+5. **Operator** - Get the DMS certificate:
   ```
-  curl -k "https://$DOMAIN/api/dmsenroller/v1/$DMS_ID" --header "Authorization: Bearer $OPERATOR_TOKEN" | jq -r .crt | base64 -d > dms.crt 
+  curl -k "https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME" --header "Authorization: Bearer $OPERATOR_TOKEN" | jq -r .certificate | base64 -d > dms.crt 
   ```
 
+#### Cloud Hosted DMS
+When creating a Cloud Hosted DMS the Payload of the request has three more parameters:
+
+  - **BootstrapCAs**: Bootstrap CAs, i.e. the Bootstrap certificate used by the device has to be issued by one of these CAs, in case it is not issued by any of these CAs the device request will not be authorized.
+  - **IsCloudDMS**: It is a boolean parameter. In this case it always has the same value **true**.
+
+Let's register a new Cloud Hosted DMS instance:
+
+1. **Operator** - Authenticate the user:
+  ```
+  OPERATOR_USERNAME=operator
+  OPERATOR_PASSWORD=operator
+  DOMAIN=dev.lamassu.io
+  ```
+  ```
+  OPERATOR_TOKEN=$(curl -k -s --location --request POST "https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token" --header 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'grant_type=password' --data-urlencode 'client_id=frontend' --data-urlencode "username=$OPERATOR_USERNAME" --data-urlencode "password=$OPERATOR_PASSWORD" | jq -r .access_token)
+  ```
+
+2. **Admin** - Authenticate the admin user
+  ```
+  ENROLLER_USERNAME=enroller
+  ENROLLER_PASSWORD=enroller
+  DOMAIN=dev.lamassu.io
+  ```
+  ```
+  ENROLLER_TOKEN=$(curl -k -s --location --request POST "https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token" --header 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'grant_type=password' --data-urlencode 'client_id=frontend' --data-urlencode "username=$ENROLLER_USERNAME" --data-urlencode "password=$ENROLLER_PASSWORD" | jq -r .access_token)
+  ```
+
+3. **Admin** - Get all the provisioned CAs
+  ```
+  CAS=$(curl -k "https://$DOMAIN/api/ca/v1/pki" --header "Authorization: Bearer $ENROLLER_TOKEN" | jq .cas[].name | jq -s)
+  ```
+
+4. **Operator** - Request the registration for a new DMS instance:
+  ```
+  DMS_NAME=HostCloudDMS
+  DMS_SUBJECT_COUNTRY=ES
+  DMS_SUBJECT_STATE=Gipuzkoa
+  DMS_SUBJECT_LOCALITY=Donostia
+  DMS_SUBJECT_ORGANIZATION=Lamassu
+  DMS_SUBJECT_ORGANIZATION_UNIT=IoT
+  ```
+  ```
+  DMS_REG_RESPONSE=$(curl -k --location --request POST "https://$DOMAIN/api/dmsmanager/v1/" \
+  --header "Authorization: Bearer $OPERATOR_TOKEN" \
+  --data-raw "{\"key_metadata\": {\"bits\":3072, \"type\":\"RSA\"}, \"subject\":{\"common_name\":\"$DMS_NAME\", \"country\":\"$DMS_SUBJECT_COUNTRY\",\"locality\":\"$DMS_SUBJECT_LOCALITY\",\"organization\":\"$DMS_SUBJECT_ORGANIZATION\",\"organization_unit\":\"$DMS_SUBJECT_ORGANIZATION_UNIT\",\"state\":\"$DMS_SUBJECT_STATE\"}, \"host_cloud_dms\":true, \"bootstrap_cas\":$CAS }")
+
+  DMS_NAME=$(echo $DMS_REG_RESPONSE | jq -r .dms.name)
+  echo $DMS_REG_RESPONSE | jq -r .private_key | base64 -d > dms.key
+  ```
+5. **Admin** - Authenticate the admin user
+  ```
+  ENROLLER_TOKEN=$(curl -k -s --location --request POST "https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token" --header 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'grant_type=password' --data-urlencode 'client_id=frontend' --data-urlencode "username=$ENROLLER_USERNAME" --data-urlencode "password=$ENROLLER_PASSWORD" | jq -r .access_token)
+  ```
+6. **Admin** - Authorize the enrollment with all the provisioned CAs
+  ```
+  AUTHORIZED_CAS=$(curl -k "https://$DOMAIN/api/ca/v1/pki" --header "Authorization: Bearer $ENROLLER_TOKEN" | jq .cas[].name | jq -s)
+  ```
+  ```
+  curl -k --location --request PUT "https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/status" \
+  --header "Authorization: Bearer $ENROLLER_TOKEN" \
+  --data-raw "{\"status\":\"APPROVED\"}"
+  ```
+  ```
+  AUTHORIZED_CA=$(echo $AUTHORIZED_CAS | jq .[0] -r)
+  ```
+  ```
+  curl -k --location --request PUT "https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME/auth" \
+  --header "Authorization: Bearer $ENROLLER_TOKEN" \
+  --data-raw "{\"authorized_cas\":[\"$AUTHORIZED_CA\"]}"
+  ```
+5. **Operator** - Get the DMS certificate:
+  ```
+  curl -k "https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME" --header "Authorization: Bearer $OPERATOR_TOKEN" | jq -r .certificate | base64 -d > dms.crt 
+  ```
 
 ### Provision your devices with x509 Certificates
 
@@ -111,6 +193,7 @@ Although the `/api/devmanager/.well-known/cacerts` endpoint returns the list con
 
 Let's first obtain the CA list for a particular DMS:
 
+#### Manual DMS
   1. First, authenticate and obtain a valid JWT
   ```
   OPERATOR_USERNAME=operator
@@ -123,7 +206,7 @@ Let's first obtain the CA list for a particular DMS:
 
   2. Obtain the CA list:
   ```
-  ENTITLED_CAS=$(curl -k --location --request GET "https://$DOMAIN/api/dmsenroller/v1/$DMS_ID" --header "Authorization: Bearer $OPERATOR_TOKEN" | jq .authorized_cas)
+  ENTITLED_CAS=$(curl -k --location --request GET "https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME" --header "Authorization: Bearer $OPERATOR_TOKEN" | jq .authorized_cas)
   ```
 
   3. Select one of the entitled the CAs from the previous list:
@@ -140,7 +223,9 @@ Let's first obtain the CA list for a particular DMS:
   DEVICE_ID=mytestdevice-123
   ```
   ```
-  openssl req -new -newkey rsa:2048 -nodes -keyout device.key -out device.csr -subj "/CN=$DEVICE_ID"
+  openssl req -new -newkey rsa:2048 -nodes -keyout device.key -out device.csr -outform DER -subj "/CN=$DEVICE_ID"
+
+  openssl base64 -in device.csr -out device.b64 -e
   ```
 
   5. Enroll the device:
@@ -151,13 +236,84 @@ Let's first obtain the CA list for a particular DMS:
   ```
   openssl s_client -connect $DOMAIN:443 2>/dev/null </dev/null |  sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > root-ca.pem
   
-  curl https://$DOMAIN/api/devmanager/.well-known/est/$SELECTED_CA/simpleenroll --cert $DMS_CRT_PATH --key $DMS_KEY_PATH -s -o device-cert.p7 --cacert root-ca.pem  --data-binary @device.csr -H "Content-Type: application/pkcs10" 
+  curl https://$DOMAIN/api/devmanager/.well-known/est/$SELECTED_CA/simpleenroll --cert $DMS_CRT_PATH --key $DMS_KEY_PATH -s -o device-cert.p7 --cacert root-ca.pem  --data @device.b64 -H "Content-Type: application/pkcs10" -H "Content-Transfer-Encoding: base64"
 
   openssl base64 -d -in device-cert.p7 | openssl pkcs7 -inform DER -outform PEM -print_certs -out device-cert.pem 
   
   openssl x509 -text -in device-cert.pem
   ```
 
+#### Cloud Hosted DMS
+
+  1. First, authenticate and obtain a valid JWT
+  ```
+  ENROLLER_USERNAME=enroller
+  ENROLLER_PASSWORD=enroller
+  DOMAIN=dev.lamassu.io
+  ```
+  ```
+  ENROLLER_TOKEN=$(curl -k -s --location --request POST "https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token" --header 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'grant_type=password' --data-urlencode 'client_id=frontend' --data-urlencode "username=$ENROLLER_USERNAME" --data-urlencode "password=$ENROLLER_PASSWORD" | jq -r .access_token)
+  ```
+
+  2. Obtain the Bootstrap CA list:
+  ```
+  ENTITLED_CAS=$(curl -k --location --request GET "https://$DOMAIN/api/dmsmanager/v1/$DMS_NAME" --header "Authorization: Bearer $OPERATOR_TOKEN" | jq .bootstrap_cas)
+  ```
+
+  3. Select one of the entitled the CAs from the previous list:
+  
+    !!! note
+        You can manually spefify the `BOOTSTRAP_CA`. 
+
+    ```
+    BOOTSTRAP_CA=$(echo $ENTITLED_CAS | jq .[0] -r)
+    ```
+
+  4. Generate the Bootstrap CSR:
+  ```
+  DEVICE_ID=bootstrap
+  ```
+  ```
+  openssl req -new -newkey rsa:2048 -nodes -keyout bootstrap.key -out bootstrap.csr -subj "/CN=$DEVICE_ID"
+  ```
+  5. **Admin** - Authenticate the admin user
+    ```
+    ENROLLER_TOKEN=$(curl -k -s --location --request POST "https://auth.$DOMAIN/auth/realms/lamassu/protocol/openid-connect/token" --header 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'grant_type=password' --data-urlencode 'client_id=frontend' --data-urlencode "username=$ENROLLER_USERNAME" --data-urlencode "password=$ENROLLER_PASSWORD" | jq -r .access_token)
+    ```
+
+  6. **Admin** - Get Bootstrap Certificate
+  ```
+  openssl s_client -connect $DOMAIN:443 2>/dev/null </dev/null |  sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > root-ca.pem
+
+  CSR_B64=$(openssl base64 -in bootstrap.csr -e | tr -d [:space:])
+
+  BOOTSTRAP_CERT=$(curl -k --location --request POST "https://$DOMAIN/api/ca/v1/pki/$BOOTSTRAP_CA/sign" --header "Authorization: Bearer $ENROLLER_TOKEN" --data-raw "{\"certificate_request\":\"$CSR_B64\", \"common_name\":\"bootstrap\",\"sign_verbatim\":true}")
+    
+  echo $BOOTSTRAP_CERT | jq -r .certificate | base64 -d > bootstrap.crt 
+  ```
+
+  7. Enroll the device:
+  ```
+  DEVICE_ID=mytestdevice-123
+  ```
+  ```
+  openssl req -new -newkey rsa:2048 -nodes -keyout device.key -out device.csr -outform DER -subj "/CN=$DEVICE_ID"
+
+  openssl base64 -in device.csr -out device.b64 -e
+  ```
+  ```
+  BOOTSTRAP_CRT_PATH=path/to/bootstrap_crt
+  BOOTSTRAP_KEY_PATH=path/to/bootstrap_key
+  ```
+  ```
+  openssl s_client -connect $DOMAIN:443 2>/dev/null </dev/null |  sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > root-ca.pem
+  
+  curl https://$DOMAIN/api/dmsmanager/.well-known/est/$DMS_NAME/simpleenroll --cert $BOOTSTRAP_CRT_PATH --key $BOOTSTRAP_KEY_PATH -s -o device-cert.p7 --cacert root-ca.pem  --data @device.b64 -H "Content-Type: application/pkcs10" -H "Content-Transfer-Encoding: base64"
+
+  openssl base64 -d -in device-cert.p7 | openssl pkcs7 -inform DER -outform PEM -print_certs -out device-cert.pem 
+  
+  openssl x509 -text -in device-cert.pem
+  ```
 ## Using the UI
 
 The UI is an easy manageable tool designed to ease the burdens to non-technical users in using Lamassu PKI. This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
@@ -193,12 +349,17 @@ The other one, will be importing it. A Certificate and a Private Key will be req
 
 Using the UI, creating a new DMS is as simple as filling the following form. 
 
-![Screenshot](img/dms-registration.png#only-light)
+Manual DMS
 
+![ManualDMS](img/dms-registration.png#only-light)
+
+Cloud Hosted DMS
+
+![CloudHostedDMS](img/Clouddms-registration.png)
 
 Once the DMS has been created successfully, a prompt showing the generated private key will be shown. It is encouraged to download it just after the creation as this prompt will be shown only once.
 
-![Screenshot](img/pk.png#only-light)
+![Screenshot](img/pk.PNG#only-light)
 
 The status of the new created DMS will be `Pending Approval`, to approve it, we must select at least one CA from the list of registered CAs. The selected CAs will be the authorised ones to sign certificates from now on. 
 
@@ -215,7 +376,7 @@ To create a device, we will need to fill the following form taking into account:
 - A device identification must be provided.
 - A DMS must be assigned.
 
-![Screenshot](img/device-register.png#only-light)
+![Screenshot](img/device-register.PNG#only-light)
 
 Each device can have certificates signed by different authorised CAs.
 
@@ -230,7 +391,7 @@ The certificates of each device as well as the cloud-connectors will be showned.
 
 The main 3 Open API documentation can be found on the following urls:
 
-- <https://dev.lamassu.io/api/dmsenroller/v1/docs/>
+- <https://dev.lamassu.io/api/dmsmanager/v1/docs/>
 - <https://dev.lamassu.io/api/ca/v1/docs/>
 - <https://dev.lamassu.io/api/devmanager/v1/docs/>
 
@@ -290,7 +451,7 @@ Lamassu provides easy to use GO clients for most of its APIs to help speeding up
         ```
     Creting CA
         ```
-        export CREATE_CA_RESP=$(curl -k -s --location --request POST "https://$CA_ADDR/v1/pki/$CA_NAME" --header "Authorization: Bearer ${TOKEN}" --header 'Content-Type: application/json' --data-raw "{\"ca_ttl\": 262800, \"enroller_ttl\": 175200, \"subject\":{ \"common_name\": \"$CA_NAME\",\"country\": \"ES\",\"locality\": \"Arrasate\",\"organization\": \"LKS Next, S. Coop\",\"state\": \"Gipuzkoa\"},\"key_metadata\":{\"bits\": 4096,\"type\": \"RSA\"}}")
+        export CREATE_CA_RESP=$(curl -k -s --location --request POST "https://$CA_ADDR/v1/pki" --header "Authorization: Bearer ${TOKEN}" --header 'Content-Type: application/json' --data-raw "{\"ca_duration\": 262800, \"issuance_duration\": 175200, \"subject\":{ \"common_name\": \"$CA_NAME\",\"country\": \"ES\",\"locality\": \"Arrasate\",\"organization\": \"LKS Next, S. Coop\",\"state\": \"Gipuzkoa\"},\"key_metadata\":{\"bits\": 4096,\"type\": \"RSA\"}}")
         ```
 
 
@@ -301,9 +462,9 @@ Lamassu provides easy to use GO clients for most of its APIs to help speeding up
 go install github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@v2.3.1
 
 
-go test -json -v ./pkg/ca/server/api/service/ | gotestfmt
-go test -json -v ./pkg/dms-enroller/server/api/service/ | gotestfmt
-go test -json -v ./pkg/device-manager/server/api/service/ | gotestfmt
+go test -json -v ./pkg/ca/server/api/ | gotestfmt
+go test -json -v ./pkg/dms-manager/server/api/ | gotestfmt
+go test -json -v ./pkg/device-manager/server/api/ | gotestfmt
 ```
 
 

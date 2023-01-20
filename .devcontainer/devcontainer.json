@@ -1,0 +1,33 @@
+// Based on https://github.com/hitsumabushi845/MkDocs-with-Remote-Containers
+{
+    "name": "MkDocs Edition Environment",
+    "dockerFile": "Dockerfile",
+     // Set *default* container specific settings.json values on container create.
+     "settings": {
+        "terminal.integrated.profiles.linux": {
+            "bash": {
+                "path": "/bin/bash",
+                "icon": "terminal-bash"
+            }
+        },
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "debug.javascript.usePreview": false
+    },
+
+    // Add the IDs of extensions you want installed when the container is created.
+    "extensions": [
+        "yzhang.markdown-all-in-one",
+        "redhat.vscode-yaml",
+        "shardulm94.trailing-spaces",
+        "oderwat.indent-rainbow"
+    ],
+
+    // Use 'forwardPorts' to make a list of ports inside the container available locally.
+    "forwardPorts": [8000],
+
+    // Use 'postCreateCommand' to run commands after the container is created.
+    "postCreateCommand": "pip3 install -r .devcontainer/pip-reqs.txt"
+
+    // Uncomment to connect as a non-root user. See https://aka.ms/vscode-remote/containers/non-root.
+    //"remoteUser": "vscode"
+}

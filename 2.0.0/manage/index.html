@@ -520,17 +520,12 @@ docker-compose procedure:</p>
 cp<span class="w"> </span>lamassu-compose/vault-credentials.json<span class="w"> </span>./backup/
 </code></pre></div>
 <ul>
-<li>
-<p>Get Snapshot of Consul: Consul provides
+<li>Get Snapshot of Consul: Consul provides
   the <a href="https://developer.hashicorp.com/consul/commands/snapshot">snapshot</a> command
   which can be run using the CLI or the API. The <code>snapshot</code> command saves a
   point-in-time snapshot of the state of the Consul servers which includes, but
-  is not limited to: Key-Value entries, the service catalog, prepared queries
-  and sessions</p>
-</li>
-<li>
-<p>ACLs</p>
-</li>
+  is not limited to: Key-Value entries, the service catalog, prepared queries,
+  sessions and ACLs</li>
 </ul>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>consul<span class="w"> </span>consul<span class="w"> </span>snapshot<span class="w"> </span>save<span class="w"> </span>backup.snap
 docker<span class="w"> </span>cp<span class="w"> </span>consul:backup.snap<span class="w"> </span>./backup/

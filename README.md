@@ -26,6 +26,7 @@ provides the following elements:
   - mike
   - mkdocs-material
   - pymdown-extensions
+  - mdformat
 
 If you prefer to use your local host configuration and your preferred editor.
 Please, follow the installation instructions for your local operating system for
@@ -50,6 +51,12 @@ review. Please, send the change to the appropriate branch:
 
 Please do not submit changes to the VERSION file unless you know what you are
 doing. This is the tag for the version number during the publication phase.
+
+Use mdformat for apply formatting rules to the Markdown files. Use this command:
+
+```bash
+mdformat --wrap 80  docs/*.md
+```
 
 ## Publishing
 

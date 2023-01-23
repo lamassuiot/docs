@@ -27,6 +27,7 @@ provides the following elements:
   - mkdocs-material
   - pymdown-extensions
   - mdformat
+  - pymarkdownlnt
 
 If you prefer to use your local host configuration and your preferred editor.
 Please, follow the installation instructions for your local operating system for
@@ -56,6 +57,13 @@ Use mdformat for apply formatting rules to the Markdown files. Use this command:
 
 ```bash
 mdformat --wrap 80  docs/*.md
+```
+
+### Linter
+A Markdown linter is included in the edition environment but it is not enforced during PR validation. It is recommended that you use it to improve the overall quality of Markdown files. Use the linter with this command:
+
+```bash
+pymarkdownlnt scan <path-to-file>
 ```
 
 ## Publishing

@@ -40,82 +40,79 @@ Database_, _Registry Settings_ and _CA Key information_.
 Following steps allow to backup an installation based on the standard
 docker-compose procedure:
 
-1. Save config file: Stores domain variable
+- Save config file: Stores domain variable
 
-   ```bash
-   cp lamassu-compose/.env backup/.env
-   ```
+  ```bash
+  cp lamassu-compose/.env backup/.env
+  ```
 
-1. Save vault credentials: Ensure that the vault credentials file is safe, and
-   not compromised. If control of the credentials is lost, the vault credentials
-   can be used to register other machines to vault. Each credential should
-   contain a single password used for authentication to a specific system.
+- Save vault credentials: Ensure that the vault credentials file is safe, and
+  not compromised. If control of the credentials is lost, the vault credentials
+  can be used to register other machines to vault. Each credential should
+  contain a single password used for authentication to a specific system.
 
-   ```bash
-   cp lamassu-compose/vault-ca-credentials.json ./backup/
-   cp lamassu-compose/vault-credentials.json ./backup/
-   ```
+  ```bash
+  cp lamassu-compose/vault-ca-credentials.json ./backup/
+  cp lamassu-compose/vault-credentials.json ./backup/
+  ```
 
-1. Get Snapshot of Consul: Consul provides
-   the [snapshot](https://developer.hashicorp.com/consul/commands/snapshot) command
-   which can be run using the CLI or the API. The `snapshot` command saves a
-   point-in-time snapshot of the state of the Consul servers which includes, but
-   is not limited to:
+- Get Snapshot of Consul: Consul provides
+  the [snapshot](https://developer.hashicorp.com/consul/commands/snapshot) command
+  which can be run using the CLI or the API. The `snapshot` command saves a
+  point-in-time snapshot of the state of the Consul servers which includes, but
+  is not limited to: Key-Value entries, the service catalog, prepared queries
+  and sessions
 
-   - Key-Value entries
-   - The service catalog
-   - Prepared queries
-   - Sessions
-   - ACLs
+  - ACLs
 
-   ```bash
-   docker exec consul consul snapshot save backup.snap
-   docker cp consul:backup.snap ./backup/
-   ```
+  ```bash
+  docker exec consul consul snapshot save backup.snap
+  docker cp consul:backup.snap ./backup/
+  ```
 
-1. Backup PostgreSQL: PostgreSQL provides the `pg_dump` utility to help you back
-   up databases. It generates a database file with SQL commands in a format that
-   can be easily restored in the future.
+- Backup PostgreSQL: PostgreSQL provides the `pg_dump` utility to help you back
+  up databases. It generates a database file with SQL commands in a format that
+  can be easily restored in the future.
 
-   ```bash
-   docker exec database bash -c 'pg_dumpall -Uadmin > database.sql'
-   docker cp database:database.sql ./backup/
-   ```
+  ```bash
+  docker exec database bash -c 'pg_dumpall -Uadmin > database.sql'
+  docker cp database:database.sql ./backup/
+  ```
 
 ## Restoring backups
 
 These steps allow to recover the state of an installation based on the standard
 docker-compose procedure:
 
-1. Restore Lamassu's configuration: retrieve credentials from backup.
+- Restore Lamassu's configuration: retrieve credentials from backup.
 
-   ```bash
-   cp backup/.env lamassu-compose/.env
-   cp ./backup/vault-ca-credentials.json lamassu-compose/vault-ca-credentials.json
-   cp ./backup/vault-credentials.json lamassu-compose/vault-credentials.json
-   ```
+  ```bash
+  cp backup/.env lamassu-compose/.env
+  cp ./backup/vault-ca-credentials.json lamassu-compose/vault-ca-credentials.json
+  cp ./backup/vault-credentials.json lamassu-compose/vault-credentials.json
+  ```
 
-1. Restore Snapshot of Consul: Running the `restore` process should be
-   straightforward. Make sure the Consul datacenter you are restoring is stable
-   and has a leader. You can verify this
-   using `consul operator raft list-peers` and checking server logs and
-   telemetry for signs of leader elections or network issues.
+- Restore Snapshot of Consul: Running the `restore` process should be
+  straightforward. Make sure the Consul datacenter you are restoring is stable
+  and has a leader. You can verify this
+  using `consul operator raft list-peers` and checking server logs and telemetry
+  for signs of leader elections or network issues.
 
-   ```bash
-   docker cp ./backup/backup.snap consul:backup.snap
-   docker exec consul consul snapshot restore backup.snap
-   docker exec consul sh -c 'curl -XPUT http://127.0.0.1:8500/v1/catalog/deregister -d"{\"Node\":\"consul-server\"}"'
-   ```
+  ```bash
+  docker cp ./backup/backup.snap consul:backup.snap
+  docker exec consul consul snapshot restore backup.snap
+  docker exec consul sh -c 'curl -XPUT http://127.0.0.1:8500/v1/catalog/deregister -d"{\"Node\":\"consul-server\"}"'
+  ```
 
-1. Restore PostgreSQL: Overrides all databases from different components.
+- Restore PostgreSQL: Overrides all databases from different components.
 
-   ```bash
-   docker cp ./backup/database.sql database:database.sql
-   docker exec database bash -c 'dropdb -Uadmin alerts'
-   docker exec database bash -c 'dropdb -Uadmin auth'
-   docker exec database bash -c 'dropdb -Uadmin ca'
-   docker exec database bash -c 'dropdb -Uadmin cloudproxy'
-   docker exec database bash -c 'dropdb -Uadmin devicemanager'
-   docker exec database bash -c 'dropdb -Uadmin dmsmanager'
-   docker exec database bash -c 'psql -Uadmin -f database.sql postgres'
-   ```
+  ```bash
+  docker cp ./backup/database.sql database:database.sql
+  docker exec database bash -c 'dropdb -Uadmin alerts'
+  docker exec database bash -c 'dropdb -Uadmin auth'
+  docker exec database bash -c 'dropdb -Uadmin ca'
+  docker exec database bash -c 'dropdb -Uadmin cloudproxy'
+  docker exec database bash -c 'dropdb -Uadmin devicemanager'
+  docker exec database bash -c 'dropdb -Uadmin dmsmanager'
+  docker exec database bash -c 'psql -Uadmin -f database.sql postgres'
+  ```

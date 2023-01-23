@@ -60,10 +60,9 @@ docker-compose procedure:
   the [snapshot](https://developer.hashicorp.com/consul/commands/snapshot) command
   which can be run using the CLI or the API. The `snapshot` command saves a
   point-in-time snapshot of the state of the Consul servers which includes, but
-  is not limited to: Key-Value entries, the service catalog, prepared queries
-  and sessions
 
-  - ACLs
+  is not limited to: Key-Value entries, the service catalog, prepared queries,
+  sessions and ACLs
 
   ```bash
   docker exec consul consul snapshot save backup.snap

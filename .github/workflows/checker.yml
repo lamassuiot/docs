@@ -1,11 +1,11 @@
-name: Publish Lamassu Docs
+name: Check Lamassu Docs
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
 
 jobs:
-  doc-publisher:
-    name: Lamassu Doc Publiser
+  doc-format-check:
+    name: Lamassu Doc Format Check
     runs-on: ubuntu-latest
     steps:
       - name: Install Python

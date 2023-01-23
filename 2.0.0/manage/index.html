@@ -505,71 +505,68 @@ will perform a system state backup that includes: <em>Certification Authority
 Database</em>, <em>Registry Settings</em> and <em>CA Key information</em>.</p>
 <p>Following steps allow to backup an installation based on the standard
 docker-compose procedure:</p>
-<ol>
+<ul>
 <li>Save config file: Stores domain variable</li>
-</ol>
+</ul>
 <div class="highlight"><pre><span></span><code>cp<span class="w"> </span>lamassu-compose/.env<span class="w"> </span>backup/.env
 </code></pre></div>
-<ol>
+<ul>
 <li>Save vault credentials: Ensure that the vault credentials file is safe, and
-   not compromised. If control of the credentials is lost, the vault credentials
-   can be used to register other machines to vault. Each credential should
-   contain a single password used for authentication to a specific system.</li>
-</ol>
+  not compromised. If control of the credentials is lost, the vault credentials
+  can be used to register other machines to vault. Each credential should
+  contain a single password used for authentication to a specific system.</li>
+</ul>
 <div class="highlight"><pre><span></span><code>cp<span class="w"> </span>lamassu-compose/vault-ca-credentials.json<span class="w"> </span>./backup/
 cp<span class="w"> </span>lamassu-compose/vault-credentials.json<span class="w"> </span>./backup/
 </code></pre></div>
-<ol>
+<ul>
 <li>
 <p>Get Snapshot of Consul: Consul provides
-   the <a href="https://developer.hashicorp.com/consul/commands/snapshot">snapshot</a> command
-   which can be run using the CLI or the API. The <code>snapshot</code> command saves a
-   point-in-time snapshot of the state of the Consul servers which includes, but
-   is not limited to:</p>
+  the <a href="https://developer.hashicorp.com/consul/commands/snapshot">snapshot</a> command
+  which can be run using the CLI or the API. The <code>snapshot</code> command saves a
+  point-in-time snapshot of the state of the Consul servers which includes, but
+  is not limited to: Key-Value entries, the service catalog, prepared queries
+  and sessions</p>
 </li>
 <li>
-<p>Key-Value entries</p>
+<p>ACLs</p>
 </li>
-<li>The service catalog</li>
-<li>Prepared queries</li>
-<li>Sessions</li>
-<li>ACLs</li>
-</ol>
+</ul>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>consul<span class="w"> </span>consul<span class="w"> </span>snapshot<span class="w"> </span>save<span class="w"> </span>backup.snap
 docker<span class="w"> </span>cp<span class="w"> </span>consul:backup.snap<span class="w"> </span>./backup/
 </code></pre></div>
-<ol>
+<ul>
 <li>Backup PostgreSQL: PostgreSQL provides the <code>pg_dump</code> utility to help you back
-   up databases. It generates a database file with SQL commands in a format that
-   can be easily restored in the future.</li>
-</ol>
+  up databases. It generates a database file with SQL commands in a format that
+  can be easily restored in the future.</li>
+</ul>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;pg_dumpall -Uadmin &gt; database.sql&#39;</span>
 docker<span class="w"> </span>cp<span class="w"> </span>database:database.sql<span class="w"> </span>./backup/
 </code></pre></div>
 <h2 id="restoring-backups">Restoring backups</h2>
 <p>These steps allow to recover the state of an installation based on the standard
 docker-compose procedure:</p>
-<ol>
+<ul>
 <li>Restore Lamassu's configuration: retrieve credentials from backup.</li>
-</ol>
+</ul>
 <div class="highlight"><pre><span></span><code>cp<span class="w"> </span>backup/.env<span class="w"> </span>lamassu-compose/.env
 cp<span class="w"> </span>./backup/vault-ca-credentials.json<span class="w"> </span>lamassu-compose/vault-ca-credentials.json
 cp<span class="w"> </span>./backup/vault-credentials.json<span class="w"> </span>lamassu-compose/vault-credentials.json
 </code></pre></div>
-<ol>
+<ul>
 <li>Restore Snapshot of Consul: Running the <code>restore</code> process should be
-   straightforward. Make sure the Consul datacenter you are restoring is stable
-   and has a leader. You can verify this
-   using <code>consul operator raft list-peers</code> and checking server logs and
-   telemetry for signs of leader elections or network issues.</li>
-</ol>
+  straightforward. Make sure the Consul datacenter you are restoring is stable
+  and has a leader. You can verify this
+  using <code>consul operator raft list-peers</code> and checking server logs and telemetry
+  for signs of leader elections or network issues.</li>
+</ul>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>cp<span class="w"> </span>./backup/backup.snap<span class="w"> </span>consul:backup.snap
 docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>consul<span class="w"> </span>consul<span class="w"> </span>snapshot<span class="w"> </span>restore<span class="w"> </span>backup.snap
 docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>consul<span class="w"> </span>sh<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;curl -XPUT http://127.0.0.1:8500/v1/catalog/deregister -d&quot;{\&quot;Node\&quot;:\&quot;consul-server\&quot;}&quot;&#39;</span>
 </code></pre></div>
-<ol>
+<ul>
 <li>Restore PostgreSQL: Overrides all databases from different components.</li>
-</ol>
+</ul>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>cp<span class="w"> </span>./backup/database.sql<span class="w"> </span>database:database.sql
 docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;dropdb -Uadmin alerts&#39;</span>
 docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;dropdb -Uadmin auth&#39;</span>

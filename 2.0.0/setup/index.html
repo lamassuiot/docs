@@ -512,13 +512,19 @@
 
 
 <h1 id="setup">Setup</h1>
-<p>Lamassu Compose is the official release containing the scripts and resources required to deploy all microservices such as the CA component, the VA component or the RA components to name a few. </p>
+<p>Lamassu Compose is the official release containing the scripts and resources
+required to deploy all microservices such as the CA component, the VA component
+or the RA components to name a few.</p>
 <h2 id="requirements">Requirements</h2>
 <ul>
 <li><code>jq</code>. Get the latest version: <a href="https://stedolan.github.io/jq/download/">https://stedolan.github.io/jq/download/</a></li>
-<li><code>docker</code> and <code>docker-compose</code>: Get the latest version: <a href="https://docs.docker.com/engine/install/ubuntu/">https://docs.docker.com/engine/install/ubuntu/</a> and <a href="https://docs.docker.com/compose/install/">https://docs.docker.com/compose/install/</a></li>
-<li>Have a working DNS server able to resolve the domain used during the installation process or add the following content to the <code>/etc/hosts</code> file, replacing the <code>dev.lamassu.io</code> domain with your own:
-    <div class="highlight"><pre><span></span><code>127.0.0.1  dev.lamassu.io 
+<li><code>docker</code> and <code>docker-compose</code>: Get the latest version:
+  <a href="https://docs.docker.com/engine/install/ubuntu/">https://docs.docker.com/engine/install/ubuntu/</a> and
+  <a href="https://docs.docker.com/compose/install/">https://docs.docker.com/compose/install/</a></li>
+<li>Have a working DNS server able to resolve the domain used during the
+  installation process or add the following content to the <code>/etc/hosts</code> file,
+  replacing the <code>dev.lamassu.io</code> domain with your own:
+  <div class="highlight"><pre><span></span><code>127.0.0.1  dev.lamassu.io 
 127.0.0.1  vault.dev.lamassu.io 
 127.0.0.1  auth.dev.lamassu.io 
 127.0.0.1  tracing.dev.lamassu.io 
@@ -527,45 +533,47 @@
 </ul>
 <h2 id="setup_1">Setup</h2>
 <ol>
-<li>
-<p>Get and run the installer script:
-    <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/lamassuiot/lamassu-compose/release/lamassu-compose.sh<span class="w"> </span>-o<span class="w"> </span>lamassu-compose.sh
+<li>Get and run the installer script:</li>
+</ol>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/lamassuiot/lamassu-compose/release/lamassu-compose.sh<span class="w"> </span>-o<span class="w"> </span>lamassu-compose.sh
 sudo<span class="w"> </span>bash<span class="w"> </span>lamassu-compose.sh<span class="w"> </span>--domain<span class="w"> </span>dev.lamassu.io<span class="w"> </span>--with-simulators<span class="w"> </span>--compose-version<span class="w"> </span>develop<span class="w"> </span>--simulation-version<span class="w"> </span>main
-</code></pre></div></p>
-</li>
-<li>
-<p><em>OPTIONAL</em>: Import your certificates:</p>
-<p>The <code>lamassu-compose.sh</code> script also generates self-signed for the downstream certificates. It is possible to provide other valid certificates by replacing the following files:
+</code></pre></div>
+<ol>
+<li><em>OPTIONAL</em>: Import your certificates:</li>
+</ol>
+<p>The <code>lamassu-compose.sh</code> script also generates self-signed for the downstream
+   certificates. It is possible to provide other valid certificates by replacing
+   the following files:</p>
 <div class="highlight"><pre><span></span><code>lamassu-compose/tls-certificates
 ├── upstream
 │   └── ...
 └── downstream
     ├── tls.crt     &lt;----- Provide your certificate
     └── tls.key     &lt;----- Provide your private key
-</code></pre></div></p>
-<p>Once you replace this certificates, restart the api-gateway to obtain the imported certificates:</p>
+</code></pre></div>
+<p>Once you replace this certificates, restart the api-gateway to obtain the
+   imported certificates:</p>
 <div class="highlight"><pre><span></span><code>docker-compose rm -s -f api-gateway dms-default
 docker-compose up -d api-gateway dms-default
 </code></pre></div>
-</li>
-<li>
-<p>Final notes:</p>
-<p>🚀 You are ready to go 🚀</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Keycloak is your auth provider. During the installation process, the service is provisioned with 2 users with different roles:
-    <div class="highlight"><pre><span></span><code>Username: enroller
-Password: enroller
-Role: admin
-</code></pre></div>
-    <div class="highlight"><pre><span></span><code>Username: operator
-Password: operator
-Role: operator
-</code></pre></div>
-You can change those credentials (or create new users) using keycloak's UI available at: <code>https://auth.&lt;DOMAIN&gt;</code></p>
-</div>
-</li>
+<ol>
+<li>Final notes:</li>
 </ol>
+<p>🚀 You are ready to go 🚀</p>
+<p>!!! note</p>
+<div class="highlight"><pre><span></span><code> Keycloak is your auth provider. During the installation process, the service is provisioned with 2 users with different roles:
+     ```
+     Username: enroller
+     Password: enroller
+     Role: admin
+     ```
+     ```
+     Username: operator
+     Password: operator
+     Role: operator
+     ```
+ You can change those credentials (or create new users) using keycloak&#39;s UI available at: `https://auth.&lt;DOMAIN&gt;`
+</code></pre></div>
 <h2 id="deploy-aws-iot-core-connectors">Deploy AWS IoT Core connectors</h2>
 <h3 id="requirements_1">Requirements</h3>
 <p>In order tu run the connector, you must have:</p>
@@ -579,53 +587,55 @@ You can change those credentials (or create new users) using keycloak's UI avail
 </ul>
 <h3 id="deployment">Deployment</h3>
 <ol>
-<li>
-<p>Download the AWS Connector source code:
-    <div class="highlight"><pre><span></span><code>git clone https://github.com/lamassuiot/lamassu-aws-connector.git
-</code></pre></div></p>
-</li>
-<li>
-<p>Configure the AWS Credentials. Those values will be used by the Lamassu AWS Connector as well as the CDK.
-    <div class="highlight"><pre><span></span><code>export AWS_ACCESS_KEY_ID=&lt;AWS_ACCESS_KEY_ID&gt;
+<li>Download the AWS Connector source code:</li>
+</ol>
+<div class="highlight"><pre><span></span><code>git clone https://github.com/lamassuiot/lamassu-aws-connector.git
+</code></pre></div>
+<ol>
+<li>Configure the AWS Credentials. Those values will be used by the Lamassu AWS
+   Connector as well as the CDK.</li>
+</ol>
+<div class="highlight"><pre><span></span><code>export AWS_ACCESS_KEY_ID=&lt;AWS_ACCESS_KEY_ID&gt;
 export AWS_SECRET_ACCESS_KEY=&lt;AWS_SECRET_ACCESS_KEY&gt;
 export AWS_ACCOUNT_ID=&lt;AWS_ACCOUNT_ID&gt;
 export AWS_DEFAULT_REGION=&lt;AWS_DEFAULT_REGION&gt;
-</code></pre></div></p>
-</li>
-<li>
-<p>Provide a friendly name for the Lamassu AWS Connector. This name will be displayed in the UI
-    <div class="highlight"><pre><span></span><code>export CONNECTOR_NAME=Lamassu IoT AWS Account
-</code></pre></div></p>
-</li>
-<li>
-<p>Substitute the aws-connector <code>.env</code> file:
-    <div class="highlight"><pre><span></span><code>envsubst &lt; .env | tee .env
-</code></pre></div></p>
-</li>
-<li>
-<p>Generate the TLS certificates used by the connector. You must have access to the main CA certificate and private key that where generated during Lamassu installation. 
-    <div class="highlight"><pre><span></span><code>export INTERNAL_CA_CERT=&lt;CHANGE_TO_LAMASSU_INSTALLATION_PATH&gt;/tls-certificates/upstream/ca.crt
+</code></pre></div>
+<ol>
+<li>Provide a friendly name for the Lamassu AWS Connector. This name will be
+   displayed in the UI</li>
+</ol>
+<div class="highlight"><pre><span></span><code>export CONNECTOR_NAME=Lamassu IoT AWS Account
+</code></pre></div>
+<ol>
+<li>Substitute the aws-connector <code>.env</code> file:</li>
+</ol>
+<div class="highlight"><pre><span></span><code>envsubst &lt; .env | tee .env
+</code></pre></div>
+<ol>
+<li>Generate the TLS certificates used by the connector. You must have access to
+   the main CA certificate and private key that where generated during Lamassu
+   installation.</li>
+</ol>
+<div class="highlight"><pre><span></span><code>export INTERNAL_CA_CERT=&lt;CHANGE_TO_LAMASSU_INSTALLATION_PATH&gt;/tls-certificates/upstream/ca.crt
 export INTERNAL_CA_KEY=&lt;CHANGE_TO_LAMASSU_INSTALLATION_PATH&gt;/tls-certificates/upstream/ca.key
 </code></pre></div>
-    After defining those variables, run the following OpenSSL commands:
-    <div class="highlight"><pre><span></span><code>openssl genrsa -out aws-connector.key 4096
+<p>After defining those variables, run the following OpenSSL commands:</p>
+<div class="highlight"><pre><span></span><code>openssl genrsa -out aws-connector.key 4096
 openssl req -new -key aws-connector.key -out aws-connector.csr -subj &quot;/CN=aws-connector&quot; 
 openssl x509 -req -extfile &lt;(printf &quot;subjectAltName=DNS:aws-connector&quot;) -in aws-connector.csr -days 365 -CA $INTERNAL_CA_CERT -CAkey $INTERNAL_CA_KEY -CAcreateserial -out aws.crt
-</code></pre></div></p>
-</li>
-<li>
-<p>Deploy the required AWS services by using the CDK:
-    <div class="highlight"><pre><span></span><code>cd aws-connector
+</code></pre></div>
+<ol>
+<li>Deploy the required AWS services by using the CDK:</li>
+</ol>
+<div class="highlight"><pre><span></span><code>cd aws-connector
 npm i
 cdk deploy
-</code></pre></div></p>
-</li>
-<li>
-<p>Start the connector:
-    <div class="highlight"><pre><span></span><code>docker-compose up -d
-</code></pre></div></p>
-</li>
+</code></pre></div>
+<ol>
+<li>Start the connector:</li>
 </ol>
+<div class="highlight"><pre><span></span><code>docker-compose up -d
+</code></pre></div>
 
 
 

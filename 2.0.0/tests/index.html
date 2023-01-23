@@ -470,16 +470,31 @@
 
 
 <h1 id="tests">Tests</h1>
-<p>Integration test are carried out to check the proper functionabillity of the server. The tests, start up the same server used in production with an empty database and run against the server using HTTP.</p>
-<p>To create the test, <em>httpexpect</em> library has been used; a set of chainable builders for HTTP requests and assertions for HTTP responses and payload, on top of net/http and several utility packages.</p>
-<p>Each test-case has three arguments: the name of the test, an instance of the service and a <em>httpexpect.Expect</em> object, upon which the rest call will be made.</p>
-<p>Passing an instance of the service per test, allows custom inicialization of the database per test. Also, as the service used is the exact same used in production, the calls made from one service to another are mantained, allowing to check the interoperability from services.</p>
-<p>The response obtained from the <em>httpexpect.Expect</em> object will be evaluated; the response's keys and values will be revised to compare with the expected ones. If the expected results don´t match with the obtained ones, an error will occur, allowing the developers to notice and fix it before releasing it into production.</p>
+<p>Integration test are carried out to check the proper functionabillity of the
+server. The tests, start up the same server used in production with an empty
+database and run against the server using HTTP.</p>
+<p>To create the test, <em>httpexpect</em> library has been used; a set of chainable
+builders for HTTP requests and assertions for HTTP responses and payload, on top
+of net/http and several utility packages.</p>
+<p>Each test-case has three arguments: the name of the test, an instance of the
+service and a <em>httpexpect.Expect</em> object, upon which the rest call will be made.</p>
+<p>Passing an instance of the service per test, allows custom inicialization of the
+database per test. Also, as the service used is the exact same used in
+production, the calls made from one service to another are mantained, allowing
+to check the interoperability from services.</p>
+<p>The response obtained from the <em>httpexpect.Expect</em> object will be evaluated; the
+response's keys and values will be revised to compare with the expected ones. If
+the expected results don´t match with the obtained ones, an error will occur,
+allowing the developers to notice and fix it before releasing it into
+production.</p>
 <p>Three different branches are differenciated:</p>
 <ul>
-<li>Development: this branch is used for testing purposes whenever a service is modified to check the proper functionabillity of the same service.</li>
-<li>Release: this branch is used for testing purposes whenever a service is modified to check the proper functionabillity of the all services.</li>
-<li>Main: once the test are passed successfully, changes are published in <em>main</em> branch.</li>
+<li>Development: this branch is used for testing purposes whenever a service is
+  modified to check the proper functionabillity of the same service.</li>
+<li>Release: this branch is used for testing purposes whenever a service is
+  modified to check the proper functionabillity of the all services.</li>
+<li>Main: once the test are passed successfully, changes are published in <em>main</em>
+  branch.</li>
 </ul>
 <h2 id="coverage">Coverage</h2>
 <p>The following commands can be used to calculate the coverage of the system:</p>
@@ -489,13 +504,17 @@ go tool cover -html=coverage.out -o coverage.html
 go tool cover -func coverage.out | grep total | awk &#39;{print substr($3, 1, length($3)-1)}&#39; | .github/coverage-badge.sh
 go tool cover -func coverage.out | grep total
 </code></pre></div>
-<p>The total and relative percentages of each component can be found in the resulting <em>cover.html</em> file. Opening the file in the browser, will mark the tested code in green and the untested one in red.</p>
-<p>The resulting <em>cover.out</em> file, can be imported to <em>go-cover-treemap.io</em> webpage to generate a visual representation of the coverage results:</p>
+<p>The total and relative percentages of each component can be found in the
+resulting <em>cover.html</em> file. Opening the file in the browser, will mark the
+tested code in green and the untested one in red.</p>
+<p>The resulting <em>cover.out</em> file, can be imported to <em>go-cover-treemap.io</em> webpage
+to generate a visual representation of the coverage results:</p>
 <figure>
 <p><img alt="Screenshot" src="../img/cover-treemap.PNG" /></p>
 </figure>
 <h3 id="pipeline">Pipeline</h3>
-<p>The test are run against the server using HTTP, the top layer of the system. Facilitating the task of testing the layers below.</p>
+<p>The test are run against the server using HTTP, the top layer of the system.
+Facilitating the task of testing the layers below.</p>
 <figure>
 <p><img alt="Screenshot" src="../img/test-pipeline.PNG" /></p>
 </figure>

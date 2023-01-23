@@ -473,25 +473,112 @@
 
 <h1 id="managing-lamassu">Managing Lamassu</h1>
 <h2 id="certificate-rotation">Certificate rotation</h2>
-<p>By default, all self-signed certificates (both upstream and downstream) have a lifespan of 365 days. At that point it will be necessary to regenerate the expired certificates:</p>
+<p>By default, all self-signed certificates (both upstream and downstream) have a
+lifespan of 365 days. At that point it will be necessary to regenerate the
+expired certificates:</p>
 <ol>
-<li>
-<p>Regenerate the certificates:
-    <div class="highlight"><pre><span></span><code>cd tls-certificates
+<li>Regenerate the certificates:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>tls-certificates
 ./gen-upstream-certs.sh
 ./gen-downstream-certs.sh
-cd ..
-</code></pre></div></p>
+<span class="nb">cd</span><span class="w"> </span>..
+</code></pre></div>
+<ol>
+<li>Reboot all services:</li>
+</ol>
+<div class="highlight"><pre><span></span><code>docker-compose<span class="w"> </span>down
+docker-compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<h2 id="backup-strategy">Backup strategy</h2>
+<p>Like any other system, Lamassu needs to be backed up regularly to ensure it can
+be restored in the event of a disaster. So the operating system, disks and
+virtual machine are a given, but with the PKI you also need to restore your
+environment in the event of a of total disaster:</p>
+<ul>
+<li>CA certificate(s) and private key(s)</li>
+<li>CA registry information</li>
+<li>CA database backup</li>
+</ul>
+<p>There are a number of ways to effectively backup a CA. As an overall summary, we
+will perform a system state backup that includes: <em>Certification Authority
+Database</em>, <em>Registry Settings</em> and <em>CA Key information</em>.</p>
+<p>Following steps allow to backup an installation based on the standard
+docker-compose procedure:</p>
+<ol>
+<li>Save config file: Stores domain variable</li>
+</ol>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>lamassu-compose/.env<span class="w"> </span>backup/.env
+</code></pre></div>
+<ol>
+<li>Save vault credentials: Ensure that the vault credentials file is safe, and
+   not compromised. If control of the credentials is lost, the vault credentials
+   can be used to register other machines to vault. Each credential should
+   contain a single password used for authentication to a specific system.</li>
+</ol>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>lamassu-compose/vault-ca-credentials.json<span class="w"> </span>./backup/
+cp<span class="w"> </span>lamassu-compose/vault-credentials.json<span class="w"> </span>./backup/
+</code></pre></div>
+<ol>
+<li>
+<p>Get Snapshot of Consul: Consul provides
+   the <a href="https://developer.hashicorp.com/consul/commands/snapshot">snapshot</a> command
+   which can be run using the CLI or the API. The <code>snapshot</code> command saves a
+   point-in-time snapshot of the state of the Consul servers which includes, but
+   is not limited to:</p>
 </li>
 <li>
-<p>Reboot all services:
-    <div class="highlight"><pre><span></span><code>docker-compose down
-docker-compose up -d
-</code></pre></div></p>
+<p>Key-Value entries</p>
 </li>
+<li>The service catalog</li>
+<li>Prepared queries</li>
+<li>Sessions</li>
+<li>ACLs</li>
 </ol>
-<h2 id="backup-strategy">Backup strategy</h2>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>consul<span class="w"> </span>consul<span class="w"> </span>snapshot<span class="w"> </span>save<span class="w"> </span>backup.snap
+docker<span class="w"> </span>cp<span class="w"> </span>consul:backup.snap<span class="w"> </span>./backup/
+</code></pre></div>
+<ol>
+<li>Backup PostgreSQL: PostgreSQL provides the <code>pg_dump</code> utility to help you back
+   up databases. It generates a database file with SQL commands in a format that
+   can be easily restored in the future.</li>
+</ol>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;pg_dumpall -Uadmin &gt; database.sql&#39;</span>
+docker<span class="w"> </span>cp<span class="w"> </span>database:database.sql<span class="w"> </span>./backup/
+</code></pre></div>
 <h2 id="restoring-backups">Restoring backups</h2>
+<p>These steps allow to recover the state of an installation based on the standard
+docker-compose procedure:</p>
+<ol>
+<li>Restore Lamassu's configuration: retrieve credentials from backup.</li>
+</ol>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>backup/.env<span class="w"> </span>lamassu-compose/.env
+cp<span class="w"> </span>./backup/vault-ca-credentials.json<span class="w"> </span>lamassu-compose/vault-ca-credentials.json
+cp<span class="w"> </span>./backup/vault-credentials.json<span class="w"> </span>lamassu-compose/vault-credentials.json
+</code></pre></div>
+<ol>
+<li>Restore Snapshot of Consul: Running the <code>restore</code> process should be
+   straightforward. Make sure the Consul datacenter you are restoring is stable
+   and has a leader. You can verify this
+   using <code>consul operator raft list-peers</code> and checking server logs and
+   telemetry for signs of leader elections or network issues.</li>
+</ol>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>cp<span class="w"> </span>./backup/backup.snap<span class="w"> </span>consul:backup.snap
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>consul<span class="w"> </span>consul<span class="w"> </span>snapshot<span class="w"> </span>restore<span class="w"> </span>backup.snap
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>consul<span class="w"> </span>sh<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;curl -XPUT http://127.0.0.1:8500/v1/catalog/deregister -d&quot;{\&quot;Node\&quot;:\&quot;consul-server\&quot;}&quot;&#39;</span>
+</code></pre></div>
+<ol>
+<li>Restore PostgreSQL: Overrides all databases from different components.</li>
+</ol>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>cp<span class="w"> </span>./backup/database.sql<span class="w"> </span>database:database.sql
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;dropdb -Uadmin alerts&#39;</span>
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;dropdb -Uadmin auth&#39;</span>
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;dropdb -Uadmin ca&#39;</span>
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;dropdb -Uadmin cloudproxy&#39;</span>
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;dropdb -Uadmin devicemanager&#39;</span>
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;dropdb -Uadmin dmsmanager&#39;</span>
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>database<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;psql -Uadmin -f database.sql postgres&#39;</span>
+</code></pre></div>
 
 
 

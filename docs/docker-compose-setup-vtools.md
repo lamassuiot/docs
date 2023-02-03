@@ -1,4 +1,4 @@
-# Lamassu Simulation Tools
+# Simulation Tools
 
 It is recommended to follow this directory layout when deploying different
 Lamassu tools:

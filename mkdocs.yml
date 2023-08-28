@@ -1,7 +1,7 @@
 site_name: Lamassu IoT Docs
 # Repository
-repo_name: lamassuiot/lamassu-compose
-repo_url: https://github.com/lamassuiot/lamassu-compose
+repo_name: Helm Chart
+repo_url: https://github.com/lamassuiot/lamassu-helm
 
 theme:
   logo: img/lamassu.svg
@@ -9,6 +9,7 @@ theme:
   name: material
   features:
     - navigation.indexes
+    - content.code.copy
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: lamassu
@@ -26,15 +27,12 @@ extra_css:
 nav:
   - "index.md"
   - Installation:
-    - "Docker Compose":
-      - "docker-compose-setup.md"
-      - "Addons":
-        - "docker-compose-setup-vtools.md"
-        - "docker-compose-setup-aws.md"
-      - "docker-compose-manage.md"
-    - "Kubernetes":
-      - "kubernetes-setup.md"
-      - "kubernetes-manage.md"
+    - "k8s/1-setup.md"
+    - "k8s/2-lamassu-arch.md"
+    - 3. Install Infrastructure microservices:
+      - "k8s/install-oss-comps.md"
+      - "k8s/install-aws-comps.md"
+    - "k8s/4-install-lamassu.md"
   - "Get Started":
     - "Provisioning Flows":
       - "usage-flows.md"
@@ -43,10 +41,10 @@ nav:
     - "Device Integration":
       - "usage-device-integration.md"
   - "Tech Reference":
-    - "architecture.md"
-    - "protocols.md"
-    - "apis.md"
-    - "aws-iot-connector.md"
+    - "tech-ref/architecture.md"
+    - "tech-ref/protocols.md"
+    - "tech-ref/apis.md"
+    - "tech-ref/aws-iot-connector.md"
 extra:
   version:
     provider: mike
@@ -70,3 +68,6 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true

@@ -1,6 +1,6 @@
-# AWS Cognito 
+# AWS Cognito
 
-This guide will walk you trhough configuring AWS Cognito to be your OIDC provider for managing your users instead of the OSS alternative provided, Keycloak.
+This guide will walk you through configuring AWS Cognito to be your OIDC provider for managing your users instead of the OSS alternative provided, Keycloak.
 
 ## AWS Console Setup
 

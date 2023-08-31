@@ -2,7 +2,7 @@
 
 !!! info
 
-    The installation namespace of the different components are controlled using the `$NS`º env variable:
+    The installation namespace of the different components are controlled using the `$NS` env variable:
     ```bash
     export NS=lamassu-dev
     ```
@@ -47,7 +47,7 @@ helm install postgres bitnami/postgresql -n $NS -f postgresql.yaml
     While installing lamassu, make sure to tune the following settings in the `values.yaml` file:
     ```yaml
     postgres:
-      hostname: "postgresql" #name of the postgres kuberentes service
+      hostname: "postgresql" #name of the postgres kubernetes service
       port: 5432
       username: "admin"  #use the global.postgresql.auth.username value
       password: "admin"  #use the global.postgresql.auth.password value
@@ -91,7 +91,7 @@ helm install postgres bitnami/postgresql-ha -n $NS -f postgres-ha.yaml
     While installing lamassu, make sure to tune the following settings in the `values.yaml` file:
     ```yaml
     postgres:
-      hostname: "postgresql-pgpool" #name of the postgres kuberentes service
+      hostname: "postgresql-pgpool" #name of the postgres kubernetes service
       port: 5432
       username: "admin"  #use the global.postgresql.username value
       password: "admin"  #use the global.postgresql.password value

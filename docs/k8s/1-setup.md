@@ -4,7 +4,7 @@ Lamassu can be deployed in any kubernetes cluster. For simplicity sake, we provi
 
 ## MicroK8s
 
-Start by downloading kuberentes from microk8s official site: [https://microk8s.io/docs/getting-started](https://microk8s.io/docs/getting-started)
+Start by downloading kubernetes from microk8s official site: [https://microk8s.io/docs/getting-started](https://microk8s.io/docs/getting-started)
 
 Once you have a running instance, make sure to enable the required plugins:
 

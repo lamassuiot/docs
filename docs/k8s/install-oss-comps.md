@@ -111,13 +111,10 @@ helm install couchdb couchdb/couchdb -n $NS \
 
 ## Crypto Engines
 
-### Hashicorp Vault & Consul - Standalone
+### Harshicorp Vault & Consul
 
-- [x] Uses Persistence Volumes
+Follow the instructions to configure the services [Vault & Consul](service-configs/Consul&Vault/vault-consul.md)
 
-### Hashicorp Vault & Consul - HA
-
-- [x] Uses Persistence Volumes
 
 ### PKCS11 - Generic
 

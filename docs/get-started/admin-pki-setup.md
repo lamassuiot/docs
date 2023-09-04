@@ -29,7 +29,7 @@ There are three possibilities to create a new CA:
 
       - The CA expiration time must be greater than the lifespan of the issued certs.
       - There are 3 types of expiration formats, choose one:
-        
+
         - `Duration`: Uses a relative *time delta* to determine the expiration date. As of now, the duration value **MUST be set in days**. Future versions will enable specifying duration in a string-like expression such as `100d` or `3y`.
         - `End Date`: Set a specific date for expiration.
         - `Indefinite Validity`: The expiration is fixed to the following timestamp `99991231235959Z` (31/12/9999 at 23:59:59).

@@ -8,7 +8,7 @@ Lamassu is moving to be more cloud-friendly, meaning that some of the `Infrastru
 
 As stated earlier, this microservices MUST always be present in any Lamassu installation, but can be fine tunned to met your requirements:
 
-- **CA Service**: *TODO: Link to config file*
+- [CA Service](../tech-ref/config/ca.md)
 - **DMS Manager Service**: *TODO: Link to config file*
 - **Device Manager**: *TODO: Link to config file*
 - **OCSP Service**: *TODO: Link to config file*

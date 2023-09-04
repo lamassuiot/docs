@@ -113,7 +113,7 @@ helm install couchdb couchdb/couchdb -n $NS \
 
 ### Harshicorp Vault & Consul
 
-Follow the instructions to configure the services [Vault & Consul](service-configs/Consul&Vault/vault-consul.md)
+Follow the instructions to configure the services [Vault & Consul](service-configs/vault-consul.md)
 
 
 ### PKCS11 - Generic

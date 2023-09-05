@@ -32,81 +32,79 @@ Lamassu CA uses a config file to configure different subsystems. The service use
             - `ca_cert_file`: `(string: "")` - Requires `validation_mode == strict`. This certificate will be used to validate all incoming http requests during the TLS handshake.
 - `amqp_event_publisher`:
     - `enabled` `(bool: "true")`
-    - `protocol` `(string: "amqp")`
-    - `hostname` `(string: "127.0.0.1")`
+    - `protocol` `(string: "amqp")` - The allowed protocols are `amqp`, `amqps`. If `amqp` is used the port must be 5672 and if `amqps` is used the port must be 5671.
+    - `hostname` `(string: "127.0.0.1")` - Address at which AMQP broker is located
     - `port` `(int: 5672)`
     - `insecure_skip_verify` `(bool: "true")`
-    - `ca_cert_file` `(string: "")`
-    - `basic_auth`
+    - `ca_cert_file` `(string: "")` - The CA certificate that is used to trust the server.
+    - `basic_auth`: - If the `amqp` protocol is used, authentication is done by user and password.
         - `enabled` `(bool: "false")`
         - `username` `(string: "")`
         - `password` `(string: "")`
-    - `client_tls_auth`:
+    - `client_tls_auth`: - If the `amqps` protocol is used, authentication is performed using the client's certificate, so the path to both the certificate and the private key must be specified.
         - `enabled` `(bool: "false")`
         - `cert_file` `(string: "")`
         - `key_file` `(string: "")`
 
 - `storage`:
-    - `provider`: "couch_db" #couch_db | postgres | dynamo_db
+    - `provider` `(string: "couch_db")` - In CA version 3 currently only couchdb is supported as storage engine. 
     - `couch_db`:
-        - `hostname` `(string: "127.0.0.1")`
-        - `port` `(int: 5432)`
-        - `protocol` `(string: "http")`
+        - `hostname` `(string: "127.0.0.1")` - Address where the database is located
+        - `port` `(int: 5984)`
+        - `protocol` `(string: "http")` - The protocol used for communication with the database is `http`, therefore, authentication is done with username and password.
         - `insecure_skip_verify` `(bool: false)`
         - `base_path` `(string: "")`
         - `username` `(string: "")`
         - `password` `(string: "")`
-    - `postgres`:
-        - `hostname` `(string: "127.0.0.1")`
-        - `port` `(int: 5432)`
-        - `username` `(string: "")`
-        - `password` `(string: "")`
 
-- `crypto_engines`:
-    - `default_id`: `(string: "")`
-    - `pkcs11`:
-        - `id` `(string: "")`
-        - `module_path` `(string: "")`
-        - `module_extra_options`:
-            - `env`:
-        - `pin` `(string: "")`
-        - `token` `(string: "")`
-        - `metadata` `(key-value: {})`
-    - `hashicorp_vault`:
-        - `id` `(string: "")`
-        - `role_id` `(string: "")`
-        - `secret_id` `(string: "")`
-        - `auto_unseal_enabled` `(bool: false)`
-        - `auto_unseal_keys` `([]string: [])`
-        - `protocol` `(string: "http")`
-        - `hostname` `(string: "127.0.0.1")`
-        - `port` `(int: 8200)`
-        - `insecure_skip_verify`: `(bool: false)`
-        - `ca_cert_file` `(string: "")`
-        - `metadata` `(key-value: {})`
-    - `aws_kms`
-        - `id` `(string: "")`
-        - `access_key_id` `(string: "")`
-        - `secret_access_key` `(string: "")`
-        - `region` `(string: "")`
-        - `metadata` `(key-value: {})`
+- `crypto_engine` `(string: "GOLANG")` - Valid options are `GOLANG`, `HASHICORP_VAULT_KV_V2`, `AWS_KMS`, `AWS_SECRETS_MANAGER` and `PKCS11`.
 
-    - `aws_secrets_manager`:
-        - `id` `(string: "")`
-        - `access_key_id` `(string: "")`
-        - `secret_access_key` `(string: "")`
-        - `region` `(string: "")`
-        - `metadata` `(key-value: {})`
+- `pkcs11`:
+    - `name` `(string: "softhsm")` - Name of the PKCS11 cryptographic engine used.
+    - `metadata` `(key-value: {})` - Variable structure of string type used to configure specific variables of each HSM. This structure does not have fixed variables.
+    - `token` `(string: "1234")` - The token used to connect to the HSM.
 
-    - `golang`:
-        - `id` `(string: "")`
-        - `storage_directory` `(string: "/data")`
-        - `metadata` `(key-value: {})`
+- `hashicorp_vault`:
+    - `name` `(string: "")` - The Vault name is a user-defined identifier for your Vault instance.
+    - `metadata` `(key-value: {})`
+    - `role_id` `(string: "")` - In Vault's authentication process, a Role ID is often used as a static identifier for a client or application. It's associated with a particular role that defines the permissions and policies a client has within Vault.
+    - `secret_id` `(string: "")` - The Secret ID is a dynamic credential associated with a Role ID. It is used as part of the authentication process to obtain a Vault token, which grants access to Vault resources.
+    - `auto_unseal_enabled` `(bool: false)` - When you start a new Vault server, it typically starts in a sealed state, where it cannot access its encrypted data or provide services until it is manually unsealed. Auto unseal automates this process.
+    - `auto_unseal_keys_file` `(string: "")` - The keys used to perform the unseal of Vault
+    - `protocol` `(string: "http")` 
+    - `base_path` `(string: "")`
+    - `hostname` `(string: "127.0.0.1")` - This is the address or URL where your Vault server is running.
+    - `port` `(int: 8200)` - The default port for HashiCorp Vault's HTTP API is 8200. This means that when you access Vault's HTTP API over HTTP or HTTPS, you typically use port 8200 by default.
+    - `insecure_skip_verify` `(bool: false)`
+    - `ca_cert_file` `(string: "")` - The CA certificate that is used to trust the server.
+
+- `aws_kms`:
+    - `name` `(string: "")` - Name of the cryptographic engine AWS KMS used
+    - `metadata` `(key-value: {})`
+    - `access_key_id` `(string: "")` -  These are your AWS access credentials used to authenticate your requests to AWS services.  Access Key ID is similar to a username.
+    - `secret_access_key` `(string: "")` - Secret Access Key is similar to a password. 
+    - `region` `(string: "")` - This specifies the AWS region where your KMS key and other resources are located. 
+
+- `aws_secrets_manager`:
+    - `name` `(string: "")` - Name of the AWS Secrets Manager cryptographic engine used
+    - `metadata` `(key-value: {})`
+    - `access_key_id` `(string: "")` -  These are your AWS access credentials used to authenticate your requests to AWS services.  Access Key ID is similar to a username.
+    - `secret_access_key` `(string: "")` - Secret Access Key is similar to a password.
+    - `region` `(string: "")` - This specifies the AWS region where your AWS Secrets Manager and other resources are located. 
+
+- `gopem`:
+    - `name` `(string: "")` - Name of the GoPEM cryptographic engine used
+    - `metadata` `(key-value: {})`
+    - `storage_directory` `(string: "")` - Directory in which the secrets (Private Keys) will be stored.
 
 - `crypto_monitoring`:
-    - `enabled` `(bool: true)`
-    - `frequency` `(string: "* * * * *")`
+    - `enabled` `(bool: true)` - Enable monitoring of cryptographic objects and notify when a certificate is expired or about to expire.
+    - `frequency` `(string: "* * * * *")` - Frequency at which such monitoring is to be performed.
     - `status_machine_deltas`:
-        - `near_expiration` `(string: "30d")`
-        - `critical_expiration`  `(string: "90d")`
-- `ocsp_server_url` `(string: "info")`
+        - `near_expiration`  `(string: "30d")` - Set the expiration time, whereby if the certificate, in this case, has 30 days or less to expire, the status will be changed to `NEARING_EXPIRATION`.
+        - `critical_expiration`  `(string: "90d")` - Set the expiration time, whereby if the certificate, in this case, has 90 days or less to expire, the status will be changed to `CRITICAL_EXPIRATION`.
+    - `automatic_ca_rotation`:
+        - `enabled` `(bool: true)` - Enable automatic CAs rotation depending on when it is going to expire, to set the date on which the rotation will be performed there is the variable `renewal_delta`.
+        - `renewal_delta` `(string: "5d")` - Set the date on which the automatic rotation is to be performed, in this case, 5 days before the CAs expire.
+
+- `ocsp_server_url` `(string: "info")` - OCSP server URL

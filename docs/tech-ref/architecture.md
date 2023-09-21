@@ -3,7 +3,7 @@
 ## Core Services
 
 <figure markdown="1">
-![Screenshot](img/architecture/architecture.svg)
+![Screenshot](../img/architecture/architecture.svg)
 </figure>
 
 Lamassu has been designed to be modular and keep the core services as simple as
@@ -40,7 +40,7 @@ are working on a solution to improve this.
 There are 4 different status that a certificate can have:
 
 <figure markdown="1">
-![Screenshot](img/architecture/ca-status.png){: style="width:225px" .center}
+![Screenshot](../img/architecture/ca-status.png){: style="width:225px" .center}
 </figure>
 
 The _Active_ state indicates that a certificate is valid and can be trusted by
@@ -149,7 +149,7 @@ the DMS authorizes or rejects the device's request. In Manual DMS mode the
 authorization is done manually by the operator.
 
 <figure markdown="1">
-![Screenshot](img/dms-mode.png)
+![Screenshot](../img/dms-mode.png)
 </figure>
 
 The DMS Manager service uses a relational database to store the list of
@@ -187,7 +187,7 @@ to improve this.
 There are 5 different status a device can have:
 
 <figure markdown="1">
-![Screenshot](img/architecture/device-status.png){: style="width:225px" .center}
+![Screenshot](../img/architecture/device-status.png){: style="width:225px" .center}
 </figure>
 
 The _Pending Provisioning_ state reflects that a device entity has been created
@@ -287,7 +287,7 @@ RabbitMQ broker. The message sent to the "alerts" queue will be consumed by the
 Alerts service and will send a mail to all the users subscribed to that event.
 
 <figure markdown="1">
-![Screenshot](img/rabbitMQ.png){: style="width:500px" .center}
+![Screenshot](../img/rabbitMQ.png){: style="width:500px" .center}
 </figure>
 
 Alerts service uses a relational database, to store the information of
@@ -372,6 +372,6 @@ requirements by leveraging the use of an API Gateway:
   communications channel between the Gateway itself and the upstream service,
   the API Gateway initiates a mutual TLS connection to ensure such thing.
 
-![Screenshot](img/architecture/architecture.svg)
+![Screenshot](../img/architecture/architecture.svg)
 
 ## Cloud Providers Add-ons

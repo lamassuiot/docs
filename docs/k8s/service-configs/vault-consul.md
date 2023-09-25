@@ -9,7 +9,11 @@ export NS=dev-lamassu
 ### Installation Modes
 #### Standalone
 
-![Screenshot](imgs/Standalone.png)
+``` mermaid
+flowchart TD
+    direction LR
+    v[Vault] --> c[Consul]
+```
 
 1. The first step is to deploy Consul as it will be used by Vault to store the PKI sensitive data. In order to make that possible, you have to use the `oss-helm-values/consul-ha.yaml` 
 
@@ -56,16 +60,22 @@ helm install vault -n $NS hashicorp/vault -f oss-helm-values/vault-ha.yaml
 ```
 
 3. After finishing the installation of the two services, the next step is to initialise vault.
-### Initialising Vault
+### Provisioning Vault
 
-By default Vault has no data which means it is in an uninitialised status.  Vault´s initialisation process consist on creating the main encryption keys used to prtotect data at rest. In order to automatise the initialised process, first open a shell and run this command to enable temporal external connectivity with vault so the initialisation process can  be carried out.
+By default Vault has no data which means it is in an uninitialised status.  Vault´s initialisation process consist on creating the main encryption keys used to protect data at rest. In order to automatise the initialised process, first open a shell and run this command to enable temporal external connectivity with vault so the initialisation process can  be carried out.
 
 ```bash
-VAULT_SVC_NAME=vault
+export VAULT_SVC_NAME=vault
 kubectl port-forward -n $NS svc/$VAULT_SVC_NAME 8200:8200 --address 0.0.0.0
 ```
 
-The script below, will take care of initializing vault by, creating the unseal keys and unsealing vault, as well as creating the AppRole accounts used by Lamassu to access this service with the required permissions:
+The script below, will take do de following things:
+
+- Creating the unseal keys
+- Unseal Vault,
+- Creating an AppRole account used by Lamassu CA
+- Create a policy to access KV-V2 service to the specified mount path
+- Attach policy to AppRole identity
 
 ```bash
 {
@@ -95,9 +105,9 @@ for ip in $(kubectl get endpoints vault -n $NS -o json | jq -r ".subsets[].addre
 done
 
 export VAULT_TOKEN=$(cat vault-credentials.json | jq .root_token)
-export SECRET_ENGINE=lamassu
-export POLICY_NAME=lms
-export ROLE_NAME=lms
+export SECRET_ENGINE=lamassu-pki-kvv2
+export POLICY_NAME=pki-kv
+export ROLE_NAME=lamassu-ca
 
 VAULT_TOKEN=$(echo $VAULT_TOKEN | sed 's/"//g')
 
@@ -110,21 +120,16 @@ curl --header "X-Vault-Token: ${VAULT_TOKEN}" --data '{"policies": "'$POLICY_NAM
 CA_VAULT_ROLEID=$(curl --header "X-Vault-Token: $VAULT_TOKEN" http://$VAULT_SVC_NAME:8200/v1/auth/approle/role/$ROLE_NAME/role-id | jq -r .data.role_id | sed 's/\\n/\n/g' | sed -Ez '$ s/\n+$//')
 CA_VAULT_SECRETID=$(curl --header "X-Vault-Token: $VAULT_TOKEN" --request POST http://$VAULT_SVC_NAME:8200/v1/auth/approle/role/$ROLE_NAME/secret-id | jq -r .data.secret_id | sed 's/\\n/\n/g' | sed -Ez '$ s/\n+$//')
 
-echo ROLE_ID
-echo $CA_VAULT_ROLEID
-
-echo secret_id
-echo $CA_VAULT_SECRETID
+echo "ROLE_ID: $CA_VAULT_ROLEID"
+echo "SECRET_ID: $CA_VAULT_SECRETID"
 }
 ```
 
-```bash
+## Lamassu Helm Chart values config
 
-ROLE_ID
-YjMyOTI4MjctNmQ1My00Y2JlLWJkYWQtMWVlYTgxYWQ2MWY3
-secret_id
-OWEwM2JkOTItOTNiMy02ZDJiLTVkZWMtMzFhYTM5Njc1YTE3
+```yaml
+services:
+  ca:
+    engine: "vault"
+    mount_path: "lamassu-pki-kvv2"
 ```
-
-
-

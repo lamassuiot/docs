@@ -34,17 +34,16 @@ nav:
       - "k8s/install-aws-comps.md"
     - "k8s/4-install-lamassu.md"
   - "Get Started":
-    - "Provisioning Flows":
-      - "usage-flows.md"
-      - "usage-flows-first-boot.md"
-      - "usage-flows-on-demand.md"
-    - "Device Integration":
-      - "usage-device-integration.md"
+      - "get-started/admin-pki-setup.md"
+      - "get-started/usage-flows.md"
+      - "get-started/device-integration.md"
   - "Tech Reference":
     - "tech-ref/architecture.md"
     - "tech-ref/protocols.md"
     - "tech-ref/apis.md"
     - "tech-ref/aws-iot-connector.md"
+    - "tech-ref/config/ca.md"
+    - "tech-ref/cloud-events.md"
 extra:
   version:
     provider: mike
@@ -76,4 +75,3 @@ markdown_extensions:
   - def_list
   - pymdownx.tasklist:
       custom_checkbox: true
-

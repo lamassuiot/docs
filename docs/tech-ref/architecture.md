@@ -145,7 +145,16 @@ of the device, instead, in the Cloud Hosted DMS the communication between the
 device and the DMS is done using the EST protocol. On the other hand, in Cloud
 Hosted DMS mode the device to communicate with the DMS and to be able to request
 a Certificate must have a Bootstrap certificate. By means of this certificate
-the DMS authorizes or rejects the device's request. In Manual DMS mode the
+the DMS authorizes or rejects the device's request.  Moreover, the DMS of Lamassu has two different options 
+when it has to authorize devices to use the enrollment functionality. On the one,
+there is an option to allow only the devices which are registered in the device manager.
+On the other hand, the other option allows all the devices, even if the device is not registered
+in the device manager. 
+
+
+
+
+In Manual DMS mode the
 authorization is done manually by the operator.
 
 <figure markdown="1">

@@ -33,9 +33,8 @@ of maintaining an accurate state of the managed entities (both CA certificates
 and regular certificates). In order to do so, a periodic task is scheduled once
 a day to check the status of validity of all certificates.
 
-!!! warning This feature does not perform well on deployments that have issued
-many certificates as it is performed on a sequential single threaded process. We
-are working on a solution to improve this.
+!!! warning 
+    This feature does not perform well on deployments that have issued many certificates as it is performed on a sequential single threaded process. We are working on a solution to improve this.
 
 There are 4 different status that a certificate can have:
 
@@ -59,12 +58,13 @@ The CA service uses a relational database to store the issued certificates and
 basic information regarding the provisioned CAs. To configure the database
 connection, set the following environment variables:
 
-| Environment Variable | Description | | -------------------- |
-------------------------------------------------------------- | |
-POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres
-database | | POSTGRES_PORT | Port for the postgres instance | |
-POSTGRES_DATABASE | Database to use | | POSTGRES_USERNAME | Username credentials
-| | POSTGRES_PASSWORD | Password credentials |
+| Environment Variable | Description |
+| -------------------- | ----------------------------------------------------- | 
+| POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres database |
+| POSTGRES_PORT | Port for the postgres instance |
+| POSTGRES_DATABASE | Database to use |
+| POSTGRES_USERNAME | Username credentials |
+| POSTGRES_PASSWORD | Password credentials |
 
 This service has been redesigned to support multiple **crypto engines**
 backends. Originally the only supported engine was the one provided by Hashicorp
@@ -75,25 +75,26 @@ engine can be added by implementing this interface.
 To provision the CA service with a crypto engine set the following environment
 variable:
 
-| Environment Variable | Description | | -------------------- |
------------------------------- | | ENGINE | `pkcs11` | `gopem` | `vault` |
+| Environment Variable | Description |
+| -------------------- | ------------------------------ |
+| ENGINE | `pkcs11` \| `gopem` \| `vault` |
 
 The current supported crypto engines are:
 
 - **pkcs11**: To Use the HSM crypto engine, define the following environment
   variables before launching the CA service:
 
-| Environment Variable | Description | | -------------------- |
---------------------------------------- | | PKCS11_DRIVER | Path to the PKCS11
-driver file | | PKCS11_LABEL | Label used by the token to be used | | PKCS11_PIN
-| PIN code to login and operate the token |
+| Environment Variable | Description |
+| -------------------- | --------------------------------------- |
+| PKCS11_DRIVER | Path to the PKCS11 driver file |
+| PKCS11_LABEL | Label used by the token to be used |
+| PKCS11_PIN | PIN code to login and operate the token |
 
 - **gopem** - Files
 
-| Environment Variable | Description | | -------------------- |
--------------------------------------------------------------------------- | |
-GOPEM_DATA | Directory where the generated private keys belonging to each CA are
-stored |
+| Environment Variable | Description |
+| -------------------- | ----------------------------------------------------- |
+| GOPEM_DATA | Directory where the generated private keys belonging to each CA are stored |
 
 Although this new design is easier to maintain and operate, we are also keeping
 the previous implementation of the Hashicorp Vault that does not follow the new
@@ -106,14 +107,14 @@ instead a Software HSM known as
 
 - **vault** - Hashicorp Vault
 
-| Environment Variable | Description | | --------------------- |
---------------------------------------------------------------------- | |
-VAULT_ADDRESS | Protocol, hostname and port to a vault instance:
-`https://vault:8200` | | VAULT_ROLE_ID | Role ID used by the CA service to login
-to vault | | VAULT_SECRET_ID | Secret ID used by the CA service to login to
-vault | | VAULT_CA | Path to the CA certificate file for `https` connections | |
-VAULT_UNSEAL_KEY_FILE | Path to the unseal vault keys | | VAULT_PKI_CA_PATH |
-Prefix to use while creating new PKI vault secrets |
+| Environment Variable | Description |
+| --------------------- | --------------------------------------------------- |
+| VAULT_ADDRESS | Protocol, hostname and port to a vault instance: `https://vault:8200` |
+| VAULT_ROLE_ID | Role ID used by the CA service to login to vault |
+| VAULT_SECRET_ID | Secret ID used by the CA service to login to vault |
+| VAULT_CA | Path to the CA certificate file for `https` connections |
+| VAULT_UNSEAL_KEY_FILE | Path to the unseal vault keys |
+| VAULT_PKI_CA_PATH | Prefix to use while creating new PKI vault secrets |
 
 ### DMS Manager
 
@@ -145,17 +146,13 @@ of the device, instead, in the Cloud Hosted DMS the communication between the
 device and the DMS is done using the EST protocol. On the other hand, in Cloud
 Hosted DMS mode the device to communicate with the DMS and to be able to request
 a Certificate must have a Bootstrap certificate. By means of this certificate
-the DMS authorizes or rejects the device's request.  Moreover, the DMS of Lamassu has two different options 
-when it has to authorize devices to use the enrollment functionality. On the one,
+the DMS authorizes or rejects the device's request.  Moreover, the DMS of Lamassu has two different options when it has to authorize devices to use the enrollment functionality. On the one,
 there is an option to allow only the devices which are registered in the device manager.
 On the other hand, the other option allows all the devices, even if the device is not registered
-in the device manager. 
+in the device manager.
 
 
-
-
-In Manual DMS mode the
-authorization is done manually by the operator.
+In Manual DMS mode the authorization is done manually by the operator.
 
 <figure markdown="1">
 ![Screenshot](../img/dms-mode.png)
@@ -165,20 +162,21 @@ The DMS Manager service uses a relational database to store the list of
 authorised CAs and basic information regarding the provisioned DMS certificates.
 To configure the database connection, set the following environment variables:
 
-| Environment Variable | Description | | -------------------- |
-------------------------------------------------------------- | |
-POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres
-database | | POSTGRES_PORT | Port for the postgres instance | |
-POSTGRES_DATABASE | Database to use | | POSTGRES_USERNAME | Username credentials
-| | POSTGRES_PASSWORD | Password credentials |
+| Environment Variable | Description |
+| -------------------- |--------------------------------------------------------- |
+| POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres database |
+| POSTGRES_PORT | Port for the postgres instance |
+| POSTGRES_DATABASE | Database to use |
+| POSTGRES_USERNAME | Username credentials |
+| POSTGRES_PASSWORD | Password credentials |
 
 - **CA** - The DMS service uses a Lamassu CA Client to update the status of the
   internal CA _LAMASSU-DMS-MANAGER_
 
-| Environment Variable | Description | | -------------------- |
----------------------------------------------------- | | LAMASSU_CA_ADDRESS |
-Lamassu CA service name and port : `ca:8087` | | LAMASSU_CA_CERT_FILE | Path to
-the internal CA |
+| Environment Variable | Description |
+| -------------------- |---------------------------------------------------- |
+| LAMASSU_CA_ADDRESS | Lamassu CA service name and port : `ca:8087` |
+| LAMASSU_CA_CERT_FILE | Path to the internal CA |
 
 ### Device manager
 
@@ -188,10 +186,10 @@ certificates. On top of that, this service manages the registration of new
 devices and to keep a track of the device status. Similar to the CA service, the
 device manager also schedules a periodic task to check the status of the
 devices. This task is launched once a day to check the status of validity of all
-certificates associated by each device. !!! warning This feature does not
-perform well on deployments that have issued many certificates as it is
-performed on a sequential single threaded process. We are working on a solution
-to improve this.
+certificates associated by each device.
+
+!!! warning 
+    This feature does not perform well on deployments that have issued many certificates as it is performed on a sequential single threaded process. We are working on a solution to improve this.
 
 There are 5 different status a device can have:
 
@@ -217,36 +215,36 @@ of the devices, certificates and slots, also, logs of devices and slots are
 created when an specific action is carried out, for example, in the creation. To
 configure the database connection, set the following environment variables:
 
-| Environment Variable | Description | | -------------------- |
-------------------------------------------------------------- | |
-POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres
-database | | POSTGRES_PORT | Port for the postgres instance | |
-POSTGRES_DATABASE | Database to use | | POSTGRES_USERNAME | Username credentials
-| | POSTGRES_PASSWORD | Password credentials |
+| Environment Variable | Description |
+| -------------------- | ------------------------------------------------------ |
+|POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres database |
+| POSTGRES_PORT | Port for the postgres instance |
+| POSTGRES_DATABASE | Database to use |
+| POSTGRES_USERNAME | Username credentials |
+| POSTGRES_PASSWORD | Password credentials |
 
 - **CA** - The Device Manager service uses a Lamassu CA Client to update the
   status of the certificates associated to the devices
 
-| Environment Variable | Description | | -------------------- |
----------------------------------------------------- | | LAMASSU_CA_ADDRESS |
-Lamassu CA service name and port: `ca:8087` | | LAMASSU_CA_CERT_FILE | Path to
-the internal CA |
+| Environment Variable | Description |
+| -------------------- | -------------------------------------------- |
+| LAMASSU_CA_ADDRESS | Lamassu CA service name and port: `ca:8087` |
+| LAMASSU_CA_CERT_FILE | Path to the internal CA |
 
 - **DMS** - The Device Manager service uses a DMS Client to update the status of
   the certificates associated to the devices
 
-| Environment Variable | Description | | ----------------------------- |
---------------------------------------------------------------- | |
-LAMASSU_DMS_MANAGER_ADDRESS | Lamassu DMS service name and port:
-`dms-manager:8085` | | LAMASSU_DMS_MANAGER_CERT_FILE | Path to the internal DMS
+| Environment Variable | Description |
+| ----------------------------- | ---------------------------------------------- |
 |
+LAMASSU_DMS_MANAGER_ADDRESS | Lamassu DMS service name and port: `dms-manager:8085` |
+| LAMASSU_DMS_MANAGER_CERT_FILE | Path to the internal DMS |
 
 - **Other** - Other configuration variables
 
-| Environment Variable | Description | | --------------------- |
----------------------------------------------------------------------- | |
-MINIMUM_REENROLL_DAYS | The minimum days that a certificate must be valid in
-order to reenroll |
+| Environment Variable | Description |
+| --------------------- | ------------------------------------------------------ |
+| MINIMUM_REENROLL_DAYS | The minimum days that a certificate must be valid in order to reenroll |
 
 ### Cloud Proxy
 
@@ -259,30 +257,32 @@ the Lamassu CAs and to assign a connector Id. The connector will be used to bind
 each Lamassu CA to their equivalent in the external cloud providers. To
 configure the database connection, set the following environment variables:
 
-| Environment Variable | Description | | -------------------- |
-------------------------------------------------------------- | |
-POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres
-database | | POSTGRES_PORT | Port for the postgres instance | |
-POSTGRES_DATABASE | Database to use | | POSTGRES_USERNAME | Username credentials
-| | POSTGRES_PASSWORD | Password credentials |
+| Environment Variable | Description |
+| -------------------- |--------------------------------------------------------- |
+| POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres database |
+| POSTGRES_PORT | Port for the postgres instance |
+| POSTGRES_DATABASE | Database to use |
+| POSTGRES_USERNAME | Username credentials |
+| POSTGRES_PASSWORD | Password credentials |
 
 - **Consul** - Cloud connectors are dynamically registered, to have a record of
   what services exist, they self-register in consul. Cloud Proxy consumes consul
   to ask which service are registered.
 
-| Environment Variable | Description | | -------------------- |
------------------------------------------------------ | | CONSUL_PROTOCOL |
-Protocol used to connect to consul instance : `https` | | CONSUL_HOST | Hostname
-to a running consul instance | | CONSUL_PORT | Port for the consul instance | |
-CONSUL_CA | Path to the internal CA |
+| Environment Variable | Description |
+| -------------------- | --------------------------------------------- |
+| CONSUL_PROTOCOL | Protocol used to connect to consul instance : `https` |
+| CONSUL_HOST | Hostname to a running consul instance |
+| CONSUL_PORT | Port for the consul instance |
+| CONSUL_CA | Path to the internal CA |
 
 - **CA** - The Device Manager service uses a Lamassu CA Client to update the
   status of the certificates associated to the devices
 
-| Environment Variable | Description | | -------------------- |
----------------------------------------------------- | | LAMASSU_CA_ADDRESS |
-Lamassu CA service name and port: `lamassu-ca:8087` | | LAMASSU_CA_CERT_FILE |
-Path to the internal CA |
+| Environment Variable | Description |
+| -------------------- | ------------------------------------------------- |
+| LAMASSU_CA_ADDRESS | Lamassu CA service name and port: `lamassu-ca:8087` |
+| LAMASSU_CA_CERT_FILE | Path to the internal CA |
 
 ### Alerts
 
@@ -303,31 +303,34 @@ Alerts service uses a relational database, to store the information of
 subscriptions and last executed events information. To configure the database
 connection, set the following environment variables:
 
-| Environment Variable | Description | | -------------------- |
-------------------------------------------------------------- | |
-POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres
-database | | POSTGRES_PORT | Port for the postgres instance | |
-POSTGRES_DATABASE | Database to use | | POSTGRES_USERNAME | Username credentials
-| | POSTGRES_PASSWORD | Password credentials |
+| Environment Variable | Description |
+| -------------------- | ----------------------------------------------- |
+| POSTGRES_HOSTNAME | Hostname or address to connect to a running postgres database |
+| POSTGRES_PORT | Port for the postgres instance |
+| POSTGRES_DATABASE | Database to use |
+| POSTGRES_USERNAME | Username credentials |
+| POSTGRES_PASSWORD | Password credentials |
 
 - **Configuration** - Alerts service allows custom configuration to send SMTP
   mails, such as:
 
-| Environment Variable | Description | | -------------------- |
--------------------------------------------------------------- | | SMTP_FROM |
-Email address of the sender of alerts generated by the service | | SMTP_INSECURE
-| Boolean value to enable or disable secure SMTP session | | SMTP_ENABLE_SSL |
-Boolean value to enable or disable SSL connection | | SMTP_USERNAME | Username
-credentials | | SMTP_PASSWORD | Password credentials | | SMTP_HOST | Hostname or
-address to SMTP server: `25` | | SMTP_PORT | Port for the SMTP instance |
+| Environment Variable | Description |
+| -------------------- | ----------------------------------------------- |
+| SMTP_FROM | Email address of the sender of alerts generated by the service |
+| SMTP_INSECURE | Boolean value to enable or disable secure SMTP session |
+| SMTP_ENABLE_SSL | Boolean value to enable or disable SSL connection |
+| SMTP_USERNAME | Username credentials |
+| SMTP_PASSWORD | Password credentials |
+| SMTP_HOST | Hostname or address to SMTP server: `25` |
+| SMTP_PORT | Port for the SMTP instance |
 
 - **Templates** - Alerts service allows custom configuration to send SMTP mails,
   such as:
 
-| Environment Variable | Description | | -------------------- |
--------------------------------------------------------------- | | TEMPLATE_HTML
-| Template in HTML format to create mail format | | TEMPLATE_JSON | Template in
-JSON format to rename queue names by readable text |
+| Environment Variable | Description |
+| -------------------- | ------------------------------------------------ |
+| TEMPLATE_HTML | Template in HTML format to create mail format |
+| TEMPLATE_JSON | Template in JSON format to rename queue names by readable text |
 
 ### OCSP
 
@@ -337,17 +340,18 @@ validity status of an X.509 digital certificate.
 OCSP service's response must be signed with a public private key, so the
 following variables must be specified.
 
-| Environment Variable | Description | | -------------------- |
----------------------------------------------------- | | SIGNER_CERT | Lamassu
-CA service name and port: `ca:8087` | | SIGNER_KEY | Path to the internal CA |
+| Environment Variable | Description |
+| -------------------- | -------------------------------------------- |
+| SIGNER_CERT | Lamassu CA service name and port: `ca:8087` |
+| SIGNER_KEY | Path to the internal CA |
 
 - **CA** - OCSP service uses a Lamassu CA Client to update the status of the
   certificates associated to the devices
 
-| Environment Variable | Description | | -------------------- |
----------------------------------------------------- | | LAMASSU_CA_ADDRESS |
-Lamassu CA service name and port: `ca:8087` | | LAMASSU_CA_CERT_FILE | Path to
-the internal CA |
+| Environment Variable | Description |
+| -------------------- | ------------------------------------------------ |
+| LAMASSU_CA_ADDRESS | Lamassu CA service name and port: `ca:8087` |
+| LAMASSU_CA_CERT_FILE | Path to the internal CA |
 
 ## Lamassu Compose
 

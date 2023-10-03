@@ -4,19 +4,43 @@ The **CA**, **DMS Manager** and **Device Manager** services publish in Rabbitmq 
 
 ## CA
 
-| **Event Type**              | **Description**                                                                                                                                                                                                                              | 
-|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ca.create                   | Event sent when the CA is created. The cloud proxy receives the event to create the CA in the cloud.                                                                                                                                         |
-| ca.import                   | Event sent when importing a CA                                                                                                                                                                                                               |
-| ca.update.status            | Event sent when the CA is updated. The cloud proxy receives the event to update the status of the CA in the cloud. Valid status: **ACTIVE**, **EXPIRED**, **REVOKED**, **NEARING_EXPIRATION** and **CRITICAL_EXPIRATION**                    |
-| ca.update.metadata          | Event to update the metadata of a CA                                                                                                                                                                                                         |
-| ca.delete                   | Event sent when deleting a CA                                                                                                                                                                                                                |
-| ca.sign-certificate         | Event sent when a certificate is signed                                                                                                                                                                                                      |
-| certificate.update.status   | Event sent when the status of a certificate is updated. The cloud proxy receives the event and updates the corresponding certificate. Valid status: **ACTIVE**, **EXPIRED**, **REVOKED**, **NEARING_EXPIRATION** and **CRITICAL_EXPIRATION** |
-| certificate.update.metadata | Event to update the metadata of a certificate.                                                                                                                                                                                               |
+| **Event Type**              | **Description**                                                                                                                                                                                                                              | **Data Structure**
+|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------
+| ca.create                   | Event sent when the CA is created. The cloud proxy receives the event to create the CA in the cloud.                                                                                                                                         | [CA Data Structure](#ca-data-structure)
+| ca.import                   | Event sent when importing a CA                                                                                                                                                                                                               | [CA Data Structure](#ca-data-structure)
+| ca.update.status            | Event sent when the CA is updated. The cloud proxy receives the event to update the status of the CA in the cloud. Valid status: **ACTIVE**, **EXPIRED**, **REVOKED**, **NEARING_EXPIRATION** and **CRITICAL_EXPIRATION**                    | [CA Data Structure](#ca-data-structure)
+| ca.update.metadata          | Event to update the metadata of a CA                                                                                                                                                                                                         | [CA Data Structure](#ca-data-structure)
+| ca.delete                   | Event sent when deleting a CA                                                                                                                                                                                                                | [Certificate Data Structure](#certificate-data-structure)
+| ca.sign-certificate         | Event sent when a certificate is signed                                                                                                                                                                                                      | [Certificate Data Structure](#certificate-data-structure)
+| certificate.update.status   | Event sent when the status of a certificate is updated. The cloud proxy receives the event and updates the corresponding certificate. Valid status: **ACTIVE**, **EXPIRED**, **REVOKED**, **NEARING_EXPIRATION** and **CRITICAL_EXPIRATION** | [Certificate Data Structure](#certificate-data-structure)
+| certificate.update.metadata | Event to update the metadata of a certificate.                                                                                                                                                                                               | [Certificate Data Structure](#certificate-data-structure)
 
-Data structure published by **ca.create**, **ca.import**, **ca.update.status** and **ca.update.metadata** events
 
+## DMS Manager
+
+| **Event Type**                         | **Description**                                                                                                                                          |**Data Structure**
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------
+| io.lamassuiot.dms.create               | Event sent when the DMS is created and received by the cloud proxy to publish to AWS IoT Core the certificates of the CAs associated to the DMS.         | [DMS Data Structure](#dms-data-structure)
+| io.lamassuiot.dms.update-status        | Event to report that the status of the DMS has been updated. Valid status: **PENDING_APPROVAL**, **REJECTED**, **APPROVED**, **EXPIRED** and **REVOKED** | [DMS Data Structure](#dms-data-structure)
+| io.lamassuiot.dms.update               | Event to inform that the DMS has been updated, the cloud proxy receives the event to update the certificates of the CAs.                                 | [DMS Data Structure](#dms-data-structure)
+| io.lamassuiot.dms.update-authorizedcas | Event to inform that authorized CAs of the DMS have been updated, the cloud proxy receives the event to update the certificates of the CAs               | [DMS Data Structure](#dms-data-structure)
+
+## Device Manager
+
+| **Event Type**                     | **Description**                                                                                                                           | **Data Structure**                             |
+|------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| io.lamassuiot.device.create        | Event sent when Device is created                                                                                                         | [Device Data Structure](#device-data-structure)
+| io.lamassuiot.device.update        | Event sent when Device is updated                                                                                                         | [Device Data Structure](#device-data-structure)
+| io.lamassuiot.device.decommision   | Event sent when the Device is Uninstalled                                                                                                 | [Device Data Structure](#device-data-structure)
+| io.lamassuiot.device.rotate        | Event sent when the Device's active certificate is rotated.                                                                               | [Slot Data Structure](#slot-data-structure)
+| io.lamassuiot.device.revoke        | Event sent when Device's active certificate is revoked                                                                                    | [Slot Data Structure](#slot-data-structure)
+| io.lamassuiot.device.enroll        | Event sent when Device enrolment is performed                                                                                             | [Certificate Data Structure](#certificate-base64-data-structure)
+| io.lamassuiot.device.reenroll      | Event sent when the Device is rewired. The event is received by the Cloud Proxy to update the device's digital twin.                      | [Certificate Data Structure](#certificate-base64-data-structure)
+| io.lamassuiot.device.forceReenroll | Event sent when you want to force the Device to be rewired. The event is received by the Cloud Proxy to update the device's digital twin. | [Force Reenroll Data Structure](#force-reenroll-data-structure)
+
+## Data Structures
+
+### CA Data Structure
 - `serial_number`: `(string: "")` - The Serial Number of the created CA certificate
 - `issuer_metadata`:
     - `serial_number`: `(string: "")` - The issuer CA certificate serial number
@@ -87,9 +111,7 @@ Data structure published by **ca.create**, **ca.import**, **ca.update.status** a
 }
 
 ```
-
-Data structure published by **ca.sign-certificate**, **certificate.update.status** and **certificate.update.metadata** events
-
+### Certificate Data Structure
 - `serial_number`: `(string: "")` - The Serial Number of the certificate
 - `issuer_metadata`:
     - `serial_number`: `(string: "")` - The issuer CA certificate serial number
@@ -141,17 +163,7 @@ Data structure published by **ca.sign-certificate**, **certificate.update.status
 
 ```
 
-## DMS Manager
-
-| **Event Type**                         | **Description**                                                                                                                                          |
-|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| io.lamassuiot.dms.create               | Event sent when the DMS is created and received by the cloud proxy to publish to AWS IoT Core the certificates of the CAs associated to the DMS.         |
-| io.lamassuiot.dms.update-status        | Event to report that the status of the DMS has been updated. Valid status: **PENDING_APPROVAL**, **REJECTED**, **APPROVED**, **EXPIRED** and **REVOKED** |
-| io.lamassuiot.dms.update               | Event to inform that the DMS has been updated, the cloud proxy receives the event to update the certificates of the CAs.                                 |
-| io.lamassuiot.dms.update-authorizedcas | Event to inform that authorized CAs of the DMS have been updated, the cloud proxy receives the event to update the certificates of the CAs               |
-
-Data structure published by DMS Manager events
-
+### DMS Data Structure
 - `dms`:
     - `name`: ``(string: "")`` - Name of the DMS
     - `status`: ``(string: "")`` - DMS status, valid status are `PENDING_APPROVAL`, `REJECTED`, `APPROVED`, `EXPIRED` and `REVOKED`.
@@ -243,22 +255,8 @@ Data structure published by DMS Manager events
     }
 }
 ```
-## Device Manager
 
-| **Event Type**                     | **Description**                                                                                                                           |
-|------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| io.lamassuiot.device.create        | Event sent when Device is created                                                                                                         |
-| io.lamassuiot.device.update        | Event sent when Device is updated                                                                                                         |
-| io.lamassuiot.device.decommision   | Event sent when the Device is Uninstalled                                                                                                 |
-| io.lamassuiot.device.rotate        | Event sent when the Device's active certificate is rotated.                                                                               |
-| io.lamassuiot.device.revoke        | Event sent when Device's active certificate is revoked                                                                                    |
-| io.lamassuiot.device.enroll        | Event sent when Device enrolment is performed                                                                                             |
-| io.lamassuiot.device.reenroll      | Event sent when the Device is rewired. The event is received by the Cloud Proxy to update the device's digital twin.                      |
-| io.lamassuiot.device.forceReenroll | Event sent when you want to force the Device to be rewired. The event is received by the Cloud Proxy to update the device's digital twin. |
-
-
-Data structure published by **io.lamassuiot.device.create**, **io.lamassuiot.device.update** and **io.lamassuiot.device.decomission** events
-
+### Device Data Structure
 - `id`: ``(string: "")`` - Device ID
 - `alias`: ``(string: "")`` 
 - `dms_name`: `(string: "")` - Name of the DMS by which the device has been registered
@@ -335,9 +333,7 @@ Data structure published by **io.lamassuiot.device.create**, **io.lamassuiot.dev
 }
 
 ```
-
-Data structure published by **io.lamassuiot.device.rotate** and **io.lamassuiot.device.revoke** events
-
+### Slot Data Structure
 - `id`: `default` - Slot ID, by default the device is created with the slot `default`.
 - `active_certificate`: - Certificate active slot
     - `ca_name`: `(string: "")` - Name of the CA that issued the certificate
@@ -387,8 +383,7 @@ Data structure published by **io.lamassuiot.device.rotate** and **io.lamassuiot.
 }
 ```
 
-Data structure published by **io.lamassuiot.device.enroll** and **io.lamassuiot.device.reenroll** events
-
+### Certificate Base64 Data Structure
 - `certificate`: `(string: "")` - Certificate in Base64-encoded PEM format
 
 ```
@@ -397,8 +392,7 @@ Data structure published by **io.lamassuiot.device.enroll** and **io.lamassuiot.
 }
 
 ```
-Data structure published by **io.lamassuiot.device.forceReenroll** event
-
+### Force Reenroll Data Structure
 - `device_id`: `(string: "")` - Device ID
 - `slot_id`: `(string: "")` - Slot ID for reenrollment
 - `require_reenrollment`: `(bool: true)` - Boolean to indicate if rewinding is required

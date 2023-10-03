@@ -27,9 +27,11 @@ spec:
             class: nginx
 EOF
 ```
+
 ### External OIDC Provider
 
-By default the helm chart deploys keycloak as the IAM provider, but it can be disabled and use your own IAM provider based on the OIDC protocol. Start by creating the new values file named `external-oidc.yml` to use by helm while installing:
+By default the helm chart deploys keycloak as the IAM provider, but it can be disabled and use your own IAM provider based on the OIDC protocol.
+ Start by creating the new values file named `external-oidc.yml` to use by helm while installing:
 
 ```yaml
 services:
@@ -37,7 +39,8 @@ services:
    enabled: false
 ```
 
-Make sure that the OIDC provider generates JWT with some claim including the user's roles or groups. We will be mapping those values to Lamssu's authorisation service by mapping the appropriate token claim.
+Make sure that the OIDC provider generates JWT with some claim including the user's roles or groups.
+ We will be mapping those values to Lamssu's authorisation service by mapping the appropriate token claim.
 
 ```yaml
 auth:
@@ -50,7 +53,6 @@ auth:
 
 !!! note
     `rolesClaim` can be a json path such as `user_props.roles`. The only requisite is that the claim **MUST** be an array.
-
 
 Lets assume that the **Admin Users** gets a JWT issued by the ODIC witch has the following info:
 
@@ -78,11 +80,13 @@ Lets assume that the **Admin Users** gets a JWT issued by the ODIC witch has the
 }
 ```
 
-As it can be seen, the JWT has a claim `realm_access.roles` including a `pki-admin` role. To instruct lamassu to use that role as the administrator role, configure the roles section `auth.authorization.roles.admin` mapping to such value.
+As it can be seen, the JWT has a claim `realm_access.roles` including a `pki-admin` role. To instruct lamassu to use that role as the administrator role,
+ configure the roles section `auth.authorization.roles.admin` mapping to such value.
 
 The list of roles to be mapped as of now, is as follows (click each role to get more info):
-  - `admin`
-  - `operator`
+
+- `admin`
+- `operator`
 
 Lets asume
 

@@ -3,10 +3,10 @@
 !!! info
 
     The installation namespace of the different components are controlled using the `$NS` env variable:
+
     ```bash
     export NS=lamassu-dev
     ```
-
 
 ## Databases
 
@@ -115,7 +115,6 @@ helm install couchdb couchdb/couchdb -n $NS \
 
 Follow the instructions to configure the services [Vault & Consul](service-configs/vault-consul.md)
 
-
 ### PKCS11 - Generic
 
 ### PKCS11 - SoftHSM
@@ -151,6 +150,5 @@ helm install rabbitmq bitnami/rabbitmq -n $NS -f rabbimq.yaml
 - [x] Uses Persistence Volumes
 
 ## Authentication
-
 
 ### Keycloak

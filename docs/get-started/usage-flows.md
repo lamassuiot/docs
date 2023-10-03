@@ -16,7 +16,7 @@ The enrollment protocol defines witch endpoints
 
 #### MTLS
 
-In the EST protocol, MTLS is used for the connection between the server and the client, i.e. the client must connect with a certificate and its corresponding private key. This certificate is used to authenticate the client in order to authorise or deny the certificate request.
+In the EST protocol, MTLS is used for the connection between the server and the client, i.e. the client must connect with a certificate and its corresponding private key. This certificate is used to authenticate the client in order to authorise or deny the enrollment/reenrollment request.
 
 ##### Chain Validation level
 In the MTLS connection, when performing the Enroll process, the client can send the certificate chain. The certificate chain is a sequence of certificates that starts with the client certificate and goes all the way to the root certificate authority. Each certificate in the chain is signed by the previous one, and this process continues until the root certificate is reached. In this case, the root certificate is stored in Lamassu.
@@ -33,8 +33,6 @@ In order to perform the verification of the certificates in the chain, the varia
 - `chain_validation_level`: `n` **- Certificates are verified up to level N of the chain.**
 
 #### PSK
-#### JWT
-#### NoAuth
 
 ### PreRegistration
 

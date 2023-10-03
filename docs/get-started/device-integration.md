@@ -1,4 +1,4 @@
-# Device Provisioning Integration
+# Device Integration
 
 ## Core Operations
 

@@ -62,7 +62,6 @@ Assign the policy to an IAM user and obtain the correspondent `accessKeyID` and 
               default: false
     ```
 
-
 ### AWS Secrets Manager
 
 Create the following IAM Policy
@@ -102,7 +101,6 @@ Assign the policy to an IAM user and obtain the correspondent `accessKeyID` and 
               region: <region> # <--- replace with aws region i.e. eu-west-1
               default: false
     ```
-
 
 ## Authentication
 

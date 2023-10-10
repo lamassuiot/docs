@@ -6,57 +6,39 @@ Define the following ENV variable as it will be referenced in both installation 
 export NS=dev-lamassu
 ```
 
-### Installation Modes
-#### Standalone
+### Installation
 
-``` mermaid
-flowchart TD
-    direction LR
-    v[Vault] --> c[Consul]
-```
-
-1. The first step is to deploy Consul as it will be used by Vault to store the PKI sensitive data. In order to make that possible, you have to use the `oss-helm-values/consul-ha.yaml` 
+1. The first step is to deploy Consul as it will be used by Vault to store the PKI sensitive data. In order to make that possible, create consul's config file `consul.yaml` 
 
 ```bash
-helm install consul -n $NS hashicorp/consul -f oss-helm-values/consul.yaml 
+cat > consul.yaml << "EOF"
+fullnameOverride: "postgresql"
+global:
+  postgresql:
+    auth:
+      username: admin
+      password: admin
+primary:
+  initdb:
+    scripts:
+      init.sql: |
+        CREATE DATABASE auth;
+        CREATE DATABASE alerts;
+        CREATE DATABASE ca;
+        CREATE DATABASE cloudproxy;
+        CREATE DATABASE devicemanager;
+        CREATE DATABASE dmsmanager;
+EOF
+```
+
+```bash
+helm install consul -n $NS hashicorp/consul -f consul.yaml 
 ```
 
 2. Once Consul is installed, Install Vault running the following command:
 
 ```bash
 helm install vault -n $NS hashicorp/vault -f oss-helm-values/vault.yaml 
-```
-
-3. After finishing the installation of the two services, the next step is to initialise vault.
-#### High Availability
-
-This section covers vault installation using high availability deployment architecture (by default the values file launches 3 replica for Consul and for Vault, but can be fine tuned to deploy as many replicas as needed).
-
-``` mermaid
-flowchart TD
-    subgraph Vault-cluster
-        direction LR
-        v1[Vault Replica 1] --- v2[Vault Replica 2]  --- v3[Vault Replica N]
-    end
-
-    subgraph Consul-cluster
-        direction LR
-        c1[Consul Replica 1] --- c2[Consul Replica 2]  --- 3[Consul Replica N]
-    end
-
- Vault-cluster --> Consul-cluster
-```
-
-1. Launch consul in HA mode: 
-
-```bash
-helm install consul -n $NS hashicorp/consul -f oss-helm-values/consul-ha.yaml 
-```
-
-2. Once Consul is installed, Install Vault in HA running the following command:
-
-```bash
-helm install vault -n $NS hashicorp/vault -f oss-helm-values/vault-ha.yaml 
 ```
 
 3. After finishing the installation of the two services, the next step is to initialise vault.

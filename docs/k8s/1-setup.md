@@ -9,7 +9,10 @@ Start by downloading kubernetes from microk8s official site: [https://microk8s.i
 
 Once you have a running instance, make sure to enable the required plugins:
 
-- **StorageClass**: This distribution already has a default Storage Class provisioner `microk8s.io/hostpath` named `microk8s-hostpath`
+- **StorageClass**: Enable a basic storage class provider by enabling the plugin
+    ```bash
+    microk8s enable hostpath-storage
+    ```
 - **CoreDNS**: This service is not provisioned by default. Run the following command to enable it
 
     ```bash

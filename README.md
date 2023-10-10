@@ -54,7 +54,7 @@ Please do not submit changes to the VERSION file unless you know what you are
 doing. This is the tag for the version number during the publication phase.
 
 ### Format
-A Markdown formatter is included in the edition evironment but it is not enforced during PR validation. It is recommeded that document editors use it to improve the document legibillity.
+A Markdown formatter is included in the edition environment but it is not enforced during PR validation. It is recommended that document editors use it to improve the document legibility.
 The formatter works right with most of mkdocs constructs but it will fail to format the fille if "Content tabs" are used.
 
 Use mdformat for apply formatting rules to the Markdown files. Use this command:

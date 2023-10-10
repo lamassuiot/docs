@@ -1,31 +1,39 @@
 # 2. Design Your Lamassu Deployment
 
-Lamassu is based on a set of microservices that can be grouped in three categories. `Business Logic microservices`, witch must be always installed,
- `Lamassu plugins` and `Infrastructure microservices`.
+Lamassu is based on a set of microservices that rely on some basic **Infrastructure services** for different purposes. Make sure to select and deploy the appropriate service for your scenario. You will need to install a Database, an Async Messaging service, and as many Crypto Engines as you require:
 
-Lamassu is moving to be more cloud-friendly, meaning that some of the `Infrastructure microservices` can be moved to the cloud
-if needed using cloud provider specific services. We also are committed to OSS, so there will always be an on-premise OSS service
-in case your PKI scenario doesn't involve any cloud service.
+## Infrastructure services
 
-## Business Logic microservices
+### Database
 
-As stated earlier, this microservices MUST always be present in any Lamassu installation, but can be fine tunned to met your requirements:
+!!! warning
 
-- [CA Service](../tech-ref/config/ca.md)
-- **DMS Manager Service**: *TODO: Link to config file*
-- **Device Manager**: *TODO: Link to config file*
-- **OCSP Service**: *TODO: Link to config file*
+    Install **ONE** service from the list below:
 
-## Lamassu plugins
+- `Postgres`: [Go to Kubernetes installation using Helm](/k8s/install-oss-comps/#postgres)
+- `CouchDB`: *TODO*
+- `AWS DynamoDB`: *TODO*
 
-- **AWS Connector Service**: *TODO: Link to config file*
-- **Alerts Service**: *TODO: Link to config file*
+### Async Messaging
 
-## Infrastructure microservices
+!!! warning
 
-- **Database**: Lamassu plans supporting different databases (also referred as Storage Engine). As of now, thees are the supported storage engines:
-    - `Postgres`: (available only for versions < v2.X)
-    - `CouchDB`: (available only for versions > v3.X)
-    - `AWS DynamoDB`: (available only for versions > v3.X)
+    Install **ONE** service from the list below:
 
-- **Database**: Lamassu plans supporting different databases (also referred as Storage Engine). As of now, thees are the supported storage engines:
+- `RabbitMQ`: [Go to Kubernetes installation using Helm](/k8s/install-oss-comps/#rabbitmq)
+
+### Crypto Engines
+
+!!! info
+
+    Install as **MANY** engines as required for your scenario:
+
+- `Hashicorp Vault (with consul)`: [Go to Kubernetes installation using Helm](/k8s/install-oss-comps/#hashicorp-vault-with-consul)
+- `SoftHSM`: [Go to Kubernetes installation using Helm](/k8s/install-oss-comps/#pkcs11-softhsm)
+- `AWS KMS`: [Go to Kubernetes installation using Helm](/k8s/install-aws-comps/#aws-kms)
+- `AWS Secrets Manager`: [Go to Kubernetes installation using Helm](/k8s/install-aws-comps/#aws-secrets-manager)
+
+
+## Next Step: Install Lamassu
+
+After Installing all the Infrastructure services, you are ready to install a lamassu instance: [Go to install instructions](/k8s/4-install-lamassu)

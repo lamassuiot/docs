@@ -2,6 +2,46 @@
 
 ## Core Deployment - OSS
 
+```yaml
+cat > lamassu.yaml << "EOF"
+
+domain: dev.lamassu.io
+
+postgres: 
+  hostname: "postgresql"
+  port: 5432
+  username: "admin"
+  password: "admin"
+
+amqp:
+  hostname: "rabbitmq"
+  port: 5672
+  username: "user"
+  password: "user"
+  tls: false
+
+services:
+  ca:
+    engines:
+      defaultEngineID: "golang-1"
+      golang: 
+      - id: "golang-1"
+        storage_directory: "/data"
+        metadata:
+          prod-ready: "false"
+      awsKms: 
+      awsSecretsManager:
+      pkcs11:
+      hashicorpVault:
+EOF
+```
+
+```bash
+export NS=lamassu-dev
+helm repo add lamassuiot http://www.lamassu.io/lamassu-helm/
+helm install lamassu lamassuiot/lamassu -n $NS -f lamassu.yaml
+```
+
 ## Core Deployment - Alternatives
 
 ### Donwstream Certificate with Let's Encrypt & Cert Manager

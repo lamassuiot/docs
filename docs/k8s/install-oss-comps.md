@@ -8,6 +8,11 @@
     export NS=lamassu-dev
     kubectl create ns $NS
     ```
+    This namespace should be created in the kubernetes installation. Run the following command for namespace registration. 
+
+    ```bash
+    kubectl create namespace $NS
+    ```
 
 ## Databases
 

@@ -1,7 +1,7 @@
 # 4. Install Lamassu
 
 ## Core Deployment - OSS
-
+ 
 ```yaml
 cat > lamassu.yaml << "EOF"
 

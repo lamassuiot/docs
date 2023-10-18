@@ -26,24 +26,27 @@ extra_css:
   - css/scheme.css
 nav:
   - "index.md"
-  - Installation:
-    - "k8s/1-setup.md"
-    - "k8s/2-lamassu-arch.md"
-    - 3. Install Infrastructure microservices:
-      - "k8s/install-oss-comps.md"
-      - "k8s/install-aws-comps.md"
-    - "k8s/4-install-lamassu.md"
-  - "Get Started":
-      - "get-started/admin-pki-setup.md"
-      - "get-started/usage-flows.md"
-      - "get-started/device-integration.md"
-  - "Tech Reference":
-    - "tech-ref/architecture.md"
-    - "tech-ref/protocols.md"
-    - "tech-ref/apis.md"
-    - "tech-ref/aws-iot-connector.md"
-    - "tech-ref/config/ca.md"
-    - "tech-ref/cloud-events.md"
+  - Deployment:
+    - Infrastructure: 
+      - "deployment/infra/kubernetes.md"
+    - Configuration:
+      - "deployment/config/helm-chart.md"
+      - "deployment/config/ca-service.md"
+  - Basic Features:
+    - "basic-features/ca-service.md"
+    - "basic-features/dms-service.md"
+    - "basic-features/device-service.md"
+    - "basic-features/va-service.md"
+    - "basic-features/alerts-service.md"
+  - Advanced Features:
+    - "advanced-features/aws-iot.md"
+    - "advanced-features/azure-iot.md"
+  - APIs:
+    - "apis/openapi.md"
+    - "apis/cloud-events.md"
+  - System Administration:
+    - "system-administration/architecture.md"
+    - "system-administration/backup-recover.md"
 extra:
   version:
     provider: mike

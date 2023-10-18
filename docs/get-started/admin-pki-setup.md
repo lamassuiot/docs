@@ -23,7 +23,7 @@ There are three possibilities to create a new CA:
 
       **CA Settings**:
       - Lamassu supports the use of several cryptographic engines, therefore, when creating the CA you can choose which cryptographic engine to use to store the private key.
-      - Lamassu supports both `RSA` and `EC` based CAs. But the configured [Crypto Engine](crypto-engines.md) may or may not support both algorithms. Check out also the supported key sizes for each algorithm family as it is also dependant on the configured engine.
+      - Lamassu supports both `RSA` and `EC` based CAs. But the configured Crypto Engine may or may not support both algorithms. Check out also the supported key sizes for each algorithm family as it is also dependant on the configured engine.
 
       **CA Expiration Settings** and **Issuance Expiration Settings**:
 
@@ -54,7 +54,7 @@ There are three possibilities to create a new CA:
 
       **CA Settings**:
 
-      - The configured [Crypto Engine](crypto-engines.md) may or may not support importing external CAs.
+      - The configured Crypto Engine may or may not support importing external CAs.
       - Select the corresponding crypto engine
       - The CA name **MUST** be unique.
       - Import x509 PEM Certificate and Private Key in PEM Format

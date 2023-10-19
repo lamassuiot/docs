@@ -3,9 +3,37 @@
 ## Quick-Start
 
 !!! warning
-    The quick start configuration is not appropriate to be deployed on Production environment and should only be run in testing/development environments.
+    The Quick Start configuration is not suitable for production use and should only be run in a testing/development environment.
+    If you need to deploy a simple kubernetes single-node cluster, [follow this guide to launch one](deploy-microk8s.md).
 
-If you don't have any experience deploying a simple kubernetes single-node cluster, [follow this guide to launch one](deploy-microk8s.md). 
+Lamassu IoT runs in a Kubernetes infrastructure. This guide is a quick start that allows you to have a Lamassu IoT instance for testing purposes.
+General installation steps are:
+
+- Select the domain for your Lamassu IoT instance
+- Install PostgreSQL as the storage engine for Lamassu IoT
+- Install Rabbitmq as AMQP queue provider
+- Install Lamassu IoT services
+- Configure Lamassu IoT users in the provided Keycloak service
+
+This process will end in a Lamassu IoT instance up and running using the default Golang based Crypto Engine wich is only suitable for testing and development.
+
+### Select the Lamassu IoT Domain
+
+Access using the VM's IP won't work as the ingress resource won't match the incoming request against the configured domain. Lamassu IoT requires a domain to access the UI and services.
+If you don't have a resolvable domain for this installation please register it locally for testing purposes.
+
+!!! info
+    Make sure to add the corresponding rule in the `/etc/hosts` in linux or MacOS or in `c:\windows\system32\drivers\etc\hosts` Windows to be able to use the DOMAIN while browsing Lamassu's UI and APIs, otherwise no response will be obtained. Accessing using the VM IP won't work as the Ingress resource won't match the incoming request against the configured domain.
+
+    An example in `/etc/hosts` or `c:\windows\system32\drivers\etc\hosts` might look like this if the VM hosting lamassu has the `192.168.100.75` IP and the domain was set to the default `dev.lamassu.io`:
+
+    ```
+    192.168.100.75  dev.lamassu.io
+    ```
+
+This domain will be used to configure Lamassu IoT Chart
+
+### Install PostgreSQL
 
 ```yaml
 cat > postgres.yaml << "EOF"
@@ -33,16 +61,20 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 helm install postgres bitnami/postgresql -f postgres.yaml
 ```
 
+## Install RabbitMQ
+
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm install rabbitmq bitnami/rabbitmq -f rabbimq.yaml --set fullnameOverride=rabbitmq --set auth.username=user --set auth.password=user
 ```
 
+## Install Lamassu
+
 ```yaml
 cat > lamassu.yaml << "EOF"
 domain: dev.lamassu.io
 
-postgres: 
+postgres:
   hostname: "postgresql"
   port: 5432
   username: "admin"
@@ -59,37 +91,29 @@ EOF
 
 ```bash
 helm repo add lamassuiot http://www.lamassu.io/lamassu-helm/
-helm install lamassu lamassuiot/lamassu -f lamassu.yaml
+helm install -n lamassu-test --create-namespace lamassu lamassuiot/lamassu -f lamassu.yaml
 ```
 
-The last step refers to [initializing Keycloak](#keycloak) to provision your PKI admin user and access Lamassu's UI witch will be accessible at your VM IP in port 443. 
-
 !!! warning
-  
-    Make sure to add the corresponding rule in the `/etc/hosts` in linux or MacOS or in `c:\windows\system32\drivers\etc\hosts` Windows to be able to use the DOMAIN while browsing Lamassu's UI and APIs, otherwise no response will be obtained. Accessing using the VM IP won't work as the Ingress resource won't match the incoming request against the configured domain. 
-
-    An example in `/etc/hosts` or `c:\windows\system32\drivers\etc\hosts` might look like this if the VM hosting lamassu has the `192.168.100.75` IP and the domain was set to the default `dev.lamassu.io`:
-
-    ```
-    192.168.100.75  dev.lamassu.io
-    ```
-
     Finally, if you are using a MicroK8S installation, run the following commands to patch Lamassu's API-Gateway Ingress resource, otherwise no response will be obtained even while having configured the domain in the `/etc/hosts` or equivalent as explained before:
 
     Edit Lamassu's `lamassu.yaml` file and add:
     ```yaml
     ingress:
       annotations: |
-        kubernetes.io/ingress.class: "public"    
+        kubernetes.io/ingress.class: "public"
     ```
 
     Apply the patch:
     ```bash
-    microk8s helm upgrade lamassu lamassuiot/lamassu -f lamassu.yaml
+    microk8s helm upgrade -n lamassu-test lamassu lamassuiot/lamassu -f lamassu.yaml
     ```
 
-## Configuration
+## Configure users in Keycloak
 
+The last step refers to [initializing Keycloak](#keycloak) to provision your PKI admin user and access Lamassu's UI witch will be accessible at your VM IP in port 443.
+
+## Configuration
 
 ### Databases
 
@@ -127,16 +151,15 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 helm install postgres bitnami/postgresql -f postgres.yaml
 ```
 
-Lamassu's Helm chart allows specifying the connection parameters to be used by the different services by providing the following configuration in the `values.yaml` file: 
+Lamassu's Helm chart allows specifying the connection parameters to be used by the different services by providing the following configuration in the `values.yaml` file:
 
 ```yaml
-postgres: 
+postgres:
   hostname: "postgresql"
   port: 5432
   username: "admin"
   password: "admin"
 ```
-
 
 #### CouchDB
 
@@ -168,7 +191,7 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 helm install rabbitmq bitnami/rabbitmq -f rabbitmq.yaml
 ```
 
-Lamassu's Helm chart allows specifying the connection parameters to be used by the different services by providing the following configuration in the `values.yaml` file: 
+Lamassu's Helm chart allows specifying the connection parameters to be used by the different services by providing the following configuration in the `values.yaml` file:
 
 ```yaml
 amqp:
@@ -178,7 +201,6 @@ amqp:
   password: "user"
   tls: false
 ```
-
 
 ### Crypto Engines
 
@@ -206,7 +228,7 @@ To enable the golang crypto engine, there is no need of installing additional se
 services:
   ca:
     engines:
-       golang: 
+       golang:
         - id: "my-golang-id-1"
           storage_directory: "/storage/data"
           metadata:
@@ -219,7 +241,7 @@ Bare in mind that if two golang engines are enabled simultaneously there will be
 
 Vault is the goto option in on-premise or air-gapped environments if no HSM is deployed as it is the current open source engine with higher security level. As per Vault's deployment model, a consul instance (or cluster) must be deployed first.
 
-A sample and basic Consul single node configuration might look like this: 
+A sample and basic Consul single node configuration might look like this:
 
 ```yaml
 fullnameOverride: "consul"
@@ -241,10 +263,11 @@ server:
 
 ```bash
 helm repo add hashicorp https://helm.releases.hashicorp.com
-helm install consul hashicorp/consul -f consul.yaml 
+helm install consul hashicorp/consul -f consul.yaml
 ```
 
 Once consul is successfully deployed, make sure to configure Vault to use the consul instance such as provided in this example configuration:
+
 ```yaml
 fullnameOverride: "vault"
 global:
@@ -274,7 +297,7 @@ injector:
 ```
 
 ```bash
-helm install vault -f vault.yaml 
+helm install vault -f vault.yaml
 ```
 
 The next step is to initialize Vault. The following bash script automatizes the init process and will perform the following actions:
@@ -289,7 +312,6 @@ The next step is to initialize Vault. The following bash script automatizes the 
 !!! note
     The script below requires having installed [jq](https://jqlang.github.io/jq/) CLI tool witch handles JSON responses
 
-
 ```bash
 {
 export SECRET_ENGINE=lamassu-pki-kvv2
@@ -301,11 +323,11 @@ isVaultInitialized=$(curl -s -k http://$VAULT_SVC_NAME:8200/v1/sys/init | jq -r 
 if [ "$isVaultInitialized" == "true" ]; then
   echo ">> Vault already initialized. Exiting init process"
 else
-	echo ">> Vault is healthy but requires init"
-	echo ">> Initializing vault"
-	credsFile="vault-credentials.json"
-	curl -s --request POST --data '{"secret_shares": 5,"secret_threshold": 3}' -k http://$VAULT_SVC_NAME:8200/v1/sys/init > $credsFile
-	echo "  - Unseal keys and root token sotred in '$credsFile'"
+  echo ">> Vault is healthy but requires init"
+  echo ">> Initializing vault"
+  credsFile="vault-credentials.json"
+  curl -s --request POST --data '{"secret_shares": 5,"secret_threshold": 3}' -k http://$VAULT_SVC_NAME:8200/v1/sys/init > $credsFile
+  echo "  - Unseal keys and root token sotred in '$credsFile'"
 fi
 
 for ip in $(kubectl get endpoints vault -n $NS -o json | jq -r ".subsets[].addresses[].ip"); do
@@ -338,22 +360,22 @@ echo "SECRET_ID: $CA_VAULT_SECRETID"
 }
 ```
 
-#### PKCS11 - SoftHSM 
+#### PKCS11 - SoftHSM
 
 The [SoftHSM](https://github.com/opendnssec/SoftHSMv2) (Software Hardware Security Module) project is an open-source software project that provides a software-based implementation of a Hardware Security Module (HSM). An HSM is a hardware device that is used to securely store and manage cryptographic keys and perform various security-related operations, such as encryption, decryption, and digital signing. SoftHSM replicates the functionality of an HSM in software, allowing developers and organizations to implement HSM-like security features without the need for physical hardware.
 
 !!! note
     Future versions will allow customizing some initialization properties for the HSM such as the label ID and the pin to access it. As of now, those values are hardcoded to `lamassuHSM` and `1234` respectively. This service is meant to be used **only for testing purposes** due to ease of access to underlying data and non FIPS 140-2 compliance
 
-It is possible configuring the Storage Class to be used by the SoftHSM deployment.  
+It is possible configuring the Storage Class to be used by the SoftHSM deployment.
 
 ```bash
 helm repo add lamassuiot http://www.lamassu.io/lamassu-helm/
 helm install softhsm lamassuiot/softhsm
 ```
 
+#### PKCS11 - Generic
 
-#### PKCS11 - Generic 
 #### AWS KMS
 
 ```json
@@ -425,8 +447,6 @@ services:
 
 If instead you choose to go with the default installation and use Keycloak as your IAM OIDC-based provider, you will need to initialize a default user after installation by performing the following steps
 
-
-
 #### AWS Cognito
 
 Amazon Cognito is a fully managed identity and user management service provided by AWS that simplifies the process of adding user sign-up, sign-in, and authentication to web and mobile applications. It is a comprehensive identity and access management (IAM) solution that is designed to help developers secure their applications by handling the user management and authentication aspects.
@@ -484,22 +504,20 @@ Finally, and the most important part, is creating a new client application for l
     - Allowed callback URLs: This is a key parameter. Bare in mind the **URL** used to access lamassu's UI. If you access the UI at `https://dev.lamassu.io` then configure such url to be allowed to sign in
     - Allowed sign-out URLs: Use the same URL as the allowed callback URL but appending `/loggedout` at the end. i.e.: `https://dev.lamassu.io/loggedout`
 
-
 !!! info "Lamassu Helm Chart - `services.auth.oidc.clientId`"
 
     Make sure to copy the App Client ID assigned by AWS as it will be needed while configuring the Lamassu's Helm Chart. Note that the App Client ID is different than the assigned name.
 
 The last critical part for configuring Cognito is to define different user groups to limit what each user is allowed to do with lamassu. As of now, lamassu only has two roles: `admin` and `operator`. In this example, we will group our user pool users in two cognito groups:
 
-  - `pki-admin` group: the users that are assigned to this cognito group will have FULL access to all operations within Lamassu, so make sure to only assign authorized users.
-  - `audit` group: in contrast, this second group will have limited access.
+- `pki-admin` group: the users that are assigned to this cognito group will have FULL access to all operations within Lamassu, so make sure to only assign authorized users.
+- `audit` group: in contrast, this second group will have limited access.
 
 Create and assign the users within your cognito user pool under the `Groups` tab
 
 !!! info "Lamassu Helm Chart"
 
     Note that we will map those groups into actual lamassu roles later on while configuring the helm chart under `services.auth.authorization`
-
 
 Configure Lamassu helm chart with the following section. Make sure to replace:
 

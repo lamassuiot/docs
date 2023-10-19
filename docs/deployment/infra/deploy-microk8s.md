@@ -1,6 +1,7 @@
 # Installing Kubernetes on MicroK8s
 
 ## MicroK8S
+
 We recommend installing microk8s on top of any Ubuntu distribution as it is well maintained by the ubuntu community. Other distributions may also be supported.
 
 Start by downloading kubernetes from microk8s official site: [https://microk8s.io/docs/getting-started](https://microk8s.io/docs/getting-started)
@@ -8,6 +9,7 @@ Start by downloading kubernetes from microk8s official site: [https://microk8s.i
 Once you have a running instance, make sure to enable the required plugins:
 
 - **StorageClass**: Enable a basic storage class provider by enabling the plugin
+
     ```bash
     microk8s enable hostpath-storage
     ```
@@ -27,7 +29,10 @@ Once you have a running instance, make sure to enable the required plugins:
     Once the ingress controller is installed, apply this patch to allow mutual TLS connections to go through the nginx controller
 
     ```bash
-    microk8s kubectl -n ingress patch ds nginx-ingress-microk8s-controller --type=json -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--enable-ssl-passthrough"}]'
+    microk8s kubectl -n ingress patch ds nginx-ingress-microk8s-controller \
+         --type=json \
+         -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--enable-ssl-passthrough"}]' \
+        /
     ```
 
 - **CertManager**: To enable the plugin run:
@@ -46,6 +51,7 @@ source ~/.bash_aliases
 
 ## K9s
 
-We recommend installing K9s, a terminal based client application, as it comes handy while debugging any kubernetes related resource, including watching pod/container logs, deleting pods, scaling replicas and much more: [https://k9scli.io/topics/install/](https://k9scli.io/topics/install/)
+We recommend installing K9s, a terminal based client application, as it comes handy while debugging any kubernetes related resource,
+including watching pod/container logs, deleting pods, scaling replicas and much more: [https://k9scli.io/topics/install/](https://k9scli.io/topics/install/)
 
-![Alt text](imgs/k9s.png)
+![A k9s screenshot](imgs/k9s.png)

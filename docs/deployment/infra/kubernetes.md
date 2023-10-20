@@ -23,10 +23,9 @@ Access using the VM's IP won't work as the ingress resource won't match the inco
 If you don't have a resolvable domain for this installation please register it locally for testing purposes.
 
 !!! info
-
     Lamassu requires defining a domain variable to be set in Lamassu's `values.yaml` file. This domain will be used to route the incomming requests to the deployed Lamassu instance within kubernetes (in fact, the API Gateway ingress defines the `domain` as its routing rule). The domain is also used while signing new CAs or Certificates to set the OCSP and CRL endpoints. Lamassu's helm chart uses `dev.lamassu.io` as the default domain. Consider chaning this value if required.
 
-    For example if instead of deploying a Lamassu instance using the default `dev.lamassu.io` domain, you require using the `mydomain.lamassu.io` domain, configure the `values.yaml` file as shown below:
+    For example if instead of deploying a Lamassu instance using the default `dev.lamassu.io` domain, you require using the `mydomain.lamassu.io` domain, configure the `values.yaml` file as shown below: 
 
     ```
     domain: mydomain.lamassu.io
@@ -38,13 +37,14 @@ If you don't have a resolvable domain for this installation please register it l
 
     Make sure to add the corresponding rule in the `/etc/hosts` in linux or MacOS or in `c:\windows\system32\drivers\etc\hosts` Windows to be able to use the `domain` while browsing Lamassu's UI and APIs, otherwise no response will be obtained. Accessing using the VM IP won't work as the Ingress resource won't match the incoming request against the configured domain.
 
-
     An example in `/etc/hosts` or `c:\windows\system32\drivers\etc\hosts` might look like this if the VM hosting lamassu has the `192.168.100.75` IP and the domain was set to the default `dev.lamassu.io`:
 
 
     ```
     192.168.100.75  dev.lamassu.io
     ```
+  
+
 This domain will be used to configure Lamassu IoT Chart
 
 ### Install PostgreSQL
@@ -108,7 +108,7 @@ helm repo add lamassuiot http://www.lamassu.io/lamassu-helm/
 helm install lamassu lamassuiot/lamassu -f lamassu.yaml
 ```
 
-!!! warning
+!!! warning 
     Finally, if you are using a MicroK8S installation, run the following commands to patch Lamassu's API-Gateway Ingress resource, otherwise no response will be obtained even while having configured the domain in the `/etc/hosts` or equivalent as explained before:
 
     Edit Lamassu's `lamassu.yaml` file and add:
@@ -117,8 +117,9 @@ helm install lamassu lamassuiot/lamassu -f lamassu.yaml
       annotations: |
         kubernetes.io/ingress.class: "public"
     ```
-
+    
     Apply the patch:
+
     ```bash
     microk8s helm upgrade lamassu lamassuiot/lamassu -f lamassu.yaml
     ```

@@ -29,10 +29,7 @@ Once you have a running instance, make sure to enable the required plugins:
     Once the ingress controller is installed, apply this patch to allow mutual TLS connections to go through the nginx controller
 
     ```bash
-    microk8s kubectl -n ingress patch ds nginx-ingress-microk8s-controller \
-         --type=json \
-         -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--enable-ssl-passthrough"}]' \
-        /
+    microk8s kubectl -n ingress patch ds nginx-ingress-microk8s-controller --type=json -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--enable-ssl-passthrough"}]'
     ```
 
 - **CertManager**: To enable the plugin run:

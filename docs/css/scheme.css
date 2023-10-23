@@ -44,3 +44,14 @@ body[data-md-color-scheme="slate"] .md-typeset code {
     line-height: 1;
     padding: 2px 3px 3px;
     }
+
+.md-typeset .grid-datamodel {
+    grid-template-columns: 1fr 1fr;
+    display: grid;
+}
+
+.grid-datamodel code {
+    white-space : pre-wrap !important;
+    width: 500px;
+    word-break: break-all!important;
+}

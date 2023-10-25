@@ -312,7 +312,7 @@ injector:
 ```
 
 ```bash
-helm install vault -f vault.yaml
+helm install vault hashicorp/vault -f vault.yaml
 ```
 
 The next step is to initialize Vault. The following bash script automatizes the init process and will perform the following actions:
@@ -324,6 +324,8 @@ The next step is to initialize Vault. The following bash script automatizes the 
 - Create a policy to access KV-V2 service to the specified mount path
 - Attach policy to AppRole identity
 
+In the case of to choose a different namespace, it is necessary to change in the following script, the value of the NS variable. 
+
 !!! note
     The script below requires having installed [jq](https://jqlang.github.io/jq/) CLI tool witch handles JSON responses
 
@@ -333,6 +335,7 @@ export SECRET_ENGINE=lamassu-pki-kvv2
 export VAULT_SVC_NAME=127.0.0.1
 export POLICY_NAME=pki-kv
 export ROLE_NAME=lamassu-ca
+export NS=default
 
 isVaultInitialized=$(curl -s -k http://$VAULT_SVC_NAME:8200/v1/sys/init | jq -r .initialized)
 if [ "$isVaultInitialized" == "true" ]; then
@@ -345,7 +348,7 @@ else
   echo "  - Unseal keys and root token sotred in '$credsFile'"
 fi
 
-for ip in $(kubectl get endpoints vault -n $NS -o json | jq -r ".subsets[].addresses[].ip"); do
+for ip in $(kubectl get endpoints vault  -o json | jq -r ".subsets[].addresses[].ip"); do
   echo '{"key": '$(cat vault-credentials.json | jq .keys[0])'}'  > payload.json
   curl     --request POST     --data @payload.json  http://$ip:8200/v1/sys/unseal
 
@@ -360,6 +363,8 @@ done
 export VAULT_TOKEN=$(cat vault-credentials.json | jq .root_token)
 
 VAULT_TOKEN=$(echo $VAULT_TOKEN | sed 's/"//g')
+
+sleep 5
 
 curl --header "X-Vault-Token: $VAULT_TOKEN" --request POST  --data '{"type": "approle"}' "http://$VAULT_SVC_NAME:8200/v1/sys/auth/approle"
 

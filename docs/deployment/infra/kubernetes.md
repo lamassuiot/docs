@@ -327,7 +327,7 @@ The next step is to initialize Vault. The following bash script automatizes the 
 In the case of to choose a different namespace, it is necessary to change in the following script, the value of the NS variable. 
 
 !!! note
-    The script below requires having installed [jq](https://jqlang.github.io/jq/) CLI tool witch handles JSON responses
+    The script below requires having installed [jq](https://jqlang.github.io/jq/) CLI tool witch handles JSON responses. Also, in the case of to choose a different namespace, it is necessary to change in the following script, the value of the NS variable. 
 
 ```bash
 {

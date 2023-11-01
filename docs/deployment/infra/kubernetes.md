@@ -11,7 +11,7 @@ General installation steps are:
 
 - Select the domain for your Lamassu IoT instance
 - Install PostgreSQL as the storage engine for Lamassu IoT
-- Install Rabbitmq as AMQP queue provider
+- Install RabbitMQ as AMQP queue provider
 - Install Lamassu IoT services
 - Configure Lamassu IoT users in the provided Keycloak service
 
@@ -25,7 +25,7 @@ If you don't have a resolvable domain for this installation please register it l
 !!! info
     Lamassu requires defining a domain variable to be set in Lamassu's `values.yaml` file. This domain will be used to route the incomming requests to the deployed Lamassu instance within kubernetes (in fact, the API Gateway ingress defines the `domain` as its routing rule). The domain is also used while signing new CAs or Certificates to set the OCSP and CRL endpoints. Lamassu's helm chart uses `dev.lamassu.io` as the default domain. Consider chaning this value if required.
 
-    For example if instead of deploying a Lamassu instance using the default `dev.lamassu.io` domain, you require using the `mydomain.lamassu.io` domain, configure the `values.yaml` file as shown below: 
+    For example if instead of deploying a Lamassu instance using the default `dev.lamassu.io` domain, you require using the `mydomain.lamassu.io` domain, configure the `values.yaml` file as shown below:
 
     ```
     domain: mydomain.lamassu.io
@@ -43,11 +43,30 @@ If you don't have a resolvable domain for this installation please register it l
     ```
     192.168.100.75  dev.lamassu.io
     ```
-  
 
-This domain will be used to configure Lamassu IoT Chart
+This domain will be used to configure Lamassu IoT Chart. This installation process will use the value of LAMASSU_DOMAIN env variable to configure the installation.
+
+```bash
+ LAMASSU_DOMAIN=dev.lamassu.io
+```
+### Create Kubernetes namespace
+For better control of the Lamassu IoT resources, it is recommended to create a namespace in Kubernetes.
+
+```bash
+ LAMASSU_NAMESPACE=lamassu-dev
+ kubectl create ns $LAMASSU_NAMESPACE
+```
 
 ### Install PostgreSQL
+
+Set your secrets for PostgreSQL installation in the following env variables: POSTGRES_USER and POSTGRES_PASSWORD
+
+```bash
+ POSTGRES_USER=<your-admin-user>
+ POSTGRES_PASSWORD=<your-admin-pwd>
+```
+
+Prepare the PostgreSQL config file
 
 ```yaml
 cat > postgres.yaml << "EOF"
@@ -55,8 +74,8 @@ fullnameOverride: "postgresql"
 global:
   postgresql:
     auth:
-      username: admin
-      password: admin
+      username: env.user
+      password: env.password
 primary:
   initdb:
     scripts:
@@ -70,42 +89,65 @@ primary:
 EOF
 ```
 
+Replace username and password with your customized env variable values
+
+```bash
+ sed 's/env.user/'"$POSTGRES_USER"'/;s/env.password/'"$POSTGRES_PASSWORD"'/' -i postgres.yaml
+```
+
+Install PostgreSQL in your Kubernetes environment
+
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
-helm install postgres bitnami/postgresql -f postgres.yaml
+helm install postgres bitnami/postgresql -n $LAMASSU_NAMESPACE -f postgres.yaml
 ```
 
 ### Install RabbitMQ
 
+Set your secrets for RabbitMQ installation in the following env variables: RABBITMQ_USER and RABBITMQ_PASSWORD
+
+```bash
+ RABBITMQ_USER=<your-admin-user>
+ RABBITMQ_PASSWORD=<your-admin-pwd>
+```
+
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
-helm install rabbitmq bitnami/rabbitmq --set fullnameOverride=rabbitmq --set auth.username=user --set auth.password=user
+helm install rabbitmq bitnami/rabbitmq -n $LAMASSU_NAMESPACE --set fullnameOverride=rabbitmq --set auth.username=$RABBITMQ_USER --set auth.password=$RABBITMQ_PASSWORD
 ```
 
 ### Install Lamassu
 
 ```yaml
 cat > lamassu.yaml << "EOF"
-domain: dev.lamassu.io
-
+domain: env.lamassu.domain
 postgres:
   hostname: "postgresql"
   port: 5432
-  username: "admin"
-  password: "admin"
+  username: "env.postgre.user"
+  password: "env.postgre.password"
 
 amqp:
   hostname: "rabbitmq"
   port: 5672
-  username: "user"
-  password: "user"
+  username: "env.rabbitmq.user"
+  password: "env.rabbitmq.password"
   tls: false
 EOF
 ```
 
+Replace values in the base config file from your env variables
+
+```bash
+sed 's/env.lamassu.domain/'"$LAMASSU_DOMAIN"'/' -i lamassu.yaml
+sed 's/env.postgre.user/'"$POSTGRES_USER"'/;s/env.postgre.password/'"$POSTGRES_PASSWORD"'/' -i lamassu.yaml
+sed 's/env.rabbitmq.user/'"$RABBITMQ_USER"'/;s/env.rabbitmq.password/'"$RABBITMQ_PASSWORD"'/' -i lamassu.yaml
+```
+Check the result in the lamassu.yaml and then install Lamassu IoT on your Kubernetes environment.
+
 ```bash
 helm repo add lamassuiot http://www.lamassu.io/lamassu-helm/
-helm install lamassu lamassuiot/lamassu -f lamassu.yaml
+helm install -n $LAMASSU_NAMESPACE lamassu lamassuiot/lamassu -f lamassu.yaml
 ```
 
 !!! warning 
@@ -121,7 +163,7 @@ helm install lamassu lamassuiot/lamassu -f lamassu.yaml
     Apply the patch:
 
     ```bash
-    microk8s helm upgrade lamassu lamassuiot/lamassu -f lamassu.yaml
+    microk8s helm upgrade -n $LAMASSU_NAMESPACE lamassu lamassuiot/lamassu -f lamassu.yaml
     ```
 
 ### Configure users in Keycloak

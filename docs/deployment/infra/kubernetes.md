@@ -45,6 +45,7 @@ access the UI and services. If you don't have a resolvable domain for this insta
 
     An example in `/etc/hosts` or `c:\windows\system32\drivers\etc\hosts` might look like this if the VM hosting lamassu has the `192.168.100.75` IP and the
     domain was set to the default `dev.lamassu.io`:
+
     ```py
     192.168.100.75  dev.lamassu.io
     ```
@@ -127,7 +128,7 @@ helm install rabbitmq bitnami/rabbitmq -n $LAMASSU_NAMESPACE --set fullnameOverr
 ### Install Lamassu
 
 Default Lamassu IoT installation includes a Keycloak server which provides the user management and authentication support. Configure the following env variables
-with the user to be created as the keycloak admin.
+with the user credentials to be created as the keycloak admin.
 
 ```bash
 KEYCLOAK_USER=<your-admin-user>
@@ -565,8 +566,44 @@ services:
     enabled: false
 ```
 
-If instead you choose to go with the default installation and use Keycloak as your IAM OIDC-based provider, you will need to initialize a default user after
-installation by performing the following steps
+If instead you choose to go with the default installation and use Keycloak as your IAM OIDC-based provider, include the following section in your `values.yaml`
+file:
+
+```yaml
+services:
+  keycloack:
+    enabled: true
+    image: ghcr.io/lamassuiot/keycloak:2.1.0
+    adminCreds:
+      username: "<admin-user>"
+      password: "<admin-password>"
+```
+
+The Keycloak Admin user credentials to be created should be specified in this section. This user is required to create Lamassu IoT users after installation by
+following the steps below:
+
+1. **Log in to the Keycloak Administration Console**: Open your web browser and navigate to the Keycloak Administration Console at
+    `https://<lamasu-domain>/auth/admin`. Log in with your administrator credentials. These credentials has been provided during the helm chart configuration.
+
+1. **Select the "lamassu" Realm**: After logging in, use the dropdown menu in the top left corner to select the "lamassu" realm. This will take you to the realm
+    where you want to create the user.
+
+1. **Navigate to the "Users" Section**: In the left-hand sidebar, locate and click on the "Users" option. Here, you'll see a list of existing users in the
+    "lamassu" realm.
+
+1. **Create a New User**: To create a new user, click the "Add User" button. This will open a form where you can configure the details of the new user.
+
+1. **Configure User Details**: In the user creation form, provide information such as the username, full name, email. Click on the create button.
+
+1. **Set User Credentials**: In the "Credentials" tab, set the user's password.
+
+1. **Assign the "pki-admin" Role**: To assign the "pki-admin" role to the user, go to the "Role Mappings" tab. Click on "Assing role", find and select
+    the "pki-admin" role and move it to the "Assigned Roles" list. This will grant the user the "pki-admin" role.
+
+1. **Login with the new user**: Once you've configured the user navigate to the Lamassu IoT console URL `https://<lamasu-domain>` and provide the user credentials.
+
+The new user is now created and has been assigned the "pki-admin" role in the "Lamassu" realm. Ensure that the user has the appropriate roles and permissions as
+per your security and access requirements.
 
 #### AWS Cognito
 

@@ -4,7 +4,7 @@
 
 !!! warning
     The Quick Start configuration is not suitable for production use and should only be run in a testing/development environment. If you need to deploy a simple
-    kubernetes single-node cluster, [follow this guide to launch one](deploy-microk8s.md).
+    kubernetes single-node cluster, [follow this guide to launch a microk8s instance](deploy-microk8s.md) or [this guide to launch a k3s instance](deploy-k3s.md)
 
 Lamassu IoT runs in a Kubernetes infrastructure. This guide is a quick start that allows you to have a Lamassu IoT instance for testing purposes. General
 installation steps are:
@@ -16,6 +16,14 @@ installation steps are:
 - Configure Lamassu IoT users in the provided Keycloak service
 
 This process will end in a Lamassu IoT instance up and running using the default Golang based Crypto Engine wich is only suitable for testing and development.
+
+!!! info
+    You can use the fast-lane script wich automates the Quick Start steps described in this document. This is the quickest path to get a Lamassu IoT instance up and running.
+    ```bash
+     curl -fsSL -o lamassu-fast-lane.sh https://raw.githubusercontent.com/lamassuiot/lamassu-helm/main/scripts/lamassu-fast-lane.sh
+     chmod 700 lamassu-fast-lane.sh
+     ./lamassu-fast-lane.sh
+    ```
 
 ### Select the Lamassu IoT Domain
 
@@ -193,6 +201,13 @@ helm install -n $LAMASSU_NAMESPACE lamassu lamassuiot/lamassu -f lamassu.yaml
 
     ```bash
     microk8s helm upgrade -n $LAMASSU_NAMESPACE lamassu lamassuiot/lamassu -f lamassu.yaml
+    ```
+
+!!! warning
+    Finally, if you are using a K3s installation, run the following commands to patch Lamassu's API-Gateway Ingress resource, otherwise no response will be
+    obtained even while having configured the domain in the `/etc/hosts` or equivalent as explained before:
+    ```bash
+     kubectl patch ing/api-gateway-https --type=json -p='[{"op": "add", "path": "/spec/ingressClassName", "value": "nginx" }]'
     ```
 
 ### Configure users in Keycloak

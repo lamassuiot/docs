@@ -71,8 +71,8 @@ kubectl create ns $LAMASSU_NAMESPACE
 Set your secrets for PostgreSQL installation in the following env variables: POSTGRES_USER and POSTGRES_PASSWORD
 
 ```bash
-POSTGRES_USER=<your-admin-user>
-POSTGRES_PASSWORD=<your-admin-pwd>
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 10 )
 ```
 
 Prepare the PostgreSQL config file
@@ -116,8 +116,8 @@ helm install postgres bitnami/postgresql -n $LAMASSU_NAMESPACE -f postgres.yaml
 Set your secrets for RabbitMQ installation in the following env variables: RABBITMQ_USER and RABBITMQ_PASSWORD
 
 ```bash
-RABBITMQ_USER=<your-admin-user>
-RABBITMQ_PASSWORD=<your-admin-pwd>
+RABBITMQ_USER=admin
+RABBITMQ_PASSWORD=$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 10 )
 ```
 
 ```bash
@@ -131,8 +131,8 @@ Default Lamassu IoT installation includes a Keycloak server which provides the u
 with the user credentials to be created as the keycloak admin.
 
 ```bash
-KEYCLOAK_USER=<your-admin-user>
-KEYCLOAK_PASSWORD=<your-admin-pwd>
+KEYCLOAK_USER=admin
+KEYCLOAK_PASSWORD=$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 10 )
 ```
 
 ```yaml
@@ -223,7 +223,7 @@ cat > postgres.yaml << "EOF"
 fullnameOverride: "postgresql"
 global:
   postgresql:
-    auth:
+    auth: #(1)
       username: admin
       password: admin
 primary:
@@ -239,6 +239,8 @@ primary:
 EOF
 ```
 
+1.  Place here the admin credentials provided during PostgreSQL configuration.
+
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm install postgres bitnami/postgresql -f postgres.yaml
@@ -251,9 +253,11 @@ Lamassu's Helm chart allows specifying the connection parameters to be used by t
 postgres:
   hostname: "postgresql"
   port: 5432
-  username: "admin"
+  username: "admin" #(1)
   password: "admin"
 ```
+
+1.  Customize your admin credentials here
 
 #### CouchDB
 
@@ -277,10 +281,12 @@ environment as it is due to insecure configurations (like non robust credentials
 
 ```yaml
 fullnameOverride: "rabbitmq"
-auth:
+auth: #(1)
   username: "user"
   password: "user"
 ```
+
+1.  Place here the admin credentials provided during RabitMQ configuration.
 
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -294,10 +300,12 @@ Lamassu's Helm chart allows specifying the connection parameters to be used by t
 amqp:
   hostname: "rabbitmq"
   port: 5672
-  username: "user"
+  username: "user" #(1)
   password: "user"
   tls: false
 ```
+
+1.  Customize your admin credentials here
 
 ### Crypto Engines
 
@@ -574,10 +582,12 @@ services:
   keycloack:
     enabled: true
     image: ghcr.io/lamassuiot/keycloak:2.1.0
-    adminCreds:
+    adminCreds: # (1)
       username: "<admin-user>"
       password: "<admin-password>"
 ```
+
+1. Set here the credentials of the root admin user for the Keycloak instalation.
 
 The Keycloak Admin user credentials to be created should be specified in this section. This user is required to create Lamassu IoT users after installation by
 following the steps below:
@@ -585,11 +595,11 @@ following the steps below:
 1. **Log in to the Keycloak Administration Console**: Open your web browser and navigate to the Keycloak Administration Console at
     `https://<lamasu-domain>/auth/admin`. Log in with your administrator credentials. These credentials has been provided during the helm chart configuration.
 
-1. **Select the "lamassu" Realm**: After logging in, use the dropdown menu in the top left corner to select the "lamassu" realm. This will take you to the realm
+1. **Select the "lamassu" Realm**: After logging in, use the dropdown menu in the top left corner to select the `lamassu` realm. This will take you to the realm
     where you want to create the user.
 
 1. **Navigate to the "Users" Section**: In the left-hand sidebar, locate and click on the "Users" option. Here, you'll see a list of existing users in the
-    "lamassu" realm.
+    `lamassu` realm.
 
 1. **Create a New User**: To create a new user, click the "Add User" button. This will open a form where you can configure the details of the new user.
 
@@ -597,12 +607,12 @@ following the steps below:
 
 1. **Set User Credentials**: In the "Credentials" tab, set the user's password.
 
-1. **Assign the "pki-admin" Role**: To assign the "pki-admin" role to the user, go to the "Role Mappings" tab. Click on "Assing role", find and select
-    the "pki-admin" role and move it to the "Assigned Roles" list. This will grant the user the "pki-admin" role.
+1. **Assign the "pki-admin" Role**: To assign the `pki-admin` role to the user, go to the "Role Mappings" tab. Click on "Assing role", find and select
+    the "pki-admin" role and move it to the "Assigned Roles" list. This will grant the user the `pki-admin` role.
 
 1. **Login with the new user**: Once you've configured the user navigate to the Lamassu IoT console URL `https://<lamasu-domain>` and provide the user credentials.
 
-The new user is now created and has been assigned the "pki-admin" role in the "Lamassu" realm. Ensure that the user has the appropriate roles and permissions as
+The new user is now created and has been assigned the `pki-admin` role in the `lamassu` realm. Ensure that the user has the appropriate roles and permissions as
 per your security and access requirements.
 
 #### AWS Cognito

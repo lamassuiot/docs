@@ -35,4 +35,4 @@ jobs:
           mike set-default ${{env.VERSION}}
       - name: Publish docs for version
         run: |
-          mike deploy ${{env.VERSION}} -b gh-pages --push
+          mike deploy ${{env.VERSION}} -b gh-pages --push --allow-empty

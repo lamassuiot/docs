@@ -1,0 +1,61 @@
+[data-md-color-scheme="lamassu"] {
+    --md-primary-fg-color:        #1060ff;
+    --md-primary-fg-color--light: #f2f5fa;
+    --md-primary-fg-color--dark:  #1F3C72;
+}  
+[data-md-color-scheme="slate"] {
+    --md-primary-fg-color:        #0E1317;
+    --md-primary-fg-color--light: #595959;
+    --md-primary-fg-color--dark:  #1A242A;
+    --md-hue: 210; /* [0, 360] */
+}  
+
+.md-nav__item .md-nav__link--active {
+    color: var(--md-accent-fg-color);
+}
+
+.md-content{
+    text-align: justify;
+}
+
+.md-typeset__table {
+    min-width: 100%;
+}
+
+.md-typeset table:not([class]) {
+    display: table;
+}
+
+.mermaid {
+    text-align: center;
+}
+
+.md-typeset code {
+    background-color: #fafafa;
+    border-radius: 5px;
+    border: 1px solid #656a7633;
+    line-height: 1;
+    padding: 2px 3px 3px;
+}
+body[data-md-color-scheme="slate"] .md-typeset code {
+    background-color: #1e222a;
+    border-radius: 5px;
+    border: 1px solid #b2b6bd33;
+    line-height: 1;
+    padding: 2px 3px 3px;
+    }
+
+.md-typeset .grid-datamodel {
+    grid-template-columns: 1fr 1fr;
+    display: grid;
+}
+
+.grid-datamodel code {
+    white-space : pre-wrap !important;
+    width: 500px;
+    word-break: break-all!important;
+}
+
+a code {
+    color: var(--md-primary-fg-color)!important;
+}

@@ -1,0 +1,1396 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../img/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.25">
+    
+    
+      
+        <title>Architecture - Lamassu IoT Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.6543a935.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../css/scheme.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="lamassu" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Lamassu IoT Docs" class="md-header__button md-logo" aria-label="Lamassu IoT Docs" data-md-component="logo">
+      
+  <img src="../../img/lamassu.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Lamassu IoT Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="lamassu" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4zM7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-orange"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var media,input,key,value,palette=__md_get("__palette");if(palette&&palette.color){"(prefers-color-scheme)"===palette.color.media&&(media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']"),palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent"));for([key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lamassuiot/lamassu-helm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Helm Chart
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Lamassu IoT Docs" class="md-nav__button md-logo" aria-label="Lamassu IoT Docs" data-md-component="logo">
+      
+  <img src="../../img/lamassu.svg" alt="logo">
+
+    </a>
+    Lamassu IoT Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lamassuiot/lamassu-helm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Helm Chart
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Welcome to Lamassu Iot Docs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Getting Started
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Advanced Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Advanced Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/advanced/helm-chart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Helm Chart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/advanced/simple-config-scenarios/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common configuration Scenarios
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/advanced/subsytem-config/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Subsytem config
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Service Features
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Service Features
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../basic-features/ca-service/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CA Service
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../basic-features/dms-service/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DMS Service
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../basic-features/device-service/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Device Service
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../basic-features/va-service/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VA Service
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../basic-features/alerts-service/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Alerts Service
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#core-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Services
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Services">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ca" class="md-nav__link">
+    <span class="md-ellipsis">
+      CA
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dms-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      DMS Manager
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      Device manager
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloud-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cloud Proxy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alerts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ocsp" class="md-nav__link">
+    <span class="md-ellipsis">
+      OCSP
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lamassu-compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lamassu Compose
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cloud-providers-add-ons" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cloud Providers Add-ons
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="architecture">Architecture</h1>
+<h2 id="core-services">Core Services</h2>
+<figure>
+<p><img alt="Screenshot" src="../../img/architecture/architecture.svg" /></p>
+</figure>
+<p>Lamassu has been designed to be modular and keep the core services as simple as possible encapsulating on each service a set of well defined responsibilities.
+The core services are those that bring the main functionalities of a modern PKI for industrial IoT use cases. The core services are:</p>
+<h3 id="ca">CA</h3>
+<p>The Certificate Authority is the service in charge of issuing and managing the life cycle of the certificate. This service manages two different types of
+certificates:</p>
+<ul>
+<li><strong>PKI Certificates</strong>: This kind of certificates are used by regular end entities such as the devices that connect to the PKI.</li>
+<li><strong>Internal Certificates</strong>: In contrast with the previous type of certificates, these certificate authorities have a more restricted use. Their creation should
+    be limited to the most trusted entities of the PKI. For instance, DMS certificates are issued by an internal CA named <em>LAMASSU-DMS-MANAGER</em> that is created
+    on boot up. For the moment this is the only internal CA that is supported by Lamassu, but we are exploring the possibility of managing the certificates used
+    by the services themselves.</li>
+</ul>
+<p>On top of the regular functionalities that can be performed on this service such as creating new CAs, issuing or revoking certificates, this service is in
+charge of maintaining an accurate state of the managed entities (both CA certificates and regular certificates). In order to do so, a periodic task is scheduled
+once a day to check the status of validity of all certificates.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This feature does not perform well on deployments that have issued many certificates as it is performed on a sequential single threaded process. We are
+working on a solution to improve this.</p>
+</div>
+<p>There are 4 different status that a certificate can have:</p>
+<figure>
+<p><img alt="Screenshot" class="center" src="../../img/architecture/ca-status.png" style="width:225px" /></p>
+</figure>
+<p>The <em>Active</em> state indicates that a certificate is valid and can be trusted by end entities. The <em>Expired</em> state indicates that a certificate has reached its
+expiration date and is no longer valid and cannot be trusted anymore. The <em>Revoked</em> state is used by PKI admins when a security incident or unexpected
+situations arise and the certificate or CA certificate is no longer trusted. Recently a new state has been added to the CA service, the <em>About to expire</em> state.
+This state indicates, as the name suggests, that the certificate will expire shortly. The current threshold is set to 30 days and cannot be configured. This
+state doesn't affect the validity of the certificate, but it is used to notify the PKI admins that the certificate is about to expire and they should take
+action.</p>
+<p>The CA service uses a relational database to store the issued certificates and basic information regarding the provisioned CAs. To configure the database
+connection, set the following environment variables:</p>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POSTGRES_HOSTNAME</td>
+<td>Hostname or address to connect to a running postgres database</td>
+</tr>
+<tr>
+<td>POSTGRES_PORT</td>
+<td>Port for the postgres instance</td>
+</tr>
+<tr>
+<td>POSTGRES_DATABASE</td>
+<td>Database to use</td>
+</tr>
+<tr>
+<td>POSTGRES_USERNAME</td>
+<td>Username credentials</td>
+</tr>
+<tr>
+<td>POSTGRES_PASSWORD</td>
+<td>Password credentials</td>
+</tr>
+</tbody>
+</table>
+<p>This service has been redesigned to support multiple <strong>crypto engines</strong> backends. Originally the only supported engine was the one provided by Hashicorp Vault,
+but the new redesign implementation allows for a more flexible <em>golang like</em> approach, that is by using the <code>crypto.Signer</code> interface. Any new crypto engine can
+be added by implementing this interface.</p>
+<p>To provision the CA service with a crypto engine set the following environment variable:</p>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ENGINE</td>
+<td><code>pkcs11</code> | <code>gopem</code> | <code>vault</code></td>
+</tr>
+</tbody>
+</table>
+<p>The current supported crypto engines are:</p>
+<ul>
+<li><strong>pkcs11</strong>: To Use the HSM crypto engine, define the following environment variables before launching the CA service:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PKCS11_DRIVER</td>
+<td>Path to the PKCS11 driver file</td>
+</tr>
+<tr>
+<td>PKCS11_LABEL</td>
+<td>Label used by the token to be used</td>
+</tr>
+<tr>
+<td>PKCS11_PIN</td>
+<td>PIN code to login and operate the token</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>gopem</strong> - Files</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GOPEM_DATA</td>
+<td>Directory where the generated private keys belonging to each CA are stored</td>
+</tr>
+</tbody>
+</table>
+<p>Although this new design is easier to maintain and operate, we are also keeping the previous implementation of the Hashicorp Vault that does not follow the new
+interface. The reason being that in order to provide a Vault implementation that follows the new interface, the Enterprise Vault license is required. This is a
+limitation that we are working on to overcome with the new crypto engine design. The new standard deployment deprecates the use of Vault as the main backend and
+instead a Software HSM known as <a href="https://github.com/opendnssec/SoftHSMv2">SoftHSM v2</a>.</p>
+<ul>
+<li><strong>vault</strong> - Hashicorp Vault</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VAULT_ADDRESS</td>
+<td>Protocol, hostname and port to a vault instance: <code>https://vault:8200</code></td>
+</tr>
+<tr>
+<td>VAULT_ROLE_ID</td>
+<td>Role ID used by the CA service to login to vault</td>
+</tr>
+<tr>
+<td>VAULT_SECRET_ID</td>
+<td>Secret ID used by the CA service to login to vault</td>
+</tr>
+<tr>
+<td>VAULT_CA</td>
+<td>Path to the CA certificate file for <code>https</code> connections</td>
+</tr>
+<tr>
+<td>VAULT_UNSEAL_KEY_FILE</td>
+<td>Path to the unseal vault keys</td>
+</tr>
+<tr>
+<td>VAULT_PKI_CA_PATH</td>
+<td>Prefix to use while creating new PKI vault secrets</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dms-manager">DMS Manager</h3>
+<p>The DMS Manager is the service in charge of managing the Registration Authority of the PKI. Instead of having a centralized Registration Authority, Lamassu uses
+a decentralized approach to be easily integrated by Device Manufacturing Systems. This way, each DMS has the authority to request the issuance of a certificate
+for a device being manufactured. Instead of relying on just one registration authority, Lamassu delegates the authorization of the issuance to the
+<a href="https://csrc.nist.gov/glossary/term/local_registration_authority">Local Registration Authority or LRA</a>.</p>
+<p>Each DMS is entitled to authorize the issuance of a certificate to a subset of CAs of the entire PKI defined by the administrator. Each DMS has a list of
+authorized CAs that may be used during the enrollment process. Once an enrollment process is initiated, the PKI will check that the provided DMS certificate is
+authorized to issue certificates for the requested CA. The authorization list can be updated to add newly created CAs or remove CAs that are no longer needed.</p>
+<p>The DMS certificates that are used to authenticate the DMS are issued by an internal CA named <em>LAMASSU-DMS-MANAGER</em>. This CA is created by default when the PKI
+is deployed as stated earlier.</p>
+<p>In Lamassu there are two different types of DMS <strong>Manual DMS</strong> and <strong>Cloud Hosted DMS</strong>. In the Manual DMS the communications between the Device and the DMS
+does not follow a standard and is done according to the needs/requirements of the device, instead, in the Cloud Hosted DMS the communication between the device
+and the DMS is done using the EST protocol. On the other hand, in Cloud Hosted DMS mode the device to communicate with the DMS and to be able to request a
+Certificate must have a Bootstrap certificate. By means of this certificate the DMS authorizes or rejects the device's request. Moreover, the DMS of Lamassu has
+two different options when it has to authorize devices to use the enrollment functionality. On the one, there is an option to allow only the devices which are
+registered in the device manager. On the other hand, the other option allows all the devices, even if the device is not registered in the device manager.</p>
+<p>In Manual DMS mode the authorization is done manually by the operator.</p>
+<figure>
+<p><img alt="Screenshot" src="../../img/dms-mode.png" /></p>
+</figure>
+<p>The DMS Manager service uses a relational database to store the list of authorised CAs and basic information regarding the provisioned DMS certificates. To
+configure the database connection, set the following environment variables:</p>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POSTGRES_HOSTNAME</td>
+<td>Hostname or address to connect to a running postgres database</td>
+</tr>
+<tr>
+<td>POSTGRES_PORT</td>
+<td>Port for the postgres instance</td>
+</tr>
+<tr>
+<td>POSTGRES_DATABASE</td>
+<td>Database to use</td>
+</tr>
+<tr>
+<td>POSTGRES_USERNAME</td>
+<td>Username credentials</td>
+</tr>
+<tr>
+<td>POSTGRES_PASSWORD</td>
+<td>Password credentials</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>CA</strong> - The DMS service uses a Lamassu CA Client to update the status of the internal CA <em>LAMASSU-DMS-MANAGER</em></li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LAMASSU_CA_ADDRESS</td>
+<td>Lamassu CA service name and port : <code>ca:8087</code></td>
+</tr>
+<tr>
+<td>LAMASSU_CA_CERT_FILE</td>
+<td>Path to the internal CA</td>
+</tr>
+</tbody>
+</table>
+<h3 id="device-manager">Device manager</h3>
+<p>At its core, the device manager is the main entry point for the enrollment process. It implements the EST protocol that must be used to obtain new certificates.
+On top of that, this service manages the registration of new devices and to keep a track of the device status. Similar to the CA service, the device manager
+also schedules a periodic task to check the status of the devices. This task is launched once a day to check the status of validity of all certificates
+associated by each device.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This feature does not perform well on deployments that have issued many certificates as it is performed on a sequential single threaded process. We are
+working on a solution to improve this.</p>
+</div>
+<p>There are 5 different status a device can have:</p>
+<figure>
+<p><img alt="Screenshot" class="center" src="../../img/architecture/device-status.png" style="width:225px" /></p>
+</figure>
+<p>The <em>Pending Provisioning</em> state reflects that a device entity has been created but no certificate has been issued yet. The <em>Fully Provisioned</em> state indicates
+that a device has all the device slots with active certificates. The <em>With warnings</em> state indicates that a device has one or more slots with certificates that
+are either expired or have been revoked. The <em>Requires Action</em> state indicates that a device has one or more slots with certificates that are about to expire.
+The <em>Decommissioned</em> state indicates that a device has been decommissioned and no longer needs to be tracked by the PKI.</p>
+<p>Each device can have certificates signed by different authorised CAs. Slots are used to link a particular device with a CA. Each Slot can store multiple
+certificates, but only one of them can be in an ACTIVE status.</p>
+<p>The Device Manager service uses a relational database to store the information of the devices, certificates and slots, also, logs of devices and slots are
+created when an specific action is carried out, for example, in the creation. To configure the database connection, set the following environment variables:</p>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POSTGRES_HOSTNAME</td>
+<td>Hostname or address to connect to a running postgres database</td>
+</tr>
+<tr>
+<td>POSTGRES_PORT</td>
+<td>Port for the postgres instance</td>
+</tr>
+<tr>
+<td>POSTGRES_DATABASE</td>
+<td>Database to use</td>
+</tr>
+<tr>
+<td>POSTGRES_USERNAME</td>
+<td>Username credentials</td>
+</tr>
+<tr>
+<td>POSTGRES_PASSWORD</td>
+<td>Password credentials</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>CA</strong> - The Device Manager service uses a Lamassu CA Client to update the status of the certificates associated to the devices</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LAMASSU_CA_ADDRESS</td>
+<td>Lamassu CA service name and port: <code>ca:8087</code></td>
+</tr>
+<tr>
+<td>LAMASSU_CA_CERT_FILE</td>
+<td>Path to the internal CA</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>DMS</strong> - The Device Manager service uses a DMS Client to update the status of the certificates associated to the devices</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>LAMASSU_DMS_MANAGER_ADDRESS</td>
+<td>Lamassu DMS service name and port: <code>dms-manager:8085</code></td>
+</tr>
+<tr>
+<td>LAMASSU_DMS_MANAGER_CERT_FILE</td>
+<td>Path to the internal DMS</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Other</strong> - Other configuration variables</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MINIMUM_REENROLL_DAYS</td>
+<td>The minimum days that a certificate must be valid in order to reenroll</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cloud-proxy">Cloud Proxy</h3>
+<p>The Cloud Proxy allows integrating CAs created in cloud providers, it is in charge of syncronizing the data between cloud providers and the data of Lamassu. In
+particular, Lamassu incorporates AWS and Azure Cloud integration.</p>
+<p>The Cloud Proxy service uses a relational database, to store the information of the Lamassu CAs and to assign a connector Id. The connector will be used to bind
+each Lamassu CA to their equivalent in the external cloud providers. To configure the database connection, set the following environment variables:</p>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POSTGRES_HOSTNAME</td>
+<td>Hostname or address to connect to a running postgres database</td>
+</tr>
+<tr>
+<td>POSTGRES_PORT</td>
+<td>Port for the postgres instance</td>
+</tr>
+<tr>
+<td>POSTGRES_DATABASE</td>
+<td>Database to use</td>
+</tr>
+<tr>
+<td>POSTGRES_USERNAME</td>
+<td>Username credentials</td>
+</tr>
+<tr>
+<td>POSTGRES_PASSWORD</td>
+<td>Password credentials</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Consul</strong> - Cloud connectors are dynamically registered, to have a record of what services exist, they self-register in consul. Cloud Proxy consumes consul
+    to ask which service are registered.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CONSUL_PROTOCOL</td>
+<td>Protocol used to connect to consul instance : <code>https</code></td>
+</tr>
+<tr>
+<td>CONSUL_HOST</td>
+<td>Hostname to a running consul instance</td>
+</tr>
+<tr>
+<td>CONSUL_PORT</td>
+<td>Port for the consul instance</td>
+</tr>
+<tr>
+<td>CONSUL_CA</td>
+<td>Path to the internal CA</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>CA</strong> - The Device Manager service uses a Lamassu CA Client to update the status of the certificates associated to the devices</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LAMASSU_CA_ADDRESS</td>
+<td>Lamassu CA service name and port: <code>lamassu-ca:8087</code></td>
+</tr>
+<tr>
+<td>LAMASSU_CA_CERT_FILE</td>
+<td>Path to the internal CA</td>
+</tr>
+</tbody>
+</table>
+<h3 id="alerts">Alerts</h3>
+<p>Alerts is the service in charge of sending mails. Users can be subscribed to particular events, such as, when a certificate is about to expire, and they will be
+notified via mail.</p>
+<p>Events from all services above (Lamassu CA, DMS Manager and Device Manager) that create, revoke or modify the status of any certificate publish a message to
+RabbitMQ broker. The message sent to the "alerts" queue will be consumed by the Alerts service and will send a mail to all the users subscribed to that event.</p>
+<figure>
+<p><img alt="Screenshot" class="center" src="../../img/rabbitMQ.png" style="width:500px" /></p>
+</figure>
+<p>Alerts service uses a relational database, to store the information of subscriptions and last executed events information. To configure the database connection,
+set the following environment variables:</p>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POSTGRES_HOSTNAME</td>
+<td>Hostname or address to connect to a running postgres database</td>
+</tr>
+<tr>
+<td>POSTGRES_PORT</td>
+<td>Port for the postgres instance</td>
+</tr>
+<tr>
+<td>POSTGRES_DATABASE</td>
+<td>Database to use</td>
+</tr>
+<tr>
+<td>POSTGRES_USERNAME</td>
+<td>Username credentials</td>
+</tr>
+<tr>
+<td>POSTGRES_PASSWORD</td>
+<td>Password credentials</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Configuration</strong> - Alerts service allows custom configuration to send SMTP mails, such as:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SMTP_FROM</td>
+<td>Email address of the sender of alerts generated by the service</td>
+</tr>
+<tr>
+<td>SMTP_INSECURE</td>
+<td>Boolean value to enable or disable secure SMTP session</td>
+</tr>
+<tr>
+<td>SMTP_ENABLE_SSL</td>
+<td>Boolean value to enable or disable SSL connection</td>
+</tr>
+<tr>
+<td>SMTP_USERNAME</td>
+<td>Username credentials</td>
+</tr>
+<tr>
+<td>SMTP_PASSWORD</td>
+<td>Password credentials</td>
+</tr>
+<tr>
+<td>SMTP_HOST</td>
+<td>Hostname or address to SMTP server: <code>25</code></td>
+</tr>
+<tr>
+<td>SMTP_PORT</td>
+<td>Port for the SMTP instance</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Templates</strong> - Alerts service allows custom configuration to send SMTP mails, such as:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TEMPLATE_HTML</td>
+<td>Template in HTML format to create mail format</td>
+</tr>
+<tr>
+<td>TEMPLATE_JSON</td>
+<td>Template in JSON format to rename queue names by readable text</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ocsp">OCSP</h3>
+<p>OCSP (Online Certificate Status Protocol) service, allows to determine the validity status of an X.509 digital certificate.</p>
+<p>OCSP service's response must be signed with a public private key, so the following variables must be specified.</p>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SIGNER_CERT</td>
+<td>Lamassu CA service name and port: <code>ca:8087</code></td>
+</tr>
+<tr>
+<td>SIGNER_KEY</td>
+<td>Path to the internal CA</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>CA</strong> - OCSP service uses a Lamassu CA Client to update the status of the certificates associated to the devices</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Environment Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LAMASSU_CA_ADDRESS</td>
+<td>Lamassu CA service name and port: <code>ca:8087</code></td>
+</tr>
+<tr>
+<td>LAMASSU_CA_CERT_FILE</td>
+<td>Path to the internal CA</td>
+</tr>
+</tbody>
+</table>
+<h2 id="lamassu-compose">Lamassu Compose</h2>
+<p>Lamassu Compose offers a SECURE deployment of the set of microservices required to manage an industrial PKI. The architecture presented on the following image
+reflects the interconnection of the different services mainly using the HTTP Protocol. The use of this deployment offers the following non functional
+requirements by leveraging the use of an API Gateway:</p>
+<ul>
+<li>
+<p><strong>Centralized point of access</strong>: Each microservice listens on a different port which ends up being challenging for developers and users. With the use of the
+    API Gateway, the user will always access the same host and port address. Port <code>80</code> for HTTP connections and port <code>443</code> for HTTPS connections.</p>
+</li>
+<li>
+<p><strong>Authentication</strong>: In order to invoke any endpoint, the API Gateway enforces each request to present a JWT. Upon receiving an HTTP request, the gateway
+    validates the presented token against the authentication server.</p>
+</li>
+<li>
+<p><strong>Authorization</strong>: Another key aspect is enforcing an authorization schema. Lamassu has been configured in such way that only specific endpoints are
+    accessible by non admin users.</p>
+</li>
+<li>
+<p><strong>Tracing</strong>: Logging the life of an HTTP request can be helpful during the debugging process of such complex application. The tracing aspect eases this
+    process by injecting a unique identifier to each request that is then printed out by each microservice logs.</p>
+</li>
+<li>
+<p><strong>Mutual TLS authentication</strong>: As mentioned earlier the gateway acts as the traffic orchestrator knowing where each service is and redirecting the traffic
+    accordingly. To prevent any unauthorized request as well as protecting the communications channel between the Gateway itself and the upstream service, the
+    API Gateway initiates a mutual TLS connection to ensure such thing.</p>
+</li>
+</ul>
+<p><img alt="Screenshot" src="../../img/architecture/architecture.svg" /></p>
+<h2 id="cloud-providers-add-ons">Cloud Providers Add-ons</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/lamassuiot" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://hub.docker.com/u/lamassuiot" target="_blank" rel="noopener" title="hub.docker.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M349.9 236.3h-66.1v-59.4h66.1v59.4zm0-204.3h-66.1v60.7h66.1V32zm78.2 144.8H362v59.4h66.1v-59.4zm-156.3-72.1h-66.1v60.1h66.1v-60.1zm78.1 0h-66.1v60.1h66.1v-60.1zm276.8 100c-14.4-9.7-47.6-13.2-73.1-8.4-3.3-24-16.7-44.9-41.1-63.7l-14-9.3-9.3 14c-18.4 27.8-23.4 73.6-3.7 103.8-8.7 4.7-25.8 11.1-48.4 10.7H2.4c-8.7 50.8 5.8 116.8 44 162.1 37.1 43.9 92.7 66.2 165.4 66.2 157.4 0 273.9-72.5 328.4-204.2 21.4.4 67.6.1 91.3-45.2 1.5-2.5 6.6-13.2 8.5-17.1l-13.3-8.9zm-511.1-27.9h-66v59.4h66.1v-59.4zm78.1 0h-66.1v59.4h66.1v-59.4zm78.1 0h-66.1v59.4h66.1v-59.4zm-78.1-72.1h-66.1v60.1h66.1v-60.1z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://twitter.com/lamassuiot" target="_blank" rel="noopener" title="twitter.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M459.37 151.716c.325 4.548.325 9.097.325 13.645 0 138.72-105.583 298.558-298.558 298.558-59.452 0-114.68-17.219-161.137-47.106 8.447.974 16.568 1.299 25.34 1.299 49.055 0 94.213-16.568 130.274-44.832-46.132-.975-84.792-31.188-98.112-72.772 6.498.974 12.995 1.624 19.818 1.624 9.421 0 18.843-1.3 27.614-3.573-48.081-9.747-84.143-51.98-84.143-102.985v-1.299c13.969 7.797 30.214 12.67 47.431 13.319-28.264-18.843-46.781-51.005-46.781-87.391 0-19.492 5.197-37.36 14.294-52.954 51.655 63.675 129.3 105.258 216.365 109.807-1.624-7.797-2.599-15.918-2.599-24.04 0-57.828 46.782-104.934 104.934-104.934 30.213 0 57.502 12.67 76.67 33.137 23.715-4.548 46.456-13.32 66.599-25.34-7.798 24.366-24.366 44.833-46.132 57.827 21.117-2.273 41.584-8.122 60.426-16.243-14.292 20.791-32.161 39.308-52.628 54.253z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.indexes", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.081f42fc.min.js"></script>
+      
+    
+  </body>
+</html>

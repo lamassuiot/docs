@@ -675,10 +675,10 @@ chmod 700 get_helm.sh
 ./get_helm.sh
 </code></pre></div>
 <h3 id="install-nginx-ingress-controller">Install Nginx Ingress controller</h3>
-<div class="highlight"><pre><span></span><code>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>https://github.com/cert-manager/cert-manager/releases/download/v1.13.2/cert-manager.yaml
+<div class="highlight"><pre><span></span><code>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/baremetal/deploy.yaml
 </code></pre></div>
 <h3 id="install-cert-manager">Install Cert Manager</h3>
-<div class="highlight"><pre><span></span><code>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/baremetal/deploy.yaml
+<div class="highlight"><pre><span></span><code>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>https://github.com/cert-manager/cert-manager/releases/download/v1.14.0/cert-manager.yaml
 </code></pre></div>
 <h2 id="k9s">K9s</h2>
 <p>We recommend installing K9s, a terminal based client application, as it comes handy while debugging any kubernetes related resource,

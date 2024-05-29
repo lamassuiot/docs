@@ -1,5 +1,4 @@
 site_name: Lamassu IoT Docs
-# Repository
 repo_name: Helm Chart
 repo_url: https://github.com/lamassuiot/lamassu-helm
 
@@ -10,6 +9,7 @@ theme:
   features:
     - navigation.indexes
     - content.code.copy
+    - content.code.annotate
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: lamassu
@@ -26,27 +26,17 @@ extra_css:
   - css/scheme.css
 nav:
   - "index.md"
-  - Deployment:
-    - Infrastructure: 
-      - "deployment/infra/kubernetes.md"
-    - Configuration:
-      - "deployment/config/helm-chart.md"
-      - "deployment/config/ca-service.md"
-  - Basic Features:
+  - "quickstart.md"
+  - Advanced Configuration:
+    - "deployment/advanced/helm-chart.md"
+    - "deployment/advanced/simple-config-scenarios.md"
+    - "deployment/advanced/subsytem-config.md"
+  - Service Features:
     - "basic-features/ca-service.md"
     - "basic-features/dms-service.md"
     - "basic-features/device-service.md"
     - "basic-features/va-service.md"
     - "basic-features/alerts-service.md"
-  - Advanced Features:
-    - "advanced-features/aws-iot.md"
-    - "advanced-features/azure-iot.md"
-  - APIs:
-    - "apis/openapi.md"
-    - "apis/cloud-events.md"
-  - System Administration:
-    - "system-administration/architecture.md"
-    - "system-administration/backup-recover.md"
 extra:
   version:
     provider: mike

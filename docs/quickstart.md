@@ -1,13 +1,9 @@
 # Getting Started
 
-In order to automate the steps required to deploy a fully functional Lamassu
-instance, a handy script known as the **fast-lane script**. In order to use such
-script make sure to have a functional kubernetes cluster.
+In order to automate the steps required to deploy a fully functional Lamassu instance, a handy script known as the **fast-lane script**. In order to use such script make sure to have a functional kubernetes cluster.
 
 !!! info
-    If you need to deploy a simple kubernetes single-node cluster,
-    [follow this guide to launch a microk8s instance](deployment/infra/deploy-microk8s.md)
-    or [this guide to launch a k3s instance](deployment/infra/deploy-k3s.md)
+     If you need to deploy a simple kubernetes single-node cluster, [follow this guide to launch a microk8s instance](deployment/infra/deploy-microk8s.md) or [this guide to launch a k3s instance](deployment/infra/deploy-k3s.md)
 
 Installing Lamassu is as simple as running this commands and following the
 simple terminal-based wizzard:

@@ -1,6 +1,6 @@
 [data-md-color-scheme="lamassu"] {
-    --md-primary-fg-color:        #225BB1;
-    --md-primary-fg-color--light: #BBCCEA;
+    --md-primary-fg-color:        #1060ff;
+    --md-primary-fg-color--light: #f2f5fa;
     --md-primary-fg-color--dark:  #1F3C72;
 }  
 [data-md-color-scheme="slate"] {
@@ -54,4 +54,8 @@ body[data-md-color-scheme="slate"] .md-typeset code {
     white-space : pre-wrap !important;
     width: 500px;
     word-break: break-all!important;
+}
+
+a code {
+    color: var(--md-primary-fg-color)!important;
 }

@@ -80,7 +80,7 @@ The workflow runs the following command for publishing the current branch
 version.
 
 ```bash
-VERSION = $(cat VERSION)
+VERSION=$(cat VERSION)
 mike deploy $VERSION -b gh-pages --push
 ```
 
@@ -88,7 +88,7 @@ and the following one for setting the curent version as latest and default (only
 for the main branch)
 
 ```bash
-VERSION = $(cat VERSION)
+VERSION=$(cat VERSION)
 mike deploy $VERSION latest -u
 mike set-default $VERSION
 ```

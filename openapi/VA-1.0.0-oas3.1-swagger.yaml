@@ -1,29 +1,38 @@
-openapi: 3.0.0
+openapi: 3.1.0
 info:
-  version: 1.0.0
+  version: 1.0.0-oas3.1
   title: 'Lamassu IoT: VA Service'
-  description: |-
-    A Validation Authority (VA) is a critical component in a Public Key Infrastructure (PKI), a system that provides secure communication and data exchange over networks. The VA plays a vital role in verifying the validity of digital certificates issued within the PKI framework. It helps ensure the trustworthiness and integrity of the entire PKI ecosystem by acting as a trusted third-party entity.
+  description: >-
+    A Validation Authority (VA) is a critical component in a Public Key
+    Infrastructure (PKI), a system that provides secure communication and data
+    exchange over networks. The VA plays a vital role in verifying the validity
+    of digital certificates issued within the PKI framework. It helps ensure the
+    trustworthiness and integrity of the entire PKI ecosystem by acting as a
+    trusted third-party entity.
 
-    This section aims to describe those protocols as well as explaining how to use them.
+
+    This section aims to describe those protocols as well as explaining how to
+    use them.
+
 
     Some useful links:
+
     - [Lamassu IoT Github repository](https://github.com/lamassuiot/lamassuiot)
-    - [Lamassu Iot Docs](https://www.lamassu.io/docs/2.5.3/basic-features/va-service/)
-    
+
+    - [Lamassu Iot
+    Docs](https://www.lamassu.io/docs/2.5.3/basic-features/va-service/)
 tags:
   - name: ocsp
   - name: crl
-  
 paths:
   /ocsp:
     get:
-      tags: 
+      tags:
         - ocsp
       summary: Verify OCSP request
       description: Verify OCSP request
       responses:
-        200:
+        '200':
           description: Successfully verified OCSP request.
           content:
             application/ocsp-response:
@@ -31,18 +40,16 @@ paths:
                 type: string
                 format: binary
                 description: The OCSP response.
-        400:
+        '400':
           description: >
-            Bad Request. Possible error reasons:
-            - Could not parse and unescape url
-            - Could not decode b64 ocsp request
-            - Method not supported
-            - Could not parse ocsp request
-        500:
+            Bad Request. Possible error reasons: - Could not parse and unescape
+            url - Could not decode b64 ocsp request - Method not supported -
+            Could not parse ocsp request
+        '500':
           description: Something went wrong while verifying ocsp request.
   /ocsp/{ocsp_request}:
     post:
-      tags: 
+      tags:
         - ocsp
       summary: Verify OCSP request
       description: Verify OCSP request
@@ -62,7 +69,7 @@ paths:
               format: binary
               description: The OCSP request in binary format.
       responses:
-        200:
+        '200':
           description: Successfully verified OCSP request.
           content:
             application/ocsp-response:
@@ -70,17 +77,15 @@ paths:
                 type: string
                 format: binary
                 description: The OCSP response.
-        400:
+        '400':
           description: >
-            Bad Request. Possible error reasons:
-            - Could not read body
-            - Method not supported
-            - Could not parse ocsp request
-        500:
+            Bad Request. Possible error reasons: - Could not read body - Method
+            not supported - Could not parse ocsp request
+        '500':
           description: Something went wrong while verifying ocsp request.
   /crl/{id}:
     get:
-      tags: 
+      tags:
         - crl
       summary: Get Certificate Revocation List (CRL) by ID
       description: Get Certificate Revocation List (CRL) by ID
@@ -92,7 +97,7 @@ paths:
             type: string
           description: The ID of the Certificate Authority (CA) associated with the CRL.
       responses:
-        200:
+        '200':
           description: Successfully retrieved CRL.
           content:
             application/pkix-crl:
@@ -100,12 +105,10 @@ paths:
                 type: string
                 format: binary
                 description: The Certificate Revocation List (CRL) in binary format.
-        400:
+        '400':
           description: Bad request. The ID parameter is missing or invalid.
-        500:
+        '500':
           description: Something went wrong while verifying ocsp request.
-  
 servers:
-  # Added by API Auto Mocking Plugin
   - description: SwaggerHub API Auto Mocking
     url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_VA/1.0.0

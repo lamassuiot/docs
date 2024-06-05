@@ -1,0 +1,351 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: 'Lamassu IoT: Alerts Service'
+  description: |-
+    At its core, the device manager is the main entry point for the enrollment process. It implements the EST protocol that must be used to obtain new certificates. On top of that, this service manages the registration of new devices and to keep a track of the device status. Similar to the CA service, the device manager also schedules a periodic task to check the status of the devices. This task is launched once a day to check the status of validity of all certificates associated by each device.
+
+    Some useful links:
+    - [Lamassu IoT Github repository](https://github.com/lamassuiot/lamassuiot)
+    - [Lamassu Iot Docs](https://www.lamassu.io/docs/2.0.0/architecture/#device-manager)
+tags:
+  - name: devices
+  - name: stats
+
+paths:
+  /devices:
+    #Faltan los filtros del query
+    get:
+      tags:
+        - devices
+      summary: Get All Devices
+      description: Get All Devices
+      parameters: []
+      responses:
+        200:
+          description: Successful operation. Returns all devices.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetDevicesResponse'
+        500:
+          description: Internal Server Error.
+    post:
+      tags:
+        - devices
+      summary: Create a Device
+      description: Create a Device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeviceBody'
+      responses:
+        201:
+          description: Successful operation. Returns the created device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        500:
+          description: Internal Server Error.
+  /devices/{id}:
+    get:
+      tags:
+        - devices
+      summary: Get Device by ID
+      description: Get Device by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the device to retrieve.
+      responses:
+        200:
+          description: Successful operation. Returns the device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /devices/{id}/idslot:
+    put:
+      tags:
+        - devices
+      summary: Update Device by ID Slot
+      description: Update Device by ID Slot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the device to update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeviceIdentitySlotBody'
+      responses:
+        200:
+          description: Successful operation. Returns the updated device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /devices/{id}/metadata:
+    put:
+      tags:
+        - devices
+      summary: Update Device Metadata
+      description: Update Device Metadata
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the device to update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        200:
+          description: Successful operation. Returns the updated device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /devices/{id}/decomission:
+    delete:
+      tags:
+        - devices
+      summary: Decomissions a Device
+      description: Decomissions a Device
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the device to decomission.
+      responses:
+        200:
+          description: Successful operation. Returns the updated device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /devices/dms/{id}:
+    get:
+      tags:
+        - devices
+      summary: Get Devices By DMS
+      description: Get Devices By DMS
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the DMS to retrieve devices for.
+      responses:
+        200:
+          description: Successful operation. Returns all devices related to the DMS.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetDevicesResponse'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /stats:
+    get:
+      tags:
+        - stats
+      summary: Get Stats
+      description: Get Stats
+      responses:
+        200:
+          description: Successful operation. Returns the stats.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DevicesStats'
+        500:
+          description: Internal Server Error.
+        
+        
+components:
+  schemas:
+    GetDevicesResponse:
+      type: object
+      properties:
+        nextBookmark:
+          type: string
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/DeviceStatus'
+        icon:
+          type: string
+        icon_color:
+          type: string
+        creation_timestamp:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+        dms_owner:
+          type: string
+        identity_slot:
+          $ref: '#/components/schemas/Slot'
+        extra_slots:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/Slot'
+        events:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DeviceEvent'
+    CreateDeviceBody:
+      type: object
+      properties:
+        id:
+          type: string
+        alias:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: object
+        dms_id:
+          type: string
+        icon:
+          type: string
+        icon_color:
+          type: string
+    UpdateDeviceIdentitySlotBody:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/Slot'
+    Slot:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - RENEWAL_PENDING
+            - EXPIRING_SOON
+            - EXPIRED
+            - REVOKED
+        active_version:
+          type: integer
+        secret_type:
+          type: string
+          enum:
+            - TOKEN
+            - x509
+            - SSH_KEY
+            - OTHER
+        versions:
+          type: object
+          additionalProperties: true  
+        events:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DeviceEvent'
+    DeviceEvent:
+      type: object
+      properties:
+        deviceEventType:
+          type: string
+          enum:
+            - CREATED
+            - PROVISIONED
+            - RE-PROVISIONED
+            - RENEWED
+            - SHADOW-UPDATED
+            - STATUS-UPDATED
+            - DECOMMISSIONED
+        eventDescriptions:
+          type: string
+    DevicesStats:
+      type: object
+      properties:
+        totalDevices:
+          type: string
+        devicesStatus:
+          type: object
+          properties:
+            type:
+              $ref: '#/components/schemas/DeviceStatus'
+          additionalProperties:
+              type: integer
+          description: map[DeviceStatus]int
+    DeviceStatus:
+      type: string
+      enum:
+        - NO_IDENTITY
+        - ACTIVE
+        - RENEWAL_PENDING
+        - EXPIRING_SOON
+        - EXPIRED
+        - REVOKED
+        - DECOMMISSIONED
+          
+          
+servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_DeviceManager/1.0.0

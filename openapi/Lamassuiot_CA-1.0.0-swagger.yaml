@@ -1,0 +1,1316 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: 'Lamassu IoT: CA Service'
+  description: |-
+    The first step to provision devices with digital certificates is to create the Certification Authority. The role of a CA is to issue and manage all the certificates.
+
+    Some useful links:
+    - [Lamassu IoT Github repository](https://github.com/lamassuiot/lamassuiot)
+    - [Lamassu Iot Docs](https://www.lamassu.io/docs/2.5.3/basic-features/ca-service/)
+    
+tags:
+  - name: CAs
+  - name: certificates
+  - name: engines
+  - name: stats
+
+
+paths:
+  /cas:
+    #Faltan los filtros del query
+    get:
+      tags:
+        - CAs
+      summary: Get All CAs
+      description: Get All CAs
+      parameters: []
+      responses:
+        200:
+          description: Successful operation. Returns all CAs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetCAsResponse'
+        500:
+          description: Something went wrong while reading all CAs from storage engine
+    post:
+      tags:
+        - CAs
+      summary: Create CA
+      description: Create CA
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCABody'
+      responses:
+        201:
+          description: Successfully created CA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CACertificate'
+        400:
+          description: >
+            Bad Request. Possible error reasons:
+            - Struct Validation error
+            - CA type inconsistent
+            - Issuance expiration greater than CA expiration
+            - Incompatible expiration time ref
+        409:
+          description: Conflict - CA already exists.
+        500:
+          description: Internal Server Error.
+  /cas/import:
+    post:
+      tags:
+        - CAs
+      summary: Import CA
+      description: Import CA
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportCABody'
+      responses:
+        201:
+          description: Successfully imported CA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportCAInput'
+        400:
+          description: >
+            Bad Request. Possible error reasons:
+            - Struct Validation error
+            - CA type inconsistent
+            - Issuance expiration greater than CA expiration
+            - Incompatible expiration time ref
+            - CA and the provided key don't match
+        500:
+          description: Internal Server Error.
+  /cas/{id}:
+    get:
+      tags:
+        - CAs
+      summary: Get CA By ID
+      description: Get CA By ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the CA to retrieve.
+      responses:
+        200:
+          description: Successful operation. Returns the CA information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CACertificate'
+        400:
+          description: Struct Validation error.
+        404:
+          description: CA not found.
+        500:
+          description: Internal Server Error.
+    delete:
+      tags:
+        - CAs
+      summary: Delete CA
+      description: Delete CA
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the CA to delete.
+      responses:
+        201:
+          description: CA successfully deleted.
+        400:
+          description: Struct Validation error || CA Status inconsistent
+        404:
+          description: CA not found
+        500:
+          description: Internal Server Error.
+  /cas/cn/{cn}:
+    get:
+      tags:
+        - CAs
+      summary: Get CAs By Common Name
+      description: Get CAs by their common name. 
+      parameters:
+        - in: path
+          name: cn
+          required: true
+          schema:
+            type: string
+          description: Common name of the CA(s) to retrieve.
+      responses:
+        200:
+          description: Successful operation. Returns the list of CAs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetCAsResponse'
+        500:
+          description: Internal Server Error.
+  /cas/{id}/metadata:
+    put:
+      tags:
+        - CAs
+      summary: Update CA Metadata
+      description: Update CA Metadata
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the CA to update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                metadata:
+                  type: object
+                  additionalProperties: true
+                  description: Metadata to update for the CA.
+      responses:
+        200:
+          description: Successful operation. Returns the CA information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CACertificate'
+        400:
+          description: Struct Validation error.
+        404:
+          description: CA not found.
+        500:
+          description: Internal Server Error.
+  /cas/{id}/status:
+    post:
+      tags:
+        - CAs
+      summary: Update CA Status
+      description: Update CA Status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the CA to update.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCertificateStatusBody'
+      responses:
+        201:
+          description: Successful operation. Returns the CA information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CACertificate'
+        400:
+          description: Struct Validation error.
+        404:
+          description: CA not found.
+        500:
+          description: Internal Server Error.
+  /cas/{id}/certificates:
+    get:
+      tags:
+        - CAs
+      summary: Get Certificates by CA
+      description: Get Certificates by CA
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the CA certificates to retrieve.
+      responses:
+        200:
+          description: Successful operation. Returns the list of CAs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetCertificatesResponse'
+        400:
+          description: Struct Validation error.
+        404:
+          description: CA not found.
+        500:
+          description: Internal Server Error.
+  /cas/{id}/certificates/status/{status}:
+  #Faltan los filtros del query
+    get:
+      tags:
+        - CAs
+      summary: Get Certificates by CA and Status
+      description: Get Certificates by CA and Status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the CA certificates to retrieve.
+          schema:
+            type: string
+        - name: status
+          in: path
+          required: true
+          description: Status of the certificates
+          schema:
+            $ref: '#/components/schemas/CertificateStatus'
+      responses:
+        200:
+          description: Successful operation. Returns the list of Certificates.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetCertificatesResponse'
+        400:
+          description: Struct Validation error.
+        404:
+          description: CA not found.
+        500:
+          description: Internal Server Error.
+  /cas/{id}/certificates/sign:
+    post:
+      tags:
+        - CAs
+      summary: Sign Certificate
+      description: Sign Certificate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the CA certificate to sign.
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SingCertificateInput'
+      responses:
+        201:
+          description: Successful operation. Returns the CA information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CACertificate'
+        400:
+          description: Struct Validation error.
+        404:
+          description: CA not found.
+        500:
+          description: Internal Server Error.
+  /cas/{id}/signature/sign:
+    post:
+      tags:
+        - CAs
+      summary: Sign Message
+      description: Sign Message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the CA used for signing.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignatureSignBody'
+      responses:
+        200:
+          description: Successful operation. Returns the signed data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignResponse'
+        400:
+          description: Struct Validation error.
+        404:
+          description: CA not found.
+        500:
+          description: Internal Server Error.
+  /cas/{id}/signature/verify:
+    post:
+      tags:
+        - CAs
+      summary: Verify Signature
+      description: Verify Signature
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the CA to verify.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignatureVerifyBody'
+      responses:
+        200:
+          description: Successful operation. Returns the verification result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+        400:
+          description: Struct Validation error.
+        404:
+          description: CA not found.
+        500:
+          description: Internal Server Error.
+  /cas/{id}/certificates/{sn}:
+    get:
+      tags:
+        - CAs
+      summary: Get Certificate by Serial Number
+      description: Get Certificate by Serial Number
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID of the CA
+        - in: path
+          name: sn
+          required: true
+          schema:
+           type: string
+          description: Serial number of the certificate
+      responses:
+        200:
+          description: Successful operation. Returns the Certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        400:
+          description: Struct Validation error.
+        404:
+          description: Certificate not found.
+        500:
+          description: Internal Server Error.
+  /certificates:
+    get:
+      tags:
+        - certificates
+      summary: Get Certificates
+      description: Update CA Metadata
+      parameters: []
+      responses:
+        200:
+          description: Successful operation. Returns all Certificates.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetCertificatesResponse'
+        500: 
+          description: Internal Server Error
+  /certificates/status/{status}:
+    get:
+      tags:
+        - certificates
+      summary: Get Certificates by Status
+      description: Get certificates by status
+      parameters:
+        - in: path
+          name: status
+          required: true
+          schema:
+            type: string
+          description: Status of the certificates to retrieve
+      responses:
+        200:
+          description: Successful operation. Returns list of Certificates.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetCertificatesResponse'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /certificates/expiration:
+    get:
+      tags:
+        - certificates
+      summary: Get Certificates by Expiration Date
+      description: Get Certificates by Expiration Date
+      parameters:
+        - in: query
+          name: expires_after
+          schema:
+            type: string
+            format: date-time
+          description: Return certificates expiring after this date (RFC3339 format)
+        - in: query
+          name: expires_before
+          schema:
+            type: string
+            format: date-time
+          description: Return certificates expiring before this date (RFC3339 format)
+      responses:
+        200:
+          description: Successful operation. Returns list of Certificates.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetCertificatesResponse'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /certificates/{sn}:
+    get:
+      tags:
+        - certificates
+      summary: Get Certificate by Serial Number
+      description: Get Certificate by Serial Number
+      parameters:
+        - in: path
+          name: sn
+          required: true
+          schema:
+            type: string
+          description: The serial number of the certificate
+      responses:
+        200:
+          description: Successful operation. Returns the Certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        400:
+          description: Struct Validation error.
+        404:
+          description: Certificate not found.
+        500:
+          description: Internal Server Error.
+  /certificates/{sn}/status:
+    put:
+      tags:
+        - certificates
+      summary: Update Certificate Status
+      description: Update Certificate Status
+      parameters:
+        - in: path
+          name: sn
+          required: true
+          schema:
+            type: string
+          description: The serial number of the certificate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCertificateStatusBody'
+      responses:
+        200:
+          description: Successful operation. Returns the updated Certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        400:
+          description: Struct Validation error.
+        404:
+          description: Certificate not found.
+        500:
+          description: Internal Server Error.
+  /certificates/{sn}/metadata:
+    put:
+      tags:
+        - certificates
+      summary: Update Certificate Metadata
+      description: Update Certificate Metadata
+      parameters:
+        - in: path
+          name: sn
+          required: true
+          schema:
+            type: string
+          description: The serial number of the certificate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCertificateMetadataBody'  
+      responses:
+        200:
+          description: Successful operation. Returns the updated Certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        400:
+          description: Struct Validation error.
+        404:
+          description: Certificate not found.
+        500:
+          description: Internal Server Error.  
+  /certificates/import:
+    post:
+      tags:
+        - certificates
+      summary: Import Certificate  
+      description: Import Certificate  
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportCertificateBody'
+      responses:
+        201:
+          description: Successful operation. Returns the updated Certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /engines:
+    get:
+      tags:
+        - engines
+      summary: Get Crypto Engine Provider
+      description: Get Crypto Engine Provider
+      responses:
+        200:
+          description: Successful operation. Returns the crypto engine provider.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CryptoEngineProvider'
+        500:
+          description: Internal Server Error.
+  /stats:
+    get:
+      tags:
+        - stats
+      summary: Get Stats
+      description: Get Stats
+      responses:
+        200:
+          description: Successful operation. Returns the certificate stats.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CAStats'
+        500:
+          description: Internal Server Error.
+  /stats/{id}:
+    get:
+      tags:
+        - stats
+      summary: Get Stats by CA ID
+      description: Get Stats by CA ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The ID of the CA
+          schema:
+            type: string
+      responses:
+        200:
+          description: Successful operation. Returns the Certificates stats.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  certificateStatus:
+                    $ref: '#/components/schemas/CertificateStatus'
+                  additionalProperties:
+                    type: integer
+                    description: Número de certificados por estado
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+      
+#Faltan los campos obligatorios
+components:
+  schemas:
+    GetCAsResponse:
+      type: object
+      properties:
+        nextBookmark:
+          type: string
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/CACertificate'
+    GetCertificatesResponse:
+      type: object
+      properties:
+        nextBookmark:
+          type: string
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Certificate'
+    Certificate:
+      type: object
+      properties:
+        serialNumber:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: {}
+        issuerCAMetadata:
+          $ref: '#/components/schemas/IssuerCAMetadata'
+        certificateStatus:
+          $ref: '#/components/schemas/CertificateStatus'
+        certificate:
+          $ref: '#/components/schemas/X509Certificate'
+        keyMetadata:
+          $ref: '#/components/schemas/KeyStrengthMetadata'
+        subject:
+          $ref: '#/components/schemas/Subject'
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type: string
+          format: date-time
+        revocationTimestamp:
+          type: string
+          format: date-time
+        revocationReason:
+          type: integer
+        certificateType:
+          $ref: '#/components/schemas/CertificateType'
+        engineID:
+          type: string
+    CACertificate:
+      allOf:
+        - $ref: '#/components/schemas/Certificate'
+        - type: object
+          properties:
+            ID:
+              type: string
+            issuanceExpirationRef:
+              $ref: '#/components/schemas/Expiration'
+            creationTS:
+              type: string
+              format: date-time
+            level:
+              type: integer  
+    IssuerCAMetadata:
+      type: object
+      properties:
+        serialNumber:
+          type: string
+        ID:
+          type: string
+        level:
+          type: integer
+    X509Certificate:
+      type: object
+      properties:
+        version:
+          type: integer
+        serialNumber:
+          type: string
+        issuer:
+          type: string
+        subject:
+          type: string
+        notBefore:
+          type: string
+          format: date-time
+        notAfter:
+          type: string
+          format: date-time
+        # puede que hagan falta otras propiedades de x509.Certificate
+    KeyStrengthMetadata:
+      type: object
+      properties:
+        keyType:
+          type: string
+          enum:
+            - UnknownPublicKeyAlgorithm
+            - RSA
+            - DSA
+            - ECDSA
+            - Ed25519
+        bits:
+          type: integer
+        keyStrength:
+          type: string
+          enum:
+            - HIGH
+            - MEDIUM
+            - LOW
+    Subject:
+      type: object
+      properties:
+        commonName:
+          type: string
+        organization:
+          type: string
+        organizationUnit:
+          type: string
+        country:
+          type: string
+        state:
+          type: string
+        locality:
+          type: string
+    Expiration:
+      type: object
+      properties:
+        expirationType:
+          type: string
+          enum:
+            - Duration
+            - Time
+        duration:
+          type: integer
+        time:
+          type: string
+          format: date-time
+    CreateCABody:
+      type: object
+      properties:
+        parentID:
+          type: string
+        ID:
+          type: string
+        keyMetadata:
+          $ref: '#/components/schemas/KeyStrengthMetadata'
+        subject:
+          $ref: '#/components/schemas/Subject'
+        CAExpiration:
+          $ref: '#/components/schemas/Expiration'
+        issuanceExpiration:
+          $ref: '#/components/schemas/Expiration'
+        engineID:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    ImportCABody:
+      type: object
+      properties:
+        ID:
+          type: string
+        engineID:
+          type: string
+        parentID:
+          type: string
+        CAPrivateKey:
+          type: string
+          description: Base64 encoded private key from PEM
+        CACertificate:
+          $ref: '#/components/schemas/X509Certificate'
+        CAChain:
+          type: array
+          items:
+            $ref: '#/components/schemas/X509Certificate'
+        CAType:
+          $ref: '#/components/schemas/CertificateType'
+        IssuanceExpiration:
+          $ref: '#/components/schemas/Expiration'
+    CertificateType:
+          type: string
+          enum:
+            - MANAGED
+            - IMPORTED
+            - EXTERNAL      
+    ImportCAInput:
+      type: object
+      properties:
+        ID:
+          type: string
+        CAType:
+          $ref: '#/components/schemas/CertificateType'
+        issuanceExpiration:
+          $ref: '#/components/schemas/Expiration'
+        CACertificate:
+          $ref: '#/components/schemas/X509Certificate'
+        CAChain:
+          type: array
+          items:
+            $ref: '#/components/schemas/X509Certificate'
+          description: >
+            Parent CAs. They MUST be sorted as follows:
+            0: Root-CA;
+            1: Subordinate CA from Root-CA; ...
+        CARSAKey:
+          $ref: '#/components/schemas/RSAKey'
+        CAECKey:
+          $ref: '#/components/schemas/ECDSAKey'
+        keyType:
+          type: string
+        engineID:
+          type: string
+        parentID:
+          type: string
+      required:
+        - CAType
+        - IssuanceExpiration
+        - CACertificate      
+    RSAKey:
+      type: object
+      properties:
+        publicKey:
+          $ref: '#/components/schemas/PublicKey'
+        D:
+          type: string
+          description: Private exponent, represented as a base-10 string to handle large integer 
+        primes:
+          type: array
+          items:
+            type: string
+          description: Prime factors of N, has >= 2 elements, represented as a base-10 string to handle large integer
+        precomputed:
+          $ref: '#/components/schemas/PrecomputedValues'
+    ECDSAKey:
+      type: object
+      properties:
+        publicKey:
+          $ref: '#/components/schemas/PublicKey'
+        D:
+          type: string
+          description: Represented as a base-10 string to handle large integers
+    PublicKey:
+      type: object
+      properties:
+        N:
+          type: string
+          description: Modulus, represented as a base-10 string to handle large integers
+        E:
+          type: integer
+          description: Public exponent
+    PrecomputedValues:
+      type: object
+      properties:
+        Dp:
+          type: string
+          description: |
+            D mod (P-1) (or mod Q-1), represented as a base-10 string to handle large integers
+        Dq:
+          type: string
+          description: |
+            D mod (Q-1), represented as a base-10 string to handle large integers
+        Qinv:
+          type: string
+          description: |
+            Q^-1 mod P, represented as a base-10 string to handle large integers
+        n:
+          $ref: '#/components/schemas/Modulus'
+        p:
+          $ref: '#/components/schemas/Modulus'
+        q:
+          $ref: '#/components/schemas/Modulus'
+    Modulus:
+      type: object
+      properties:
+        nat:
+          type: string
+          description: |
+            The underlying natural number for this modulus, represented as a base-10 string to handle large integers.
+        leading:
+          type: integer
+          description: Number of leading zeros in the modulus.
+        m0inv:
+          type: integer
+          description: -nat.limbs[0]⁻¹ mod _W.
+        rr:
+          type: string
+          description: |
+            R*R for Montgomery representation, represented as a base-10 string to handle large integers.
+    UpdateCertificateStatusBody:
+      type: object
+      properties:
+        newStatus:
+          $ref: '#/components/schemas/CertificateStatus'
+        revocationReason:
+          type: integer
+    CertificateStatus:
+      type: string
+      enum: 
+        - ACTIVE
+        - EXPIRED
+        - REVOKED
+    SingCertificateInput:
+      type: object
+      required:
+        - CAID
+        - CertRequest
+      properties:
+        CAID:
+          type: string
+        certRequest:
+          $ref: '#/components/schemas/X509CertificateRequest'
+        subject:
+          $ref: '#/components/schemas/Subject'
+        signVerbatim:
+          type: boolean
+    X509CertificateRequest:
+      type: object
+      properties:
+        raw:
+          type: string
+          format: byte
+          description: Complete ASN.1 DER content (CSR, signature algorithm and signature)
+        rawTBSCertificateRequest:
+          type: string
+          format: byte
+          description: Certificate request info part of raw ASN.1 DER content
+        rawSubjectPublicKeyInfo:
+          type: string
+          format: byte
+          description: DER encoded SubjectPublicKeyInfo
+        rawSubject:
+          type: string
+          format: byte
+          description: DER encoded Subject
+        version:
+          type: integer
+          description: Version of the certificate request
+        signature:
+          type: string
+          format: byte
+          description: Signature of the certificate request
+        signatureAlgorithm:
+          type: integer
+          description: Algorithm used for the signature
+        publicKeyAlgorithm:
+          type: integer
+          description: Algorithm used for the public key
+        PublicKey:
+          type: object
+          description: Public key information
+        subject:
+          $ref: '#/components/schemas/pkixName'
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixAttributeTypeAndValueSET'
+          description: CSR attributes
+        extensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixExtension'
+          description: All requested extensions, in raw form
+        extraExtensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixExtension'
+          description: Extensions to be copied raw into any CSR marshaled by CreateCertificateRequest
+        DNSNames:
+          type: array
+          items:
+            type: string
+          description: Subject Alternate Name values for DNS names
+        emailAddresses:
+          type: array
+          items:
+            type: string
+          description: Subject Alternate Name values for email addresses
+        IPAddresses:
+          type: array
+          items:
+            type: string
+            format: byte
+          description: Subject Alternate Name values for IP addresses
+        URIs:
+          type: array
+          items:
+            $ref: '#/components/schemas/URL'
+          description: Subject Alternate Name values for URIs
+    pkixName:
+      type: object
+      properties:
+        country:
+          type: array
+          items:
+            type: string
+        organization:
+          type: array
+          items:
+            type: string
+        organizationalUnit:
+          type: array
+          items:
+            type: string
+        locality:
+          type: array
+          items:
+            type: string
+        province:
+          type: array
+          items:
+            type: string
+        streetAddress:
+          type: array
+          items:
+            type: string
+        postalCode:
+          type: array
+          items:
+            type: string
+        serialNumber:
+          type: string
+        commonName:
+          type: string
+        names:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+          description: All parsed attributes
+        extraNames:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+          description: Attributes to be copied raw into any marshaled distinguished names
+    pkixAttributeTypeAndValue:
+      type: object
+      properties:
+        pkixType:
+          type: array
+          items:
+            type: integer
+        pkixValue:
+          type: object
+    pkixAttributeTypeAndValueSET:
+      type: object
+      properties:
+        pkixType:
+          type: array
+          items:
+            type: integer
+          description: ASN.1 Object Identifier
+        pkixValue:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+          description: A set of sets of AttributeTypeAndValue    
+    pkixExtension:
+      type: object
+      properties:
+        ID:
+          type: array
+          items:
+            type: integer
+        critical:
+          type: boolean
+        value:
+          type: string
+          format: byte      
+    URL:
+      type: object
+      properties:
+        scheme:
+          type: string
+        opaque:
+          type: string
+          description: Encoded opaque data
+        user:
+          $ref: '#/components/schemas/UserInfo'
+        host:
+          type: string
+          description: Host or host:port
+        path:
+          type: string
+          description: Path (relative paths may omit leading slash)
+        rawPath:
+          type: string
+          description: Encoded path hint
+        omitHost:
+          type: boolean
+          description: Do not emit empty host (authority)
+        forceQuery:
+          type: boolean
+          description: Append a query ('?') even if RawQuery is empty
+        rawQuery:
+          type: string
+          description: Encoded query values, without '?'
+        fragment:
+          type: string
+          description: Fragment for references, without '#'
+        rawFragment:
+          type: string
+          description: Encoded fragment hint
+    UserInfo:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        passwordSet:
+          type: boolean
+    SignatureSignBody:
+      type: object
+      properties:
+        message: 
+          type: string
+        messageType:
+          type: string
+          enum:
+            - hash
+            - raw
+        signingAlgorithm:
+          type: string
+    SignResponse:
+      type: object
+      properties:
+        signedData:
+          type: string
+          format: byte     
+    SignatureVerifyBody:
+      type: object
+      properties:
+        signature:
+          type: string
+        message:
+          type: string
+        messageType:
+          type: string
+          enum:
+            - hash
+            - raw
+        signingAlgorithm:
+          type: string
+    VerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: Indicates whether the signature is valid or not.
+    UpdateCertificateMetadataBody:
+      type: object
+      properties:
+        metadata:
+          type: object
+          additionalProperties: true
+    ImportCertificateBody:
+      type: object
+      required:
+        - certificate
+      properties:
+        metadata:
+          type: object
+          additionalProperties: true
+        certificate:
+          $ref: '#/components/schemas/X509Certificate'     
+    CryptoEngineProvider:
+      type: object
+      properties:
+        cryptoEngineInfo:
+          $ref: '#/components/schemas/CryptoEngineInfo' 
+        ID:
+          type: string
+        default:
+          type: boolean
+    CryptoEngineInfo:
+      type: object
+      properties:
+        cryptoEngineType:
+          type: string
+          enum:
+            - PKCS11
+            - AzureKeyVault   
+            - Golang
+            - VaultKV2
+            - AWSKMS
+            - AWSSecretsManager
+        securityLevel:
+          type: integer
+        provider:
+          type: string
+        name:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        supportedKeyTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupportedKeyTypeInfo'
+    SupportedKeyTypeInfo:
+      type: object
+      properties:
+        keyType:
+          type: integer
+        sizes:
+          type: array
+          items: 
+            type: integer
+    CAStats:
+      type: object
+      properties:
+        CACertificatesStats:
+          $ref: '#/components/schemas/CertificatesStats'
+        certificatesStats:
+          $ref: '#/components/schemas/CertificatesStats'
+    CertificatesStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        distribution:
+          type: object
+          additionalProperties:
+            type: integer
+        status:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/CertificateStatus'
+      
+servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_CA/1.0.0

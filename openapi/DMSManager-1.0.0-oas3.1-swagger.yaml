@@ -1,23 +1,38 @@
-openapi: 3.0.0
+openapi: 3.1.0
 info:
-  version: 1.0.0
+  version: 1.0.0-oas3.1
   title: 'Lamassu IoT: DMS Service'
-  description: |-
-    The DMS Manager is the service in charge of managing the Registration Authority of the PKI. Instead of having a centralized Registration Authority, Lamassu uses a decentralized approach to be easily integrated by Device Manufacturing Systems. This way, each DMS has the authority to request the issuance of a certificate for a device being manufactured. Instead of relying on just one registration authority, Lamassu delegates the authorization of the issuance to the Local Registration Authority or LRA.
+  description: >-
+    The DMS Manager is the service in charge of managing the Registration
+    Authority of the PKI. Instead of having a centralized Registration
+    Authority, Lamassu uses a decentralized approach to be easily integrated by
+    Device Manufacturing Systems. This way, each DMS has the authority to
+    request the issuance of a certificate for a device being manufactured.
+    Instead of relying on just one registration authority, Lamassu delegates the
+    authorization of the issuance to the Local Registration Authority or LRA.
 
-    Each DMS is entitled to authorize the issuance of a certificate to a subset of CAs of the entire PKI defined by the administrator. Each DMS has a list of authorized CAs that may be used during the enrollment process. Once an enrollment process is initiated, the PKI will check that the provided DMS certificate is authorized to issue certificates for the requested CA. The authorization list can be updated to add newly created CAs or remove CAs that are no longer needed.
+
+    Each DMS is entitled to authorize the issuance of a certificate to a subset
+    of CAs of the entire PKI defined by the administrator. Each DMS has a list
+    of authorized CAs that may be used during the enrollment process. Once an
+    enrollment process is initiated, the PKI will check that the provided DMS
+    certificate is authorized to issue certificates for the requested CA. The
+    authorization list can be updated to add newly created CAs or remove CAs
+    that are no longer needed.
+
 
     Some useful links:
+
     - [Lamassu IoT Github repository](https://github.com/lamassuiot/lamassuiot)
-    - [Lamassu Iot Docs](https://www.lamassu.io/docs/2.0.0/architecture/#dms-manager)
+
+    - [Lamassu Iot
+    Docs](https://www.lamassu.io/docs/2.0.0/architecture/#dms-manager)
 tags:
   - name: dms
   - name: stats
   - name: cacerts
-  - name: simpleenroll  
-
+  - name: simpleenroll
 paths:
-  #Faltan los filtros del query
   /dms:
     get:
       tags:
@@ -26,7 +41,7 @@ paths:
       description: Get All DMs
       parameters: []
       responses:
-        200:
+        '200':
           description: Successful operation. Returns all DMS.
           content:
             application/json:
@@ -34,7 +49,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/GetDMSResponse'
-        500:
+        '500':
           description: Internal Server Error.
     post:
       tags:
@@ -45,16 +60,16 @@ paths:
         required: true
         content:
           application/json:
-              schema:
-                $ref: '#/components/schemas/CreateDMSBody'
+            schema:
+              $ref: '#/components/schemas/CreateDMSBody'
       responses:
-        201:
+        '201':
           description: Successfull operation. Returns created DMS
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DMS'
-        500:
+        '500':
           description: Internal Server Error.
   /dms/{id}:
     get:
@@ -70,15 +85,15 @@ paths:
             type: string
             description: ID of the DMS to get.
       responses:
-        200:
+        '200':
           description: Successfull operation. Returns DMS
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DMS'
-        400:
+        '400':
           description: Struct Validation error.
-        500:
+        '500':
           description: Internal Server Error.
     put:
       tags:
@@ -96,18 +111,18 @@ paths:
         required: true
         content:
           application/json:
-              schema:
-                $ref: '#/components/schemas/DMS'
+            schema:
+              $ref: '#/components/schemas/DMS'
       responses:
-        200:
+        '200':
           description: Successfull operation. Returns DMS
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DMS'
-        400:
+        '400':
           description: Struct Validation error.
-        500:
+        '500':
           description: Internal Server Error.
   /dms/bind-identity:
     post:
@@ -119,18 +134,18 @@ paths:
         required: true
         content:
           application/json:
-              schema:
-                $ref: '#/components/schemas/BindIdentityToDeviceBody'
+            schema:
+              $ref: '#/components/schemas/BindIdentityToDeviceBody'
       responses:
-        200:
+        '200':
           description: Successfull operation. Returns DMS
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BindIdentityToDeviceOutput'
-        400:
+        '400':
           description: Struct Validation error.
-        500:
+        '500':
           description: Internal Server Error.
   /stats:
     get:
@@ -139,14 +154,14 @@ paths:
       summary: Get Stats
       description: Get Stats
       responses:
-        200:
+        '200':
           description: Successful operation. Returns the total of DMS.
           content:
             application/json:
               schema:
                 type: integer
                 description: Total DMS
-        500:
+        '500':
           description: Internal Server Error.
   /cacerts:
     get:
@@ -155,7 +170,7 @@ paths:
       summary: Get CA Certificates
       description: Get CA Certificates
       responses:
-        200:
+        '200':
           description: Successful operation. Returns CAs.
           content:
             application/x-pem-file:
@@ -166,7 +181,7 @@ paths:
               schema:
                 type: string
                 format: binary
-        500:
+        '500':
           description: Internal Server Error.
   /{aps}/cacerts:
     get:
@@ -182,7 +197,7 @@ paths:
             type: string
           description: The identifier of the Authorization Point System (APS)
       responses:
-        200:
+        '200':
           description: Successful operation. Returns CAs.
           content:
             application/x-pem-file:
@@ -193,7 +208,7 @@ paths:
               schema:
                 type: string
                 format: binary
-        500:
+        '500':
           description: Internal Server Error.
   /simpleenroll:
     post:
@@ -210,7 +225,7 @@ paths:
               format: binary
               description: The Certificate Signing Request (CSR) in PKCS#10 format.
       responses:
-        200:
+        '200':
           description: Successfully enrolled for a certificate.
           content:
             application/x-pem-file:
@@ -223,14 +238,12 @@ paths:
                 type: string
                 format: binary
                 description: The enrolled certificate in PKCS#7 format.
-        400:
+        '400':
           description: >
-            Bad Request. Possible error reasons:
-            - Content-type must be application/pkcs10
-            - Could not read the body payload
-            - Body payload must be base64 encoded
-            - Could not parse the payload into a csr
-        500:
+            Bad Request. Possible error reasons: - Content-type must be
+            application/pkcs10 - Could not read the body payload - Body payload
+            must be base64 encoded - Could not parse the payload into a csr
+        '500':
           description: Internal Server Error.
   /{aps}/simpleenroll:
     post:
@@ -254,7 +267,7 @@ paths:
               format: binary
               description: The Certificate Signing Request (CSR) in PKCS#10 format.
       responses:
-        200:
+        '200':
           description: Successfully enrolled for a certificate.
           content:
             application/x-pem-file:
@@ -267,14 +280,12 @@ paths:
                 type: string
                 format: binary
                 description: The enrolled certificate in PKCS#7 format.
-        400:
+        '400':
           description: >
-            Bad Request. Possible error reasons:
-            - Content-type must be application/pkcs10
-            - Could not read the body payload
-            - Body payload must be base64 encoded
-            - Could not parse the payload into a csr
-        500:
+            Bad Request. Possible error reasons: - Content-type must be
+            application/pkcs10 - Could not read the body payload - Body payload
+            must be base64 encoded - Could not parse the payload into a csr
+        '500':
           description: Internal Server Error.
   /simplerenroll:
     post:
@@ -291,7 +302,7 @@ paths:
               format: binary
               description: The Certificate Signing Request (CSR) in PKCS#10 format.
       responses:
-        200:
+        '200':
           description: Successfully reenrolled for a certificate.
           content:
             application/x-pem-file:
@@ -304,14 +315,12 @@ paths:
                 type: string
                 format: binary
                 description: The reenrolled certificate in PKCS#7 format.
-        400:
+        '400':
           description: >
-            Bad Request. Possible error reasons:
-            - Content-type must be application/pkcs10
-            - Could not read the body payload
-            - Body payload must be base64 encoded
-            - Could not parse the payload into a csr
-        500:
+            Bad Request. Possible error reasons: - Content-type must be
+            application/pkcs10 - Could not read the body payload - Body payload
+            must be base64 encoded - Could not parse the payload into a csr
+        '500':
           description: Internal Server Error.
   /{aps}/simplerenroll:
     post:
@@ -335,7 +344,7 @@ paths:
               format: binary
               description: The Certificate Signing Request (CSR) in PKCS#10 format.
       responses:
-        200:
+        '200':
           description: Successfully reenrolled for a certificate.
           content:
             application/x-pem-file:
@@ -348,14 +357,12 @@ paths:
                 type: string
                 format: binary
                 description: The reenrolled certificate in PKCS#7 format.
-        400:
+        '400':
           description: >
-            Bad Request. Possible error reasons:
-            - Content-type must be application/pkcs10
-            - Could not read the body payload
-            - Body payload must be base64 encoded
-            - Could not parse the payload into a csr
-        500:
+            Bad Request. Possible error reasons: - Content-type must be
+            application/pkcs10 - Could not read the body payload - Body payload
+            must be base64 encoded - Could not parse the payload into a csr
+        '500':
           description: Internal Server Error.
 components:
   schemas:
@@ -495,13 +502,13 @@ components:
         bindMode:
           type: string
           enum:
-            - "CREATED"
-            - "PROVISIONED"
-            - "RE-PROVISIONED"
-            - "RENEWED"
-            - "SHADOW-UPDATED"
-            - "STATUS-UPDATED"
-            - "DECOMMISSIONED"
+            - CREATED
+            - PROVISIONED
+            - RE-PROVISIONED
+            - RENEWED
+            - SHADOW-UPDATED
+            - STATUS-UPDATED
+            - DECOMMISSIONED
         deviceID:
           type: string
         certificateSerialNumber:
@@ -514,7 +521,7 @@ components:
         dms:
           $ref: '#/components/schemas/DMS'
         device:
-          $ref: '#/components/schemas/Device'     
+          $ref: '#/components/schemas/Device'
     Certificate:
       type: object
       properties:
@@ -547,7 +554,7 @@ components:
         certificateType:
           $ref: '#/components/schemas/CertificateType'
         engineID:
-          type: string        
+          type: string
     IssuerCAMetadata:
       type: object
       properties:
@@ -559,7 +566,7 @@ components:
           type: integer
     CertificateStatus:
       type: string
-      enum: 
+      enum:
         - ACTIVE
         - EXPIRED
         - REVOKED
@@ -580,7 +587,6 @@ components:
         notAfter:
           type: string
           format: date-time
-        # puede que hagan falta otras propiedades de x509.Certificate
     KeyStrengthMetadata:
       type: object
       properties:
@@ -616,11 +622,11 @@ components:
         locality:
           type: string
     CertificateType:
-          type: string
-          enum:
-            - MANAGED
-            - IMPORTED
-            - EXTERNAL   
+      type: string
+      enum:
+        - MANAGED
+        - IMPORTED
+        - EXTERNAL
     Device:
       type: object
       properties:
@@ -686,7 +692,7 @@ components:
             - OTHER
         versions:
           type: object
-          additionalProperties: true  
+          additionalProperties: true
         events:
           type: object
           additionalProperties:
@@ -706,8 +712,7 @@ components:
             - DECOMMISSIONED
         eventDescriptions:
           type: string
-    
 servers:
-  # Added by API Auto Mocking Plugin
   - description: SwaggerHub API Auto Mocking
-    url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_DMSManager/1.0.0
+    url: >-
+      https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_DMSManager/1.0.0

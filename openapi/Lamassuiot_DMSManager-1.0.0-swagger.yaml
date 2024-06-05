@@ -1,0 +1,713 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: 'Lamassu IoT: DMS Service'
+  description: |-
+    The DMS Manager is the service in charge of managing the Registration Authority of the PKI. Instead of having a centralized Registration Authority, Lamassu uses a decentralized approach to be easily integrated by Device Manufacturing Systems. This way, each DMS has the authority to request the issuance of a certificate for a device being manufactured. Instead of relying on just one registration authority, Lamassu delegates the authorization of the issuance to the Local Registration Authority or LRA.
+
+    Each DMS is entitled to authorize the issuance of a certificate to a subset of CAs of the entire PKI defined by the administrator. Each DMS has a list of authorized CAs that may be used during the enrollment process. Once an enrollment process is initiated, the PKI will check that the provided DMS certificate is authorized to issue certificates for the requested CA. The authorization list can be updated to add newly created CAs or remove CAs that are no longer needed.
+
+    Some useful links:
+    - [Lamassu IoT Github repository](https://github.com/lamassuiot/lamassuiot)
+    - [Lamassu Iot Docs](https://www.lamassu.io/docs/2.0.0/architecture/#dms-manager)
+tags:
+  - name: dms
+  - name: stats
+  - name: cacerts
+  - name: simpleenroll  
+
+paths:
+  #Faltan los filtros del query
+  /dms:
+    get:
+      tags:
+        - dms
+      summary: Get All DMs
+      description: Get All DMs
+      parameters: []
+      responses:
+        200:
+          description: Successful operation. Returns all DMS.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetDMSResponse'
+        500:
+          description: Internal Server Error.
+    post:
+      tags:
+        - dms
+      summary: Create DMS
+      description: Create DMS
+      requestBody:
+        required: true
+        content:
+          application/json:
+              schema:
+                $ref: '#/components/schemas/CreateDMSBody'
+      responses:
+        201:
+          description: Successfull operation. Returns created DMS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DMS'
+        500:
+          description: Internal Server Error.
+  /dms/{id}:
+    get:
+      tags:
+        - dms
+      summary: Get DMS by ID
+      description: Get DMS by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: ID of the DMS to get.
+      responses:
+        200:
+          description: Successfull operation. Returns DMS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DMS'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+    put:
+      tags:
+        - dms
+      summary: Update DMS by ID
+      description: Update DMS by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: ID of the DMS to update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+              schema:
+                $ref: '#/components/schemas/DMS'
+      responses:
+        200:
+          description: Successfull operation. Returns DMS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DMS'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /dms/bind-identity:
+    post:
+      tags:
+        - dms
+      summary: Bind Identity to Device
+      description: Bind Identity to Device
+      requestBody:
+        required: true
+        content:
+          application/json:
+              schema:
+                $ref: '#/components/schemas/BindIdentityToDeviceBody'
+      responses:
+        200:
+          description: Successfull operation. Returns DMS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BindIdentityToDeviceOutput'
+        400:
+          description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /stats:
+    get:
+      tags:
+        - stats
+      summary: Get Stats
+      description: Get Stats
+      responses:
+        200:
+          description: Successful operation. Returns the total of DMS.
+          content:
+            application/json:
+              schema:
+                type: integer
+                description: Total DMS
+        500:
+          description: Internal Server Error.
+  /cacerts:
+    get:
+      tags:
+        - cacerts
+      summary: Get CA Certificates
+      description: Get CA Certificates
+      responses:
+        200:
+          description: Successful operation. Returns CAs.
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+            application/pkcs7-mime:
+              schema:
+                type: string
+                format: binary
+        500:
+          description: Internal Server Error.
+  /{aps}/cacerts:
+    get:
+      tags:
+        - cacerts
+      summary: Get CA Certificates
+      description: Get CA Certificates
+      parameters:
+        - in: path
+          name: aps
+          required: true
+          schema:
+            type: string
+          description: The identifier of the Authorization Point System (APS)
+      responses:
+        200:
+          description: Successful operation. Returns CAs.
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+            application/pkcs7-mime:
+              schema:
+                type: string
+                format: binary
+        500:
+          description: Internal Server Error.
+  /simpleenroll:
+    post:
+      tags:
+        - simpleenroll
+      summary: Simple Enroll for a Certificate
+      description: Simple Enroll for a Certificate
+      requestBody:
+        required: true
+        content:
+          application/pkcs10:
+            schema:
+              type: string
+              format: binary
+              description: The Certificate Signing Request (CSR) in PKCS#10 format.
+      responses:
+        200:
+          description: Successfully enrolled for a certificate.
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+                description: The enrolled certificate in PEM format.
+            application/pkcs7-mime:
+              schema:
+                type: string
+                format: binary
+                description: The enrolled certificate in PKCS#7 format.
+        400:
+          description: >
+            Bad Request. Possible error reasons:
+            - Content-type must be application/pkcs10
+            - Could not read the body payload
+            - Body payload must be base64 encoded
+            - Could not parse the payload into a csr
+        500:
+          description: Internal Server Error.
+  /{aps}/simpleenroll:
+    post:
+      tags:
+        - simpleenroll
+      summary: Simple Enroll for a Certificate Using an Identifier
+      description: Simple Enroll for a Certificate Using an Identifier
+      parameters:
+        - in: path
+          name: aps
+          required: true
+          schema:
+            type: string
+          description: The identifier of the Authorization Point System (APS).
+      requestBody:
+        required: true
+        content:
+          application/pkcs10:
+            schema:
+              type: string
+              format: binary
+              description: The Certificate Signing Request (CSR) in PKCS#10 format.
+      responses:
+        200:
+          description: Successfully enrolled for a certificate.
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+                description: The enrolled certificate in PEM format.
+            application/pkcs7-mime:
+              schema:
+                type: string
+                format: binary
+                description: The enrolled certificate in PKCS#7 format.
+        400:
+          description: >
+            Bad Request. Possible error reasons:
+            - Content-type must be application/pkcs10
+            - Could not read the body payload
+            - Body payload must be base64 encoded
+            - Could not parse the payload into a csr
+        500:
+          description: Internal Server Error.
+  /simplerenroll:
+    post:
+      tags:
+        - simpleenroll
+      summary: Simple Reenroll for a Certificate
+      description: Simple Reenroll for a Certificate
+      requestBody:
+        required: true
+        content:
+          application/pkcs10:
+            schema:
+              type: string
+              format: binary
+              description: The Certificate Signing Request (CSR) in PKCS#10 format.
+      responses:
+        200:
+          description: Successfully reenrolled for a certificate.
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+                description: The reenrolled certificate in PEM format.
+            application/pkcs7-mime:
+              schema:
+                type: string
+                format: binary
+                description: The reenrolled certificate in PKCS#7 format.
+        400:
+          description: >
+            Bad Request. Possible error reasons:
+            - Content-type must be application/pkcs10
+            - Could not read the body payload
+            - Body payload must be base64 encoded
+            - Could not parse the payload into a csr
+        500:
+          description: Internal Server Error.
+  /{aps}/simplerenroll:
+    post:
+      tags:
+        - simpleenroll
+      summary: Simple Reenroll for a Certificate Using an Identifier
+      description: Simple Reenroll for a Certificate Using an Identifier
+      parameters:
+        - in: path
+          name: aps
+          required: true
+          schema:
+            type: string
+          description: The identifier of the Authorization Point System (APS).
+      requestBody:
+        required: true
+        content:
+          application/pkcs10:
+            schema:
+              type: string
+              format: binary
+              description: The Certificate Signing Request (CSR) in PKCS#10 format.
+      responses:
+        200:
+          description: Successfully reenrolled for a certificate.
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+                description: The reenrolled certificate in PEM format.
+            application/pkcs7-mime:
+              schema:
+                type: string
+                format: binary
+                description: The reenrolled certificate in PKCS#7 format.
+        400:
+          description: >
+            Bad Request. Possible error reasons:
+            - Content-type must be application/pkcs10
+            - Could not read the body payload
+            - Body payload must be base64 encoded
+            - Could not parse the payload into a csr
+        500:
+          description: Internal Server Error.
+components:
+  schemas:
+    GetDMSResponse:
+      type: object
+      properties:
+        nextBookmark:
+          type: string
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/DMS'
+    DMS:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        creationDate:
+          type: string
+          format: date-time
+        settings:
+          $ref: '#/components/schemas/DMSSettings'
+    DMSSettings:
+      type: object
+      properties:
+        enrollmentSettings:
+          $ref: '#/components/schemas/EnrollmentSettings'
+        reEnrollmentSettings:
+          $ref: '#/components/schemas/ReEnrollmentSettings'
+        CADistributionSettings:
+          $ref: '#/components/schemas/CADistributionSettings'
+    EnrollmentSettings:
+      type: object
+      properties:
+        enrollmentProtocol:
+          type: string
+          enum:
+            - EST_RFC7030
+        enrollmentOptionsESTRFC7030:
+          $ref: '#/components/schemas/EnrollmentOptionsESTRFC7030'
+        deviceProvisionProfile:
+          $ref: '#/components/schemas/DeviceProvisionProfile'
+        enrollmentCA:
+          type: string
+        enableReplaceableEnrollment:
+          type: boolean
+        registrationMode:
+          type: string
+          enum:
+            - JITP
+            - PRE_REGISTRATION
+    ReEnrollmentSettings:
+      type: object
+      properties:
+        additionalValidationCAs:
+          type: array
+          items:
+            type: string
+        reenrollmentDelta:
+          type: integer
+          format: int64
+          description: time.Duration type
+        enableExpiredRenewal:
+          type: boolean
+        preventiveDelta:
+          type: integer
+          format: int64
+          description: time.Duration type
+        criticalDelta:
+          type: integer
+          format: int64
+          description: time.Duration type
+    CADistributionSettings:
+      type: object
+      properties:
+        includeLamassuSystemCA:
+          type: boolean
+        includeEnrollmentCA:
+          type: boolean
+        managedCAs:
+          type: array
+          items:
+            type: string
+    EnrollmentOptionsESTRFC7030:
+      type: object
+      properties:
+        authMode:
+          type: string
+          enum:
+            - ESTServerKeyGenBitSize
+            - ESTServerKeyGenKeyType
+        authOptionsMTLS:
+          $ref: '#/components/schemas/AuthOptionsClientCertificate'
+    AuthOptionsClientCertificate:
+      type: object
+      properties:
+        validationCAs:
+          type: array
+          items:
+            type: string
+        chainLevelValidation:
+          type: integer
+    DeviceProvisionProfile:
+      type: object
+      properties:
+        icon:
+          type: string
+        iconColor:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        tags:
+          type: array
+          items:
+            type: string
+    CreateDMSBody:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        settings:
+          $ref: '#/components/schemas/DMSSettings'
+    BindIdentityToDeviceBody:
+      type: object
+      properties:
+        bindMode:
+          type: string
+          enum:
+            - "CREATED"
+            - "PROVISIONED"
+            - "RE-PROVISIONED"
+            - "RENEWED"
+            - "SHADOW-UPDATED"
+            - "STATUS-UPDATED"
+            - "DECOMMISSIONED"
+        deviceID:
+          type: string
+        certificateSerialNumber:
+          type: string
+    BindIdentityToDeviceOutput:
+      type: object
+      properties:
+        certificate:
+          $ref: '#/components/schemas/Certificate'
+        dms:
+          $ref: '#/components/schemas/DMS'
+        device:
+          $ref: '#/components/schemas/Device'     
+    Certificate:
+      type: object
+      properties:
+        serialNumber:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: {}
+        issuerCAMetadata:
+          $ref: '#/components/schemas/IssuerCAMetadata'
+        certificateStatus:
+          $ref: '#/components/schemas/CertificateStatus'
+        certificate:
+          $ref: '#/components/schemas/X509Certificate'
+        keyMetadata:
+          $ref: '#/components/schemas/KeyStrengthMetadata'
+        subject:
+          $ref: '#/components/schemas/Subject'
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type: string
+          format: date-time
+        revocationTimestamp:
+          type: string
+          format: date-time
+        revocationReason:
+          type: integer
+        certificateType:
+          $ref: '#/components/schemas/CertificateType'
+        engineID:
+          type: string        
+    IssuerCAMetadata:
+      type: object
+      properties:
+        serialNumber:
+          type: string
+        ID:
+          type: string
+        level:
+          type: integer
+    CertificateStatus:
+      type: string
+      enum: 
+        - ACTIVE
+        - EXPIRED
+        - REVOKED
+    X509Certificate:
+      type: object
+      properties:
+        version:
+          type: integer
+        serialNumber:
+          type: string
+        issuer:
+          type: string
+        subject:
+          type: string
+        notBefore:
+          type: string
+          format: date-time
+        notAfter:
+          type: string
+          format: date-time
+        # puede que hagan falta otras propiedades de x509.Certificate
+    KeyStrengthMetadata:
+      type: object
+      properties:
+        keyType:
+          type: string
+          enum:
+            - UnknownPublicKeyAlgorithm
+            - RSA
+            - DSA
+            - ECDSA
+            - Ed25519
+        bits:
+          type: integer
+        keyStrength:
+          type: string
+          enum:
+            - HIGH
+            - MEDIUM
+            - LOW
+    Subject:
+      type: object
+      properties:
+        commonName:
+          type: string
+        organization:
+          type: string
+        organizationUnit:
+          type: string
+        country:
+          type: string
+        state:
+          type: string
+        locality:
+          type: string
+    CertificateType:
+          type: string
+          enum:
+            - MANAGED
+            - IMPORTED
+            - EXTERNAL   
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/DeviceStatus'
+        icon:
+          type: string
+        iconColor:
+          type: string
+        creationTtimestamp:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+        DMSOwner:
+          type: string
+        identitySlot:
+          $ref: '#/components/schemas/Slot'
+        extraSlots:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/Slot'
+        events:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DeviceEvent'
+    DeviceStatus:
+      type: string
+      enum:
+        - NO_IDENTITY
+        - ACTIVE
+        - RENEWAL_PENDING
+        - EXPIRING_SOON
+        - EXPIRED
+        - REVOKED
+        - DECOMMISSIONED
+    Slot:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - RENEWAL_PENDING
+            - EXPIRING_SOON
+            - EXPIRED
+            - REVOKED
+        activeVersion:
+          type: integer
+        secretType:
+          type: string
+          enum:
+            - TOKEN
+            - x509
+            - SSH_KEY
+            - OTHER
+        versions:
+          type: object
+          additionalProperties: true  
+        events:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DeviceEvent'
+    DeviceEvent:
+      type: object
+      properties:
+        deviceEventType:
+          type: string
+          enum:
+            - CREATED
+            - PROVISIONED
+            - RE-PROVISIONED
+            - RENEWED
+            - SHADOW-UPDATED
+            - STATUS-UPDATED
+            - DECOMMISSIONED
+        eventDescriptions:
+          type: string
+    
+servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_DMSManager/1.0.0

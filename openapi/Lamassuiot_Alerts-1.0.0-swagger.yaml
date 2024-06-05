@@ -1,0 +1,261 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: 'Lamassu IoT: Alerts Service'
+  description: |-
+    Alerts is the service in charge of sending mails. Users can be subscribed to particular events, such as, when a certificate is about to expire, and they will be notified via mail.
+    
+    Events from all services above (Lamassu CA, DMS Manager and Device Manager) that create, revoke or modify the status of any certificate publish a message to RabbitMQ broker. The message sent to the "alerts" queue will be consumed by the Alerts service and will send a mail to all the users subscribed to that event.
+
+    Some useful links:
+    - [Lamassu IoT Github repository](https://github.com/lamassuiot/lamassuiot)
+    - [Lamassu Iot Docs](https://www.lamassu.io/docs/2.0.0/architecture/#alerts)
+tags:
+  - name: events
+  - name: user
+  
+paths:
+  /events/latest:
+    get:
+      tags:
+        - events
+      summary: Get Latest Events Per Type
+      description: Get Latest Events Per Type
+      responses:
+        200:
+          description: Successful operation. Returns latest events.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertLatestEvent'
+        500:
+          description: Internal Server Error.
+  /user/{userId}/subscribtions:
+    get:
+      tags:
+        - user
+      summary: Get User Subscriptions
+      description: Get User Subscriptions
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+          description: ID of the user to retrieve subscriptions for.
+      responses:
+        200:
+          description: Successful operation. Returns user's subscriptions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subscription'
+        400:
+            description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /user/{userId}/subscribe:
+    post:
+      tags:
+        - user
+      summary: Subscribe to Events
+      description: Subscribe to Events
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+          description: ID of the user that wants to subscribe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscribeBody'
+      responses:
+        200:
+          description: Successful operation. Returns user's subscriptions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subscription'
+        400:
+            description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+  /user/{userId}/unsubscribe/{subId}:
+    post:
+      tags:
+        - user
+      summary: Unsubscribe from Events
+      description: Unsubscribe from Events
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+          description: ID of the user to unsubscribe.
+        - in: path
+          name: subId
+          required: true
+          schema:
+            type: string
+          description: ID of the subscription to unsubscribe.
+      responses:
+        200:
+          description: Successful operation. Returns user's subscriptions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subscription'
+        400:
+            description: Struct Validation error.
+        500:
+          description: Internal Server Error.
+components:
+  schemas:
+    AlertLatestEvent:
+      type: object
+      properties:
+        eventType:
+          $ref: '#/components/schemas/EventType'
+        event:
+          $ref: '#/components/schemas/Event'
+        lastSeen:
+          type: string
+          format: date-time
+        totalSeen:
+          type: integer
+    Event:
+      type: object
+      properties:
+        context:
+          $ref: '#/components/schemas/EventContext'
+        dataEncoded:
+          type: string
+          format: byte
+        dataBase64:
+          type: boolean
+          description: Indicates if the event, when serialized, represents the data field using the base64 encoding
+        fieldErrors:
+          type: string
+          additionalProperties:
+            type: string
+    EventType:
+      type: string
+      enum:
+        - ca.create
+        - ca.import
+        - ca.certificate.import
+        - ca.status.update
+        - ca.metadata.update
+        - ca.sign.certificate
+        - ca.sign.signature
+        - ca.delete
+        - certificate.create
+        - certificate.import
+        - certificate.status.update
+        - certificate.metadata.update
+        - dms.create
+        - dms.update
+        - dms.enroll
+        - dms.reenroll
+        - dms.bind-device-id
+        - device.create
+        - device.identity.update
+        - device.status.update
+        - device.metadata.update
+        - any
+    EventContext:
+      type: object
+      properties:
+        specVersion:
+          type: string
+        eventType:
+          type: string
+        source:
+          type: string
+        subject:
+          type: string
+        id:
+          type: string
+        time:
+          type: string
+        dataSchema:
+          type: string
+        dataContentType:
+          type: string
+        dataContentEncoding:
+          type: string
+        dataMediaType:
+          type: string
+        extensions:
+          type: object
+    Subscription:
+      type: object
+      properties:
+        ID:
+          type: string
+        userID:
+          type: string
+        eventType:
+          $ref: '#/components/schemas/EventType'
+        subscriptionDate:
+          type: string
+          format: date-time
+        subscriptionCondition:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionCondition'
+          description: Conditions for the subscription.
+        channel:
+          $ref: '#/components/schemas/Channel'
+    SubscriptionCondition:
+      type: object
+      properties:
+        conditionType:
+          type: string
+          enum:
+            - JSON-SCHEMA
+            - JSON-PATH
+        condition:
+          type: string
+    Channel:
+      type: object
+      properties:
+        channelType:
+          type: string
+          enum:
+            - EMAIL
+            - MSTEAMS
+            - WEBHOOK
+        name:
+          type: string
+        config:
+          type: object
+    SubscribeBody:
+      type: object
+      properties:
+        eventType:
+           $ref: '#/components/schemas/EventType'
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionCondition'
+        channel:
+          $ref: '#/components/schemas/Channel'
+    
+servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_Alerts/1.0.0

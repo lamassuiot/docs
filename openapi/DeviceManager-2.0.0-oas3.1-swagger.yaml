@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  version: 1.0.0-oas3.1
+  version: 2.0.0-oas3.1
   title: 'Lamassu IoT: Device Manager Service'
   description: >-
     At its core, the device manager is the main entry point for the enrollment
@@ -18,6 +18,8 @@ info:
 
     - [Lamassu Iot
     Docs](https://www.lamassu.io/docs/2.0.0/architecture/#device-manager)
+security:
+  - Oauth2Password: []
 tags:
   - name: devices
   - name: stats
@@ -28,7 +30,47 @@ paths:
         - devices
       summary: Get All Devices
       description: Get All Devices
-      parameters: []
+      parameters: 
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns all devices.
@@ -39,7 +81,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/GetDevicesResponse'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting all devices.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
     post:
       tags:
         - devices
@@ -59,7 +105,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Device'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while creating device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /devices/{id}:
     get:
       tags:
@@ -82,8 +132,16 @@ paths:
                 $ref: '#/components/schemas/Device'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting the device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /devices/{id}/idslot:
     put:
       tags:
@@ -112,8 +170,16 @@ paths:
                 $ref: '#/components/schemas/Device'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while updating device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /devices/{id}/metadata:
     put:
       tags:
@@ -146,8 +212,16 @@ paths:
                 $ref: '#/components/schemas/Device'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while updating device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /devices/{id}/decomission:
     delete:
       tags:
@@ -170,8 +244,16 @@ paths:
                 $ref: '#/components/schemas/Device'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while decomissioning device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /devices/dms/{id}:
     get:
       tags:
@@ -185,6 +267,46 @@ paths:
           schema:
             type: string
           description: ID of the DMS to retrieve devices for.
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns all devices related to the DMS.
@@ -196,8 +318,16 @@ paths:
                   $ref: '#/components/schemas/GetDevicesResponse'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting devices.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /stats:
     get:
       tags:
@@ -214,7 +344,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/DevicesStats'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting stats.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
 components:
   schemas:
     GetDevicesResponse:
@@ -239,19 +373,19 @@ components:
           $ref: '#/components/schemas/DeviceStatus'
         icon:
           type: string
-        iconColor:
+        icon_color:
           type: string
-        creationTtimestamp:
+        creation_timestamp:
           type: string
           format: date-time
         metadata:
           type: object
           additionalProperties: true
-        DMSOwner:
+        dms_owner:
           type: string
-        identitySlot:
+        identity:
           $ref: '#/components/schemas/Slot'
-        extraSlots:
+        slots:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/Slot'
@@ -274,11 +408,11 @@ components:
           type: object
           additionalProperties:
             type: object
-        dmsID:
+        dms_id:
           type: string
         icon:
           type: string
-        iconColor:
+        icon_color:
           type: string
     UpdateDeviceIdentitySlotBody:
       type: object
@@ -295,9 +429,9 @@ components:
             - EXPIRING_SOON
             - EXPIRED
             - REVOKED
-        activeVersion:
+        active_version:
           type: integer
-        secretType:
+        type:
           type: string
           enum:
             - TOKEN
@@ -314,7 +448,7 @@ components:
     DeviceEvent:
       type: object
       properties:
-        deviceEventType:
+        type:
           type: string
           enum:
             - CREATED
@@ -324,32 +458,68 @@ components:
             - SHADOW-UPDATED
             - STATUS-UPDATED
             - DECOMMISSIONED
-        eventDescriptions:
+        description:
           type: string
     DevicesStats:
       type: object
       properties:
-        totalDevices:
-          type: string
-        devicesStatus:
-          type: object
-          properties:
-            type:
-              $ref: '#/components/schemas/DeviceStatus'
-          additionalProperties:
-            type: integer
+        total:
+          type: integer
+        status_distribution:
+          $ref: '#/components/schemas/DeviceStatus'
           description: map[DeviceStatus]int
     DeviceStatus:
-      type: string
-      enum:
-        - NO_IDENTITY
-        - ACTIVE
-        - RENEWAL_PENDING
-        - EXPIRING_SOON
-        - EXPIRED
-        - REVOKED
-        - DECOMMISSIONED
+      type: object
+      properties:
+        ACTIVE:
+          type: integer
+        DECOMMISSIONED:
+          type: integer
+        EXPIRED:
+          type: integer
+        EXPIRING_SOON:
+          type: integer
+        NO_IDENTITY:
+          type: integer
+        RENEWAL_PENDING:
+          type: integer
+        REVOKED:
+          type: integer
+      additionalProperties: false
+    400Error:
+      type: object
+      properties:
+        message: 
+          type: string
+          enum:
+            - Struct validation error
+          example: Struct validation error
+    500Error:
+      type: object
+      properties:
+        message: 
+          type: string
+          enum:
+            - Internal Server Error
+          example: Internal Server Error
+  securitySchemes:
+    MTLS:
+      type: mutualTLS
+    Oauth2Password:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read: Grants read access
+            write: Grants write access
+    NoAuth:
+      type: http
+      scheme: bearer
+          
 servers:
   - description: SwaggerHub API Auto Mocking
     url: >-
       https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_DeviceManager/1.0.0
+  - description: Local
+    url: https://localhost:8443/api/devmanager/v1

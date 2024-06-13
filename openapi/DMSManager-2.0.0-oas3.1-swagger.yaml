@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  version: 1.0.0-oas3.1
+  version: 2.0.0-oas3.1
   title: 'Lamassu IoT: DMS Service'
   description: >-
     The DMS Manager is the service in charge of managing the Registration
@@ -27,19 +27,60 @@ info:
 
     - [Lamassu Iot
     Docs](https://www.lamassu.io/docs/2.0.0/architecture/#dms-manager)
+security:
+  - Oauth2Password: []
 tags:
   - name: dms
   - name: stats
-  - name: cacerts
-  - name: simpleenroll
+  - name: est
 paths:
   /dms:
     get:
       tags:
         - dms
-      summary: Get All DMs
-      description: Get All DMs
-      parameters: []
+      summary: Get All DMS
+      description: Get All DMS
+      parameters: 
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns all DMS.
@@ -50,7 +91,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/GetDMSResponse'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting all DMS.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
     post:
       tags:
         - dms
@@ -70,7 +115,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/DMS'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while creating the DMS.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /dms/{id}:
     get:
       tags:
@@ -93,8 +142,18 @@ paths:
                 $ref: '#/components/schemas/DMS'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting the DMS.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
     put:
       tags:
         - dms
@@ -122,8 +181,18 @@ paths:
                 $ref: '#/components/schemas/DMS'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while updating DMS.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /dms/bind-identity:
     post:
       tags:
@@ -145,8 +214,18 @@ paths:
                 $ref: '#/components/schemas/BindIdentityToDeviceOutput'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while binding identity to device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /stats:
     get:
       tags:
@@ -162,11 +241,15 @@ paths:
                 type: integer
                 description: Total DMS
         '500':
-          description: Internal Server Error.
-  /cacerts:
+          description: Something went wrong while getting stats.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+  /.well-known/est/cacerts:
     get:
       tags:
-        - cacerts
+        - est
       summary: Get CA Certificates
       description: Get CA Certificates
       responses:
@@ -182,11 +265,15 @@ paths:
                 type: string
                 format: binary
         '500':
-          description: Internal Server Error.
-  /{aps}/cacerts:
-    get:
+          description: Something went wrong while getting certificates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+  /.well-known/est/{aps}/cacerts:
+    get: 
       tags:
-        - cacerts
+        - est
       summary: Get CA Certificates
       description: Get CA Certificates
       parameters:
@@ -209,11 +296,15 @@ paths:
                 type: string
                 format: binary
         '500':
-          description: Internal Server Error.
-  /simpleenroll:
+          description: Something went wrong while getting certificates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+  /.well-known/est/simpleenroll:
     post:
       tags:
-        - simpleenroll
+        - est
       summary: Simple Enroll for a Certificate
       description: Simple Enroll for a Certificate
       requestBody:
@@ -243,12 +334,22 @@ paths:
             Bad Request. Possible error reasons: - Content-type must be
             application/pkcs10 - Could not read the body payload - Body payload
             must be base64 encoded - Could not parse the payload into a csr
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Could not read the body payload
         '500':
-          description: Internal Server Error.
-  /{aps}/simpleenroll:
+          description: Something went wrong while ernolling.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+  /.well-known/est/{aps}/simpleenroll:
     post:
       tags:
-        - simpleenroll
+        - est
       summary: Simple Enroll for a Certificate Using an Identifier
       description: Simple Enroll for a Certificate Using an Identifier
       parameters:
@@ -285,12 +386,22 @@ paths:
             Bad Request. Possible error reasons: - Content-type must be
             application/pkcs10 - Could not read the body payload - Body payload
             must be base64 encoded - Could not parse the payload into a csr
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Could not read the body payload
         '500':
-          description: Internal Server Error.
-  /simplerenroll:
+          description: Something went wrong while enrolling.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+  /.well-known/est/simplerenroll:
     post:
       tags:
-        - simpleenroll
+        - est
       summary: Simple Reenroll for a Certificate
       description: Simple Reenroll for a Certificate
       requestBody:
@@ -320,12 +431,22 @@ paths:
             Bad Request. Possible error reasons: - Content-type must be
             application/pkcs10 - Could not read the body payload - Body payload
             must be base64 encoded - Could not parse the payload into a csr
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Could not read the body payload
         '500':
-          description: Internal Server Error.
-  /{aps}/simplerenroll:
+          description: Something went wrong while reenrolling.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+  /.well-known/est/{aps}/simplerenroll:
     post:
       tags:
-        - simpleenroll
+        - est
       summary: Simple Reenroll for a Certificate Using an Identifier
       description: Simple Reenroll for a Certificate Using an Identifier
       parameters:
@@ -362,14 +483,24 @@ paths:
             Bad Request. Possible error reasons: - Content-type must be
             application/pkcs10 - Could not read the body payload - Body payload
             must be base64 encoded - Could not parse the payload into a csr
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Could not read the body payload
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while reenrolling.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
 components:
   schemas:
     GetDMSResponse:
       type: object
       properties:
-        nextBookmark:
+        next:
           type: string
         list:
           type: array
@@ -385,7 +516,7 @@ components:
         metadata:
           type: object
           additionalProperties: true
-        creationDate:
+        creation_ts:
           type: string
           format: date-time
         settings:
@@ -393,28 +524,28 @@ components:
     DMSSettings:
       type: object
       properties:
-        enrollmentSettings:
+        enrollment_settings:
           $ref: '#/components/schemas/EnrollmentSettings'
-        reEnrollmentSettings:
+        reenrollment_settings:
           $ref: '#/components/schemas/ReEnrollmentSettings'
-        CADistributionSettings:
+        ca_distribution_settings:
           $ref: '#/components/schemas/CADistributionSettings'
     EnrollmentSettings:
       type: object
       properties:
-        enrollmentProtocol:
+        protocol:
           type: string
           enum:
             - EST_RFC7030
-        enrollmentOptionsESTRFC7030:
+        est_rfc7030_settings:
           $ref: '#/components/schemas/EnrollmentOptionsESTRFC7030'
-        deviceProvisionProfile:
+        device_provisioning_profile:
           $ref: '#/components/schemas/DeviceProvisionProfile'
-        enrollmentCA:
+        enrollment_ca:
           type: string
-        enableReplaceableEnrollment:
+        enable_replaceable_enrollment:
           type: boolean
-        registrationMode:
+        registration_mode:
           type: string
           enum:
             - JITP
@@ -422,60 +553,60 @@ components:
     ReEnrollmentSettings:
       type: object
       properties:
-        additionalValidationCAs:
+        additional_validation_cas:
           type: array
           items:
             type: string
-        reenrollmentDelta:
+        reenrollment_delta:
           type: integer
           format: int64
           description: time.Duration type
-        enableExpiredRenewal:
+        enable_expired_renewal:
           type: boolean
-        preventiveDelta:
+        preventive_delta:
           type: integer
           format: int64
           description: time.Duration type
-        criticalDelta:
+        critical_delta:
           type: integer
           format: int64
           description: time.Duration type
     CADistributionSettings:
       type: object
       properties:
-        includeLamassuSystemCA:
+        include_system_ca:
           type: boolean
-        includeEnrollmentCA:
+        include_enrollment_ca:
           type: boolean
-        managedCAs:
+        managed_cas:
           type: array
           items:
             type: string
     EnrollmentOptionsESTRFC7030:
       type: object
       properties:
-        authMode:
+        auth_mode:
           type: string
           enum:
             - ESTServerKeyGenBitSize
             - ESTServerKeyGenKeyType
-        authOptionsMTLS:
+        client_certificate_settings:
           $ref: '#/components/schemas/AuthOptionsClientCertificate'
     AuthOptionsClientCertificate:
       type: object
       properties:
-        validationCAs:
+        validation_cas:
           type: array
           items:
             type: string
-        chainLevelValidation:
+        chain_level_validation:
           type: integer
     DeviceProvisionProfile:
       type: object
       properties:
         icon:
           type: string
-        iconColor:
+        icon_color:
           type: string
         metadata:
           type: object
@@ -499,7 +630,7 @@ components:
     BindIdentityToDeviceBody:
       type: object
       properties:
-        bindMode:
+        bind_mode:
           type: string
           enum:
             - CREATED
@@ -509,9 +640,9 @@ components:
             - SHADOW-UPDATED
             - STATUS-UPDATED
             - DECOMMISSIONED
-        deviceID:
+        device_id:
           type: string
-        certificateSerialNumber:
+        certificate_serial_number:
           type: string
     BindIdentityToDeviceOutput:
       type: object
@@ -525,42 +656,42 @@ components:
     Certificate:
       type: object
       properties:
-        serialNumber:
+        serial_number:
           type: string
         metadata:
           type: object
           additionalProperties: {}
-        issuerCAMetadata:
+        issuer_metadata:
           $ref: '#/components/schemas/IssuerCAMetadata'
-        certificateStatus:
+        status:
           $ref: '#/components/schemas/CertificateStatus'
         certificate:
           $ref: '#/components/schemas/X509Certificate'
-        keyMetadata:
+        key_metadata:
           $ref: '#/components/schemas/KeyStrengthMetadata'
         subject:
           $ref: '#/components/schemas/Subject'
-        validFrom:
+        valid_from:
           type: string
           format: date-time
-        validTo:
+        valid_to:
           type: string
           format: date-time
-        revocationTimestamp:
+        revocation_timestamp:
           type: string
           format: date-time
-        revocationReason:
+        revocation_reason:
           type: integer
-        certificateType:
+        type:
           $ref: '#/components/schemas/CertificateType'
-        engineID:
+        engine_id:
           type: string
     IssuerCAMetadata:
       type: object
       properties:
-        serialNumber:
+        serial_number:
           type: string
-        ID:
+        id:
           type: string
         level:
           type: integer
@@ -573,24 +704,165 @@ components:
     X509Certificate:
       type: object
       properties:
+        raw:
+          type: string
+          format: byte
+        raw_tbs_certificate:
+          type: string
+          format: byte
+        raw_subject_public_key_info:
+          type: string
+          format: byte
+        raw_subject:
+          type: string
+          format: byte
+        raw_issuer:
+          type: string
+          format: byte
+        signature:
+          type: string
+          format: byte
+        signature_algorithm:
+          type: integer
+        public_key_algorithm:
+          type: integer
+        public_key:
+          type: object
         version:
           type: integer
-        serialNumber:
-          type: string
+        serial_number:
+          $ref: '#/components/schemas/BigInt'
         issuer:
-          type: string
+          $ref: '#/components/schemas/pkixName'
         subject:
-          type: string
-        notBefore:
-          type: string
-          format: date-time
-        notAfter:
+          $ref: '#/components/schemas/pkixName'
+        not_before:
           type: string
           format: date-time
+        not_after:
+          type: string
+          format: date-time
+        key_usage:
+          type: integer
+        extensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixExtension'
+        extra_extensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixExtension'
+        unhandled_critical_extensions:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+        ext_key_usage:
+          type: array
+          items:
+            type: integer
+        unknown_ext_key_usage:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+        basic_constraints_valid:
+          type: boolean
+        is_ca:
+          type: boolean
+        max_path_len:
+          type: integer
+        max_path_len_zero:
+          type: boolean
+        subject_key_id:
+          type: string
+          format: byte
+        authority_key_id:
+          type: string
+          format: byte
+        ocsp_server:
+          type: array
+          items:
+            type: string
+        issuing_certificate_url:
+          type: array
+          items:
+            type: string
+        dns_names:
+          type: array
+          items:
+            type: string
+        email_addresses:
+          type: array
+          items:
+            type: string
+        ip_addresses:
+          type: array
+          items:
+            type: string
+            format: ipv4
+        uris:
+          type: array
+          items:
+            $ref: '#/components/schemas/URL'
+        permitted_dns_domains_critical:
+          type: boolean
+        permitted_dns_domains:
+          type: array
+          items:
+            type: string
+        excluded_dns_domains:
+          type: array
+          items:
+            type: string
+        permitted_ip_ranges:
+          type: array
+          items:
+            $ref: '#/components/schemas/IPNet'
+        excluded_ip_ranges:
+          type: array
+          items:
+            $ref: '#/components/schemas/IPNet'
+        permitted_email_addresses:
+          type: array
+          items:
+            type: string
+            format: email
+        excluded_email_addresses:
+          type: array
+          items:
+            type: string
+            format: email
+        permitted_uri_domains:
+          type: array
+          items:
+            type: string
+            format: uri
+        excluded_uri_domains:
+          type: array
+          items:
+            type: string
+            format: uri
+        crl_distribution_points:
+          type: array
+          items:
+            type: string
+        policy_identifiers:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+        policies:
+          type: array
+          items:
+            $ref: '#/components/schemas/OID'
     KeyStrengthMetadata:
       type: object
       properties:
-        keyType:
+        key_type:
           type: string
           enum:
             - UnknownPublicKeyAlgorithm
@@ -600,7 +872,7 @@ components:
             - Ed25519
         bits:
           type: integer
-        keyStrength:
+        key_strength:
           type: string
           enum:
             - HIGH
@@ -609,11 +881,11 @@ components:
     Subject:
       type: object
       properties:
-        commonName:
+        common_name:
           type: string
         organization:
           type: string
-        organizationUnit:
+        organization_unit:
           type: string
         country:
           type: string
@@ -640,19 +912,19 @@ components:
           $ref: '#/components/schemas/DeviceStatus'
         icon:
           type: string
-        iconColor:
+        icon_color:
           type: string
-        creationTtimestamp:
+        creation_timestamp:
           type: string
           format: date-time
         metadata:
           type: object
           additionalProperties: true
-        DMSOwner:
+        dms_owner:
           type: string
-        identitySlot:
+        identity:
           $ref: '#/components/schemas/Slot'
-        extraSlots:
+        slots:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/Slot'
@@ -681,9 +953,9 @@ components:
             - EXPIRING_SOON
             - EXPIRED
             - REVOKED
-        activeVersion:
+        active_version:
           type: integer
-        secretType:
+        type:
           type: string
           enum:
             - TOKEN
@@ -700,7 +972,7 @@ components:
     DeviceEvent:
       type: object
       properties:
-        deviceEventType:
+        type:
           type: string
           enum:
             - CREATED
@@ -710,9 +982,192 @@ components:
             - SHADOW-UPDATED
             - STATUS-UPDATED
             - DECOMMISSIONED
-        eventDescriptions:
+        description:
           type: string
+    pkixName:
+      type: object
+      properties:
+        country:
+          type: array
+          items:
+            type: string
+        organization:
+          type: array
+          items:
+            type: string
+        organizational_unit:
+          type: array
+          items:
+            type: string
+        locality:
+          type: array
+          items:
+            type: string
+        province:
+          type: array
+          items:
+            type: string
+        street_address:
+          type: array
+          items:
+            type: string
+        postal_code:
+          type: array
+          items:
+            type: string
+        serial_number:
+          type: string
+        common_name:
+          type: string
+        names:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+          description: All parsed attributes
+        extra_names:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+          description: Attributes to be copied raw into any marshaled distinguished names
+    pkixAttributeTypeAndValue:
+      type: object
+      properties:
+        type:
+          type: array
+          items:
+            type: integer
+        value:
+          type: object
+    pkixAttributeTypeAndValueSET:
+      type: object
+      properties:
+        type:
+          type: array
+          items:
+            type: integer
+          description: ASN.1 Object Identifier
+        value:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+          description: A set of sets of AttributeTypeAndValue
+    pkixExtension:
+      type: object
+      properties:
+        ID:
+          type: array
+          items:
+            type: integer
+        critical:
+          type: boolean
+        value:
+          type: string
+          format: byte
+    URL:
+      type: object
+      properties:
+        scheme:
+          type: string
+        opaque:
+          type: string
+          description: Encoded opaque data
+        user:
+          $ref: '#/components/schemas/UserInfo'
+        host:
+          type: string
+          description: Host or host:port
+        path:
+          type: string
+          description: Path (relative paths may omit leading slash)
+        raw_path:
+          type: string
+          description: Encoded path hint
+        omit_host:
+          type: boolean
+          description: Do not emit empty host (authority)
+        force_query:
+          type: boolean
+          description: Append a query ('?') even if RawQuery is empty
+        raw_query:
+          type: string
+          description: Encoded query values, without '?'
+        fragment:
+          type: string
+          description: Fragment for references, without '#'
+        raw_fragment:
+          type: string
+          description: Encoded fragment hint
+    UserInfo:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        password_set:
+          type: boolean
+    BigInt:
+      type: object
+      properties:
+        neg:
+          type: boolean
+        abs:
+            type: integer
+    IPNet:
+      type: object
+      properties:
+        IP:
+          type: string
+          format: ipv4
+        IPMask:
+          type: string
+          format: ipv4
+    OID:
+      type: object
+      properties:
+        der:
+          type: string
+          format: byte
+    400Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - Struct validation error
+            - Content-type must be application/pkcs10 
+            - Could not read the body payload 
+            - Body payload must be base64 encoded 
+            - Could not parse the payload into a csr
+    500Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - Internal Server Error
+          example: Internal Server Error
+  securitySchemes:
+    MTLS:
+      type: mutualTLS
+    Oauth2Password:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read: Grants read access
+            write: Grants write access
+    NoAuth:
+      type: http
+      scheme: bearer
+          
+          
 servers:
   - description: SwaggerHub API Auto Mocking
     url: >-
       https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_DMSManager/1.0.0
+  - description: Local
+    url: https://localhost:8443/api/dmsmanager/v1

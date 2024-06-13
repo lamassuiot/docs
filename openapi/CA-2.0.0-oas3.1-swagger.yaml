@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  version: 1.0.0-oas3.1
+  version: 2.0.0-oas3.1
   title: 'Lamassu IoT: CA Service'
   description: >-
     The first step to provision devices with digital certificates is to create
@@ -14,6 +14,8 @@ info:
 
     - [Lamassu Iot
     Docs](https://www.lamassu.io/docs/2.5.3/basic-features/ca-service/)
+security:
+  
 tags:
   - name: CAs
   - name: certificates
@@ -26,7 +28,47 @@ paths:
         - CAs
       summary: Get All CAs
       description: Get All CAs
-      parameters: []
+      parameters: 
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns all CAs.
@@ -37,7 +79,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/GetCAsResponse'
         '500':
-          description: Something went wrong while reading all CAs from storage engine
+          description: Something went wrong while getting all CAs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
     post:
       tags:
         - CAs
@@ -60,10 +106,26 @@ paths:
             Bad Request. Possible error reasons: - Struct Validation error - CA
             type inconsistent - Issuance expiration greater than CA expiration -
             Incompatible expiration time ref
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                message: CA type inconsistent
         '409':
           description: Conflict - CA already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/409Error'
+              example:
+                message: CA already exists
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while creating a CA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/import:
     post:
       tags:
@@ -88,8 +150,18 @@ paths:
             type inconsistent - Issuance expiration greater than CA expiration -
             Incompatible expiration time ref - CA and the provided key don't
             match
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                message: CA type inconsistent
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while importing CA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/{id}:
     get:
       tags:
@@ -112,10 +184,26 @@ paths:
                 $ref: '#/components/schemas/CACertificate'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: CA not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: CA not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting the CA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
     delete:
       tags:
         - CAs
@@ -133,10 +221,26 @@ paths:
           description: CA successfully deleted.
         '400':
           description: Struct Validation error || CA Status inconsistent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
-          description: CA not found
+          description: CA not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: CA not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while deleting CA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/cn/{cn}:
     get:
       tags:
@@ -150,6 +254,46 @@ paths:
           schema:
             type: string
           description: Common name of the CA(s) to retrieve.
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns the list of CAs.
@@ -160,7 +304,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/GetCAsResponse'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting CAs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/{id}/metadata:
     put:
       tags:
@@ -194,10 +342,26 @@ paths:
                 $ref: '#/components/schemas/CACertificate'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: CA not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: CA not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while updating CA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/{id}/status:
     post:
       tags:
@@ -225,10 +389,26 @@ paths:
                 $ref: '#/components/schemas/CACertificate'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: CA not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: CA not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while updating CA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/{id}/certificates:
     get:
       tags:
@@ -242,6 +422,46 @@ paths:
           schema:
             type: string
           description: ID of the CA certificates to retrieve.
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns the list of CAs.
@@ -253,10 +473,26 @@ paths:
                   $ref: '#/components/schemas/GetCertificatesResponse'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: CA not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: CA not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting certificates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/{id}/certificates/status/{status}:
     get:
       tags:
@@ -276,6 +512,46 @@ paths:
           description: Status of the certificates
           schema:
             $ref: '#/components/schemas/CertificateStatus'
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns the list of Certificates.
@@ -287,10 +563,26 @@ paths:
                   $ref: '#/components/schemas/GetCertificatesResponse'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: CA not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: CA not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting certificates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/{id}/certificates/sign:
     post:
       tags:
@@ -318,10 +610,26 @@ paths:
                 $ref: '#/components/schemas/CACertificate'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: CA not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: CA not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while singing the certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/{id}/signature/sign:
     post:
       tags:
@@ -350,10 +658,26 @@ paths:
                 $ref: '#/components/schemas/SignResponse'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: CA not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: CA not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while signing message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/{id}/signature/verify:
     post:
       tags:
@@ -382,10 +706,26 @@ paths:
                 $ref: '#/components/schemas/VerifyResponse'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: CA not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: CA not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while verifying the signature.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /cas/{id}/certificates/{sn}:
     get:
       tags:
@@ -414,17 +754,73 @@ paths:
                 $ref: '#/components/schemas/Certificate'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: Certificate not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: certificate not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting the certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /certificates:
     get:
       tags:
         - certificates
       summary: Get Certificates
       description: Update CA Metadata
-      parameters: []
+      parameters: 
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns all Certificates.
@@ -435,7 +831,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/GetCertificatesResponse'
         '500':
-          description: Internal Server Error
+          description: Something went wrong while getting all certificates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /certificates/status/{status}:
     get:
       tags:
@@ -449,6 +849,46 @@ paths:
           schema:
             type: string
           description: Status of the certificates to retrieve
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns list of Certificates.
@@ -460,8 +900,18 @@ paths:
                   $ref: '#/components/schemas/GetCertificatesResponse'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting certificates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /certificates/expiration:
     get:
       tags:
@@ -481,6 +931,46 @@ paths:
             type: string
             format: date-time
           description: Return certificates expiring before this date (RFC3339 format)
+        - name: sort_by
+          in: query
+          description: Field by which to sort the results.
+          required: false
+          schema:
+            type: string
+            example: name
+        - name: sort_mode
+          in: query
+          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: asc
+        - name: page_size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            example: 5
+        - name: bookmark
+          in: query
+          description: Bookmark for pagination.
+          required: false
+          schema:
+            type: string
+            example: "bm12345"
+        - name: filter
+          in: query
+          description: |
+            Filter criteria. Example format: field[operation]=value.
+            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+            Supported operations for date fields: bf (before), eq (equal), af (after).
+            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+          required: false
+          schema:
+            type: string
+            example: status[eq]=active
       responses:
         '200':
           description: Successful operation. Returns list of Certificates.
@@ -492,8 +982,18 @@ paths:
                   $ref: '#/components/schemas/GetCertificatesResponse'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting certificates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /certificates/{sn}:
     get:
       tags:
@@ -516,10 +1016,26 @@ paths:
                 $ref: '#/components/schemas/Certificate'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: Certificate not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: certificate not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting the certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /certificates/{sn}/status:
     put:
       tags:
@@ -548,10 +1064,26 @@ paths:
                 $ref: '#/components/schemas/Certificate'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: Certificate not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: certificate not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while updating certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /certificates/{sn}/metadata:
     put:
       tags:
@@ -580,10 +1112,26 @@ paths:
                 $ref: '#/components/schemas/Certificate'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '404':
           description: Certificate not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/404Error'
+              example:
+                err: certificate not found
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while updating certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /certificates/import:
     post:
       tags:
@@ -605,8 +1153,18 @@ paths:
                 $ref: '#/components/schemas/Certificate'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while importing certificate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /engines:
     get:
       tags:
@@ -623,7 +1181,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/CryptoEngineProvider'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting the crypto engine provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /stats:
     get:
       tags:
@@ -640,7 +1202,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/CAStats'
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting the stats.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /stats/{id}:
     get:
       tags:
@@ -666,17 +1232,26 @@ paths:
                     $ref: '#/components/schemas/CertificateStatus'
                   additionalProperties:
                     type: integer
-                    description: Número de certificados por estado
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting stats.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
 components:
   schemas:
     GetCAsResponse:
       type: object
       properties:
-        nextBookmark:
+        next:
           type: string
         list:
           type: array
@@ -685,7 +1260,7 @@ components:
     GetCertificatesResponse:
       type: object
       properties:
-        nextBookmark:
+        next:
           type: string
         list:
           type: array
@@ -694,46 +1269,46 @@ components:
     Certificate:
       type: object
       properties:
-        serialNumber:
+        serial_number:
           type: string
         metadata:
           type: object
           additionalProperties: {}
-        issuerCAMetadata:
+        issuer_ca_metadata:
           $ref: '#/components/schemas/IssuerCAMetadata'
-        certificateStatus:
+        certificate_status:
           $ref: '#/components/schemas/CertificateStatus'
         certificate:
           $ref: '#/components/schemas/X509Certificate'
-        keyMetadata:
+        key_metadata:
           $ref: '#/components/schemas/KeyStrengthMetadata'
         subject:
           $ref: '#/components/schemas/Subject'
-        validFrom:
+        valid_from:
           type: string
           format: date-time
-        validTo:
+        valid_to:
           type: string
           format: date-time
-        revocationTimestamp:
+        revocation_timestamp:
           type: string
           format: date-time
-        revocationReason:
+        revocation_reason:
           type: integer
-        certificateType:
+        certificate_type:
           $ref: '#/components/schemas/CertificateType'
-        engineID:
+        engine_id:
           type: string
     CACertificate:
       allOf:
         - $ref: '#/components/schemas/Certificate'
         - type: object
           properties:
-            ID:
+            id:
               type: string
-            issuanceExpirationRef:
+            issuance_expiration_ref:
               $ref: '#/components/schemas/Expiration'
-            creationTS:
+            creation_ts:
               type: string
               format: date-time
             level:
@@ -741,33 +1316,174 @@ components:
     IssuerCAMetadata:
       type: object
       properties:
-        serialNumber:
+        serial_number:
           type: string
-        ID:
+        id:
           type: string
         level:
           type: integer
     X509Certificate:
       type: object
       properties:
+        raw:
+          type: string
+          format: byte
+        raw_tbs_certificate:
+          type: string
+          format: byte
+        raw_subject_public_key_info:
+          type: string
+          format: byte
+        raw_subject:
+          type: string
+          format: byte
+        raw_issuer:
+          type: string
+          format: byte
+        signature:
+          type: string
+          format: byte
+        signature_algorithm:
+          type: integer
+        public_key_algorithm:
+          type: integer
+        public_key:
+          type: object
         version:
           type: integer
-        serialNumber:
-          type: string
+        serial_number:
+          $ref: '#/components/schemas/BigInt'
         issuer:
-          type: string
+          $ref: '#/components/schemas/pkixName'
         subject:
-          type: string
-        notBefore:
-          type: string
-          format: date-time
-        notAfter:
+          $ref: '#/components/schemas/pkixName'
+        not_before:
           type: string
           format: date-time
-    KeyStrengthMetadata:
+        not_after:
+          type: string
+          format: date-time
+        key_usage:
+          type: integer
+        extensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixExtension'
+        extra_extensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixExtension'
+        unhandled_critical_extensions:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+        ext_key_usage:
+          type: array
+          items:
+            type: integer
+        unknown_ext_key_usage:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+        basic_constraints_valid:
+          type: boolean
+        is_ca:
+          type: boolean
+        max_path_len:
+          type: integer
+        max_path_len_zero:
+          type: boolean
+        subject_key_id:
+          type: string
+          format: byte
+        authority_key_id:
+          type: string
+          format: byte
+        ocsp_server:
+          type: array
+          items:
+            type: string
+        issuing_certificate_url:
+          type: array
+          items:
+            type: string
+        dns_names:
+          type: array
+          items:
+            type: string
+        email_addresses:
+          type: array
+          items:
+            type: string
+        ip_addresses:
+          type: array
+          items:
+            type: string
+            format: ipv4
+        uris:
+          type: array
+          items:
+            $ref: '#/components/schemas/URL'
+        permitted_dns_domains_critical:
+          type: boolean
+        permitted_dns_domains:
+          type: array
+          items:
+            type: string
+        excluded_dns_domains:
+          type: array
+          items:
+            type: string
+        permitted_ip_ranges:
+          type: array
+          items:
+            $ref: '#/components/schemas/IPNet'
+        excluded_ip_ranges:
+          type: array
+          items:
+            $ref: '#/components/schemas/IPNet'
+        permitted_email_addresses:
+          type: array
+          items:
+            type: string
+            format: email
+        excluded_email_addresses:
+          type: array
+          items:
+            type: string
+            format: email
+        permitted_uri_domains:
+          type: array
+          items:
+            type: string
+            format: uri
+        excluded_uri_domains:
+          type: array
+          items:
+            type: string
+            format: uri
+        crl_distribution_points:
+          type: array
+          items:
+            type: string
+        policy_identifiers:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+        policies:
+          type: array
+          items:
+            $ref: '#/components/schemas/OID' 
+    KeyMetadata:
       type: object
       properties:
-        keyType:
+        key_type:
           type: string
           enum:
             - UnknownPublicKeyAlgorithm
@@ -777,7 +1493,12 @@ components:
             - Ed25519
         bits:
           type: integer
-        keyStrength:
+    KeyStrengthMetadata:
+      allOf:
+        - $ref: '#/components/schemas/KeyMetadata'
+        - type: object
+      properties:
+        key_strength:
           type: string
           enum:
             - HIGH
@@ -786,11 +1507,11 @@ components:
     Subject:
       type: object
       properties:
-        commonName:
+        common_name:
           type: string
         organization:
           type: string
-        organizationUnit:
+        organization_unit:
           type: string
         country:
           type: string
@@ -801,7 +1522,7 @@ components:
     Expiration:
       type: object
       properties:
-        expirationType:
+        expiration_type:
           type: string
           enum:
             - Duration
@@ -814,44 +1535,55 @@ components:
     CreateCABody:
       type: object
       properties:
-        parentID:
+        parent_id:
           type: string
-        ID:
+        id:
           type: string
-        keyMetadata:
-          $ref: '#/components/schemas/KeyStrengthMetadata'
+        key_metadata:
+          $ref: '#/components/schemas/KeyMetadata'
         subject:
           $ref: '#/components/schemas/Subject'
-        CAExpiration:
+        ca_expiration:
           $ref: '#/components/schemas/Expiration'
-        issuanceExpiration:
+        issuance_expiration:
           $ref: '#/components/schemas/Expiration'
-        engineID:
+        engine_id:
           type: string
         metadata:
           type: object
           additionalProperties: true
-    ImportCABody:
+    ImportCA:
       type: object
       properties:
-        ID:
+        id:
           type: string
-        engineID:
+        engine_id:
           type: string
-        parentID:
+        parent_id:
           type: string
-        CAPrivateKey:
+    ImportCABody:
+      allOf:
+        - $ref: '#/components/schemas/Certificate'
+        - type: object
+      properties:
+        id:
+          type: string
+        engine_id:
+          type: string
+        parent_id:
+          type: string
+        ca_private_key:
           type: string
           description: Base64 encoded private key from PEM
-        CACertificate:
+        ca_certificate:
           $ref: '#/components/schemas/X509Certificate'
-        CAChain:
+        ca_chain:
           type: array
           items:
             $ref: '#/components/schemas/X509Certificate'
-        CAType:
+        ca_type:
           $ref: '#/components/schemas/CertificateType'
-        IssuanceExpiration:
+        issuance_expiration:
           $ref: '#/components/schemas/Expiration'
     CertificateType:
       type: string
@@ -862,45 +1594,40 @@ components:
     ImportCAInput:
       type: object
       properties:
-        ID:
+        id:
           type: string
-        CAType:
+        ca_type:
           $ref: '#/components/schemas/CertificateType'
-        issuanceExpiration:
+        issuance_expiration:
           $ref: '#/components/schemas/Expiration'
-        CACertificate:
+        ca_certificate:
           $ref: '#/components/schemas/X509Certificate'
-        CAChain:
+        ca_chain:
           type: array
           items:
             $ref: '#/components/schemas/X509Certificate'
           description: >
             Parent CAs. They MUST be sorted as follows: 0: Root-CA; 1:
             Subordinate CA from Root-CA; ...
-        CARSAKey:
+        ca_rsa_key:
           $ref: '#/components/schemas/RSAKey'
-        CAECKey:
+        ca_ec_key:
           $ref: '#/components/schemas/ECDSAKey'
-        keyType:
+        key_type:
           type: string
-        engineID:
+        engine_id:
           type: string
-        parentID:
+        parent_id:
           type: string
       required:
-        - CAType
-        - IssuanceExpiration
-        - CACertificate
+        - ca_type
+        - issuance_expiration
+        - ca_certificate
     RSAKey:
-      type: object
+      allOf:
+        - $ref: '#/components/schemas/ECDSAKey'
+        - type: object
       properties:
-        publicKey:
-          $ref: '#/components/schemas/PublicKey'
-        D:
-          type: string
-          description: >-
-            Private exponent, represented as a base-10 string to handle large
-            integer
         primes:
           type: array
           items:
@@ -909,11 +1636,11 @@ components:
             Prime factors of N, has >= 2 elements, represented as a base-10
             string to handle large integer
         precomputed:
-          $ref: '#/components/schemas/PrecomputedValues'
+            $ref: '#/components/schemas/PrecomputedValues'
     ECDSAKey:
       type: object
       properties:
-        publicKey:
+        public_key:
           $ref: '#/components/schemas/PublicKey'
         D:
           type: string
@@ -921,7 +1648,7 @@ components:
     PublicKey:
       type: object
       properties:
-        'N':
+        N:
           type: string
           description: Modulus, represented as a base-10 string to handle large integers
         E:
@@ -944,7 +1671,7 @@ components:
           type: string
           description: |
             Q^-1 mod P, represented as a base-10 string to handle large integers
-        'n':
+        n:
           $ref: '#/components/schemas/Modulus'
         p:
           $ref: '#/components/schemas/Modulus'
@@ -972,9 +1699,9 @@ components:
     UpdateCertificateStatusBody:
       type: object
       properties:
-        newStatus:
+        new_status:
           $ref: '#/components/schemas/CertificateStatus'
-        revocationReason:
+        revocation_reason:
           type: integer
     CertificateStatus:
       type: string
@@ -990,11 +1717,11 @@ components:
       properties:
         CAID:
           type: string
-        certRequest:
+        cert_request:
           $ref: '#/components/schemas/X509CertificateRequest'
         subject:
           $ref: '#/components/schemas/Subject'
-        signVerbatim:
+        sign_verbatim:
           type: boolean
     X509CertificateRequest:
       type: object
@@ -1003,15 +1730,15 @@ components:
           type: string
           format: byte
           description: Complete ASN.1 DER content (CSR, signature algorithm and signature)
-        rawTBSCertificateRequest:
+        raw_tbs_certificate_request:
           type: string
           format: byte
           description: Certificate request info part of raw ASN.1 DER content
-        rawSubjectPublicKeyInfo:
+        raw_subject_public_key_info:
           type: string
           format: byte
           description: DER encoded SubjectPublicKeyInfo
-        rawSubject:
+        raw_subject:
           type: string
           format: byte
           description: DER encoded Subject
@@ -1022,13 +1749,13 @@ components:
           type: string
           format: byte
           description: Signature of the certificate request
-        signatureAlgorithm:
+        signature_algorithm:
           type: integer
           description: Algorithm used for the signature
-        publicKeyAlgorithm:
+        public_key_algorithm:
           type: integer
           description: Algorithm used for the public key
-        PublicKey:
+        public_key:
           type: object
           description: Public key information
         subject:
@@ -1043,30 +1770,30 @@ components:
           items:
             $ref: '#/components/schemas/pkixExtension'
           description: All requested extensions, in raw form
-        extraExtensions:
+        extra_extensions:
           type: array
           items:
             $ref: '#/components/schemas/pkixExtension'
           description: >-
             Extensions to be copied raw into any CSR marshaled by
             CreateCertificateRequest
-        DNSNames:
+        dns_names:
           type: array
           items:
             type: string
           description: Subject Alternate Name values for DNS names
-        emailAddresses:
+        email_addresses:
           type: array
           items:
             type: string
           description: Subject Alternate Name values for email addresses
-        IPAddresses:
+        ip_addresses:
           type: array
           items:
             type: string
             format: byte
           description: Subject Alternate Name values for IP addresses
-        URIs:
+        uris:
           type: array
           items:
             $ref: '#/components/schemas/URL'
@@ -1082,7 +1809,7 @@ components:
           type: array
           items:
             type: string
-        organizationalUnit:
+        organizational_unit:
           type: array
           items:
             type: string
@@ -1094,24 +1821,24 @@ components:
           type: array
           items:
             type: string
-        streetAddress:
+        street_address:
           type: array
           items:
             type: string
-        postalCode:
+        postal_code:
           type: array
           items:
             type: string
-        serialNumber:
+        serial_number:
           type: string
-        commonName:
+        common_name:
           type: string
         names:
           type: array
           items:
             $ref: '#/components/schemas/pkixAttributeTypeAndValue'
           description: All parsed attributes
-        extraNames:
+        extra_names:
           type: array
           items:
             $ref: '#/components/schemas/pkixAttributeTypeAndValue'
@@ -1119,21 +1846,21 @@ components:
     pkixAttributeTypeAndValue:
       type: object
       properties:
-        pkixType:
+        type:
           type: array
           items:
             type: integer
-        pkixValue:
+        value:
           type: object
     pkixAttributeTypeAndValueSET:
       type: object
       properties:
-        pkixType:
+        type:
           type: array
           items:
             type: integer
           description: ASN.1 Object Identifier
-        pkixValue:
+        value:
           type: array
           items:
             type: array
@@ -1143,7 +1870,7 @@ components:
     pkixExtension:
       type: object
       properties:
-        ID:
+        id:
           type: array
           items:
             type: integer
@@ -1168,22 +1895,22 @@ components:
         path:
           type: string
           description: Path (relative paths may omit leading slash)
-        rawPath:
+        raw_path:
           type: string
           description: Encoded path hint
-        omitHost:
+        omit_host:
           type: boolean
           description: Do not emit empty host (authority)
-        forceQuery:
+        force_query:
           type: boolean
           description: Append a query ('?') even if RawQuery is empty
-        rawQuery:
+        raw_query:
           type: string
           description: Encoded query values, without '?'
         fragment:
           type: string
           description: Fragment for references, without '#'
-        rawFragment:
+        raw_fragment:
           type: string
           description: Encoded fragment hint
     UserInfo:
@@ -1193,39 +1920,32 @@ components:
           type: string
         password:
           type: string
-        passwordSet:
+        password_set:
           type: boolean
     SignatureSignBody:
       type: object
       properties:
         message:
           type: string
-        messageType:
+        type:
           type: string
           enum:
             - hash
             - raw
-        signingAlgorithm:
+        signing_algorithm:
           type: string
     SignResponse:
       type: object
       properties:
-        signedData:
+        signed_data:
           type: string
           format: byte
     SignatureVerifyBody:
-      type: object
+      allOf:
+        - $ref: '#/components/schemas/SignatureSignBody'
+        - type: object
       properties:
         signature:
-          type: string
-        message:
-          type: string
-        messageType:
-          type: string
-          enum:
-            - hash
-            - raw
-        signingAlgorithm:
           type: string
     VerifyResponse:
       type: object
@@ -1250,27 +1970,27 @@ components:
         certificate:
           $ref: '#/components/schemas/X509Certificate'
     CryptoEngineProvider:
-      type: object
+      allOf:
+        - $ref: '#/components/schemas/CryptoEngineInfo'
+        - type: object
       properties:
-        cryptoEngineInfo:
-          $ref: '#/components/schemas/CryptoEngineInfo'
-        ID:
+        id:
           type: string
         default:
           type: boolean
     CryptoEngineInfo:
       type: object
       properties:
-        cryptoEngineType:
+        type:
           type: string
           enum:
             - PKCS11
             - AzureKeyVault
-            - Golang
+            - GOLANG
             - VaultKV2
             - AWSKMS
             - AWSSecretsManager
-        securityLevel:
+        security_level:
           type: integer
         provider:
           type: string
@@ -1279,14 +1999,14 @@ components:
         metadata:
           type: object
           additionalProperties: true
-        supportedKeyTypes:
+        supported_key_types:
           type: array
           items:
             $ref: '#/components/schemas/SupportedKeyTypeInfo'
     SupportedKeyTypeInfo:
       type: object
       properties:
-        keyType:
+        type:
           type: integer
         sizes:
           type: array
@@ -1295,9 +2015,9 @@ components:
     CAStats:
       type: object
       properties:
-        CACertificatesStats:
+        CA_ertificates_stats:
           $ref: '#/components/schemas/CertificatesStats'
-        certificatesStats:
+        certificates_stats:
           $ref: '#/components/schemas/CertificatesStats'
     CertificatesStats:
       type: object
@@ -1312,6 +2032,79 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/CertificateStatus'
+    BigInt:
+      type: object
+      properties:
+        neg:
+          type: boolean
+        abs:
+            type: integer
+    IPNet:
+      type: object
+      properties:
+        IP:
+          type: string
+          format: ipv4
+        IPMask:
+          type: string
+          format: ipv4
+    OID:
+      type: object
+      properties:
+        der:
+          type: string
+          format: byte
+    400Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - struct validation error
+            - CA type inconsistent
+            - issuance expiration greater than CA expiration
+            - incompatible expiration time ref
+            - CA and the provided key dont match
+    404Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - CA not found
+            - certificate not found
+    409Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - CA already exists
+    500Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - internal Server Error
+          example: internal Server Error
+  securitySchemes:
+    MTLS:
+      type: mutualTLS
+    Oauth2Password:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read: Grants read access
+            write: Grants write access
+    NoAuth:
+      type: http
+      scheme: bearer
+          
 servers:
   - description: SwaggerHub API Auto Mocking
     url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_CA/1.0.0
+  - description: Local
+    url: https://localhost:8443/api/ca/v1

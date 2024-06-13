@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  version: 1.0.0-oas3.1
+  version: 2.0.0-oas3.1
   title: 'Lamassu IoT: VA Service'
   description: >-
     A Validation Authority (VA) is a critical component in a Public Key
@@ -21,45 +21,19 @@ info:
 
     - [Lamassu Iot
     Docs](https://www.lamassu.io/docs/2.5.3/basic-features/va-service/)
+
+security:
+  - mutualTLS: []
 tags:
   - name: ocsp
   - name: crl
 paths:
   /ocsp:
-    get:
-      tags:
-        - ocsp
-      summary: Verify OCSP request
-      description: Verify OCSP request
-      responses:
-        '200':
-          description: Successfully verified OCSP request.
-          content:
-            application/ocsp-response:
-              schema:
-                type: string
-                format: binary
-                description: The OCSP response.
-        '400':
-          description: >
-            Bad Request. Possible error reasons: - Could not parse and unescape
-            url - Could not decode b64 ocsp request - Method not supported -
-            Could not parse ocsp request
-        '500':
-          description: Something went wrong while verifying ocsp request.
-  /ocsp/{ocsp_request}:
     post:
       tags:
         - ocsp
       summary: Verify OCSP request
       description: Verify OCSP request
-      parameters:
-        - in: path
-          name: ocsp_request
-          required: true
-          schema:
-            type: string
-          description: The OCSP request in base64 format.
       requestBody:
         required: true
         content:
@@ -79,10 +53,63 @@ paths:
                 description: The OCSP response.
         '400':
           description: >
+            Bad Request. Possible error reasons: - Could not parse and unescape
+            url - Could not decode b64 ocsp request - Method not supported -
+            Could not parse ocsp request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Method not supported
+        '500':
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+              example: 
+                err: Something went wrong while verifying ocsp request
+  /ocsp/{ocsp_request}:
+    get:
+      tags:
+        - ocsp
+      summary: Verify OCSP request
+      description: Verify OCSP request
+      parameters:
+        - in: path
+          name: ocsp_request
+          required: true
+          schema:
+            type: string
+          description: The OCSP request in base64 format.
+      responses:
+        '200':
+          description: Successfully verified OCSP request.
+          content:
+            application/ocsp-response:
+              schema:
+                type: string
+                format: binary
+                description: The OCSP response.
+        '400':
+          description: >
             Bad Request. Possible error reasons: - Could not read body - Method
             not supported - Could not parse ocsp request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Could not read body
         '500':
-          description: Something went wrong while verifying ocsp request.
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+              example: 
+                err: Something went wrong while verifying ocsp request
   /crl/{id}:
     get:
       tags:
@@ -107,8 +134,48 @@ paths:
                 description: The Certificate Revocation List (CRL) in binary format.
         '400':
           description: Bad request. The ID parameter is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: The ID parameter is missing or invalid
         '500':
-          description: Something went wrong while verifying ocsp request.
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+              example: 
+                err: Something went wrong while getting crl list
+components:
+  schemas:
+    400Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - Could not parse and unescape url
+            - Could not decode b64 ocsp request 
+            - Method not supported 
+            - Could not parse ocsp request 
+            - Could not read requestBody
+            - The ID parameter is missing or invalid
+    500Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - Something went wrong while verifying ocsp request
+            - Something went wrong while getting crl list
+  securitySchemes:
+    mutualTLS:
+      type: mutualTLS
+    
 servers:
   - description: SwaggerHub API Auto Mocking
     url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_VA/1.0.0
+  - description: Local
+    url: https://localhost:8443/api/va/v1

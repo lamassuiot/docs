@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  version: 1.0.0-oas3.1
+  version: 2.0.0-oas3.1
   title: 'Lamassu IoT: Alerts Service'
   description: >-
     Alerts is the service in charge of sending mails. Users can be subscribed to
@@ -20,6 +20,9 @@ info:
     - [Lamassu IoT Github repository](https://github.com/lamassuiot/lamassuiot)
 
     - [Lamassu Iot Docs](https://www.lamassu.io/docs/2.0.0/architecture/#alerts)
+
+security:
+  - mutualTLS: []
 tags:
   - name: events
   - name: user
@@ -40,8 +43,12 @@ paths:
                 items:
                   $ref: '#/components/schemas/AlertLatestEvent'
         '500':
-          description: Internal Server Error.
-  /user/{userId}/subscribtions:
+          description: Something went wrong while getting the events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
+  /user/{userId}/subscriptions:
     get:
       tags:
         - user
@@ -65,8 +72,18 @@ paths:
                   $ref: '#/components/schemas/Subscription'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while getting the subscriptions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /user/{userId}/subscribe:
     post:
       tags:
@@ -97,8 +114,18 @@ paths:
                   $ref: '#/components/schemas/Subscription'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while subscribing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
   /user/{userId}/unsubscribe/{subId}:
     post:
       tags:
@@ -129,36 +156,46 @@ paths:
                   $ref: '#/components/schemas/Subscription'
         '400':
           description: Struct Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400Error'
+              example:
+                err: Struct Validation error
         '500':
-          description: Internal Server Error.
+          description: Something went wrong while unsubscribing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/500Error'
 components:
   schemas:
     AlertLatestEvent:
       type: object
       properties:
-        eventType:
+        event_types:
           $ref: '#/components/schemas/EventType'
         event:
           $ref: '#/components/schemas/Event'
-        lastSeen:
+        seen_at:
           type: string
           format: date-time
-        totalSeen:
+        counter:
           type: integer
     Event:
       type: object
       properties:
         context:
           $ref: '#/components/schemas/EventContext'
-        dataEncoded:
+        data_encoded:
           type: string
           format: byte
-        dataBase64:
+        data_base64:
           type: boolean
           description: >-
             Indicates if the event, when serialized, represents the data field
             using the base64 encoding
-        fieldErrors:
+        field_errors:
           type: string
           additionalProperties:
             type: string
@@ -190,9 +227,9 @@ components:
     EventContext:
       type: object
       properties:
-        specVersion:
+        spec_version:
           type: string
-        eventType:
+        type:
           type: string
         source:
           type: string
@@ -202,29 +239,29 @@ components:
           type: string
         time:
           type: string
-        dataSchema:
+        data_schema:
           type: string
-        dataContentType:
+        data_content_ype:
           type: string
-        dataContentEncoding:
+        data_content_encoding:
           type: string
-        dataMediaType:
+        data_media_type:
           type: string
         extensions:
           type: object
     Subscription:
       type: object
       properties:
-        ID:
+        id:
           type: string
-        userID:
+        user_id:
           type: string
-        eventType:
+        event_type:
           $ref: '#/components/schemas/EventType'
-        subscriptionDate:
+        subscription_ts:
           type: string
           format: date-time
-        subscriptionCondition:
+        conditions:
           type: array
           items:
             $ref: '#/components/schemas/SubscriptionCondition'
@@ -234,7 +271,7 @@ components:
     SubscriptionCondition:
       type: object
       properties:
-        conditionType:
+        type:
           type: string
           enum:
             - JSON-SCHEMA
@@ -244,7 +281,7 @@ components:
     Channel:
       type: object
       properties:
-        channelType:
+        type:
           type: string
           enum:
             - EMAIL
@@ -257,7 +294,7 @@ components:
     SubscribeBody:
       type: object
       properties:
-        eventType:
+        event_type:
           $ref: '#/components/schemas/EventType'
         conditions:
           type: array
@@ -265,6 +302,27 @@ components:
             $ref: '#/components/schemas/SubscriptionCondition'
         channel:
           $ref: '#/components/schemas/Channel'
+    400Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - Struct validation error
+    500Error:
+      type: object
+      properties:
+        err: 
+          type: string
+          enum:
+            - Internal Server Error
+          example: Internal Server Error
+  securitySchemes:
+    mutualTLS:
+      type: mutualTLS
+          
 servers:
   - description: SwaggerHub API Auto Mocking
-    url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_Alerts/1.0.0
+    url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_Alerts/2.0.0
+  - description: Local
+    url: https://localhost:8443/api/alerts/v1

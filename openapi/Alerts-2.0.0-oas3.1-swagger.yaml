@@ -55,11 +55,7 @@ paths:
       summary: Get User Subscriptions
       description: Get User Subscriptions
       parameters:
-        - in: path
-          name: userId
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/userId'
           description: ID of the user to retrieve subscriptions for.
       responses:
         '200':
@@ -71,13 +67,13 @@ paths:
                 items:
                   $ref: '#/components/schemas/Subscription'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: Struct Validation error
+                err: Struct validation error
         '500':
           description: Something went wrong while getting the subscriptions.
           content:
@@ -91,11 +87,7 @@ paths:
       summary: Subscribe to Events
       description: Subscribe to Events
       parameters:
-        - in: path
-          name: userId
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/userId'
           description: ID of the user that wants to subscribe.
       requestBody:
         required: true
@@ -113,13 +105,13 @@ paths:
                 items:
                   $ref: '#/components/schemas/Subscription'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: Struct Validation error
+                err: Struct validation error
         '500':
           description: Something went wrong while subscribing.
           content:
@@ -133,18 +125,9 @@ paths:
       summary: Unsubscribe from Events
       description: Unsubscribe from Events
       parameters:
-        - in: path
-          name: userId
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/userId'
           description: ID of the user to unsubscribe.
-        - in: path
-          name: subId
-          required: true
-          schema:
-            type: string
-          description: ID of the subscription to unsubscribe.
+        - $ref: '#/components/parameters/subId'
       responses:
         '200':
           description: Successful operation. Returns user's subscriptions.
@@ -155,13 +138,13 @@ paths:
                 items:
                   $ref: '#/components/schemas/Subscription'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: Struct Validation error
+                err: Struct validation error
         '500':
           description: Something went wrong while unsubscribing.
           content:
@@ -169,6 +152,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/500Error'
 components:
+  parameters:
+    userId:
+      in: path
+      name: userId
+      required: true
+      schema:
+        type: string
+    subId:
+      in: path
+      name: subId
+      required: true
+      schema:
+        type: string
+      description: ID of the subscription to unsubscribe.
   schemas:
     AlertLatestEvent:
       type: object
@@ -254,6 +251,7 @@ components:
       properties:
         id:
           type: string
+          example: "41bee0c6-15cb-4e1e-b2cb-d4b300f647a3"
         user_id:
           type: string
         event_type:
@@ -291,6 +289,8 @@ components:
           type: string
         config:
           type: object
+          example:
+            email: "example@gmail.com"
     SubscribeBody:
       type: object
       properties:
@@ -322,7 +322,5 @@ components:
       type: mutualTLS
           
 servers:
-  - description: SwaggerHub API Auto Mocking
-    url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_Alerts/2.0.0
   - description: Local
     url: https://localhost:8443/api/alerts/v1

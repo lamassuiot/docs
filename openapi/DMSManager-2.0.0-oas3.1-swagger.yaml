@@ -28,7 +28,7 @@ info:
     - [Lamassu Iot
     Docs](https://www.lamassu.io/docs/2.0.0/architecture/#dms-manager)
 security:
-  - Oauth2Password: []
+  - Oauth2: []
 tags:
   - name: dms
   - name: stats
@@ -41,55 +41,18 @@ paths:
       summary: Get All DMS
       description: Get All DMS
       parameters: 
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns all DMS.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GetDMSResponse'
+                $ref: '#/components/schemas/GetDMSResponse'
         '500':
           description: Something went wrong while getting all DMS.
           content:
@@ -106,7 +69,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateDMSBody'
+              $ref: '#/components/schemas/DMS'
       responses:
         '201':
           description: Successfull operation. Returns created DMS
@@ -127,12 +90,8 @@ paths:
       summary: Get DMS by ID
       description: Get DMS by ID
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            description: ID of the DMS to get.
+        - $ref: '#/components/parameters/id'
+          description: ID of the DMS to get.
       responses:
         '200':
           description: Successfull operation. Returns DMS
@@ -141,13 +100,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/DMS'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: Struct Validation error
+                err: Struct validation error
         '500':
           description: Something went wrong while getting the DMS.
           content:
@@ -160,12 +119,8 @@ paths:
       summary: Update DMS by ID
       description: Update DMS by ID
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            description: ID of the DMS to update.
+        - $ref: '#/components/parameters/id'
+          description: ID of the DMS to update.
       requestBody:
         required: true
         content:
@@ -180,13 +135,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/DMS'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: Struct Validation error
+                err: Struct validation error
         '500':
           description: Something went wrong while updating DMS.
           content:
@@ -213,13 +168,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/BindIdentityToDeviceOutput'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: Struct Validation error
+                err: Struct validation error
         '500':
           description: Something went wrong while binding identity to device.
           content:
@@ -238,7 +193,11 @@ paths:
           content:
             application/json:
               schema:
-                type: integer
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    example: 6
                 description: Total DMS
         '500':
           description: Something went wrong while getting stats.
@@ -252,6 +211,8 @@ paths:
         - est
       summary: Get CA Certificates
       description: Get CA Certificates
+      security:
+        - MTLS: []
       responses:
         '200':
           description: Successful operation. Returns CAs.
@@ -276,13 +237,10 @@ paths:
         - est
       summary: Get CA Certificates
       description: Get CA Certificates
+      security:
+        - MTLS: []
       parameters:
-        - in: path
-          name: aps
-          required: true
-          schema:
-            type: string
-          description: The identifier of the Authorization Point System (APS)
+        - $ref: '#/components/parameters/aps'
       responses:
         '200':
           description: Successful operation. Returns CAs.
@@ -307,6 +265,8 @@ paths:
         - est
       summary: Simple Enroll for a Certificate
       description: Simple Enroll for a Certificate
+      security:
+        - MTLS: []
       requestBody:
         required: true
         content:
@@ -352,13 +312,10 @@ paths:
         - est
       summary: Simple Enroll for a Certificate Using an Identifier
       description: Simple Enroll for a Certificate Using an Identifier
+      security:
+        - MTLS: []
       parameters:
-        - in: path
-          name: aps
-          required: true
-          schema:
-            type: string
-          description: The identifier of the Authorization Point System (APS).
+        - $ref: '#/components/parameters/aps'
       requestBody:
         required: true
         content:
@@ -404,6 +361,8 @@ paths:
         - est
       summary: Simple Reenroll for a Certificate
       description: Simple Reenroll for a Certificate
+      security:
+        - MTLS: []
       requestBody:
         required: true
         content:
@@ -449,13 +408,10 @@ paths:
         - est
       summary: Simple Reenroll for a Certificate Using an Identifier
       description: Simple Reenroll for a Certificate Using an Identifier
+      security:
+        - MTLS: []
       parameters:
-        - in: path
-          name: aps
-          required: true
-          schema:
-            type: string
-          description: The identifier of the Authorization Point System (APS).
+        - $ref: '#/components/parameters/aps'
       requestBody:
         required: true
         content:
@@ -496,6 +452,65 @@ paths:
               schema:
                 $ref: '#/components/schemas/500Error'
 components:
+  parameters:
+    sortByParam:
+      name: sort_by
+      in: query
+      description: Field by which to sort the results.
+      required: false
+      schema:
+        type: string
+        example: name
+    sortModeParam:
+      name: sort_mode
+      in: query
+      description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+        example: asc
+    pageSizeParam:
+      name: page_size
+      in: query
+      description: Number of items per page.
+      required: false
+      schema:
+        type: integer
+        example: 5
+    bookmarkParam:
+      name: bookmark
+      in: query
+      description: Bookmark for pagination.
+      required: false
+      schema:
+        type: string
+        example: "bm12345"
+    filterParam:
+      name: filter
+      in: query
+      description: |
+        Filter criteria. Example format: field[operation]=value.
+        Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+        Supported operations for date fields: bf (before), eq (equal), af (after).
+        Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+      required: false
+      schema:
+        type: string
+        example: status[eq]=active
+    id:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+    aps:
+      in: path
+      name: aps
+      required: true
+      schema:
+        type: string
+      description: The identifier of the Authorization Point System (APS).
   schemas:
     GetDMSResponse:
       type: object
@@ -516,11 +531,28 @@ components:
         metadata:
           type: object
           additionalProperties: true
+          example: 
+            "lamassu.io/iot/aws.954121426360":
+              groups:
+                - "TEST-LMS"
+              jitp_config:
+                aws_ca_id: ""
+                enable_template: false
+                provisioning_role_arn: ""
+              policies:
+                policy_document: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iot:*\"],\"Resource\":[\"*\"]}]}"
+                policy_name: "my-p"
+              registration_mode: "auto"
+              shadow_config:
+                enable: true
         creation_ts:
           type: string
           format: date-time
         settings:
           $ref: '#/components/schemas/DMSSettings'
+      required:
+        - id
+        - name
     DMSSettings:
       type: object
       properties:
@@ -615,18 +647,6 @@ components:
           type: array
           items:
             type: string
-    CreateDMSBody:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        metadata:
-          type: object
-          additionalProperties: true
-        settings:
-          $ref: '#/components/schemas/DMSSettings'
     BindIdentityToDeviceBody:
       type: object
       properties:
@@ -644,261 +664,20 @@ components:
           type: string
         certificate_serial_number:
           type: string
+      required:
+        - bind_mode
+        - device_id
+        - certificate_serial_number
     BindIdentityToDeviceOutput:
       type: object
       properties:
         certificate:
-          $ref: '#/components/schemas/Certificate'
+          type: string
+          example: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUdyVENDQkpXZ0F3SUJBZ0lRRGlHdHRrcnAvUDZSd2h3L044bDZCakFOQmdrcWhraUc5dzBCQVFzRkFEQncKTVJFd0R3WURWUVFHREFnOGMzUnlhVzVuUGpFUk1BOEdBMVVFQ0F3SVBITjBjbWx1Wno0eEVUQVBCZ05WQkFjTQpDRHh6ZEhKcGJtYytNUkV3RHdZRFZRUUtEQWc4YzNSeWFXNW5QakVSTUE4R0ExVUVDd3dJUEhOMGNtbHVaejR4CkR6QU5CZ05WQkFNVEJuQnlkV1ZpWVRBZUZ3MHlOREEyTVRjd056QTBOREZhRncweU5UQTBNVE13TnpBME16bGEKTUhBeEVUQVBCZ05WQkFZTUNEeHpkSEpwYm1jK01SRXdEd1lEVlFRSURBZzhjM1J5YVc1blBqRVJNQThHQTFVRQpCd3dJUEhOMGNtbHVaejR4RVRBUEJnTlZCQW9NQ0R4emRISnBibWMrTVJFd0R3WURWUVFMREFnOGMzUnlhVzVuClBqRVBNQTBHQTFVRUF4TUdjSEoxWldKaE1JSUNJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBZzhBTUlJQ0NnS0MKQWdFQTN1ZVZOMDljVE4vUUljRnBTV3hkN3JxNGFKSmRva0xqb2dGNklsUmkzbGNrUEhiYWZxZG04Z2c4YVpVaQo3SDhyRVJuRHdVWVViSUgzTzNSSlZ3MHhzdjV4YVZzM2M1VGdYb2JtNG90cDZhT2JST25RcmEwVWpISk8zRytECkJQRnVRci96OHlQSGxhVkpJNklWM3JlWW5sNEFkY09yZkJoRzVDaDJuTDdUcmdiNnJHdVhiMmRyYmlhRHE3ZDAKcW9UK1Y4MWlyQ2JHUnZEU1g2bWZNRm1INDNKYW9ZdnYveDh0SUk1dzVmNXFHU3k4S2U2ekRnOFoyZktSWUtJNwpTQmpFc0hRUGIxZXZidnhvRWRiRHgwOW5VSHBxSHR2bnNwMmdDWEdydGxsb1pMV0RYMGZ1Nmo2a1E2aWpnWXEvCnA2Q1FMTG4xYmdoREVlVDlmOGp4YVhlWHNlRWFaTS9laVpROHVPbVV1dzBTZVZ0UWhvWllmanZyNlNLRjhxUkYKbkRxbnlqMXo5RlZnTkdiall5NlpmMTVoMmw4bE1tQ0s4WUN5V1BmMk4rMWlXcHBnejh0QUxWOCtWb3VhZXNPSwp6MytDZGVUWWxWdzQ0QmNuc0dKN1dFZjluMEdteGs4VHp3OXNUQmYyZWVQaXp3K2NScSt6ekV4NHJ1dUlRc3JoCnRtVTQxMm83TUplaXh0RnN2N3pGUEN0L0lNMGg2Umx0ZGlwREJvOE4wYVl2N1pzVzdVM2hDajJXaWEzclg5TDMKM0JwTVQ2RDlwbGZFZXF2V0ZMQjBEcWFPS0s0dndyVmNYcnB1bm0wZnlic0NwaURCRGJvaUxYeE1CdDYxb2p3QQpvSklKNDVJTnIrWkd2cG5IS0s0SncydnpMVkl3MU5DYzhBa01RcDRmTm9ZZlhVRUNBd0VBQWFPQ0FVRXdnZ0U5Ck1BNEdBMVVkRHdFQi93UUVBd0lCbGpBZEJnTlZIU1VFRmpBVUJnZ3JCZ0VGQlFjREFnWUlLd1lCQlFVSEF3RXcKRHdZRFZSMFRBUUgvQkFVd0F3RUIvekF0QmdOVkhRNEVKZ1FrWVRkaU1EZzFOMll0TW1KaU5TMDBNREV6TFRneQpabVF0TURoaU9EUmlabUk0WTJGaE1DOEdBMVVkSXdRb01DYUFKR0UzWWpBNE5UZG1MVEppWWpVdE5EQXhNeTA0Ck1tWmtMVEE0WWpnMFltWmlPR05oWVRCQUJnZ3JCZ0VGQlFjQkFRUTBNREl3TUFZSUt3WUJCUVVITUFHR0pHaDAKZEhCek9pOHZaR1YyTG14aGJXRnpjM1V1ZEdWemRDOWhjR2t2ZG1FdmIyTnpjREJaQmdOVkhSOEVVakJRTUU2ZwpUS0JLaGtob2RIUndjem92TDJSbGRpNXNZVzFoYzNOMUxuUmxjM1F2WVhCcEwzWmhMMk55YkM5aE4ySXdPRFUzClppMHlZbUkxTFRRd01UTXRPREptWkMwd09HSTROR0ptWWpoallXRXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnSUIKQUpwcUxOMWNXcDlKclJZL21Vcmx0dEFERlJ3a2o5YmlkbDJITVVDeVJCaDA0bFhVWnREaDdaUkFYRUlZY3R4bgppeU56eDY5MXZIVGtBMUt0YW05TUc3TzNCS3I4bk1QZjM3VE1ZTDJtOENRZFU2STZqRUFrUktBZVZqL0p5TGVSClVDSmpzcVdOYVpuYmV0a3FHRk5qbktiU0NOSm1uQ2VMeUVHSk1ScncvWTQyZlp0NE5DYXltM1ZlODRlekl2MGUKOFpmbFVhWEgrckNpYVZ5cHY5S3BudUpCZWRsOVdDUlJ3TTR0ZGs5bmJNbmcreGZLMnZuMkRWNmhKellKME1jWApmYUlnRDU1MFdwQmt0N0JBbWhNd0VWQkNKWWhQNmw3cjhjaVRtdTdRMWJhZ1VwY0tWY002cTNaVitHdUNyaStpCmhqOFQzY1Job2RNUmdrZHpFZ2dzSkRhL2NwWVVwOFpTU0RQTWk5V3FVaWY4Mm56dFJiakRmc3MwRnV4T04yWTYKZlFMTWpZZFhXVW0xTzk5Qkw5TnJtYkVldG5sY08zTDRlYk9NdXRGUDV1YlV1MXZNUjF6VURnM2x6VFA2Wk1BcApyV0hxUi9IU1NxVlRuTnMrUnNsb2UvV0g5cUhFVGlFMFNBaEx0d3EvUzZDRzZKVm91TWd3VVFHdEJLQllDSGxKCkZ5OU1zdXdJL2t3NXZGTGJRTXpSc01tT3dFeFN4VHhMU1lkczBqZm84OU1VZGFCQWdrTEJTc2VpQ0I4cFBoMCsKMEFrRW5GbEVoYjJpTktLZ1F6cGN4NTBleHN3aktyVXdWck9BUTFQRnpXYlFOVWdtc2dCVmpmZDZ3N2hMQ3FyLwo5M3NTUzduSXh6V1lSRjVnYW8vb21QVlYxeUVRaWk4TFoybk5zbHMweXA3eQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg="
         dms:
           $ref: '#/components/schemas/DMS'
         device:
           $ref: '#/components/schemas/Device'
-    Certificate:
-      type: object
-      properties:
-        serial_number:
-          type: string
-        metadata:
-          type: object
-          additionalProperties: {}
-        issuer_metadata:
-          $ref: '#/components/schemas/IssuerCAMetadata'
-        status:
-          $ref: '#/components/schemas/CertificateStatus'
-        certificate:
-          $ref: '#/components/schemas/X509Certificate'
-        key_metadata:
-          $ref: '#/components/schemas/KeyStrengthMetadata'
-        subject:
-          $ref: '#/components/schemas/Subject'
-        valid_from:
-          type: string
-          format: date-time
-        valid_to:
-          type: string
-          format: date-time
-        revocation_timestamp:
-          type: string
-          format: date-time
-        revocation_reason:
-          type: integer
-        type:
-          $ref: '#/components/schemas/CertificateType'
-        engine_id:
-          type: string
-    IssuerCAMetadata:
-      type: object
-      properties:
-        serial_number:
-          type: string
-        id:
-          type: string
-        level:
-          type: integer
-    CertificateStatus:
-      type: string
-      enum:
-        - ACTIVE
-        - EXPIRED
-        - REVOKED
-    X509Certificate:
-      type: object
-      properties:
-        raw:
-          type: string
-          format: byte
-        raw_tbs_certificate:
-          type: string
-          format: byte
-        raw_subject_public_key_info:
-          type: string
-          format: byte
-        raw_subject:
-          type: string
-          format: byte
-        raw_issuer:
-          type: string
-          format: byte
-        signature:
-          type: string
-          format: byte
-        signature_algorithm:
-          type: integer
-        public_key_algorithm:
-          type: integer
-        public_key:
-          type: object
-        version:
-          type: integer
-        serial_number:
-          $ref: '#/components/schemas/BigInt'
-        issuer:
-          $ref: '#/components/schemas/pkixName'
-        subject:
-          $ref: '#/components/schemas/pkixName'
-        not_before:
-          type: string
-          format: date-time
-        not_after:
-          type: string
-          format: date-time
-        key_usage:
-          type: integer
-        extensions:
-          type: array
-          items:
-            $ref: '#/components/schemas/pkixExtension'
-        extra_extensions:
-          type: array
-          items:
-            $ref: '#/components/schemas/pkixExtension'
-        unhandled_critical_extensions:
-          type: array
-          items:
-            type: array
-            items:
-              type: integer
-        ext_key_usage:
-          type: array
-          items:
-            type: integer
-        unknown_ext_key_usage:
-          type: array
-          items:
-            type: array
-            items:
-              type: integer
-        basic_constraints_valid:
-          type: boolean
-        is_ca:
-          type: boolean
-        max_path_len:
-          type: integer
-        max_path_len_zero:
-          type: boolean
-        subject_key_id:
-          type: string
-          format: byte
-        authority_key_id:
-          type: string
-          format: byte
-        ocsp_server:
-          type: array
-          items:
-            type: string
-        issuing_certificate_url:
-          type: array
-          items:
-            type: string
-        dns_names:
-          type: array
-          items:
-            type: string
-        email_addresses:
-          type: array
-          items:
-            type: string
-        ip_addresses:
-          type: array
-          items:
-            type: string
-            format: ipv4
-        uris:
-          type: array
-          items:
-            $ref: '#/components/schemas/URL'
-        permitted_dns_domains_critical:
-          type: boolean
-        permitted_dns_domains:
-          type: array
-          items:
-            type: string
-        excluded_dns_domains:
-          type: array
-          items:
-            type: string
-        permitted_ip_ranges:
-          type: array
-          items:
-            $ref: '#/components/schemas/IPNet'
-        excluded_ip_ranges:
-          type: array
-          items:
-            $ref: '#/components/schemas/IPNet'
-        permitted_email_addresses:
-          type: array
-          items:
-            type: string
-            format: email
-        excluded_email_addresses:
-          type: array
-          items:
-            type: string
-            format: email
-        permitted_uri_domains:
-          type: array
-          items:
-            type: string
-            format: uri
-        excluded_uri_domains:
-          type: array
-          items:
-            type: string
-            format: uri
-        crl_distribution_points:
-          type: array
-          items:
-            type: string
-        policy_identifiers:
-          type: array
-          items:
-            type: array
-            items:
-              type: integer
-        policies:
-          type: array
-          items:
-            $ref: '#/components/schemas/OID'
-    KeyStrengthMetadata:
-      type: object
-      properties:
-        key_type:
-          type: string
-          enum:
-            - UnknownPublicKeyAlgorithm
-            - RSA
-            - DSA
-            - ECDSA
-            - Ed25519
-        bits:
-          type: integer
-        key_strength:
-          type: string
-          enum:
-            - HIGH
-            - MEDIUM
-            - LOW
-    Subject:
-      type: object
-      properties:
-        common_name:
-          type: string
-        organization:
-          type: string
-        organization_unit:
-          type: string
-        country:
-          type: string
-        state:
-          type: string
-        locality:
-          type: string
-    CertificateType:
-      type: string
-      enum:
-        - MANAGED
-        - IMPORTED
-        - EXTERNAL
     Device:
       type: object
       properties:
@@ -1152,22 +931,23 @@ components:
   securitySchemes:
     MTLS:
       type: mutualTLS
-    Oauth2Password:
+    Oauth2:
       type: oauth2
       flows:
+        authorizationCode:
+          authorizationUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/auth
+          tokenUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/token
+          scopes: {}
         clientCredentials:
-          tokenUrl: https://example.com/oauth/token
-          scopes:
-            read: Grants read access
-            write: Grants write access
+          tokenUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/token
+          scopes: {}
     NoAuth:
       type: http
       scheme: bearer
           
           
 servers:
-  - description: SwaggerHub API Auto Mocking
-    url: >-
-      https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_DMSManager/1.0.0
   - description: Local
     url: https://localhost:8443/api/dmsmanager/v1
+  - description: est
+    url: https://localhost:8443/api/dmsmanager

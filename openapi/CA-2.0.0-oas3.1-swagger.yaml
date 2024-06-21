@@ -15,6 +15,7 @@ info:
     - [Lamassu Iot
     Docs](https://www.lamassu.io/docs/2.5.3/basic-features/ca-service/)
 security:
+  - Oauth2: []
   
 tags:
   - name: CAs
@@ -29,55 +30,18 @@ paths:
       summary: Get All CAs
       description: Get All CAs
       parameters: 
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns all CAs.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GetCAsResponse'
+                $ref: '#/components/schemas/GetCAsResponse'
         '500':
           description: Something went wrong while getting all CAs.
           content:
@@ -103,7 +67,7 @@ paths:
                 $ref: '#/components/schemas/CACertificate'
         '400':
           description: >
-            Bad Request. Possible error reasons: - Struct Validation error - CA
+            Bad Request. Possible error reasons: - Struct validation error - CA
             type inconsistent - Issuance expiration greater than CA expiration -
             Incompatible expiration time ref
           content:
@@ -111,7 +75,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                message: CA type inconsistent
+                err: CA type inconsistent
         '409':
           description: Conflict - CA already exists.
           content:
@@ -119,7 +83,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/409Error'
               example:
-                message: CA already exists
+                err: CA already exists
         '500':
           description: Something went wrong while creating a CA.
           content:
@@ -146,7 +110,7 @@ paths:
                 $ref: '#/components/schemas/ImportCAInput'
         '400':
           description: >
-            Bad Request. Possible error reasons: - Struct Validation error - CA
+            Bad Request. Possible error reasons: - Struct validation error - CA
             type inconsistent - Issuance expiration greater than CA expiration -
             Incompatible expiration time ref - CA and the provided key don't
             match
@@ -155,7 +119,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                message: CA type inconsistent
+                err: CA type inconsistent
         '500':
           description: Something went wrong while importing CA.
           content:
@@ -169,11 +133,7 @@ paths:
       summary: Get CA By ID
       description: Get CA By ID
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the CA to retrieve.
       responses:
         '200':
@@ -183,13 +143,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/CACertificate'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: CA not found.
           content:
@@ -210,23 +170,24 @@ paths:
       summary: Delete CA
       description: Delete CA
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the CA to delete.
       responses:
         '201':
           description: CA successfully deleted.
+          content:
+            application/json:
+               schema:
+                type: object
+                properties: {}
         '400':
-          description: Struct Validation error || CA Status inconsistent
+          description: Struct validation error || CA Status inconsistent
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: CA not found.
           content:
@@ -248,61 +209,20 @@ paths:
       summary: Get CAs By Common Name
       description: Get CAs by their common name.
       parameters:
-        - in: path
-          name: cn
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/cn'
           description: Common name of the CA(s) to retrieve.
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns the list of CAs.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GetCAsResponse'
+                $ref: '#/components/schemas/GetCAsResponse'
         '500':
           description: Something went wrong while getting CAs.
           content:
@@ -316,11 +236,7 @@ paths:
       summary: Update CA Metadata
       description: Update CA Metadata
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the CA to update.
       requestBody:
         required: true
@@ -341,13 +257,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/CACertificate'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: CA not found.
           content:
@@ -369,11 +285,7 @@ paths:
       summary: Update CA Status
       description: Update CA Status
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the CA to update.
       requestBody:
         content:
@@ -388,13 +300,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/CACertificate'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: CA not found.
           content:
@@ -416,69 +328,28 @@ paths:
       summary: Get Certificates by CA
       description: Get Certificates by CA
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the CA certificates to retrieve.
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns the list of CAs.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GetCertificatesResponse'
+                $ref: '#/components/schemas/GetCertificatesResponse'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: CA not found.
           content:
@@ -500,75 +371,29 @@ paths:
       summary: Get Certificates by CA and Status
       description: Get Certificates by CA and Status
       parameters:
-        - name: id
-          in: path
-          required: true
+        - $ref: '#/components/parameters/id'
           description: ID of the CA certificates to retrieve.
-          schema:
-            type: string
-        - name: status
-          in: path
-          required: true
-          description: Status of the certificates
-          schema:
-            $ref: '#/components/schemas/CertificateStatus'
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/status'
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns the list of Certificates.
           content:
             application/json:
               schema:
-                type: array
-                items:
                   $ref: '#/components/schemas/GetCertificatesResponse'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: CA not found.
           content:
@@ -590,12 +415,8 @@ paths:
       summary: Sign Certificate
       description: Sign Certificate
       parameters:
-        - name: id
-          in: path
-          required: true
+        - $ref: '#/components/parameters/id'
           description: ID of the CA certificate to sign.
-          schema:
-            type: string
       requestBody:
         content:
           application/json:
@@ -609,13 +430,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/CACertificate'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: CA not found.
           content:
@@ -637,12 +458,8 @@ paths:
       summary: Sign Message
       description: Sign Message
       parameters:
-        - name: id
-          in: path
-          required: true
+        - $ref: '#/components/parameters/id'
           description: ID of the CA used for signing.
-          schema:
-            type: string
       requestBody:
         required: true
         content:
@@ -657,13 +474,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/SignResponse'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: CA not found.
           content:
@@ -685,11 +502,7 @@ paths:
       summary: Verify Signature
       description: Verify Signature
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the CA to verify.
       requestBody:
         required: true
@@ -705,13 +518,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyResponse'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: CA not found.
           content:
@@ -733,18 +546,9 @@ paths:
       summary: Get Certificate by Serial Number
       description: Get Certificate by Serial Number
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-          description: ID of the CA
-        - in: path
-          name: sn
-          required: true
-          schema:
-            type: string
-          description: Serial number of the certificate
+        - $ref: '#/components/parameters/id'
+          description: ID of the CA.
+        - $ref: '#/components/parameters/sn'
       responses:
         '200':
           description: Successful operation. Returns the Certificate.
@@ -753,13 +557,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Certificate'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: Certificate not found.
           content:
@@ -781,55 +585,18 @@ paths:
       summary: Get Certificates
       description: Update CA Metadata
       parameters: 
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns all Certificates.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GetCertificatesResponse'
+                $ref: '#/components/schemas/GetCertificatesResponse'
         '500':
           description: Something went wrong while getting all certificates.
           content:
@@ -843,69 +610,27 @@ paths:
       summary: Get Certificates by Status
       description: Get certificates by status
       parameters:
-        - in: path
-          name: status
-          required: true
-          schema:
-            type: string
-          description: Status of the certificates to retrieve
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/status'
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns list of Certificates.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GetCertificatesResponse'
+                $ref: '#/components/schemas/GetCertificatesResponse'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '500':
           description: Something went wrong while getting certificates.
           content:
@@ -931,63 +656,26 @@ paths:
             type: string
             format: date-time
           description: Return certificates expiring before this date (RFC3339 format)
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns list of Certificates.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GetCertificatesResponse'
+                $ref: '#/components/schemas/GetCertificatesResponse'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '500':
           description: Something went wrong while getting certificates.
           content:
@@ -1001,12 +689,7 @@ paths:
       summary: Get Certificate by Serial Number
       description: Get Certificate by Serial Number
       parameters:
-        - in: path
-          name: sn
-          required: true
-          schema:
-            type: string
-          description: The serial number of the certificate
+        - $ref: '#/components/parameters/sn'
       responses:
         '200':
           description: Successful operation. Returns the Certificate.
@@ -1015,13 +698,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Certificate'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: Certificate not found.
           content:
@@ -1043,12 +726,7 @@ paths:
       summary: Update Certificate Status
       description: Update Certificate Status
       parameters:
-        - in: path
-          name: sn
-          required: true
-          schema:
-            type: string
-          description: The serial number of the certificate
+        - $ref: '#/components/parameters/sn'
       requestBody:
         required: true
         content:
@@ -1063,13 +741,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Certificate'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: Certificate not found.
           content:
@@ -1091,12 +769,7 @@ paths:
       summary: Update Certificate Metadata
       description: Update Certificate Metadata
       parameters:
-        - in: path
-          name: sn
-          required: true
-          schema:
-            type: string
-          description: The serial number of the certificate
+        - $ref: '#/components/parameters/sn'
       requestBody:
         required: true
         content:
@@ -1111,13 +784,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Certificate'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '404':
           description: Certificate not found.
           content:
@@ -1152,13 +825,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Certificate'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '500':
           description: Something went wrong while importing certificate.
           content:
@@ -1214,12 +887,8 @@ paths:
       summary: Get Stats by CA ID
       description: Get Stats by CA ID
       parameters:
-        - in: path
-          name: id
-          required: true
+        - $ref: '#/components/parameters/id'
           description: The ID of the CA
-          schema:
-            type: string
       responses:
         '200':
           description: Successful operation. Returns the Certificates stats.
@@ -1228,18 +897,20 @@ paths:
               schema:
                 type: object
                 properties:
-                  certificateStatus:
-                    $ref: '#/components/schemas/CertificateStatus'
-                  additionalProperties:
+                  ACTIVE:
+                    type: integer
+                  EXPIRED:
+                    type: integer
+                  REVOKED:
                     type: integer
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/400Error'
               example:
-                err: struct Validation error
+                err: struct validation error
         '500':
           description: Something went wrong while getting stats.
           content:
@@ -1247,6 +918,77 @@ paths:
               schema:
                 $ref: '#/components/schemas/500Error'
 components:
+  parameters:
+    sortByParam:
+      name: sort_by
+      in: query
+      description: Field by which to sort the results.
+      required: false
+      schema:
+        type: string
+        example: name
+    sortModeParam:
+      name: sort_mode
+      in: query
+      description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+        example: asc
+    pageSizeParam:
+      name: page_size
+      in: query
+      description: Number of items per page.
+      required: false
+      schema:
+        type: integer
+        example: 5
+    bookmarkParam:
+      name: bookmark
+      in: query
+      description: Bookmark for pagination.
+      required: false
+      schema:
+        type: string
+        example: "bm12345"
+    filterParam:
+      name: filter
+      in: query
+      description: |
+        Filter criteria. Example format: field[operation]=value.
+        Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+        Supported operations for date fields: bf (before), eq (equal), af (after).
+        Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+      required: false
+      schema:
+        type: string
+        example: status[eq]=active
+    id:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+    cn:
+      in: path
+      name: cn
+      required: true
+      schema:
+        type: string
+    status:
+      name: status
+      required: true
+      schema:
+        type: string
+      description: Status of the certificates to retrieve
+    sn:
+      in: path
+      name: sn
+      required: true
+      schema:
+        type: string
+      description: Serial number of the certificate
   schemas:
     GetCAsResponse:
       type: object
@@ -1271,15 +1013,13 @@ components:
       properties:
         serial_number:
           type: string
-        metadata:
-          type: object
-          additionalProperties: {}
-        issuer_ca_metadata:
+        issuer_metadata:
           $ref: '#/components/schemas/IssuerCAMetadata'
-        certificate_status:
+        status:
           $ref: '#/components/schemas/CertificateStatus'
         certificate:
-          $ref: '#/components/schemas/X509Certificate'
+          type: string
+          example: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUdyVENDQkpXZ0F3SUJBZ0lRRGlHdHRrcnAvUDZSd2h3L044bDZCakFOQmdrcWhraUc5dzBCQVFzRkFEQncKTVJFd0R3WURWUVFHREFnOGMzUnlhVzVuUGpFUk1BOEdBMVVFQ0F3SVBITjBjbWx1Wno0eEVUQVBCZ05WQkFjTQpDRHh6ZEhKcGJtYytNUkV3RHdZRFZRUUtEQWc4YzNSeWFXNW5QakVSTUE4R0ExVUVDd3dJUEhOMGNtbHVaejR4CkR6QU5CZ05WQkFNVEJuQnlkV1ZpWVRBZUZ3MHlOREEyTVRjd056QTBOREZhRncweU5UQTBNVE13TnpBME16bGEKTUhBeEVUQVBCZ05WQkFZTUNEeHpkSEpwYm1jK01SRXdEd1lEVlFRSURBZzhjM1J5YVc1blBqRVJNQThHQTFVRQpCd3dJUEhOMGNtbHVaejR4RVRBUEJnTlZCQW9NQ0R4emRISnBibWMrTVJFd0R3WURWUVFMREFnOGMzUnlhVzVuClBqRVBNQTBHQTFVRUF4TUdjSEoxWldKaE1JSUNJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBZzhBTUlJQ0NnS0MKQWdFQTN1ZVZOMDljVE4vUUljRnBTV3hkN3JxNGFKSmRva0xqb2dGNklsUmkzbGNrUEhiYWZxZG04Z2c4YVpVaQo3SDhyRVJuRHdVWVViSUgzTzNSSlZ3MHhzdjV4YVZzM2M1VGdYb2JtNG90cDZhT2JST25RcmEwVWpISk8zRytECkJQRnVRci96OHlQSGxhVkpJNklWM3JlWW5sNEFkY09yZkJoRzVDaDJuTDdUcmdiNnJHdVhiMmRyYmlhRHE3ZDAKcW9UK1Y4MWlyQ2JHUnZEU1g2bWZNRm1INDNKYW9ZdnYveDh0SUk1dzVmNXFHU3k4S2U2ekRnOFoyZktSWUtJNwpTQmpFc0hRUGIxZXZidnhvRWRiRHgwOW5VSHBxSHR2bnNwMmdDWEdydGxsb1pMV0RYMGZ1Nmo2a1E2aWpnWXEvCnA2Q1FMTG4xYmdoREVlVDlmOGp4YVhlWHNlRWFaTS9laVpROHVPbVV1dzBTZVZ0UWhvWllmanZyNlNLRjhxUkYKbkRxbnlqMXo5RlZnTkdiall5NlpmMTVoMmw4bE1tQ0s4WUN5V1BmMk4rMWlXcHBnejh0QUxWOCtWb3VhZXNPSwp6MytDZGVUWWxWdzQ0QmNuc0dKN1dFZjluMEdteGs4VHp3OXNUQmYyZWVQaXp3K2NScSt6ekV4NHJ1dUlRc3JoCnRtVTQxMm83TUplaXh0RnN2N3pGUEN0L0lNMGg2Umx0ZGlwREJvOE4wYVl2N1pzVzdVM2hDajJXaWEzclg5TDMKM0JwTVQ2RDlwbGZFZXF2V0ZMQjBEcWFPS0s0dndyVmNYcnB1bm0wZnlic0NwaURCRGJvaUxYeE1CdDYxb2p3QQpvSklKNDVJTnIrWkd2cG5IS0s0SncydnpMVkl3MU5DYzhBa01RcDRmTm9ZZlhVRUNBd0VBQWFPQ0FVRXdnZ0U5Ck1BNEdBMVVkRHdFQi93UUVBd0lCbGpBZEJnTlZIU1VFRmpBVUJnZ3JCZ0VGQlFjREFnWUlLd1lCQlFVSEF3RXcKRHdZRFZSMFRBUUgvQkFVd0F3RUIvekF0QmdOVkhRNEVKZ1FrWVRkaU1EZzFOMll0TW1KaU5TMDBNREV6TFRneQpabVF0TURoaU9EUmlabUk0WTJGaE1DOEdBMVVkSXdRb01DYUFKR0UzWWpBNE5UZG1MVEppWWpVdE5EQXhNeTA0Ck1tWmtMVEE0WWpnMFltWmlPR05oWVRCQUJnZ3JCZ0VGQlFjQkFRUTBNREl3TUFZSUt3WUJCUVVITUFHR0pHaDAKZEhCek9pOHZaR1YyTG14aGJXRnpjM1V1ZEdWemRDOWhjR2t2ZG1FdmIyTnpjREJaQmdOVkhSOEVVakJRTUU2ZwpUS0JLaGtob2RIUndjem92TDJSbGRpNXNZVzFoYzNOMUxuUmxjM1F2WVhCcEwzWmhMMk55YkM5aE4ySXdPRFUzClppMHlZbUkxTFRRd01UTXRPREptWkMwd09HSTROR0ptWWpoallXRXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnSUIKQUpwcUxOMWNXcDlKclJZL21Vcmx0dEFERlJ3a2o5YmlkbDJITVVDeVJCaDA0bFhVWnREaDdaUkFYRUlZY3R4bgppeU56eDY5MXZIVGtBMUt0YW05TUc3TzNCS3I4bk1QZjM3VE1ZTDJtOENRZFU2STZqRUFrUktBZVZqL0p5TGVSClVDSmpzcVdOYVpuYmV0a3FHRk5qbktiU0NOSm1uQ2VMeUVHSk1ScncvWTQyZlp0NE5DYXltM1ZlODRlekl2MGUKOFpmbFVhWEgrckNpYVZ5cHY5S3BudUpCZWRsOVdDUlJ3TTR0ZGs5bmJNbmcreGZLMnZuMkRWNmhKellKME1jWApmYUlnRDU1MFdwQmt0N0JBbWhNd0VWQkNKWWhQNmw3cjhjaVRtdTdRMWJhZ1VwY0tWY002cTNaVitHdUNyaStpCmhqOFQzY1Job2RNUmdrZHpFZ2dzSkRhL2NwWVVwOFpTU0RQTWk5V3FVaWY4Mm56dFJiakRmc3MwRnV4T04yWTYKZlFMTWpZZFhXVW0xTzk5Qkw5TnJtYkVldG5sY08zTDRlYk9NdXRGUDV1YlV1MXZNUjF6VURnM2x6VFA2Wk1BcApyV0hxUi9IU1NxVlRuTnMrUnNsb2UvV0g5cUhFVGlFMFNBaEx0d3EvUzZDRzZKVm91TWd3VVFHdEJLQllDSGxKCkZ5OU1ldXdJL2t3NXZGTGJRTXpSc01tT3dFeFN4VHhMU1lkczBqZm84OU1VZGFCQWdrTEJTc2VpQ0I4cFBoMCsKMEFrRW5GbEVoYjJpTktLZ1F6cGN4NTBleHN3aktyVXdWck9BUTFQRnpXYlFOVWdtc2dCVmpmZDZ3N2hMQ3FyLwo5M3NTUzduSXh6V1lSRjVnYW8vb21QVlYxeUVRaWk4TFoybk5zbHMweXA3eQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg="
         key_metadata:
           $ref: '#/components/schemas/KeyStrengthMetadata'
         subject:
@@ -1294,11 +1034,15 @@ components:
           type: string
           format: date-time
         revocation_reason:
-          type: integer
-        certificate_type:
+          $ref: '#/components/schemas/RevocationReason'
+        type:
           $ref: '#/components/schemas/CertificateType'
         engine_id:
           type: string
+        metadata:
+          type: object
+          additionalProperties: true
+          example: {}
     CACertificate:
       allOf:
         - $ref: '#/components/schemas/Certificate'
@@ -1306,13 +1050,16 @@ components:
           properties:
             id:
               type: string
-            issuance_expiration_ref:
+              example: "d9329907-14a0-4973-bca5-d87b2f849c6g"
+            issuance_expiration:
               $ref: '#/components/schemas/Expiration'
             creation_ts:
               type: string
               format: date-time
             level:
               type: integer
+          required:
+            - id
     IssuerCAMetadata:
       type: object
       properties:
@@ -1322,168 +1069,10 @@ components:
           type: string
         level:
           type: integer
-    X509Certificate:
-      type: object
-      properties:
-        raw:
-          type: string
-          format: byte
-        raw_tbs_certificate:
-          type: string
-          format: byte
-        raw_subject_public_key_info:
-          type: string
-          format: byte
-        raw_subject:
-          type: string
-          format: byte
-        raw_issuer:
-          type: string
-          format: byte
-        signature:
-          type: string
-          format: byte
-        signature_algorithm:
-          type: integer
-        public_key_algorithm:
-          type: integer
-        public_key:
-          type: object
-        version:
-          type: integer
-        serial_number:
-          $ref: '#/components/schemas/BigInt'
-        issuer:
-          $ref: '#/components/schemas/pkixName'
-        subject:
-          $ref: '#/components/schemas/pkixName'
-        not_before:
-          type: string
-          format: date-time
-        not_after:
-          type: string
-          format: date-time
-        key_usage:
-          type: integer
-        extensions:
-          type: array
-          items:
-            $ref: '#/components/schemas/pkixExtension'
-        extra_extensions:
-          type: array
-          items:
-            $ref: '#/components/schemas/pkixExtension'
-        unhandled_critical_extensions:
-          type: array
-          items:
-            type: array
-            items:
-              type: integer
-        ext_key_usage:
-          type: array
-          items:
-            type: integer
-        unknown_ext_key_usage:
-          type: array
-          items:
-            type: array
-            items:
-              type: integer
-        basic_constraints_valid:
-          type: boolean
-        is_ca:
-          type: boolean
-        max_path_len:
-          type: integer
-        max_path_len_zero:
-          type: boolean
-        subject_key_id:
-          type: string
-          format: byte
-        authority_key_id:
-          type: string
-          format: byte
-        ocsp_server:
-          type: array
-          items:
-            type: string
-        issuing_certificate_url:
-          type: array
-          items:
-            type: string
-        dns_names:
-          type: array
-          items:
-            type: string
-        email_addresses:
-          type: array
-          items:
-            type: string
-        ip_addresses:
-          type: array
-          items:
-            type: string
-            format: ipv4
-        uris:
-          type: array
-          items:
-            $ref: '#/components/schemas/URL'
-        permitted_dns_domains_critical:
-          type: boolean
-        permitted_dns_domains:
-          type: array
-          items:
-            type: string
-        excluded_dns_domains:
-          type: array
-          items:
-            type: string
-        permitted_ip_ranges:
-          type: array
-          items:
-            $ref: '#/components/schemas/IPNet'
-        excluded_ip_ranges:
-          type: array
-          items:
-            $ref: '#/components/schemas/IPNet'
-        permitted_email_addresses:
-          type: array
-          items:
-            type: string
-            format: email
-        excluded_email_addresses:
-          type: array
-          items:
-            type: string
-            format: email
-        permitted_uri_domains:
-          type: array
-          items:
-            type: string
-            format: uri
-        excluded_uri_domains:
-          type: array
-          items:
-            type: string
-            format: uri
-        crl_distribution_points:
-          type: array
-          items:
-            type: string
-        policy_identifiers:
-          type: array
-          items:
-            type: array
-            items:
-              type: integer
-        policies:
-          type: array
-          items:
-            $ref: '#/components/schemas/OID' 
     KeyMetadata:
       type: object
       properties:
-        key_type:
+        type:
           type: string
           enum:
             - UnknownPublicKeyAlgorithm
@@ -1522,7 +1111,7 @@ components:
     Expiration:
       type: object
       properties:
-        expiration_type:
+        type:
           type: string
           enum:
             - Duration
@@ -1552,6 +1141,10 @@ components:
         metadata:
           type: object
           additionalProperties: true
+      required:
+        - key_metadata
+        - ca_expiration
+        - issuance_expiration
     ImportCA:
       type: object
       properties:
@@ -1562,9 +1155,7 @@ components:
         parent_id:
           type: string
     ImportCABody:
-      allOf:
-        - $ref: '#/components/schemas/Certificate'
-        - type: object
+      type: object
       properties:
         id:
           type: string
@@ -1576,15 +1167,23 @@ components:
           type: string
           description: Base64 encoded private key from PEM
         ca_certificate:
-          $ref: '#/components/schemas/X509Certificate'
+          type: string
+          example:
+            "MHCCAQEEIOUXa254YMYXWksCADpHFdJ+ly+nrQFsa0ozEuTZXmP50AoGCCqGSM49AwEHOUQDQgAEuLp+SvdUZJTXqCHivs3BpwfkKSAZ19ug9590zn7Hec2dLZj1tPG6uywNx1FjrBpX2j6DBnyp1owBUYOY1RVWtw=="
         ca_chain:
           type: array
           items:
-            $ref: '#/components/schemas/X509Certificate'
-        ca_type:
+            type: string
+        type:
           $ref: '#/components/schemas/CertificateType'
         issuance_expiration:
           $ref: '#/components/schemas/Expiration'
+      required:
+        - id
+        - parent_id
+        - ca_private_key
+        - ca_certificate
+        - issuance_expiration
     CertificateType:
       type: string
       enum:
@@ -1601,11 +1200,13 @@ components:
         issuance_expiration:
           $ref: '#/components/schemas/Expiration'
         ca_certificate:
-          $ref: '#/components/schemas/X509Certificate'
+          type: string
+          exmple:
+            "lwcoluyVN3Sg25qIVdgzUUq61Rav+IEc8krsmWC8J/mxMyjTfkdr7thVatZCUhmQtdasbQh6esWHKTa/5t+EzRBa8HGVUWkvQWfLT8O0UpvcKFEI81yyCz2CmzOvY+izesf+SlWwjGmcu/ouTynRiJSje0qhSVRGwSydyHgBv41zip2i36P1Cc+/XI9StrFBOslecYhvXgRVGIxgapZ5m/j9Mu7l7Qiqjxn6LIqlZdoxcbfeqVYln3+ukYHZpNOjLkPO65d7SytBKVC2XSJn4BaSdEQqqn+zGmvOTb5Pc/JIKO2zoEfTnGie/vlEz5aQczaNEBG+dDK+y+FlA97Yzq04Laa70OpXnDLj/mqwg1bl0yi/bgum1J6f8ISroEmMsxNBDOYhjmQV7przHFO8Ik4P5iPQNMqGAGQIQfcFH5gV6/J+c+oE11tXayfdGdf1DrSkUvnVHqv+LfAhG5Y/07dH/OmXb7fCzvnk1VuuDc7OV1iHolvQYW5LvmUuJbsrdW6n39vmG5eM2F5/K9cO2/CdvHLOJadSxYH2enDlWmn/yht2OWudEKxQEgNgk8uqb8zdBbhRKolJxSW49xzjFQ2S0Ma+E117m9foPHeRYCi76OPk4AxL0nG1CWQfXNgCbsLy6LAhUxyTvyVg+5syRkhQM+VU0jNjyst4gMr0q4A="
         ca_chain:
           type: array
           items:
-            $ref: '#/components/schemas/X509Certificate'
+            type: string
           description: >
             Parent CAs. They MUST be sorted as follows: 0: Root-CA; 1:
             Subordinate CA from Root-CA; ...
@@ -1699,16 +1300,29 @@ components:
     UpdateCertificateStatusBody:
       type: object
       properties:
-        new_status:
+        status:
           $ref: '#/components/schemas/CertificateStatus'
         revocation_reason:
-          type: integer
+          $ref: '#/components/schemas/RevocationReason'
     CertificateStatus:
       type: string
       enum:
         - ACTIVE
         - EXPIRED
         - REVOKED
+    RevocationReason:
+      type: string
+      enum:
+        - Unspecified
+        - KeyCompromise
+        - CACompromise
+        - AffiliationChanged
+        - Superseded
+        - CessationOfOperation
+        - CertificateHold
+        - RemoveFromCRL
+        - PrivilegeWithdrawn
+        - AACompromise
     SingCertificateInput:
       type: object
       required:
@@ -1831,6 +1445,7 @@ components:
             type: string
         serial_number:
           type: string
+          example: "06-6c-9f-cf-99-bf-8c-0a-39-e2-f0-78-8a-42-e6-96-36-5b-ca"
         common_name:
           type: string
         names:
@@ -1927,19 +1542,25 @@ components:
       properties:
         message:
           type: string
-        type:
+          description: "base64 encoded message"
+        message_type:
           type: string
           enum:
             - hash
             - raw
-        signing_algorithm:
+        signature_algorithm:
           type: string
+          example: "RSASSA_PSS_SHA_256"
+      required:
+        - message_type
+        - signature_algorithm
     SignResponse:
       type: object
       properties:
         signed_data:
           type: string
           format: byte
+          example: "kRk0621HqEHfh+0HW9UMmrcCehHyhWGB23Glsklqjt33R90zOHvAAzvRb7K55ACS9Fv/1vZ7Tgsg8MFjyX6q2hjTS/bfCQh0MMsVkz8HruKVWHIk54O2PG0oCg3fCGh8sMfhj+aX0m1pyN+Pe1+nfztZzCKyXkVpGEy+4Zjw5PoZSogsB7Er6/OyACXIrO3SAnj7YDlvfSLuNYjLvXC04W9rrAhnJpVFVoXI6F57JG7pq/OWtOfE5USy0FZt8LDA2vPHRIQEMCn5xJfZG8mujSjU6i3SN6WAdImUlVTQ8xz6ynV+5bHJfUnQdM7Rx8Qb0UeEtFY8/GG4YUD0B29JqtzMKoOlrTiizW5Y74PdIVRSweJEH0DzXD4WKzy34/aEy/RpXaKIdAj+GoiGs4ccar9FHg+781A90iWx7m3SGS7VRjjduGw5h9afCIumNYkMxSiHAZib7c0pa5lx95sumTAarlz35wbd1IdkQYdAoCRIWpoQdrI6dhvCk1lxoIg27Y+grzLKwXd5UYnRNBwcp30BK65zRLcpkZIcpRrbN4v2e+Oklypj5oOXtMN/zg8vEVAyzFDPE+oq8CAsD1ItHOVlQ9548UPca8jJFo+az/DHj1r2cM2AoqNzhmjVk99S9y8GICtwHH3LHIPezrFe5xqyjbiT9547/NniDUKe6Pc="
     SignatureVerifyBody:
       allOf:
         - $ref: '#/components/schemas/SignatureSignBody'
@@ -1947,6 +1568,10 @@ components:
       properties:
         signature:
           type: string
+          example:
+            "lwcoluyVN3Sg25qIVdgzUUq61Rav+IEc8krsmWC8J/mxMyjTfkdr7thVatZCUhmQtdasbQh6esWHKTa/5t+EzRBa8HGVUWkvQWfLT8O0UpvcKFEI81yyCz2CmzOvY+izesf+SlWwjGmcu/ouTynRiJSje0qhSVRGwSydyHgBv41zip2i36P1Cc+/XI9StrFBOslecYhvXgRVGIxgapZ5m/j9Mu7l7Qiqjxn6LIqlZdoxcbfeqVYln3+ukYHZpNOjLkPO65d7SytBKVC2XSJn4BaSdEQqqn+zGmvOTb5Pc/JIKO2zoEfTnGie/vlEz5aQczaNEBG+dDK+y+FlA97Yzq04Laa70OpXnDLj/mqwg1bl0yi/bgum1J6f8ISroEmMsxNBDOYhjmQV7przHFO8Ik4P5iPQNMqGAGQIQfcFH5gV6/J+c+oE11tXayfdGdf1DrSkUvnVHqv+LfAhG5Y/07dH/OmXb7fCzvnk1VuuDc7OV1iHolvQYW5LvmUuJbsrdW6n39vmG5eM2F5/K9cO2/CdvHLOJadSxYH2enDlWmn/yht2OWudEKxQEgNgk8uqb8zdBbhRKolJxSW49xzjFQ2S0Ma+E117m9foPHeRYCi76OPk4AxL0nG1CWQfXNgCbsLy6LAhUxyTvyVg+5syRkhQM+VU0jNjyst4gMr0q4A="
+      reuired:
+        - signature
     VerifyResponse:
       type: object
       properties:
@@ -1968,7 +1593,9 @@ components:
           type: object
           additionalProperties: true
         certificate:
-          $ref: '#/components/schemas/X509Certificate'
+          type: string
+          example:
+            "lwcoluyVN3Sg25qIVdgzUUq61Rav+IEc8krsmWC8J/mxMyjTfkdr7thVatZCUhmQtdasbQh6esWHKTa/5t+EzRBa8HGVUWkvQWfLT8O0UpvcKFEI81yyCz2CmzOvY+izesf+SlWwjGmcu/ouTynRiJSje0qhSVRGwSydyHgBv41zip2i36P1Cc+/XI9StrFBOslecYhvXgRVGIxgapZ5m/j9Mu7l7Qiqjxn6LIqlZdoxcbfeqVYln3+ukYHZpNOjLkPO65d7SytBKVC2XSJn4BaSdEQqqn+zGmvOTb5Pc/JIKO2zoEfTnGie/vlEz5aQczaNEBG+dDK+y+FlA97Yzq04Laa70OpXnDLj/mqwg1bl0yi/bgum1J6f8ISroEmMsxNBDOYhjmQV7przHFO8Ik4P5iPQNMqGAGQIQfcFH5gV6/J+c+oE11tXayfdGdf1DrSkUvnVHqv+LfAhG5Y/07dH/OmXb7fCzvnk1VuuDc7OV1iHolvQYW5LvmUuJbsrdW6n39vmG5eM2F5/K9cO2/CdvHLOJadSxYH2enDlWmn/yht2OWudEKxQEgNgk8uqb8zdBbhRKolJxSW49xzjFQ2S0Ma+E117m9foPHeRYCi76OPk4AxL0nG1CWQfXNgCbsLy6LAhUxyTvyVg+5syRkhQM+VU0jNjyst4gMr0q4A="
     CryptoEngineProvider:
       allOf:
         - $ref: '#/components/schemas/CryptoEngineInfo'
@@ -1999,6 +1626,9 @@ components:
         metadata:
           type: object
           additionalProperties: true
+          example:
+            lamassu.io/cryptoengine.golang.storage-path: "/data"
+            prod-ready: "false"
         supported_key_types:
           type: array
           items:
@@ -2007,31 +1637,60 @@ components:
       type: object
       properties:
         type:
-          type: integer
+          type: string
+          enum:
+            - RSA
+            - DSA
+            - ECDSA
+            - Ed25519
         sizes:
           type: array
           items:
             type: integer
+            example:
+              [1024,2048,3072,4096]
     CAStats:
       type: object
       properties:
-        CA_ertificates_stats:
+        cas:
+          $ref: '#/components/schemas/CACertificatesStats'
+        certificates:
           $ref: '#/components/schemas/CertificatesStats'
-        certificates_stats:
-          $ref: '#/components/schemas/CertificatesStats'
-    CertificatesStats:
+    Stats:
       type: object
       properties:
         total:
           type: integer
-        distribution:
+        status_distribution:
           type: object
-          additionalProperties:
-            type: integer
-        status:
-          type: object
-          additionalProperties:
-            $ref: '#/components/schemas/CertificateStatus'
+          properties:
+            ACTIVE:
+              type: integer
+            EXPIRED:
+              type: integer
+            REVOKED:
+              type: integer
+    CACertificatesStats:
+      allOf:
+        - $ref: '#/components/schemas/Stats'
+        - type: object
+          properties:
+            engine_distribution:
+              type: object
+              additionalProperties:
+                type: integer
+              example:
+                "golang-1": 8
+    CertificatesStats:
+      allOf:
+        - $ref: '#/components/schemas/Stats'
+        - type: object
+          properties:
+            ca_distribution:
+              type: object
+              additionalProperties:
+                type: integer
+              example: {}
     BigInt:
       type: object
       properties:
@@ -2091,20 +1750,20 @@ components:
   securitySchemes:
     MTLS:
       type: mutualTLS
-    Oauth2Password:
+    Oauth2:
       type: oauth2
       flows:
+        authorizationCode:
+          authorizationUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/auth
+          tokenUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/token
+          scopes: {}
         clientCredentials:
-          tokenUrl: https://example.com/oauth/token
-          scopes:
-            read: Grants read access
-            write: Grants write access
+          tokenUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/token
+          scopes: {}
     NoAuth:
       type: http
       scheme: bearer
           
 servers:
-  - description: SwaggerHub API Auto Mocking
-    url: https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_CA/1.0.0
   - description: Local
     url: https://localhost:8443/api/ca/v1

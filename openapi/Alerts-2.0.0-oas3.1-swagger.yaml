@@ -22,7 +22,7 @@ info:
     - [Lamassu Iot Docs](https://www.lamassu.io/docs/2.0.0/architecture/#alerts)
 
 security:
-  - mutualTLS: []
+  - Oauth2: []
 tags:
   - name: events
   - name: user
@@ -318,8 +318,16 @@ components:
             - Internal Server Error
           example: Internal Server Error
   securitySchemes:
-    mutualTLS:
-      type: mutualTLS
+    Oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/auth
+          tokenUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/token
+          scopes: {}
+        clientCredentials:
+          tokenUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/token
+          scopes: {}
           
 servers:
   - description: Local

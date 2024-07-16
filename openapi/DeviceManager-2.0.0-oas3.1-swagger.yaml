@@ -19,7 +19,7 @@ info:
     - [Lamassu Iot
     Docs](https://www.lamassu.io/docs/2.0.0/architecture/#device-manager)
 security:
-  - Oauth2Password: []
+  - Oauth2: []
 tags:
   - name: devices
   - name: stats
@@ -31,55 +31,18 @@ paths:
       summary: Get All Devices
       description: Get All Devices
       parameters: 
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns all devices.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GetDevicesResponse'
+                $ref: '#/components/schemas/GetDevicesResponse'
         '500':
           description: Something went wrong while getting all devices.
           content:
@@ -117,11 +80,7 @@ paths:
       summary: Get Device by ID
       description: Get Device by ID
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the device to retrieve.
       responses:
         '200':
@@ -131,7 +90,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Device'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
@@ -149,11 +108,7 @@ paths:
       summary: Update Device by ID Slot
       description: Update Device by ID Slot
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the device to update.
       requestBody:
         required: true
@@ -169,7 +124,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Device'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
@@ -187,11 +142,7 @@ paths:
       summary: Update Device Metadata
       description: Update Device Metadata
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the device to update.
       requestBody:
         required: true
@@ -211,7 +162,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Device'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
@@ -229,11 +180,7 @@ paths:
       summary: Decomissions a Device
       description: Decomissions a Device
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the device to decomission.
       responses:
         '200':
@@ -243,7 +190,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Device'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
@@ -261,63 +208,22 @@ paths:
       summary: Get Devices By DMS
       description: Get Devices By DMS
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/id'
           description: ID of the DMS to retrieve devices for.
-        - name: sort_by
-          in: query
-          description: Field by which to sort the results.
-          required: false
-          schema:
-            type: string
-            example: name
-        - name: sort_mode
-          in: query
-          description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
-          required: false
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: asc
-        - name: page_size
-          in: query
-          description: Number of items per page.
-          required: false
-          schema:
-            type: integer
-            example: 5
-        - name: bookmark
-          in: query
-          description: Bookmark for pagination.
-          required: false
-          schema:
-            type: string
-            example: "bm12345"
-        - name: filter
-          in: query
-          description: |
-            Filter criteria. Example format: field[operation]=value.
-            Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
-            Supported operations for date fields: bf (before), eq (equal), af (after).
-            Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
-          required: false
-          schema:
-            type: string
-            example: status[eq]=active
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/sortModeParam'
+        - $ref: '#/components/parameters/pageSizeParam'
+        - $ref: '#/components/parameters/bookmarkParam'
+        - $ref: '#/components/parameters/filterParam'
       responses:
         '200':
           description: Successful operation. Returns all devices related to the DMS.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GetDevicesResponse'
+                $ref: '#/components/schemas/GetDevicesResponse'
         '400':
-          description: Struct Validation error.
+          description: Struct validation error.
           content:
             application/json:
               schema:
@@ -350,11 +256,63 @@ paths:
               schema:
                 $ref: '#/components/schemas/500Error'
 components:
+  parameters:
+    sortByParam:
+      name: sort_by
+      in: query
+      description: Field by which to sort the results.
+      required: false
+      schema:
+        type: string
+        example: name
+    sortModeParam:
+      name: sort_mode
+      in: query
+      description: Sort mode, can be 'asc' for ascending or 'desc' for descending.
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+        example: asc
+    pageSizeParam:
+      name: page_size
+      in: query
+      description: Number of items per page.
+      required: false
+      schema:
+        type: integer
+        example: 5
+    bookmarkParam:
+      name: bookmark
+      in: query
+      description: Bookmark for pagination.
+      required: false
+      schema:
+        type: string
+        example: "bm12345"
+    filterParam:
+      name: filter
+      in: query
+      description: |
+        Filter criteria. Example format: field[operation]=value.
+        Supported operations for string fields: eq (equal), ne (not equal), ct (contains), nc (not contains).
+        Supported operations for date fields: bf (before), eq (equal), af (after).
+        Supported operations for number fields: eq (equal), ne (not equal), lt (less than), le (less or equal), gt (greater than), ge (greater or equal).
+      required: false
+      schema:
+        type: string
+        example: status[eq]=active
+    id:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
   schemas:
     GetDevicesResponse:
       type: object
       properties:
-        nextBookmark:
+        next:
           type: string
         list:
           type: array
@@ -365,16 +323,19 @@ components:
       properties:
         id:
           type: string
+          example: "e5309a78-5d62-4994-bcc6-3428dd483700"
         tags:
           type: array
           items:
             type: string
+          example: ["iot","smart-box"]
         status:
           $ref: '#/components/schemas/DeviceStatus'
         icon:
           type: string
         icon_color:
           type: string
+          example: "#25eee2-#333333"
         creation_timestamp:
           type: string
           format: date-time
@@ -389,21 +350,37 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/Slot'
+          example: {}
         events:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/DeviceEvent'
+          example:
+            "2024-05-21T08:44:32.832652912Z": 
+              type: "CREATED"
+              description: ""
+            "2024-05-21T08:44:41.207092641Z": 
+              type: "STATUS-UPDATED"
+              description: "Status updated from 'NO_IDENTITY' to 'ACTIVE'"
+            "2024-05-21T08:49:00.291736997Z": 
+              type: "STATUS-UPDATED"
+              description: "Status updated from 'ACTIVE' to 'RENEWAL_PENDING'"
+            "2024-06-17T12:23:04.958944869Z": 
+              type: "DECOMMISSIONED"
+              description: ""
     CreateDeviceBody:
       type: object
       properties:
         id:
           type: string
+          example: "e5309a78-5d62-4994-bcc6-3428dd483700"
         alias:
           type: string
         tags:
           type: array
           items:
             type: string
+          example: ["iot","smart-box"]
         metadata:
           type: object
           additionalProperties:
@@ -414,6 +391,12 @@ components:
           type: string
         icon_color:
           type: string
+          example: "#25eee2-#333333"
+      required:
+        - id
+        - dms_id
+        - icon
+        - icon_color
     UpdateDeviceIdentitySlotBody:
       type: object
       additionalProperties:
@@ -445,6 +428,13 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/DeviceEvent'
+          example:
+            "2024-05-21T08:44:41.1929788Z": 
+              type: "PROVISIONED"
+              description: ""
+            "2024-05-21T08:49:00.275489438Z": 
+              type: "STATUS-UPDATED"
+              description: "Status updated from 'NO_IDENTITY' to 'ACTIVE'"
     DeviceEvent:
       type: object
       properties:
@@ -466,30 +456,36 @@ components:
         total:
           type: integer
         status_distribution:
-          $ref: '#/components/schemas/DeviceStatus'
-          description: map[DeviceStatus]int
+          type: object
+          properties:
+            ACTIVE:
+              type: integer
+            DECOMMISSIONED:
+              type: integer
+            EXPIRED:
+              type: integer
+            EXPIRING_SOON:
+              type: integer
+            NO_IDENTITY:
+              type: integer
+            RENEWAL_PENDING:
+              type: integer
+            REVOKED:
+              type: integer
     DeviceStatus:
-      type: object
-      properties:
-        ACTIVE:
-          type: integer
-        DECOMMISSIONED:
-          type: integer
-        EXPIRED:
-          type: integer
-        EXPIRING_SOON:
-          type: integer
-        NO_IDENTITY:
-          type: integer
-        RENEWAL_PENDING:
-          type: integer
-        REVOKED:
-          type: integer
-      additionalProperties: false
+      type: string
+      enum:
+       - ACTIVE
+       - DECOMMISSIONED
+       - EXPIRED
+       - EXPIRING_SOON
+       - NO_IDENTITY
+       - RENEWAL_PENDING
+       - REVOKED
     400Error:
       type: object
       properties:
-        message: 
+        err: 
           type: string
           enum:
             - Struct validation error
@@ -497,7 +493,7 @@ components:
     500Error:
       type: object
       properties:
-        message: 
+        err: 
           type: string
           enum:
             - Internal Server Error
@@ -505,21 +501,20 @@ components:
   securitySchemes:
     MTLS:
       type: mutualTLS
-    Oauth2Password:
+    Oauth2:
       type: oauth2
       flows:
+        authorizationCode:
+          authorizationUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/auth
+          tokenUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/token
+          scopes: {}
         clientCredentials:
-          tokenUrl: https://example.com/oauth/token
-          scopes:
-            read: Grants read access
-            write: Grants write access
+          tokenUrl: https://localhost/auth/realms/lamassu/protocol/openid-connect/token
+          scopes: {}
     NoAuth:
       type: http
       scheme: bearer
           
 servers:
-  - description: SwaggerHub API Auto Mocking
-    url: >-
-      https://virtserver.swaggerhub.com/MIKELELOLA003_1/Lamassuiot_DeviceManager/1.0.0
   - description: Local
     url: https://localhost:8443/api/devmanager/v1

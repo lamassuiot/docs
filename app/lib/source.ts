@@ -4,7 +4,7 @@ import { createElement } from 'react';
 
 const iconMap: Record<string, string> = {
   lamassu: '/images/lamassu.svg',
-  k8s: '/images/k8s.svg',
+  k8s: '/images/kubernetes.svg',
 };
 
 export const source = loader({

@@ -15,33 +15,33 @@ La página principal de alertas presenta una lista exhaustiva de todos los **tip
 
 Adicionalmente, al expandir la información de cada evento, se presenta un **ejemplo de la estructura de datos JSON** de la última instancia registrada. Esta información es de gran valor, ya que permite a los desarrolladores y administradores entender con precisión el esquema de la notificación y cómo procesarla en sistemas externos, como un sistema de gestión de incidentes o una aplicación de automatización.
 
-![](/images/image85.png)
+![](/images/manual-servicios-core-alerts-eventos-y-suscripciones.png)
 ## Gestión de Suscripciones
 Para cada evento, se puede crear una suscripción a la que se envían notificaciones cuando el evento ocurre. Este proceso permite a los administradores del sistema personalizar qué eventos monitorizan y cómo son notificados. La configuración de las suscripciones, incluyendo el destino de las notificaciones, se gestiona de forma individual para cada tipo de evento.
 
 Al pulsar sobre el botón **Subscribe** se abre un modal de configuración que permite seleccionar uno de los tres mecanismos de notificación disponibles en Lamassu IoT.
 
 * **Email Notification**: Envía una notificación por correo electrónico a una dirección específica cada vez que el evento se registra. Para configurar este método, solo es necesario proporcionar la dirección de correo electrónico de destino.  
-  ![](/images/image86.png)  
+  ![](/images/manual-servicios-core-alerts-gestion-de-suscripciones.png)  
 * **Microsoft Teams Webhook**: Utiliza un webhook para enviar una notificación al canal de Microsoft Teams configurado, lo que permite integrar las alertas directamente en los flujos de trabajo de colaboración. Se debe proporcionar un nombre para la suscripción y la URL del webhook de Microsoft Teams.  
-  ![](/images/image87.png)  
+  ![](/images/manual-servicios-core-alerts-gestion-de-suscripciones-a.png)  
 * **Webhook**: Envía una notificación en formato JSON a una URL de webhook personalizada, lo que permite integrar las alertas con cualquier servicio o aplicación que soporte este protocolo. Para este mecanismo, se debe especificar un nombre, el **Método HTTP** (siempre **POST** o **PUT**) y la URL de destino. El documento JSON del evento se entregará como el cuerpo de la solicitud HTTP.  
-  ![](/images/image88.png)
+  ![](/images/manual-servicios-core-alerts-gestion-de-suscripciones-b.png)
 ### Filtros y condiciones
 Después de seleccionar el mecanismo de notificación, se puede establecer un filtro para determinar las condiciones que deben cumplirse para que el evento sea notificado. Esto permite un control más granular y evita recibir notificaciones irrelevantes. Los formatos de filtro disponibles son:
 
 * **None**: No se aplica ningún filtro. Se enviarán notificaciones para todas las instancias del evento.  
 * **JSON Path**: Utiliza la sintaxis de JSON Path para evaluar una condición sobre un campo específico del evento JSON.  
-  ![](/images/image89.png)  
+  ![](/images/manual-servicios-core-alerts-filtros-y-condiciones.png)  
 * **JSON Schema**: Permite aplicar un esquema JSON para validar el evento. Las notificaciones solo se enviarán si el evento cumple con el esquema definido. Esto es útil para asegurar que solo se procesen eventos con un formato de datos esperado y consistente.   
-  ![](/images/image90.png)  
+  ![](/images/manual-servicios-core-alerts-filtros-y-condiciones-a.png)  
 * **Javascript**: Permite escribir una función de JavaScript personalizada para evaluar condiciones complejas sobre el evento JSON. Por ejemplo, la función `function (event) { return event.data.status == "NO_IDENTITY"; }` podría usarse para notificar solo cuando el estado de un dispositivo cambia a "No Identity". Esto ofrece la mayor flexibilidad, ya que se pueden aplicar lógicas avanzadas para filtrar los eventos antes de que se envíen las notificaciones. 
 
-  ![](/images/image91.png)
+  ![](/images/manual-servicios-core-alerts-filtros-y-condiciones-b.png)
 ### Confirmación de la suscripción
 El último paso del proceso es la **confirmación**. Una vez que se ha configurado el canal de notificación y el filtro (si corresponde), la interfaz muestra un resumen de la suscripción. Aquí puedes revisar el tipo de evento, el canal de notificación seleccionado y la condición del filtro antes de confirmar.
 
-![](/images/image92.png)
+![](/images/manual-servicios-core-alerts-confirmacion-de-la-suscripcion.png)
 
 Al hacer clic en **Confirm Subscription**, la suscripción se activa y Lamassu IoT comenzará a enviar notificaciones basadas en la configuración que has establecido.
 ### Gestión de Suscripciones Existentes

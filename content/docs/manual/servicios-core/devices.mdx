@@ -18,19 +18,19 @@ Para facilitar la búsqueda y el seguimiento, la interfaz permite filtrar los di
 * **Revoked**: El certificado del dispositivo ha sido revocado.  
 * **Decommissioned**: El dispositivo ha sido dado de baja y ya no está en uso.
 
-![](/images/image63.png)
+![](/images/manual-servicios-core-devices-visualizacion-de-dispositivos-gestionados.png)
 ### Detalle del Dispositivo: Historial de Certificados
 Al seleccionar un dispositivo específico, se accede a su página de detalles. La pestaña de **Historial de Certificados** muestra un registro cronológico de todos los certificados X.509 que han sido asociados a la identidad de ese dispositivo. Aquí se pueden ver detalles como el número de serie, el estado del certificado (por ejemplo, activo, expirado o revocado), el nombre común, la CA emisora y los periodos de validez.
 
 Esta funcionalidad es fundamental para auditar y rastrear la historia de la identidad del dispositivo, lo que permite identificar si un certificado ha sido reemplazado o revocado en algún momento.
 
-![](/images/image64.png)
+![](/images/manual-servicios-core-devices-detalle-del-dispositivo-historial-de-certificados.png)
 ### Detalle del Dispositivo: Línea de tiempo de eventos
 La pestaña de **Línea de tiempo de eventos** (Device Event Timeline) proporciona un registro detallado y cronológico de los eventos más importantes relacionados con el dispositivo y su identidad. Estos eventos pueden incluir el aprovisionamiento inicial, la renovación de certificados o cambios de estado.
 
 Esta línea de tiempo es una herramienta poderosa para el análisis forense y la resolución de problemas, ya que permite ver la secuencia exacta de las acciones que han ocurrido en la vida del dispositivo.
 
-![](/images/image65.png)
+![](/images/manual-servicios-core-devices-detalle-del-dispositivo-linea-de-tiempo-de-eventos.png)
 ## Registro de Nuevos Dispositivos
 Además de la gestión de dispositivos ya enrolados, Lamassu IoT permite el registro manual de nuevos dispositivos. Esto es particularmente útil para el modo de registro por **Pre-registration**, donde la identidad del dispositivo debe existir en el sistema antes de que pueda solicitar un certificado.
 
@@ -44,7 +44,7 @@ El proceso de registro de un nuevo dispositivo se realiza a través de un formul
 
 Una vez registrado, el dispositivo aparecerá en el listado de dispositivos con el estado **No Identity** hasta que complete el proceso de *enrollment* y obtenga su primer certificado.
 
-![](/images/image66.png)
+![](/images/manual-servicios-core-devices-registro-de-nuevos-dispositivos.png)
 ## Asignación Manual de Identidad
 La **Asignación manual de identidad** es una acción que solo está disponible para dispositivos en estado **No Identity**, es decir, que han sido registrados en el sistema pero aún no tienen un certificado asignado. Esta funcionalidad permite vincular un certificado ya existente o emitir uno nuevo de forma manual.
 
@@ -52,27 +52,27 @@ El proceso se lleva a cabo desde la vista de detalles del dispositivo:
 
 * **Iniciar la asignación**: Se hace clic en el botón **Assign Identity**. Esto abrirá una ventana emergente. 
 
-  ![](/images/image67.png)
+  ![](/images/manual-servicios-core-devices-asignacion-manual-de-identidad.png)
 
 * **Vincular certificado existente**: La aplicación buscará certificados activos con un Common Name (CN) que coincida con el Device ID. Si se encuentra un certificado, se puede seleccionar y vincular al dispositivo.  
-  ![](/images/image68.png)  
+  ![](/images/manual-servicios-core-devices-asignacion-manual-de-identidad-a.png)  
 * **Emitir un nuevo certificado**: Si no se encuentra un certificado existente, o si se desea emitir uno nuevo, se puede seleccionar la opción **Issue New Instead**. Esto te permite elegir la **Certification Authority** que emitirá el nuevo certificado para el dispositivo. Se muestran por defecto las CAs vinculadas a la RA que gestiona ell dispositivo.
 
-  ![](/images/image69.png)
+  ![](/images/manual-servicios-core-devices-asignacion-manual-de-identidad-b.png)
 
 * **Confirmar y asignar**: Una vez seleccionado el certificado (existente o nuevo), se confirma la asignación. El dispositivo pasará del estado **No Identity** al estado **Active** y el certificado aparecerá en su historial. 
 
-  ![](/images/image70.png) 
+  ![](/images/manual-servicios-core-devices-asignacion-manual-de-identidad-c.png) 
 
 
-  ![](/images/image71.png)
+  ![](/images/manual-servicios-core-devices-asignacion-manual-de-identidad-d.png)
 ## Revocación de Identidad
 La revocación de la identidad es un proceso crítico para la seguridad que permite invalidar un certificado antes de su fecha de caducidad. Esta acción es irreversible. En Lamassu IoT, la revocación se realiza desde la sección de detalle del dispositivo, específicamente desde la línea de tiempo de eventos.
 
 El proceso de revocación se lleva a cabo de la siguiente manera:
 
 * **Acceder a la revocación**: En la sección **Device Event Timeline**, junto al último certificado **Active**, se encuentra la opción de **Revoke**. Al hacer clic en ella, se abre una ventana de confirmación.   
-  ![](/images/image72.png)  
+  ![](/images/manual-servicios-core-devices-revocacion-de-identidad.png)  
 * **Seleccionar el motivo de revocación**: La ventana emergente solicita seleccionar un motivo de revocación (Revocation Reason). Esto es esencial para el registro de auditoría y la generación de la CRL (Certificate Revocation List). Los motivos disponibles, definidos en el **RFC 5280**, y otros adicionales son:  
   * **Unspecified**: Motivo de revocación no especificado.  
   * **KeyCompromise**: La clave privada del certificado ha sido comprometida.  
@@ -85,9 +85,9 @@ El proceso de revocación se lleva a cabo de la siguiente manera:
   * **PrivilegeWithdrawn**: Se han retirado los privilegios de la entidad asociada al certificado.  
   * **AACompromise**: La clave de un servidor de autorización de atributos ha sido comprometida.  
   * **WeakAlgorithmOrKey**: La clave o el algoritmo del certificado se consideran débiles o han sido comprometidos.  
-    ![](/images/image73.png)  
+    ![](/images/manual-servicios-core-devices-revocacion-de-identidad-a.png)  
 * **Confirmar la revocación**: Una vez seleccionado el motivo, se confirma la acción. El estado del certificado cambiará a **Revoked** en la línea de tiempo y en el historial de certificados. El certificado revocado dejará de ser válido.   
-  ![](/images/image74.png)  
+  ![](/images/manual-servicios-core-devices-revocacion-de-identidad-b.png)  
   Es importante destacar que, una vez revocado un certificado, la identidad del dispositivo puede ser restaurada asignándole un nuevo certificado válido. En caso de que la razón de revocación sea CertificateHold, se permitirá la reactivación. 
 ## Desactivación de Dispositivos (Decommissioning)
 El *Decommissioning* es el proceso irreversible de dar de baja un dispositivo de forma definitiva del sistema. A diferencia de la revocación, que sólo invalida el certificado, la desactivación revoca todos los certificados asociados al dispositivo y le impide obtener nuevas identidades en el futuro. Es una acción de seguridad crítica que se utiliza cuando un dispositivo es retirado permanentemente o ya no es de confianza.
@@ -95,11 +95,11 @@ El *Decommissioning* es el proceso irreversible de dar de baja un dispositivo de
 El proceso se realiza de la siguiente manera:
 
 * **Acceder a la acción**: Desde la vista de detalles de un dispositivo activo, se hace clic en el botón **Decommission**.  
-  ![](/images/image75.png)   
+  ![](/images/manual-servicios-core-devices-desactivacion-de-dispositivos-decommissioning.png)   
 * **Confirmar la acción irreversible**: Aparecerá una ventana de advertencia que explica que la acción es irreversible y que se revocarán todos los certificados asociados al dispositivo, impidiendo que vuelva a obtener una identidad. 
 
-  ![](/images/image76.png)
+  ![](/images/manual-servicios-core-devices-desactivacion-de-dispositivos-decommissioning-a.png)
 
 * **Confirmar y desactivar**: Al confirmar la desactivación, el sistema revoca el certificado activo del dispositivo con la razón CessationOfOperation y cambia su estado a **Decommissioned**. El dispositivo ya no podrá realizar operaciones con la PKI. 
 
-  ![](/images/image77.png)
+  ![](/images/manual-servicios-core-devices-desactivacion-de-dispositivos-decommissioning-b.png)

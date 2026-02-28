@@ -8,7 +8,7 @@ Las **Registration Authorities (RA)** o Autoridades de Registro, son un componen
 
 En el contexto de **Lamassu IoT**, las RA se utilizan para definir reglas y configuraciones específicas para el proceso de *enrollment* (registro) y *re-enrollment* (renovación) de los dispositivos. Esto incluye la selección del protocolo de emisión, la validación de certificados, y la generación de claves, entre otras funciones.
 
-![](/images/image53.png)
+![](/images/manual-servicios-core-ra-automatizacion-de-procesos-de-emision-de-certificados.png)
 ## Protocolos de Emisión \- EST
 El protocolo de inscripción de certificados **EST (Enrollment over Secure Transport)** es el único protocolo de emisión soportado en la configuración actual de Lamassu IoT. EST es un protocolo estándar, especificado en el **RFC 7030**, diseñado para la inscripción segura de certificados X.509 utilizando un transporte seguro como **TLS (Transport Layer Security)**. Es una alternativa más moderna y segura a protocolos más antiguos como SCEP.
 
@@ -161,13 +161,13 @@ fi
 ## Configuración de una RA \- Enrollment
 La configuración de un **DMS (Device Management Service)** en el proceso de *Enrollment* define cómo se registrarán los dispositivos nuevos. Esta configuración se encuentra en la sección "Enrollment Device Registration".
 
-![](/images/image55.png)
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-enrollment.png)
 
 * **Registration Mode**: Determina el método de registro inicial. Lamassu IoT soporta **JITP (Just-in-Time Provisioning)**, donde un dispositivo es provisionado al conectarse por primera vez, y el modo **Pre-registration**, donde el dispositivo ya debe existir en el sistema para autorizar la emisión de su identidad. Esta elección es crítica para la estrategia de despliegue de dispositivos. Por ejemplo, JITP es ideal para grandes despliegues donde no se tiene un control estricto sobre cada dispositivo antes de su conexión, mientras que Pre-registration es preferible para entornos de alta seguridad donde cada dispositivo debe ser conocido y aprobado previamente.  
 * **Tags**: Se pueden asignar etiquetas a los dispositivos registrados para facilitar su organización y gestión. Estas etiquetas son especialmente útiles para agrupar dispositivos por función, ubicación o tipo, permitiendo una gestión más granular y una búsqueda eficiente.  
 * **Device Icon**: Permite asociar un icono y un color por defecto a los dispositivos que se registren a través de esta RA. Esto facilita su identificación visual en el sistema y mejora la experiencia del usuario al gestionar un gran número de dispositivos.
 
-![](/images/image56.png)
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-enrollment-a.png)
 
 * **Protocol**: Como se mencionó anteriormente, el protocolo de inscripción es **EST**.  
 * **Enrollment CA**: Se debe seleccionar la Certification Authority que se encargará de emitir los certificados para los dispositivos registrados a través de esta RA.  
@@ -176,11 +176,11 @@ La configuración de un **DMS (Device Management Service)** en el proceso de *En
   * **Client Certificate**: El dispositivo debe presentar un certificado de cliente válido. Para este modo, es necesario seleccionar una o varias CAs en el campo **Validation CAs** que actuarán como validadoras de los certificados presentados. Adicionalmente, el campo **Chain Validation Level** permite especificar la longitud de la cadena de validación de certificados que se requiere validar. Un valor de \-1 indica que se debe validar la cadena completa hasta la CA raíz. También, el campo **Allow Authenticating Expired Certificates** indica si se permite a un dispositivo enrolarse presentando un certificado expirado. Esta opción es útil en situaciones donde un dispositivo no pudo renovar su certificado a tiempo debido a problemas de conectividad, permitiéndole recuperarse sin intervención manual.  
   * **External Webhook**: La autenticación se delega a un servicio externo. Para esto, se debe configurar un *webhook* con la URL del servicio, el nivel de registro y el modo de autenticación del *webhook*.
 
-![](/images/image57.png)
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-enrollment-b.png)
 ## Configuración de una RA \- ReEnrollment
 El *Re-Enrollment* es el proceso de renovación de un certificado que está a punto de caducar. La configuración de Re-Enrollment en Lamassu IoT permite automatizar y controlar este proceso. Esta configuración se encuentra en la sección "Re-Enrollment Settings".
 
-![](/images/image58.png)
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-reenrollment.png)
 
 * **Revoke On Re-Enroll**: Indica si el certificado anterior del dispositivo debe ser revocado automáticamente una vez que se ha emitido y registrado un nuevo certificado en la renovación.  
 * **Allow Expired Renewal**: Permite que un dispositivo renueve un certificado que ya ha expirado, lo cual es útil en escenarios donde un dispositivo ha estado desconectado por un tiempo.  
@@ -191,12 +191,12 @@ El *Re-Enrollment* es el proceso de renovación de un certificado que está a pu
 ## Configuración de una RA \- ServerKeyGen
 La generación de claves es una parte fundamental de la seguridad. Lamassu IoT permite la generación de claves en el lado del servidor, lo que puede simplificar el proceso para algunos dispositivos. Esta configuración se encuentra en la sección "Server Key Generation".
 
-![](/images/image59.png)
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-serverkeygen.png)
 
 * **Enable Server-Side Key Generation**: Permite que Lamassu genere el par de claves (pública/privada) en nombre del dispositivo. Esto puede ser útil para dispositivos con recursos limitados que no pueden generar sus propias claves.  
 * **Key Type**: Se puede seleccionar el algoritmo criptográfico para la generación de la clave, como **RSA** o **ECDSA**. En el caso de **ECDSA**, el campo **Curve** se utiliza para seleccionar la curva criptográfica, por ejemplo, P-256.
 
-![](/images/image60.png)
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-serverkeygen-a.png)
 
 #### Ejemplo de Proceso Completo de ServerKeyGen
 
@@ -251,7 +251,7 @@ La distribución de entidades de confianza es crucial para que los dispositivos 
 * **Include Enrollment CA**: Permite la inclusión del certificado de la CA de inscripción, lo que asegura que el dispositivo confíe en la entidad que emitió su certificado.  
 * **Managed CAs**: Se pueden seleccionar CAs específicas para que se distribuyan a los dispositivos, asegurando que confíen en las CAs correctas del ecosistema.
 
-![](/images/image61.png)
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-distribucion-de-entidades-de-confianza.png)
 ## Acciones sobre la RA
 La interfaz de Lamassu IoT permite realizar diversas acciones sobre una RA ya configurada, facilitando su gestión y mantenimiento. Estas acciones se encuentran disponibles en el menú de opciones de cada RA y son las siguientes:
 
@@ -261,4 +261,4 @@ La interfaz de Lamassu IoT permite realizar diversas acciones sobre una RA ya co
 * **EST (RFC-7030)**: Muestra información detallada sobre los endpoints de EST para la RA, incluyendo la URL base, las URLs específicas y comandos para cada operación (*simpleenroll*, *simplereenroll*, etc.), lo que es útil para la integración de dispositivos.  
 * **Delete**: Permite eliminar la RA. Esta acción es irreversible y debe usarse con precaución.
 
-![](/images/image62.png)
+![](/images/manual-servicios-core-ra-acciones-sobre-la-ra.png)

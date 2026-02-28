@@ -13,11 +13,11 @@ Actualmente hay disponibles 3 acciones:
 - **Importar una nueva autoridad de certificación generada externamente**, permite importar en Lamassu una autoridad de certificación, cuyo par de claves ha sido generado de manera externa.  
 - **Importar un certificado de autoridad de certificación sin clave privada**, en este caso se importa la CA para poder usarla en procesos de validación y no como fuente de nuevos certificados gestionados por Lamassu.
 
-![](/images/image17.png)
+![](/images/manual-servicios-core-cas-creacion-de-entidades-de-certificacion.png)
 ## Creación de una nueva autoridad de certificación
 La creación de una Autoridad de Certificación (CA) es un proceso fundamental en el establecimiento de una infraestructura de clave pública (PKI). Lamassu IoT permite provisionar tanto autoridades raíz como intermedias mediante la generación automática de pares de claves criptográficas que son gestionados de forma segura por el sistema integrado de gestión de claves.
 
-![](/images/image18.png)
+![](/images/manual-servicios-core-cas-creacion-de-una-nueva-autoridad-de-certificacion.png)
 
 # 
 
@@ -43,7 +43,7 @@ En esta sección se permite la selección de un perfil existente o definir uno e
 
 Si no se proporciona ningún perfil se aplicará uno por defecto con los usos de clave básicos.
 
-![](/images/image19.png)
+![](/images/manual-servicios-core-cas-seleccion-de-perfil-de-emision-del-certificado-de-la-ca.png)
 
 #### Configuración de CA
 
@@ -96,7 +96,7 @@ La configuración de expiración define la validez temporal tanto del certificad
 * **Valor por defecto:** 10 años (10y)  
 * **Consideración:** Debe ser mayor que la duración de los certificados que emitirá
 
-![](/images/image20.png)
+![](/images/manual-servicios-core-cas-certificado-de-ca-ca-certificate-expiration.png)
 
 La expiración de la CA se puede definir como un expresión de duración, fijar una fecha fija, o marcarla como indefinida, lo que en términos prácticos permitirá la emisión de una CA sin caducidad. 
 
@@ -104,11 +104,11 @@ En el caso de expresar una duración, las unidades permitidas son: y (años), w 
 
 En caso de elegir la opción de fecha específica, se ofrecerá un calendario para seleccionar la fecha de caducidad. 
 
-![](/images/image21.png)
+![](/images/manual-servicios-core-cas-certificado-de-ca-ca-certificate-expiration-a.png)
 
 Para el caso de indefinido, se fijará la fecha de expiración máxima permitida. 
 
-![](/images/image22.png)
+![](/images/manual-servicios-core-cas-certificado-de-ca-ca-certificate-expiration-b.png)
 
 ##### Certificados End-Entity expiración por Defecto (Default End-Entity Certificate Issuance Expiration)
 
@@ -119,7 +119,7 @@ Para el caso de indefinido, se fijará la fecha de expiración máxima permitida
 
 Se expresa en los mismos términos que la caducidad de la CA. 
 
-![](/images/image23.png)
+![](/images/manual-servicios-core-cas-certificados-end-entity-expiracion-por-defecto-default-end-entity-certificate-issuan.png)
 
 Una vez creada la CA debe ser visible en el listado de CAs del sistema.
 ## Creación de CAs a partir de claves del KMS
@@ -127,13 +127,13 @@ Lamassu IoT permite la creación de CAs a partir de claves previamente generadas
 
 En este caso, primero se solicita la selección de la clave de soporte para esta nueva CA.
 
-![](/images/image24.png)
+![](/images/manual-servicios-core-cas-creacion-de-cas-a-partir-de-claves-del-kms.png)
 
 Se abre un popup que permite al usuario seleccionar la clave deseada de entre las disponibles en el KMS. Una vez seleccionada la clave, el proceso continúa como se describe en el punto anterior. 
 
-![](/images/image25.png)
+![](/images/manual-servicios-core-cas-creacion-de-cas-a-partir-de-claves-del-kms-a.png)
 ## Importación de autoridades de certificación
-![](/images/image26.png)
+![](/images/manual-servicios-core-cas-importacion-de-autoridades-de-certificacion.png)
 
 La importación de entidades de certificación permite importar en el sistema una CA que ha sido generada de manera externa. Para ello se sigue el siguiente proceso:
 
@@ -165,12 +165,12 @@ De manera opcional se proporcionarán en formato PEM la cadena de certificados d
 ## Operando con entidades de confianza – CAs
 ### Visualización de autoridades de certificación
 Accediendo a la sección de autoridades de certificación se mostrará el listado de CAs registradas en el sistema. El listado permitirá el filtro mediante el nombre de la CA, el estado o el tipo de CA.  
-![](/images/image27.png)
+![](/images/manual-servicios-core-cas-visualizacion-de-autoridades-de-certificacion.png)
 
-Seleccionado la acción ![](/images/image28.png) da acceso a los detalles de la CA y a diferentes opciones de gestión. 
+Seleccionado la acción ![](/images/manual-servicios-core-cas-visualizacion-de-autoridades-de-certificacion-a.png) da acceso a los detalles de la CA y a diferentes opciones de gestión. 
 
 En los detalles se muestra el resumen del estado de los certificados emitidos por la CA: certificados activos, expirados y revocados.   
-![](/images/image29.png)
+![](/images/manual-servicios-core-cas-visualizacion-de-autoridades-de-certificacion-b.png)
 
 Se ofrecen dos acciones:
 
@@ -179,19 +179,19 @@ Se ofrecen dos acciones:
 
 Se muestra información detallada, el certificado en formato PEM y se da acceso a la relación de certificados emitidos por la CA a través de la pestaña “Issued Certificates”
 
-![](/images/image30.png)
+![](/images/manual-servicios-core-cas-visualizacion-de-autoridades-de-certificacion-c.png)
 ### Emisión de certificados
 La acción de emisión de certificados se puede realizar desde la pestaña “Issued Certificates” de los detalles de la CA, mediante la acción “Issue New”.  
-![](/images/image31.png)
+![](/images/manual-servicios-core-cas-emision-de-certificados.png)
 
-La funcionalidad de emisión es accesible también desde el listado de CAs mediante la acción ![](/images/image32.png)  
-![](/images/image33.png)
+La funcionalidad de emisión es accesible también desde el listado de CAs mediante la acción ![](/images/manual-servicios-core-cas-emision-de-certificados-a.png)  
+![](/images/manual-servicios-core-cas-emision-de-certificados-b.png)
 
 Y desde la funcionalidad  listado completo de certificados emitidos por Lamassu mediante la acción “Issue Certificate”
 
-![](/images/image34.png)  
+![](/images/manual-servicios-core-cas-emision-de-certificados-c.png)  
  En este caso se solicitará la selección de una CA antes de acceder al formulario de emisión.  
-![](/images/image35.png)
+![](/images/manual-servicios-core-cas-emision-de-certificados-d.png)
 
 El formulario de emisión de certificados ofrece 2 opciones para la emisión:
 
@@ -202,7 +202,7 @@ El formulario de emisión de certificados ofrece 2 opciones para la emisión:
 
 El usuario proporciona la información requerida para la creación del CSR, la consola genera una clave In Place y genera el CSR correspondiente mediante el cual se solicita la emisión del certificado a la CA. 
 
-![](/images/image36.png)
+![](/images/manual-servicios-core-cas-emision-a-partir-de-una-clave-privada-y-el-csr-generados-en-el-browser.png)
 
 **Método de emisión:** Seleccionar  "Generate Key & CSR in Browser" para la generación del par de claves y la solicitud de certificado (CSR) directamente en el navegador
 
@@ -243,7 +243,7 @@ Los SANs proporcionan identificadores alternativos para el certificado, permitie
 * **Email:** Direcciones de correo electrónico  
 * **URI:** Identificadores de recursos uniformes
 
-![](/images/image37.png)
+![](/images/manual-servicios-core-cas-subject-alternative-names-sans.png)
 
 Es posible añadir múltiples SAN de cada tipo, se selecciona el tipo, añadiendo el valor y pulsando la acción “Add”. 
 
@@ -296,14 +296,14 @@ Especifica aplicaciones específicas para las que está autorizado el certificad
 
 Una vez completado los campos del formulario se solicita la emisión del certificado obteniendo el certificado y la clave privada generada en formato PEM. Esta clave privada no se almacena debe ser descargada y custodiada por el usuario ya que no se podrá volver a obtener.
 
-![](/images/image38.png)
+![](/images/manual-servicios-core-cas-key-usage-uso-de-claves.png)
 
 #### Emisión a partir de un CSR generado de manera externa
 
 Mediante esta opción se podrá realizar la emisión de certificados a partir de CSRs que hayan sido generados de manera externa. Para ello en el selector de modo del formulario de emisión es necesario seleccionar “Upload Existing CSR”.
 
 Se debe proporcionar un CSR válido que contenga los detalles del certificado a emitir, Subject Name, SANs,..   
-![](/images/image39.png)
+![](/images/manual-servicios-core-cas-emision-a-partir-de-un-csr-generado-de-manera-externa.png)
 
 Adicionalmente se proporcionará la duración deseada para el certificado y los usos permitidos. Con esta información se procederá a la emisión como se describe en el apartado anterior. 
 ### Revocación de CAs y certificados
@@ -315,7 +315,7 @@ Para iniciar el proceso de revocación, primero debes navegar a la sección de A
 
 En el menú lateral, haz clic en el icono de **Autoridades de Certificación** (representado por una "casa" con un símbolo de documento). Se mostrará una lista de todas las CAs configuradas y sus estados. Puedes usar los filtros por **Nombre**, **Estado** (Activo, Expirado) y **Tipo** (Gestionado, Importado) para encontrar la CA deseada.
 
-![](/images/image40.png)
+![](/images/manual-servicios-core-cas-acceder-a-las-autoridades-de-certificacion.png)
 
 ##### Ver Detalles de la CA
 
@@ -323,7 +323,7 @@ Una vez que hayas localizado la CA que deseas revocar, haz clic en ella para ver
 
 Haz clic en el nombre de la CA (por ejemplo, "demo") en la lista. Esto te llevará a la página de detalles de la CA, donde podrás ver información general, certificados PEM, metadatos y certificados emitidos. Aquí también encontrarás el botón para revocar la CA.
 
-*![](/images/image41.png)*
+*![](/images/manual-servicios-core-cas-ver-detalles-de-la-ca.png)*
 
 ##### Iniciar el Proceso de Revocación
 
@@ -344,7 +344,7 @@ Lee atentamente la advertencia: "Revocar una Autoridad de Certificación es una 
 * CertificateHold (Retención de certificado)  
 * RemoveFromCRL (Eliminar de la CRL)
 
-*![](/images/image42.png)*
+*![](/images/manual-servicios-core-cas-iniciar-el-proceso-de-revocacion.png)*
 
 Para evitar revocaciones accidentales, el sistema te pedirá que confirmes el nombre de la CA.
 
@@ -352,7 +352,7 @@ En el campo de texto, escribe el **nombre exacto de la CA** que estás revocando
 
 Haz clic en el botón **Confirm Revocation**. Una vez completada la revocación, la CA cambiará su estado a **REVOKED** (Revocada) en la página de detalles, y ya no podrás emitir certificados nuevos con ella. En su lugar, verás la opción **Permanently Delete** (Eliminar Permanentemente).
 
-*![](/images/image43.png)*
+*![](/images/manual-servicios-core-cas-iniciar-el-proceso-de-revocacion-a.png)*
 
 ##### Consideraciones Importantes
 

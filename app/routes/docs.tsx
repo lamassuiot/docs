@@ -7,9 +7,11 @@ import browserCollections from 'fumadocs-mdx:collections/browser';
 import { baseOptions, gitConfig } from '@/lib/layout.shared';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { LLMCopyButton, ViewOptions } from '@/components/ai/page-actions';
+import { redirect } from 'react-router';
 
 export async function loader({ params }: Route.LoaderArgs) {
   const slugs = params['*'].split('/').filter((v) => v.length > 0);
+  if (slugs.length === 0) throw redirect('/docs/manual');
   const page = source.getPage(slugs);
   if (!page) throw new Response('Not found', { status: 404 });
 

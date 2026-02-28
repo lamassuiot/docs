@@ -1,0 +1,294 @@
+---
+title: Fastlane
+description: Referencia del script scripts/lamassu-fast-lane.sh para desplegar Lamassu PKI de forma automatizada en Kubernetes
+---
+
+# Fastlane - Despliegue automatizado en Kubernetes
+
+Esta sección documenta el script `scripts/lamassu-fast-lane.sh`, cuyo objetivo es desplegar de forma automatizada una pila completa de Lamassu PKI sobre un clúster Kubernetes ya existente, con intervención manual mínima.
+
+La instalación incluye:
+
+- PostgreSQL
+- Keycloak
+- RabbitMQ
+- Chart Helm de Lamassu
+
+El modo Fastlane está orientado a:
+
+- Entornos de desarrollo
+- Pruebas de concepto (PoC)
+- Pipelines de integración continua (CI)
+- Escenarios donde se necesita un entorno funcional en el menor tiempo posible
+
+<Callout type="warning">
+  Fastlane prioriza velocidad y automatización. Para producción, usa un despliegue manual con control granular de cada componente.
+</Callout>
+
+## Flujo general de ejecución
+
+Las acciones principales se ejecutan secuencialmente desde la función `main`:
+
+1. Procesamiento de flags de línea de comandos
+2. Detección de la distribución Kubernetes
+3. Verificación de dependencias
+4. Solicitud o generación de configuración (modo interactivo o no interactivo)
+5. Instalación de PostgreSQL, RabbitMQ, Keycloak y Lamassu (Helm)
+6. Configuración de TLS
+7. Impresión de instrucciones finales
+
+## Flags de línea de comandos
+
+Todos los parámetros son procesados por la función `process_flags`.
+
+| Flag | Valor por defecto | Descripción |
+|---|---|---|
+| `-h`, `--help` | - | Muestra la ayuda y finaliza |
+| `-n`, `--non-interactive` | `false` | Omite prompts y genera/usa credenciales por defecto |
+| `-ns`, `--namespace` | `lamassu-dev` | Namespace Kubernetes donde se despliegan los recursos |
+| `-d`, `--domain` | `dev.lamassu.io` | Dominio usado para endpoint y certificados TLS |
+| `-v`, `--version` | `latest` | Versión del chart Helm de Lamassu |
+| `--https-port` | `443` | Puerto HTTPS del gateway |
+| `--http-port` | `80` | Puerto HTTP del gateway |
+| `--offline` | `false` | Activa modo offline |
+| `--tls-crt` | - | Ruta al certificado TLS (PEM) |
+| `--tls-key` | - | Ruta a la clave privada TLS (PEM) |
+| `--helm-chart-lamassu` | - | Ruta a chart local Lamassu (`.tgz`) |
+| `--helm-chart-postgres` | - | Ruta a chart local PostgreSQL (`.tgz`) |
+| `--helm-chart-keycloak` | - | Ruta a chart local Keycloak (`.tgz`) |
+| `--helm-chart-rabbitmq` | - | Ruta a chart local RabbitMQ (`.tgz`) |
+| `-l`, `--local-chart-path` | - | Ruta a directorio local descomprimido del chart Lamassu |
+
+## Detección de distribución Kubernetes
+
+La función `detect_distribution` identifica la distribución con el siguiente orden de prioridad:
+
+1. `microk8s`
+2. `k3s`
+3. `kind`
+4. Kubernetes estándar
+
+Comportamientos específicos:
+
+- En `microk8s`, los comandos se ejecutan con prefijos `microk8s kubectl` y `microk8s helm`.
+- En `kind`, el script muestra una advertencia de uso exclusivo para pruebas.
+
+## Verificación de dependencias
+
+La función `check_dependencies` valida prerequisitos según la distribución detectada.
+
+Requisitos generales:
+
+- `yq`
+- CLI de la distribución detectada
+
+Requisitos específicos:
+
+| Distribución | Herramientas requeridas |
+|---|---|
+| `k3s` | `kubectl`, `helm` |
+| `microk8s` | `microk8s kubectl`, `microk8s helm` |
+
+### Addons obligatorios en MicroK8s
+
+Se valida que estén habilitados:
+
+- `helm`
+- `hostpath-storage`
+- `dns`
+- `cert-manager`
+
+También se verifica un release Helm de Envoy Gateway llamado `eg` en el namespace `envoy-gateway-system`.
+Si no existe, se instala automáticamente la versión `v1.3.0` y se crea un `GatewayClass` llamado `eg`.
+
+## Modo interactivo vs no interactivo
+
+### Modo interactivo (por defecto)
+
+La función `request_config_data` solicita:
+
+- Dominio Lamassu
+- Usuario y contraseña admin PostgreSQL
+- Usuario y contraseña admin RabbitMQ
+- Usuario y contraseña admin Keycloak
+- Namespace Kubernetes
+
+### Modo no interactivo (`-n`)
+
+- Se generan credenciales aleatorias de 30 caracteres alfanuméricos.
+- Se usan valores por defecto para dominio y namespace, salvo que se sobrescriban con flags.
+
+## Modo online vs offline
+
+El script admite dos estrategias para obtener charts Helm.
+
+### Modo online (por defecto)
+
+Los charts se descargan desde repositorios remotos.
+
+### Modo offline
+
+Requiere obligatoriamente rutas a los cuatro charts:
+
+- `--helm-chart-lamassu`
+- `--helm-chart-postgres`
+- `--helm-chart-keycloak`
+- `--helm-chart-rabbitmq`
+
+Si falta cualquiera de ellos, el script finaliza con error.
+
+En este modo se fuerza:
+
+```bash
+imagePullPolicy: Never
+```
+
+## Instalación de componentes
+
+### PostgreSQL (`install_postgresql`)
+
+- Chart: `bitnami/postgresql` (`16.7.27`)
+- Release: `postgres`
+- `fullnameOverride: "postgresql"`
+
+Se crea un script SQL de inicialización con estas bases de datos:
+
+| Base de datos | Servicio |
+|---|---|
+| `auth` | Keycloak |
+| `alerts` | Alerts |
+| `ca` | CA |
+| `va` | VA |
+| `cloudproxy` | Cloud Proxy |
+| `devicemanager` | Device Manager |
+| `dmsmanager` | DMS Manager |
+| `kms` | KMS |
+
+### Keycloak (`install_keycloak`)
+
+- Chart: `bitnami/keycloak` (`22.1.1`)
+- Release: `auth`
+- Uso de base de datos externa: `postgresql:5432/auth`
+- `httpRelativePath: /auth/`
+
+Configuración automática del realm `lamassu`:
+
+- Rol: `pki-admin`
+- Usuario inicial: `lamassu` / `lamassu` (cambio obligatorio)
+- Cliente público: `frontend` con `/*` en redirect URIs
+
+En modo online se descarga automáticamente un tema personalizado desde:
+
+- `github.com/lamassuiot/keycloak-theme`
+
+### RabbitMQ (`install_rabbitmq`)
+
+- Chart: `bitnami/rabbitmq` (`12.6.0`)
+- Release: `rabbitmq`
+- `fullnameOverride: "rabbitmq"`
+- Credenciales inyectadas dinámicamente mediante `yq`
+
+### Lamassu (`install_lamassu`)
+
+Se genera un archivo `lamassu.yaml` que se pasa a `helm install`.
+
+Configuraciones principales:
+
+- PostgreSQL: host `postgresql`, puerto `5432`
+- AMQP: host `rabbitmq`, puerto `5672`, TLS deshabilitado
+- Motor criptográfico: `filesystem /crypto/fs`, ID `fs-1`
+- OIDC JWKS:
+  `http://auth-keycloak.<NAMESPACE>/auth/realms/lamassu/protocol/openid-connect/certs`
+- Ruta adicional de gateway: `/auth -> auth-keycloak:80`
+- Direcciones de gateway: IP(s) obtenidas con `hostname -I`
+- Puertos de gateway: desde `--https-port` y `--http-port`
+- Dominios CA: valor de `--domain`
+
+Si `--https-port` es distinto de `443`, el puerto se añade al dominio antes de escribirlo en `values`.
+
+## Configuración TLS
+
+### Certificado externo
+
+Si se proporcionan:
+
+- `--tls-crt`
+- `--tls-key`
+
+Se crea un secret Kubernetes:
+
+- `downstream-provided-crt`
+
+Y se configura:
+
+```yaml
+tls:
+  type: external
+  externalOptions:
+    secretName: downstream-provided-crt
+```
+
+### Certificado gestionado por cert-manager
+
+Si no se proporciona certificado:
+
+```yaml
+tls:
+  type: certManager
+```
+
+Además, el script crea un `Issuer` self-signed y el recurso `Certificate`.
+
+## Salida tras la instalación
+
+En caso de éxito, se muestra:
+
+- URL de Lamassu UI: `https://<DOMAIN>`
+- Credenciales iniciales: `lamassu / lamassu`
+- Consola Keycloak: `https://<DOMAIN>/auth/admin`
+- Credenciales admin de Keycloak
+
+El usuario `lamassu` se crea con:
+
+```yaml
+requiredActions: [UPDATE_PASSWORD]
+```
+
+Por tanto, debe cambiar contraseña en el primer acceso.
+
+## Uso en CI
+
+El script se utiliza en el workflow de GitHub Actions:
+
+- `.github/workflows/test-fast-lane.yaml`
+
+Ejemplo:
+
+```bash
+./scripts/lamassu-fast-lane.sh -n -ns lamassu-ci -d ci.lamassu.io -l ./charts/lamassu
+```
+
+En este escenario:
+
+- `-n`: modo no interactivo
+- `-ns`: namespace específico
+- `-d`: dominio de CI
+- `-l`: chart local
+
+Tras la instalación, se ejecuta `helm test` para validar la salud de los servicios.
+
+## Ejemplo rápido
+
+```bash
+./scripts/lamassu-fast-lane.sh \
+  -n \
+  -ns lamassu-dev \
+  -d dev.lamassu.io \
+  -l ./charts/lamassu
+```
+
+## Resumen
+
+`lamassu-fast-lane.sh` proporciona un mecanismo totalmente automatizado para desplegar un entorno Lamassu funcional en Kubernetes en pocos minutos, integrando base de datos, autenticación, mensajería, gateway y TLS.
+
+Está optimizado para rapidez, reproducibilidad y uso en entornos no productivos, con soporte para escenarios offline y pipelines de CI.

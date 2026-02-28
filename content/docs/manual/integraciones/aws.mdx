@@ -1,0 +1,117 @@
+---
+title: Integración con AWS IoT Core
+description: Configuración de la integración de Lamassu IoT con AWS IoT Core
+---
+
+# Integración con AWS IOT Core
+La funcionalidad de **Platform Integrations** en Lamassu IoT permite extender la gestión de identidades digitales de los dispositivos a plataformas de terceros. Esto es esencial para entornos de IoT que dependen de plataformas de nube como AWS IoT Core o Azure IoT Hub para la gestión de dispositivos, la ingesta de datos y otras operaciones.
+
+Esta funcionalidad configura una Registration Authority (RA) para que se integre con una plataforma externa, lo que permite a los dispositivos enrolados en esa RA utilizar su identidad (certificado digital) para autenticarse y operar en la plataforma de destino.
+
+La página de **Platform Integrations** muestra las integraciones que han sido detectadas basándose en los metadatos de las RA. Cada tarjeta de integración indica la plataforma (ej. AWS IoT Core) y la RA a la que está vinculada.
+
+![](/images/image78.png)
+## Integración con AWS IoT Core
+En este momento, Lamassu IoT soporta la integración con **AWS IoT Core**. Esta integración permite que los certificados emitidos por una RA se registren automáticamente como "things" en AWS IoT Core, lo que facilita el aprovisionamiento seguro de dispositivos.
+### Configuración de la Integración
+La configuración de una integración con AWS IoT Core se realiza asociando una RA con la plataforma de AWS. Este proceso establece un conector que permite la sincronización de las identidades de los dispositivos. Una vez configurada, los certificados que Lamassu IoT emite para los dispositivos gestionados por la RA se envían a AWS IoT Core para que se asocien a un "thing". De esta forma, el dispositivo puede utilizar su certificado para autenticarse de forma segura en la plataforma de AWS.
+
+El proceso de registro de una nueva integración consta de varias etapas. Primero, se crea una correspondencia entre una RA y el tipo de conector a utilizar. Para ello, se selecciona la RA que se desea vincular y se elige el conector, que en este caso es **AWS IoT Core**. 
+
+![](/images/image79.png)
+
+Una vez registrada la integración, se procede a configurarla. 
+
+Como primer paso para la configuración, la aplicación comprueba si la CA asociada a la RA ya ha sido sincronizada con AWS. Si la CA no está registrada, se muestra una alerta y se ofrece la opción de **sincronizar la CA con AWS**. Se puede elegir entre registrarla como una **Primary Account** o **Secondary Account**, lo que define el nivel de acceso y el control sobre la clave privada de la CA.
+
+* **Primary Account**: Este tipo de registro designa a una cuenta de AWS como la propietaria de la CA. Requiere que la cuenta tenga acceso a la clave privada de la CA, ya que se utiliza para firmar los certificados de verificación necesarios para el registro. Solo una cuenta puede ser la propietaria de la CA en una misma región de AWS.  
+* **Secondary Account**: Este tipo de registro se utiliza cuando se desea registrar una CA en una cuenta de AWS secundaria que no posee la clave privada de la CA. En este caso, el registro se realiza mediante un proceso de verificación que no requiere acceso a la clave privada. Este método es útil para escenarios donde la CA se gestiona centralizadamente en una cuenta, pero los dispositivos deben ser aprovisionados en varias cuentas de AWS.
+
+![](/images/image80.png)
+
+Una vez sincronizada, se habilitan las opciones de configuración restantes para el aprovisionamiento. El proceso de registro de la CA en AWS se realiza de forma asíncrona. Una vez solicitada la sincronización, el estado cambiará a **REQUESTED** y se deberá esperar a que se complete. Durante este tiempo, la configuración permanecerá deshabilitada. Es necesario hacer clic en **'Reload & Check Status'** periódicamente para verificar que la operación ha finalizado y se ha sincronizado correctamente. 
+
+![](/images/image81.png)
+
+Una vez completado el registro y la CA ha sido sincronizada con éxito (el estado cambiará a **SUCCEEDED**), las opciones de configuración restantes se desbloquean. A partir de este momento, se procede a configurar los detalles específicos de la integración. 
+
+![](/images/image82.png)
+
+#### Thing Provisioning & Policies
+
+Este segmento de la configuración define cómo se aprovisionarán los dispositivos en AWS IoT Core y las políticas de seguridad que se les aplicarán. Es aquí donde se establece el comportamiento del dispositivo dentro del ecosistema de AWS.
+
+* **Registration Mode**: Determina el modo en que el dispositivo se registrará en AWS y se le asociará un "thing". Lamassu IoT soporta los siguientes modos:  
+  * **None**: En este modo, Lamassu IoT solo sincroniza la identidad del certificado con AWS IoT Core, pero no realiza ninguna acción de aprovisionamiento adicional. Esto es útil si el aprovisionamiento de "things" se gestiona de forma externa.  
+  * **Automatic Registration on Enrollment**: Este modo automatiza la creación de un "thing" en AWS IoT Core en el momento en que un dispositivo se conecta por primera vez y presenta un certificado válido.  
+  * **JITP Template**: Utiliza una plantilla de aprovisionamiento de AWS IoT para crear "things" y otros recursos asociados. Este método es ideal para automatizar la creación de recursos de forma consistente. Al seleccionar este modo, se debe habilitar la opción **Enable JITP Template** y proporcionar el **Provisioning Role ARN**, que es el rol de IAM que permite a AWS IoT Core crear los recursos definidos en la plantilla.
+
+![](/images/image83.png)
+
+* **Thing Groups**: Se pueden asignar grupos de "things" (Thing Groups) de AWS a los dispositivos. Estos grupos se utilizan para la gestión, control de acceso y actualizaciones de forma colectiva. La asignación de grupos es una práctica recomendada para organizar un gran número de dispositivos de manera eficiente y aplicar políticas de manera escalable.  
+* **IoT Policies**: Permite adjuntar políticas de AWS IoT a los dispositivos para definir sus permisos. Es posible añadir políticas personalizadas a través de un documento JSON. Esto es crucial para granular el control sobre lo que el dispositivo puede hacer en la plataforma, como publicar en temas específicos de MQTT, suscribirse a otros temas o interactuar con el Device Shadow. La correcta definición de estas políticas asegura que los dispositivos solo tengan los permisos necesarios para su función, minimizando los riesgos de seguridad. 
+
+#### Device Shadow & Automation
+
+Este segmento permite la integración con la funcionalidad de *Device Shadow* de AWS IoT y la automatización asociada.
+
+* **Enable Device Shadow**: Habilita la interacción de Lamassu con el *shadow document* de los dispositivos en AWS. Un *shadow* es una representación virtual del estado del dispositivo en la nube, que permite interactuar con él incluso si está desconectado. Lamassu puede utilizar esta funcionalidad para monitorear el estado y aplicar cambios de forma remota.  
+* **Classic Shadow/Named Shadow**: Se puede elegir entre el *shadow* clásico o los *shadows* con nombre. La elección de uno u otro dependerá de la implementación que se haya realizado en el dispositivo para comunicarse con la plataforma AWS IoT Core. El **Classic Shadow** es la representación predeterminada del estado de un dispositivo, ideal para dispositivos más simples con un solo estado a gestionar. El acceso a este *shadow* se realiza a través de una URL fija. Por otro lado, los **Named Shadows** permiten tener múltiples *shadow documents* independientes para un mismo dispositivo. Esta opción es ideal para dispositivos más complejos con varias funcionalidades, como un robot con un *shadow* para su brazo y otro para su sistema de sensores. Cada *named shadow* tiene su propia URL, lo que permite una gestión más modular y granular.
+
+![](/images/image84.png)
+### Ejemplo de políticas con Device Shadow
+La siguiente política de AWS IoT permite a un dispositivo conectarse a AWS IoT Core y utilizar las funcionalidades de publicación, suscripción y recepción de mensajes, incluyendo las del **Device Shadow**. El uso de la variable `${iot:Connection.Thing.ThingName}` asegura que la política se aplique únicamente al "thing" al que el dispositivo está conectado, lo que garantiza el **principio de privilegio mínimo**.
+
+La política de IAM de AWS no admite la sintaxis de expresiones regulares como la alternancia para combinar patrones de recursos en una sola línea. Sin embargo, conceptualmente, la política se puede entender como una expresión con opcionalidad para cubrir tanto el *Classic Shadow* como los *Named Shadows*.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Connect"
+      ],
+      "Resource": [
+        "arn:aws:iot:eu-west-1:eu-west-1:client/${iot:Connection.Thing.ThingName}"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Publish"
+      ],
+      "Resource": [
+        "arn:aws:iot:eu-west-1:eu-west-1:topic/$aws/things/${iot:Connection.Thing.ThingName}",
+        "arn:aws:iot:eu-west-1:eu-west-1:topic/$aws/things/${iot:Connection.Thing.ThingName}/shadow/[name/${ShadowName}/]*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Subscribe"
+      ],
+      "Resource": [
+        "arn:aws:iot:eu-west-1:eu-west-1:topicfilter/$aws/things/${iot:Connection.Thing.ThingName}",
+        "arn:aws:iot:eu-west-1:eu-west-1:topicfilter/$aws/things/${iot:Connection.Thing.ThingName}/shadow/[name/${ShadowName}/]*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Receive"
+      ],
+      "Resource": [
+        "arn:aws:iot:eu-west-1:eu-west-1:topic/$aws/things/${iot:Connection.Thing.ThingName}",
+        "arn:aws:iot:eu-west-1:eu-west-1:topic/$aws/things/${iot:Connection.Thing.ThingName}/shadow/[name/${ShadowName}/]*"
+      ]
+    }
+  ]
+}
+
+```
+
+* **Permiso para conectar**: El primer *statement* permite que el dispositivo se conecte utilizando el nombre de su "thing" como identificador.  
+* **Permisos de publicación**: El segundo *statement* autoriza al dispositivo a publicar mensajes en un tema genérico y, de manera conceptual, en todos los temas relacionados con el *shadow*. La sintaxis \[name/`${ShadowName}`/\]\* es una representación para indicar que el subpath name/`${ShadowName}` es opcional, lo que cubriría tanto el *Classic Shadow* como el *Named Shadow*. Esto le permite actualizar el estado deseado y el estado reportado del dispositivo.  
+* **Permisos de suscripción y recepción**: Los dos últimos *statements* conceden permisos para suscribirse y recibir mensajes del mismo conjunto de temas. Esto es necesario para que el dispositivo pueda recibir actualizaciones de su *shadow* o comandos de otros servicios.

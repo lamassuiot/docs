@@ -1,0 +1,20 @@
+---
+title: Introducción
+description: Despliegue de Lamassu IoT en infraestructura on-premise gestionada con Kubernetes
+---
+
+# Despliegue OnPrem con Kubernetes
+
+Lamassu IoT puede desplegarse en infraestructura propia mediante **Kubernetes**, tanto en clústeres gestionados internamente como en entornos self-managed.
+
+## Requisitos previos
+
+- Clúster Kubernetes v1.25 o superior
+- `kubectl` configurado con acceso al clúster
+- Helm v3
+- Acceso a un registro de contenedores (Docker Hub o privado)
+- Almacenamiento persistente disponible (PVC)
+
+## Arquitectura
+
+Lamassu IoT se despliega como un conjunto de microservicios Kubernetes independientes, cada uno con su propio `Deployment`, `Service` y configuración de secretos.

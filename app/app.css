@@ -1,3 +1,93 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
+
+/* ── Lamassu custom theme ─────────────────────────────────────────────────
+   Overrides neutral.css with Lamassu site colors.
+   Light: blue-tinted whites / navy primary
+   Dark:  deep navy (#0f0c29 → #1e1b4b) / cyan accent (#22d3ee)
+   ──────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Light mode */
+  --color-fd-background:           hsl(225, 60%, 97%);
+  --color-fd-foreground:           hsl(225, 65%, 8%);
+  --color-fd-muted:                hsl(225, 40%, 92%);
+  --color-fd-muted-foreground:     hsl(225, 25%, 42%);
+  --color-fd-popover:              hsl(225, 55%, 98%);
+  --color-fd-popover-foreground:   hsl(225, 65%, 8%);
+  --color-fd-card:                 hsl(225, 45%, 94%);
+  --color-fd-card-foreground:      hsl(225, 65%, 8%);
+  --color-fd-border:               hsla(225, 70%, 55%, 0.18);
+  --color-fd-primary:              hsl(221, 83%, 48%);
+  --color-fd-primary-foreground:   hsl(0, 0%, 98%);
+  --color-fd-secondary:            hsl(225, 40%, 88%);
+  --color-fd-secondary-foreground: hsl(225, 65%, 18%);
+  --color-fd-accent:               hsla(221, 80%, 58%, 0.2);
+  --color-fd-accent-foreground:    hsl(225, 65%, 18%);
+  --color-fd-ring:                 hsl(192, 100%, 42%);
+}
+
+.dark {
+  /* Deep navy matching the Lamassu gradient (#0f0c29 / #1e1b4b) */
+  --color-fd-background:           hsl(246, 60%, 6%);
+  --color-fd-foreground:           hsl(210, 40%, 94%);
+  --color-fd-muted:                hsl(237, 50%, 12%);
+  --color-fd-muted-foreground:     hsla(222, 55%, 80%, 0.65);
+  --color-fd-popover:              hsl(240, 55%, 8%);
+  --color-fd-popover-foreground:   hsl(210, 40%, 90%);
+  --color-fd-card:                 hsl(237, 52%, 10%);
+  --color-fd-card-foreground:      hsl(210, 40%, 94%);
+  --color-fd-border:               hsla(222, 80%, 65%, 0.14);
+  /* Cyan accent — #22d3ee / cyan-400 from the site CTA */
+  --color-fd-primary:              hsl(192, 91%, 50%);
+  --color-fd-primary-foreground:   hsl(246, 60%, 6%);
+  --color-fd-secondary:            hsl(237, 50%, 15%);
+  --color-fd-secondary-foreground: hsl(210, 40%, 88%);
+  --color-fd-accent:               hsla(222, 80%, 60%, 0.18);
+  --color-fd-accent-foreground:    hsl(210, 60%, 90%);
+  --color-fd-ring:                 hsl(192, 91%, 50%);
+}
+
+/* Sidebar section separators — bolder labels */
+#nd-sidebar p.inline-flex,
+#nd-sidebar-mobile p.inline-flex {
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Cap icon images in sidebar tab triggers and dropdown items */
+#nd-sidebar img,
+#nd-sidebar-mobile img,
+[role="option"] img,
+[data-radix-popper-content-wrapper] img {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  max-width: 1.25rem !important;
+  max-height: 1.25rem !important;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* Center all images in doc content */
+.prose img,
+article img,
+[class*='prose'] img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Justify all text in doc content */
+.prose p,
+.prose li,
+.prose td,
+article p,
+article li,
+article td,
+[class*='prose'] p,
+[class*='prose'] li,
+[class*='prose'] td {
+  text-align: justify;
+}

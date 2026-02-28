@@ -1,0 +1,215 @@
+---
+title: "[KMS] Gestión de Claves Criptográficas"
+description: Gestión y operación de claves criptográficas en Lamassu IoT
+---
+
+# Gestión de claves criptográficas (KMS)
+El servicio de **Gestión de Claves Criptográficas (KMS)** de Lamassu IoT es el componente central encargado de administrar de forma segura el ciclo de vida de las claves criptográficas dentro de la plataforma. Su propósito principal es garantizar que las claves maestras y operativas se generen, almacenen y protejan, permitiendo su uso en los procesos de firma, tanto como claves “autónomas” o como claves de soporte de las CAs gestionadas por el sistema. 
+
+Es fundamental destacar que, en su configuración actual, Lamassu IoT **soporta exclusivamente la gestión de claves asimétricas** (como RSA y curvas elípticas). Estas claves son la base para la creación de identidades basadas en certificados X.509, permitiendo operaciones de firma electrónica y autenticación mutua esenciales en una infraestructura PKI. El módulo abstrae la complejidad de interactuar directamente con diferentes proveedores de servicios criptográficos, ofreciendo una gestión unificada y centralizada.
+## Motores criptográficos
+En el núcleo de la PKI radica la gestión y operación sobre claves criptográficas que se usan para firmar diferentes tipos de *cripto-activos* tales como certificados digitales x509.
+
+En función del contexto donde se despliega la PKI, pueden existir normativas que obliguen a hacer uso de cierto equipamiento hardware sobre el cual deban realizarse las operaciones tales como los *Hardware Security Modules* o HSMs, se requiera delegar en un servicio cloud, etc.
+
+Es por ello que Lamassu dispone de un mecanismo de extensión para la generación, custodia y operación de claves criptográficas, delegando dichas operaciones en servicios externos a la propia implementación de LAMASSU. Cada instancia LAMASSU, puede tener más de un motor criptográfico configurado de forma simultánea, incluso varias instancias del mismo tipo de motor.
+
+Hasta la fecha, LAMASSU soporta los siguientes motores criptográficos:
+
+![](/images/image1.png)
+
+Cada tipo de motor criptográfico ofrece unas prestaciones diferentes que se describen a continuación, sin embargo, uno de los aspectos más cruciales reside en **cómo se realiza la custodia de las claves criptográficas** (todas ellas sensibles al tratarse de claves privadas). Es por ello, que Lamassu indica la seguridad de cada motor criptográfico mediante una calificación de 1 a 3, siendo 1 una calificación *poco segura*, y 3 un motor *muy seguro*. Aun así, los motores de nivel 3 tienen sus puntos débiles a considerar:
+
+| Crypto Engine | Nivel de seguridad | OnPrem / Cloud | Coste adicional | Generación de claves | Persistencia *at-rest* segura | Filtración de claves | Consideraciones |
+| :---- | :---: | :---- | :---- | :---- | :---- | :---- | :---- |
+| File System | 1 | OnPrem y Cloud | No | **Entropía Software**  La generación de claves se realiza mediante las librerías criptográficas software del lenguaje de programación GoLang. | **Insegura** \* delegado en el sistema de archivos | **Insegura** \* delegado en el sistema de archivos | No usar en entornos de producción |
+| Hashicorp Key Vault | 2 | OnPrem y Cloud | No |  | **Segura** | **Insegura**  Cualquier administrador con permisos suficientes, es capaz de visualizar la clave privada. | Es recomendable limitar el acceso a Vault al personal necesario, dotando de las políticas de acceso estrictamente necesario. También requiere de una custodia de las claves de *Unseal* de Vault siguiendo un procedimiento estricto. |
+| AWS Secrets Manager | 2 | Cloud | Sí |  | **Segura** | **Insegura**  Cualquier administrador con permisos suficientes, es capaz de visualizar la clave privada. | De forma similar a Hashicorp Vault, la persistencia segura *at-rest* es garantizada por AWS.  |
+| AWS KMS | 3 | Cloud | Sí | **Entropía Hardware** | **Segura** | **Segura** | Pese a no tener acceso físico a la clave, un administrador/atacante puede utilizar la clave para firmar “artefactos” |
+| PKCS11 | 3\* | AirGap OnPrem y Cloud | Hardware disponible en versión Key as a Service de pago por vendors como AWS o Azure. Integrable con HSMs OnPrem over TCP/TLS | **Entropía Hardware** | **Segura**\* |  | Por lo general es difícil catalogar el nivel de seguridad de un motor criptográfico que implemente la interfaz PKCS11, pero por lo general HSMs comerciales son soluciones criptográficamente seguras. Debido a ello, se otorga el nivel 3 aunque es recomendable contextualizarlo en función del HSM usado. El reto del uso de HSMs radica en la gestión de HMSs. |
+
+Lamassu muestra en la consola el listado completo de motores criptográficos habilitados tal y como se puede ver a continuación.   
+![](/images/image2.png)
+
+Cada motor criptográfico define qué familia de algoritmos soporta (RSA, ECC/ECDSA) así con los tamaños de claves capaces de generar.  
+Así mismo, durante el proceso de despliegue de la PKI es obligatorio designar uno de los motores criptográficos como motor por defecto. Este será el motor criptográfico que se usará para generar y persistir las claves en aquellos procesos que así lo requieran, y donde el usuario no especifique ningún motor específico, como la creación o importación de CAs. Este motor aparece seleccionado por defecto en el selector de Crypto Engines en la creación o importación de CAs.
+
+![](/images/image3.png)
+## Gestión de claves criptográficas
+La pantalla principal de la sección KMS ofrece un inventario detallado de todas las claves registradas en el sistema. Esta vista es fundamental para que los administradores de seguridad supervisen el estado actual de los activos criptográficos base de la plataforma y su vinculación con otras entidades.
+
+La tabla de gestión de claves presenta la siguiente información técnica para cada elemento:
+
+* **Name**: El nombre descriptivo asignado a la clave para identificarla de forma unívoca dentro de la infraestructura.  
+* **Type**: Especifica el algoritmo y el tamaño de la clave (por ejemplo, RSA 2048, RSA 4096, o curvas elípticas como EC P-256).  
+* **Strength**: Un indicador visual de la fortaleza criptográfica de la clave, calculado en función de su algoritmo y tamaño de clave.  
+* **Public/Private**: Indica la disponibilidad del material criptográfico; si el sistema dispone del par completo (clave pública y privada) o si solo se gestiona la referencia a la clave pública.  
+* **Crypto Engine**: Identifica el motor criptográfico de custodia y gestión. Representa dónde reside físicamente la clave (ej. un HSM local, AWS KMS, HashiCorp Vault, etc.).  
+* **Aliases**: Muestra nombres alternativos o alias asociados a la clave, facilitando su referencia en diferentes contextos operativos.  
+* **Tags**: Etiquetas de metadatos utilizadas para la clasificación y organización lógica de las claves.  
+* **Related Entities**: Indica si existen certificados digitales u otras entidades de la PKI vinculadas a esta clave específica, permitiendo rastrear su uso real.
+
+![](/images/image4.png)
+
+**Herramientas de Gestión y Acciones Rápidas**
+
+Desde esta página principal, el usuario tiene acceso a las herramientas necesarias para expandir o modificar el repositorio de claves. Además de las opciones globales de búsqueda y creación, cada línea de la tabla cuenta con un menú de **Acciones Rápidas** para la gestión individual:
+
+* **View Details (Ver detalles)**: Permite inspeccionar en profundidad los metadatos de la clave, incluyendo su identificador técnico, el desglose del motor criptográfico que la custodia y el estado de sus versiones.  
+* **Generate CSR (Generar CSR)**: Facilita la creación de una Solicitud de Firma de Certificado (Certificate Signing Request) utilizando la clave seleccionada. Es el paso previo necesario para obtener un certificado digital vinculado a esta clave.  
+* **Sign/Verify (Firmar/Verificar)**: Proporciona una utilidad para realizar operaciones de firma y verificación criptográfica directamente sobre la clave. Esta herramienta es útil para validar que la clave operativa y el motor criptográfico funcionan correctamente.  
+* **Delete Key (Eliminar clave)**: Permite dar de baja la clave del sistema.
+
+![](/images/image5.png)
+### Registro y Generación de Nuevas Claves
+El proceso de registro permite incorporar nuevas capacidades criptográficas a Lamassu IoT. El flujo principal se centra en la **generación de un nuevo par de claves asimétricas** gestionadas directamente por los motores configurados.
+
+**Paso 1: Iniciación del Registro**
+
+Para comenzar, el usuario debe hacer clic en el botón **"Create New Key"** ubicado en la parte superior de la página principal de KMS. Esto abrirá un asistente guiado.
+
+![](/images/image6.png)
+
+**Paso 2: Selección del Modo de Registro**
+
+En la primera etapa del asistente, se debe seleccionar el **Modo de Creación**. Para crear nuevo material criptográfico:
+
+* **Generate New Key Pair**: Este modo indica a Lamassu IoT que debe solicitar al motor criptográfico seleccionado la creación de un nuevo par de claves (pública y privada).
+
+![](/images/image7.png)
+
+**Paso 3: Configuración de la Nueva Clave**
+
+![](/images/image8.png)
+
+Se definen las propiedades técnicas:
+
+* **Key Name**: Nombre descriptivo único.  
+* **Crypto Engine**: Selección del motor de custodia (Soft Engine, HSM, AWS KMS, etc.).  
+* **Key Type y Key Size**: Selección del algoritmo (RSA o EC) y sus parámetros asociados.  
+* **Tags**: Metadatos para su clasificación y localización posterior.  
+* **Metadata:** Campo reservado para usos avanzados. Permite asociar información extra a la clave.
+### Importación de Claves Externas
+La importación de claves permite a Lamassu IoT gestionar y utilizar material criptográfico que ha sido generado fuera de la plataforma. 
+
+Este flujo es esencial para los siguientes escenarios:
+
+* **Políticas de BYOK (Bring Your Own Key)**: Organizaciones que generan sus claves en entornos "air-gapped" o HSMs desconectados y solo importan la referencia operativa a la nube o a Lamassu.  
+* **Migración de Sistemas**: Integración de claves que ya están en producción en proveedores externos sin necesidad de re-emitir certificados.  
+* **Consolidación de Identidad**: Uso de una misma raíz de confianza generada por un tercero para firmar identidades gestionadas por Lamassu.
+
+**Proceso de Importación de claves**
+
+Para incorporar una clave externa, se utiliza el asistente de registro seleccionando el modo correspondiente.
+
+#### Paso 1: Selección del Modo
+En el inicio del asistente, seleccione la opción de importación:
+
+* **Import Existing Key Pair**: Este modo permite subir un archivo que contenga el par de claves (pública y privada) para que sea gestionado por el motor criptográfico seleccionado.
+
+![](/images/image7.png)
+
+**Paso 2: Configuración de la Importación**
+
+En esta pantalla se deben proporcionar los detalles de la clave y el archivo correspondiente. Los campos solicitados son:
+
+* **Tags:** Etiquetas para la clasificación y localización posterior de la clave  
+* **Metadata:** Campo reservado para usos avanzados. Permite asociar información extra a la clave.  
+* **Key Name**: Un nombre descriptivo para identificar la clave dentro de Lamassu IoT.  
+* **Crypto Engine**: Seleccionar el motor criptográfico que custodiará y explotará la clave.  
+* **Private Key (PEM)**: Clave privada en formato PEM.
+
+![](/images/image9.png)
+
+**Paso 3: Finalización**
+
+Tras completar la información, se completa el registro. La clave importada quedará almacenada de forma segura en el motor criptográfico y estará lista para ser utilizada en operaciones de firma y generación de CSRs.
+### Detalles de la Clave
+La pantalla de detalles proporciona una vista exhaustiva de toda la información técnica y administrativa asociada a una clave criptográfica específica. Para acceder a esta vista, seleccione la opción **View Details** en el menú de acciones de la lista principal.
+
+La pestaña **Overview** presenta los metadatos esenciales de la clave organizados en los siguientes campos:
+
+*  **Key Name**: El nombre descriptivo asignado a la clave.  
+* **Key Identifier**: El identificador único del sistema para la clave. Lamassu IoT hace uso de formatos de ID basados en la especificación  PKCS11.  
+* **Tags**: Etiquetas asociadas para la gestión.   
+* **Aliases**: Lista de alias asociados a la clave. Son nombres alternativos de la clave.  
+* **Crypto Engine**: El motor criptográfico donde reside la clave.  
+* **Algorithm, Key Size & Strength**: El algoritmo y los parámetros de la clave (ej. EC P-256).
+
+![](/images/image10.png)
+
+**Entidades Relacionadas:** La sección **Related Entities** muestra una lista de todos los objetos en Lamassu IoT que dependen de esta clave.
+
+![](/images/image11.png)
+
+**Clave Pública** 
+
+La pestaña **Public Key** muestra la representación de la clave pública.
+
+* **Public Key (PEM)**: Muestra el bloque de texto de la clave pública en formato PEM estándar. Esta pestaña permite visualizar y copiar fácilmente la clave pública para su uso en sistemas externos.
+
+![](/images/image12.png)
+### Firma y Verificación (Sign / Verify)
+Esta funcionalidad es una herramienta que permite realizar operaciones criptográficas directamente sobre la clave seleccionada. Es fundamental para verificar que el par de claves (pública y privada) funciona correctamente y que el motor criptográfico subyacente responde a las peticiones.
+
+Al acceder a **Sign / Verify**, se abre una ventana con dos bloques principales: **Sign** (Firmar) y **Verify** (Verificar).
+
+**Firmar** 
+
+En esta pestaña se utiliza la clave privada custodiada para generar una firma digital sobre un mensaje de texto.
+
+![](/images/image13.png)
+
+* **Algorithm**: Desplegable para seleccionar el algoritmo de firma a utilizar. Las opciones disponibles dependen del tipo de clave (por ejemplo, `ECDSA_SHA_256` para claves de curva elíptica P-256).  
+* **Message Type**: Define el tipo de contenido que se va a firmar. Las opciones son:  
+  * **Raw**: El contenido introducido se trata como datos en crudo que serán firmados directamente (o hasheados y firmados según el mecanismo).  
+  * **Digest**: El contenido introducido se trata como un *hash* (resumen criptográfico) ya calculado previamente.  
+* **Payload Encoding**: Especifica la codificación del mensaje de entrada. Las opciones disponibles son:  
+  * **UTF-8**: Para texto plano.  
+  * **Hex**: Para datos binarios representados en hexadecimal.  
+  * **Base64**: Para datos binarios codificados en Base64.  
+* **Message**: Área de texto donde se introduce el contenido que se desea firmar (el mensaje en texto plano o el hash, según el tipo y codificación seleccionados).  
+* **Sign**: Botón que envía la solicitud al motor criptográfico.  
+* **Signature**: Campo de sólo lectura que muestra el resultado de la operación. La firma generada se presenta codificada en formato **Hexadecimal**.
+
+**Verificar (Verify)**
+
+Esta pestaña permite comprobar la validez de una firma utilizando la clave pública asociada. Es útil para confirmar que una firma fue generada realmente por la clave privada correspondiente.
+
+![](/images/image14.png)
+
+* **Algorithm**: Desplegable para seleccionar el algoritmo de verificación, que debe coincidir con el utilizado para firmar.  
+* **Message Type**: Indica si el mensaje original es un texto plano (**Raw**) o un resumen criptográfico (**Digest**).  
+* **Payload Encoding**: Especifica la codificación del mensaje de entrada.   
+* **Message**: Área de texto para introducir el mensaje original o su hash.  
+* **Signature**: Área de texto para introducir la firma que se desea verificar (en formato base64).  
+* **Verify**: Botón que ejecuta la comprobación.  
+* **Result**: Indicador visual que confirma si la firma es válida o inválida.
+### Firma Local con PKCS\#11
+La plataforma ofrece una funcionalidad para facilitar la integración con herramientas locales. El botón **Sign locally with OpenSSL & PKCS11 tools** da acceso a instrucciones detalladas para lanzar operaciones de firma usando la clave desde herramientas locales de firma haciendo uso del módulo PKCS11 de Lamassu IoT. Esta funcionalidad es esencial para desarrolladores y administradores que necesitan integrar las claves custodiadas en Lamassu IoT con flujos de trabajo locales o scripts de automatización sin exponer el material de la clave privada.
+
+Al acceder a esta opción, se presentan los pasos necesarios para configurar el entorno local, incluyendo la descarga y configuración del módulo PKCS\#11, así como ejemplos concretos de comandos para firmar datos utilizando herramientas estándar como **OpenSSL**.
+
+![](/images/image15.png)
+### Generación de CSR
+La generación de una Solicitud de Firma de Certificado (CSR) es un paso crucial para obtener un certificado digital válido emitido por una Autoridad de Certificación (CA). Esta funcionalidad permite crear una solicitud PKCS\#10 firmada con la clave privada custodiada en Lamassu IoT, sin que dicha clave tenga que salir nunca del entorno seguro del KMS.
+
+* **Obtención de Certificados de CA Externas**: Permite solicitar certificados a CAs públicas o corporativas externas utilizando claves generadas y protegidas dentro de Lamassu IoT.  
+* **Renovación de Identidades**: Creación de nuevas solicitudes para renovar certificados existentes manteniendo la misma clave criptográfica.
+
+**Formulario de Generación**
+
+Al seleccionar la acción **Generate CSR**, se abre un formulario donde se debe especificar la información de identidad (Subject DN) y otros atributos del certificado. Los campos disponibles son:
+
+* **Common Name (CN)**: El nombre principal que identifica a la entidad (ej. el dominio o ID del dispositivo). Es un campo obligatorio.  
+* **Organization (O)**: Nombre de la organización o empresa.  
+* **Organizational Unit (OU)**: Departamento o división dentro de la organización.  
+* **Country (C)**: Código de país de dos letras (ej. ES, US).  
+* **State / Province (ST)**: Estado o provincia.  
+* **Locality (L)**: Ciudad o localidad.  
+* **Email Address**: Dirección de correo electrónico de contacto.  
+* **Subject Alternative Names (SANs)**: Permite añadir nombres alternativos para la identidad, como nombres de dominio adicionales (DNS) o direcciones IP.
+
+Una vez completados los campos, al pulsar el botón de generación, el sistema crea la CSR firmada y la presenta en pantalla, permitiendo su descarga o copiado para ser enviada a la CA correspondiente.
+
+![](/images/image16.png)

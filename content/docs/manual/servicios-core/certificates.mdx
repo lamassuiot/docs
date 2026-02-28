@@ -1,0 +1,27 @@
+---
+title: "[Certs] Gestión de Certificados"
+description: Visualización y gestión de certificados emitidos
+---
+
+# Gestión de certificados
+Los certificados emitidos por Lamassu son accesibles, tanto desde la pestaña de Issued Certificates de los detalles de una CA como desde la opción “Certificates” del menú lateral.   
+En la pestaña de “Issued Certificates” se muestran los certificados emitidos por la CA seleccionada.
+
+![](/images/image44.png)
+
+Como desde la opción “Certificates” del menú lateral, donde se presentan todos los certificados emitidos por Lamassu independientemente de la CA que lo haya emitido. Esta pantalla incluye la opción de filtro de los certificados por CN, número de serie, estado y por la CA que lo emitió. 
+
+![](/images/image45.png)
+
+Por cada certificado se incluye un conjunto de acciones vinculadas al certificado.   
+![](/images/image46.png)  
+Acceso a los detalles “View Details”, un mecanismo de inspección rápida (Quick Inspect) con la información básica del certificado, la opción de descarga en formato PEM y el acceso a las acciones de revocación.   
+![](/images/image47.png)  
+La vista de detalle, proporciona información adicional y el acceso a las acciones de revocación. 
+## Revocación de certificados
+Ya sea desde las acciones del listado de certificados, como desde la vista de detalle se puede desencadenar la acción de revocación. Al pulsar sobre “Revoke Certificate” se abre una ventana modal en la que se debe seleccionar la razón de la revocación.   
+![](/images/image48.png)
+
+Es importante destacar que la única razón reversible es “CertificateHold”, una revocación por cualquier otra  razón no podrá ser revertida. En caso de seleccionar “CertificateHold” se ofrecerá una acción de reactivación. 
+
+![](/images/image49.png)

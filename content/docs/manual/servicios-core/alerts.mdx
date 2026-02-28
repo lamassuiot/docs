@@ -1,0 +1,90 @@
+---
+title: "[Alerts] Alertas y Suscripciones"
+description: Monitorización proactiva mediante eventos y suscripciones
+---
+
+# Alertas
+La funcionalidad de **Alertas** en Lamassu IoT es una herramienta avanzada para la monitorización y la observación del estado de la PKI. Va más allá de la simple visualización, permitiendo a los usuarios **reaccionar de forma proactiva y automatizada** a los eventos que ocurren en la infraestructura. Esta capacidad es crucial en entornos de IoT, donde el número de dispositivos y la frecuencia de las operaciones hacen inviable la monitorización manual. A través de la gestión de suscripciones, los administradores pueden asegurarse de que eventos críticos, como la revocación de un certificado o la detección de un intento de registro fallido, no pasen desapercibidos, lo que mejora la seguridad y la resiliencia del sistema.
+## Eventos y Suscripciones
+La página principal de alertas presenta una lista exhaustiva de todos los **tipos de eventos** que pueden ser generados por la PKI de Lamassu IoT. Estos eventos cubren un amplio espectro de actividades, desde operaciones de ciclo de vida de certificados y dispositivos hasta cambios de estado en las RA. Para cada tipo de evento, la interfaz proporciona un conjunto de métricas clave que facilitan la toma de decisiones:
+
+* **Last Seen**: Muestra cuándo ocurrió la última instancia del evento. Esto ayuda a identificar si un evento es recurrente o si ha ocurrido recientemente, lo cual es fundamental para el diagnóstico.  
+* **Counter**: Indica el número total de veces que el evento ha sido registrado en el sistema. Un contador alto puede señalar una tendencia, un problema subyacente en un dispositivo o una configuración errónea.  
+* **Subscriptions**: Informa si ya existen suscripciones activas para ese evento, evitando la creación de suscripciones duplicadas y proporcionando una visión general de la monitorización ya implementada.  
+* **Actions**: El botón **Subscribe** permite iniciar el proceso de creación de una nueva suscripción, adaptada a las necesidades específicas del usuario o equipo.
+
+Adicionalmente, al expandir la información de cada evento, se presenta un **ejemplo de la estructura de datos JSON** de la última instancia registrada. Esta información es de gran valor, ya que permite a los desarrolladores y administradores entender con precisión el esquema de la notificación y cómo procesarla en sistemas externos, como un sistema de gestión de incidentes o una aplicación de automatización.
+
+![](/images/image85.png)
+## Gestión de Suscripciones
+Para cada evento, se puede crear una suscripción a la que se envían notificaciones cuando el evento ocurre. Este proceso permite a los administradores del sistema personalizar qué eventos monitorizan y cómo son notificados. La configuración de las suscripciones, incluyendo el destino de las notificaciones, se gestiona de forma individual para cada tipo de evento.
+
+Al pulsar sobre el botón **Subscribe** se abre un modal de configuración que permite seleccionar uno de los tres mecanismos de notificación disponibles en Lamassu IoT.
+
+* **Email Notification**: Envía una notificación por correo electrónico a una dirección específica cada vez que el evento se registra. Para configurar este método, solo es necesario proporcionar la dirección de correo electrónico de destino.  
+  ![](/images/image86.png)  
+* **Microsoft Teams Webhook**: Utiliza un webhook para enviar una notificación al canal de Microsoft Teams configurado, lo que permite integrar las alertas directamente en los flujos de trabajo de colaboración. Se debe proporcionar un nombre para la suscripción y la URL del webhook de Microsoft Teams.  
+  ![](/images/image87.png)  
+* **Webhook**: Envía una notificación en formato JSON a una URL de webhook personalizada, lo que permite integrar las alertas con cualquier servicio o aplicación que soporte este protocolo. Para este mecanismo, se debe especificar un nombre, el **Método HTTP** (siempre **POST** o **PUT**) y la URL de destino. El documento JSON del evento se entregará como el cuerpo de la solicitud HTTP.  
+  ![](/images/image88.png)
+### Filtros y condiciones
+Después de seleccionar el mecanismo de notificación, se puede establecer un filtro para determinar las condiciones que deben cumplirse para que el evento sea notificado. Esto permite un control más granular y evita recibir notificaciones irrelevantes. Los formatos de filtro disponibles son:
+
+* **None**: No se aplica ningún filtro. Se enviarán notificaciones para todas las instancias del evento.  
+* **JSON Path**: Utiliza la sintaxis de JSON Path para evaluar una condición sobre un campo específico del evento JSON.  
+  ![](/images/image89.png)  
+* **JSON Schema**: Permite aplicar un esquema JSON para validar el evento. Las notificaciones solo se enviarán si el evento cumple con el esquema definido. Esto es útil para asegurar que solo se procesen eventos con un formato de datos esperado y consistente.   
+  ![](/images/image90.png)  
+* **Javascript**: Permite escribir una función de JavaScript personalizada para evaluar condiciones complejas sobre el evento JSON. Por ejemplo, la función `function (event) { return event.data.status == "NO_IDENTITY"; }` podría usarse para notificar solo cuando el estado de un dispositivo cambia a "No Identity". Esto ofrece la mayor flexibilidad, ya que se pueden aplicar lógicas avanzadas para filtrar los eventos antes de que se envíen las notificaciones. 
+
+  ![](/images/image91.png)
+### Confirmación de la suscripción
+El último paso del proceso es la **confirmación**. Una vez que se ha configurado el canal de notificación y el filtro (si corresponde), la interfaz muestra un resumen de la suscripción. Aquí puedes revisar el tipo de evento, el canal de notificación seleccionado y la condición del filtro antes de confirmar.
+
+![](/images/image92.png)
+
+Al hacer clic en **Confirm Subscription**, la suscripción se activa y Lamassu IoT comenzará a enviar notificaciones basadas en la configuración que has establecido.
+### Gestión de Suscripciones Existentes
+Para gestionar una suscripción que ya está activa, simplemente selecciónala en el listado de la página principal de alertas. Al hacerlo, se abrirá un modal de **Subscription Details** que muestra toda la información de la suscripción. Desde esta ventana, se pueden realizar las siguientes acciones:
+
+* **Ver detalles**: Muestra información completa sobre la suscripción, incluyendo su tipo de evento, el canal de notificación, los detalles de contacto (como la dirección de correo electrónico) y las condiciones de filtrado aplicadas.  
+* **Editar**: Permite modificar la configuración de la suscripción, como el canal de notificación o el filtro.  
+* **Anular suscripción (Unsubscribe)**: Desactiva y elimina la suscripción. Esta acción es útil cuando una alerta ya no es necesaria.
+
+## Catálogo de Eventos del Sistema
+La siguiente tabla resume los eventos que pueden ser generados por la plataforma Lamassu IoT, clasificados por el componente que los origina.
+
+| Evento | Descripción |
+| ----- | ----- |
+| **ca.create** | Creación de una CA |
+| **ca.import** | Importación de una CA |
+| **ca.profile.update** | Actualización de perfil de CA |
+| **ca.reissue** | Reemisión de una CA |
+| **ca.sign.certificate** | Firma / emisión de certificado |
+| **ca.signature.sign** | Operación de firma criptográfica |
+| **ca.delete** | Eliminación de una CA |
+| **certificate.delete** | Eliminación de un certificado |
+| **profile.create** | Creación de perfil de emisión |
+| **profile.update** | Actualización de perfil de emisión |
+| **profile.delete** | Eliminación de perfil de emisión |
+| **dms.create** | Creación de un DMS |
+| **dms.update** | Actualización de un DMS |
+| **dms.delete** | Eliminación de un DMS |
+| **dms.enroll** | Inscripción (enroll) de dispositivo |
+| **dms.reenroll** | Re-inscripción (reenroll) de dispositivo |
+| **dms.bind-device-id** | Asociación de identidad a dispositivo |
+| **device.create** | Creación de dispositivo |
+| **device.identity.update** | Actualización de identidad del dispositivo |
+| **device.status.update** | Cambio de estado del dispositivo |
+| **device.metadata.update** | Actualización de metadatos del dispositivo |
+| **device.delete** | Eliminación de un dispositivo |
+| **va.role.crl.create** | Cálculo/creación de CRL |
+| **kms.create** | Creación de clave en KMS |
+| **kms.import** | Importación de una clave KMS |
+| **kms.update.metadata** | Actualización de metadatos de clave KMS |
+| **kms.update.aliases** | Actualización de alias de clave KMS |
+| **kms.update.name** | Cambio de nombre de una clave KMS |
+| **kms.update.tags** | Actualización de etiquetas (tags) de clave KMS |
+| **kms.delete** | Eliminación de una clave KMS |
+| **kms.sign.message** | Firma de un mensaje con clave KMS |
+| **kms.verify.signature** | Verificación de firma con clave KMS |

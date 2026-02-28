@@ -3,7 +3,7 @@ title: "[RA] Registration Authority"
 description: Configuración y uso del módulo RA para automatizar la emisión de certificados
 ---
 
-# Automatización de procesos de emisión de certificados \- RA
+# Automatización de procesos de emisión de certificados
 Las **Registration Authorities (RA)** o Autoridades de Registro, son un componente clave en una **PKI (Infraestructura de Clave Pública)**. Su principal función es gestionar la identidad de los dispositivos y las políticas para la emisión de certificados. En un entorno IoT, una RA es la encargada de validar la solicitud de un nuevo certificado de un dispositivo antes de que la **Certification Authority (CA)** lo emita, lo que garantiza que solo los dispositivos confiables obtengan certificados.
 
 En el contexto de **Lamassu IoT**, las RA se utilizan para definir reglas y configuraciones específicas para el proceso de *enrollment* (registro) y *re-enrollment* (renovación) de los dispositivos. Esto incluye la selección del protocolo de emisión, la validación de certificados, y la generación de claves, entre otras funciones.
@@ -17,8 +17,8 @@ En Lamassu IoT, EST se utiliza para la comunicación entre el dispositivo y la P
 * **Enroll**: El dispositivo solicita un nuevo certificado. El proceso de enrollment incluye la validación de la identidad del dispositivo por parte de la RA y la posterior emisión del certificado por la CA.  
   **Ejemplo de invocación con curl:**
 
-```
-# Se envía una solicitud de firma de certificado (CSR) al servidor EST mediante el método POST.
+```bash
+# Se envía una solicitud de firma de certificado (CSR) al servidor EST mediante el método POST.
 # El servidor procesará la solicitud y, si es válida, devolverá el nuevo certificado.
 # La URL incluye la RA (aps).
 curl -X POST --cacert ca_cert.pem --cert client_cert.pem --key client_key.pem \
@@ -26,17 +26,13 @@ curl -X POST --cacert ca_cert.pem --cert client_cert.pem --key client_key.pem \
 -d @device_csr.pem \
 https://$HOST:$PORT/.well-known/est/$APS/simpleenroll \
 -o device_cert.pem
-
-
-
-
 ```
 
 * **Re-enroll**: El dispositivo solicita la renovación de un certificado que está a punto de caducar. Este proceso sigue un flujo similar al de enrollment, pero con políticas de renovación específicas configuradas en la RA.  
   **Ejemplo de invocación con curl:**
 
-```
-# Se utiliza el certificado actual del dispositivo para autenticarse y solicitar la renovación mediante el método POST.
+```bash
+# Se utiliza el certificado actual del dispositivo para autenticarse y solicitar la renovación mediante el método POST.
 # El CSR es opcional si se quiere mantener la misma clave.
 # La URL incluye la RA (aps).
 curl -X POST --cacert ca_cert.pem --cert device_cert.pem --key device_key.pem \
@@ -44,32 +40,24 @@ curl -X POST --cacert ca_cert.pem --cert device_cert.pem --key device_key.pem \
 -d @device_csr_renewal.pem \
 https://$HOST:$PORT/.well-known/est/$APS/simplereenroll \
 -o new_device_cert.pem
-
-
-
-
 ```
 
 * **CACerts**: Los dispositivos pueden solicitar los certificados de la cadena de confianza completa, lo que les permite validar la identidad de la CA que emitió su certificado y la del propio servidor de Lamassu IoT.  
   **Ejemplo de invocación con curl:**
 
-```
-# Se obtienen los certificados de la CA del servidor mediante una solicitud GET.
+```bash
+# Se obtienen los certificados de la CA del servidor mediante una solicitud GET.
 # La URL incluye la RA (aps).
 curl -X GET --cacert ca_cert.pem \
 https://$HOST:$PORT/.well-known/est/$APS/cacerts \
 -o est_cacerts.pem
-
-
-
-
 ```
 
 * **ServerKeyGen**: Esta operación permite que el servidor genere el par de claves (pública/privada) en nombre del dispositivo, lo que simplifica el proceso para dispositivos con capacidades de hardware limitadas.  
   **Ejemplo de invocación con curl:**
 
-```
-# Se solicita al servidor que genere un par de claves y devuelva el certificado, usando el método POST.
+```bash
+# Se solicita al servidor que genere un par de claves y devuelva el certificado, usando el método POST.
 # Esto es útil para dispositivos que no pueden generar su propia clave privada.
 # La URL incluye la RA (aps).
 curl -X POST --cacert ca_cert.pem --cert client_auth_cert.pem --key client_auth_key.pem \
@@ -77,17 +65,13 @@ curl -X POST --cacert ca_cert.pem --cert client_auth_cert.pem --key client_auth_
 -d @minimal_csr.pem \
 https://$HOST:$PORT/.well-known/est/$APS/serverkeygen \
 -o device_cert_and_key.pem
-
-
-
-
 ```
 
 #### Ejemplo de Proceso Completo de Enrollment
 
 El siguiente script de ejemplo demuestra un proceso completo de enrollment en un dispositivo utilizando openssl para la generación de claves y curl para la comunicación con el servidor EST.
 
-```
+```bash
 #!/bin/bash
 
 # Este script demuestra el proceso de enrollment de un dispositivo IoT usando EST.
@@ -130,16 +114,13 @@ if [ -s "$DEVICE_CERT" ]; then
 else
     echo "Error en el enrollment. No se recibió el certificado."
 fi
-
-
-
 ```
 
 #### Ejemplo de Proceso Completo de Re-enrollment
 
 El siguiente script de ejemplo demuestra un proceso completo de re-enrollment en un dispositivo que ya ha sido enrolado previamente. Este proceso asume que el dispositivo ya tiene una clave privada y un certificado válidos.
 
-```
+```bash
 #!/bin/bash
 
 # Este script demuestra el proceso de re-enrollment de un dispositivo IoT usando EST.
@@ -176,14 +157,9 @@ if [ -s "$NEW_DEVICE_CERT" ]; then
 else
     echo "Error en el re-enrollment. No se recibió el nuevo certificado."
 fi
-
-
-
 ```
 ## Configuración de una RA \- Enrollment
 La configuración de un **DMS (Device Management Service)** en el proceso de *Enrollment* define cómo se registrarán los dispositivos nuevos. Esta configuración se encuentra en la sección "Enrollment Device Registration".
-
-![](/images/image54.png)
 
 ![](/images/image55.png)
 
@@ -226,7 +202,7 @@ La generación de claves es una parte fundamental de la seguridad. Lamassu IoT p
 
 El siguiente script demuestra el proceso de ServerKeyGen, donde el cliente no genera su propia clave privada, sino que la solicita al servidor EST. El servidor genera el par de claves y devuelve el certificado junto con la clave privada en formato PKCS\#7.
 
-```shell
+```bash
 #!/bin/bash
 
 # Este script demuestra el proceso de ServerKeyGen de un dispositivo IoT.
@@ -267,9 +243,6 @@ openssl pkcs7 -in $DEVICE_CERT_AND_KEY -nocerts -out $DEVICE_KEY
 echo "¡ServerKeyGen exitoso! Certificado en $DEVICE_CERT y clave en $DEVICE_KEY."
 # Limpiar el CSR temporal
 rm temp_key.pem minimal_csr.pem
-
-
-
 ```
 ## Configuración de una RA \- Distribución de Entidades de Confianza
 La distribución de entidades de confianza es crucial para que los dispositivos puedan validar los certificados que reciben. En Lamassu IoT, esta configuración se encuentra en la sección "CA Distribution".
@@ -278,7 +251,7 @@ La distribución de entidades de confianza es crucial para que los dispositivos 
 * **Include Enrollment CA**: Permite la inclusión del certificado de la CA de inscripción, lo que asegura que el dispositivo confíe en la entidad que emitió su certificado.  
 * **Managed CAs**: Se pueden seleccionar CAs específicas para que se distribuyan a los dispositivos, asegurando que confíen en las CAs correctas del ecosistema.
 
-## ![](/images/image61.png)
+![](/images/image61.png)
 ## Acciones sobre la RA
 La interfaz de Lamassu IoT permite realizar diversas acciones sobre una RA ya configurada, facilitando su gestión y mantenimiento. Estas acciones se encuentran disponibles en el menú de opciones de cada RA y son las siguientes:
 

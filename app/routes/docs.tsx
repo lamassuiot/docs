@@ -36,7 +36,15 @@ const clientLoader = browserCollections.docs.createClientLoader({
   ) {
     const markdownUrl = `/llms.mdx/docs/${[...slugs, 'index.mdx'].join('/')}`;
     return (
-      <DocsPage toc={toc}>
+      <DocsPage
+        toc={toc}
+        tableOfContent={{
+          style: 'clerk',
+        }}
+        tableOfContentPopover={{
+          style: 'clerk',
+        }}
+      >
         <title>{frontmatter.title}</title>
         <meta name="description" content={frontmatter.description} />
         <DocsTitle>{frontmatter.title}</DocsTitle>

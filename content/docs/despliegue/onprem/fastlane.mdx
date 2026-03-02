@@ -14,29 +14,6 @@ La instalación incluye:
 - RabbitMQ
 - Chart Helm de Lamassu
 
-El modo Fastlane está orientado a:
-
-- Entornos de desarrollo
-- Pruebas de concepto (PoC)
-- Pipelines de integración continua (CI)
-- Escenarios donde se necesita un entorno funcional en el menor tiempo posible
-
-<Callout type="warning">
-  Fastlane prioriza velocidad y automatización. Para producción, usa un despliegue manual con control granular de cada componente.
-</Callout>
-
-## Flujo general de ejecución
-
-Las acciones principales se ejecutan secuencialmente desde la función `main`:
-
-1. Procesamiento de flags de línea de comandos
-2. Detección de la distribución Kubernetes
-3. Verificación de dependencias
-4. Solicitud o generación de configuración (modo interactivo o no interactivo)
-5. Instalación de PostgreSQL, RabbitMQ, Keycloak y Lamassu (Helm)
-6. Configuración de TLS
-7. Impresión de instrucciones finales
-
 ## Flags de línea de comandos
 
 Todos los parámetros son procesados por la función `process_flags`.

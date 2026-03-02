@@ -86,7 +86,7 @@
     position: fixed; top: 0; left: 0; right: 0;
     z-index: 100;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 48px;
+    padding: 14px 36px;
     background: rgba(11,15,46,0.7);
     backdrop-filter: blur(20px);
     border-bottom: 1px solid rgba(100,140,255,0.12);
@@ -102,43 +102,32 @@
     width: 28px; height: 28px;
   }
 
-  .nav-center {
-    display: flex; align-items: center; gap: 4px;
-  }
-  .nav-center a {
-    color: rgba(255,255,255,0.7);
-    text-decoration: none;
-    font-size: 14px;
-    font-family: var(--sans);
-    font-weight: 400;
-    padding: 6px 14px;
-    border-radius: 6px;
-    transition: all 0.2s;
-  }
-  .nav-center a:hover { color: #fff; background: rgba(255,255,255,0.05); }
-  .nav-center a.active { color: #fff; font-weight: 500; }
-
   .nav-right {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 12px;
   }
   .nav-right a {
     text-decoration: none; font-size: 14px; font-weight: 500;
-    padding: 9px 20px; border-radius: 8px;
+    padding: 9px 18px; border-radius: 8px;
     transition: all 0.2s;
   }
-  .nav-btn-outline {
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(255,255,255,0.05);
+  .nav-link {
+    color: rgba(255,255,255,0.7);
+    padding: 0;
+    font-size: 13px;
+    font-weight: 400;
+    font-family: var(--mono);
+    letter-spacing: 0.03em;
   }
-  .nav-btn-outline:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.35); }
-  .nav-btn-fill {
+  .nav-link:hover {
+    color: #fff;
+  }
+  .nav-btn {
     background: var(--accent);
     color: #001a2e;
     font-weight: 600;
-    box-shadow: 0 0 30px rgba(0,224,255,0.3);
+    box-shadow: 0 0 22px rgba(0,224,255,0.28);
   }
-  .nav-btn-fill:hover { background: #33eaff; box-shadow: 0 0 40px rgba(0,224,255,0.5); }
+  .nav-btn:hover { background: #33eaff; box-shadow: 0 0 34px rgba(0,224,255,0.45); }
 
   /* HERO */
   .hero {
@@ -475,9 +464,6 @@
     nav {
       padding: 14px 20px;
     }
-    .nav-center {
-      display: none;
-    }
     .hero {
       padding: 110px 28px 64px;
     }
@@ -517,7 +503,10 @@
     }
     .nav-right a {
       font-size: 12px;
-      padding: 8px 12px;
+      padding: 8px 11px;
+    }
+    .nav-link {
+      display: none;
     }
     .hero {
       min-height: 12vh;
@@ -593,20 +582,8 @@
     </svg>
     Lamassu
   </a>
-  <div class="nav-center">
-    <a href="/#">Plataforma</a>
-    <a href="/#">Funcionalidades</a>
-    <a href="/#">Valor</a>
-    <a href="/#">Casos de éxito</a>
-    <a href="/docs" class="active">Docs</a>
-    <a href="/#">Arch</a>
-    <a href="https://github.com/lamassuiot" target="_blank" rel="noopener noreferrer" style="color:rgba(255,255,255,0.5)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg>
-    </a>
-  </div>
   <div class="nav-right">
-    <a href="https://lamassu.io" target="_blank" rel="noopener noreferrer" class="nav-btn-fill">Habla con expertos</a>
-    <a href="/docs/manual" class="nav-btn-outline">Inicia sesion</a>
+    <a href="/docs/manual" class="nav-btn">Ir a la documentación</a>
   </div>
 </nav>
 

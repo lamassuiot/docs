@@ -26,7 +26,7 @@ Al pulsar sobre el botón **Subscribe** se abre un modal de configuración que p
 * **Microsoft Teams Webhook**: Utiliza un webhook para enviar una notificación al canal de Microsoft Teams configurado, lo que permite integrar las alertas directamente en los flujos de trabajo de colaboración. Se debe proporcionar un nombre para la suscripción y la URL del webhook de Microsoft Teams.  
   ![](/images/manual-servicios-core-alerts-gestion-de-suscripciones-a.png)  
 * **Webhook**: Envía una notificación en formato JSON a una URL de webhook personalizada, lo que permite integrar las alertas con cualquier servicio o aplicación que soporte este protocolo. Para este mecanismo, se debe especificar un nombre, el **Método HTTP** (siempre **POST** o **PUT**) y la URL de destino. El documento JSON del evento se entregará como el cuerpo de la solicitud HTTP.  
-  ![](/images/manual-servicios-core-alerts-gestion-de-suscripciones-b.png)
+
 ### Filtros y condiciones
 Después de seleccionar el mecanismo de notificación, se puede establecer un filtro para determinar las condiciones que deben cumplirse para que el evento sea notificado. Esto permite un control más granular y evita recibir notificaciones irrelevantes. Los formatos de filtro disponibles son:
 

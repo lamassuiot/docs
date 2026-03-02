@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lamassu IoT — Docs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0b0f2e;
+    --bg2: #0d1540;
+    --surface: #111835;
+    --surface2: #161e42;
+    --border: rgba(100, 140, 255, 0.14);
+    --accent: #00e0ff;
+    --accent2: #00e5c3;
+    --accent3: #6a8fff;
+    --text: #ffffff;
+    --muted: #7a8bbf;
+    --mono: 'DM Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --display: 'Syne', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    background-image: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(60,100,255,0.35) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 40% at 80% 30%, rgba(0,180,255,0.12) 0%, transparent 60%);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Diagonal line grid like landing */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(100,140,255,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(100,140,255,0.06) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Ambient glow blobs */
+  .glow-orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb-1 {
+    width: 700px; height: 700px;
+    background: radial-gradient(circle, rgba(50,100,255,0.25) 0%, transparent 70%);
+    top: -300px; left: -200px;
+    animation: drift1 20s ease-in-out infinite;
+  }
+  .orb-2 {
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(0,180,255,0.15) 0%, transparent 70%);
+    bottom: -100px; right: -100px;
+    animation: drift2 25s ease-in-out infinite;
+  }
+  .orb-3 {
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(0,229,195,0.08) 0%, transparent 70%);
+    top: 40%; right: 15%;
+    animation: drift3 18s ease-in-out infinite;
+  }
+
+  @keyframes drift1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(80px,60px)} }
+  @keyframes drift2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-60px,-80px)} }
+  @keyframes drift3 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(40px,-50px)} }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 48px;
+    background: rgba(11,15,46,0.7);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(100,140,255,0.12);
+  }
+
+  .nav-logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--display); font-weight: 700; font-size: 17px;
+    letter-spacing: -0.02em; color: var(--text);
+    text-decoration: none;
+  }
+  .nav-logo img-placeholder {
+    width: 28px; height: 28px;
+  }
+
+  .nav-center {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .nav-center a {
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    font-size: 14px;
+    font-family: var(--sans);
+    font-weight: 400;
+    padding: 6px 14px;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .nav-center a:hover { color: #fff; background: rgba(255,255,255,0.05); }
+  .nav-center a.active { color: #fff; font-weight: 500; }
+
+  .nav-right {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .nav-right a {
+    text-decoration: none; font-size: 14px; font-weight: 500;
+    padding: 9px 20px; border-radius: 8px;
+    transition: all 0.2s;
+  }
+  .nav-btn-outline {
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.05);
+  }
+  .nav-btn-outline:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.35); }
+  .nav-btn-fill {
+    background: var(--accent);
+    color: #001a2e;
+    font-weight: 600;
+    box-shadow: 0 0 30px rgba(0,224,255,0.3);
+  }
+  .nav-btn-fill:hover { background: #33eaff; box-shadow: 0 0 40px rgba(0,224,255,0.5); }
+
+  /* HERO */
+  .hero {
+    position: relative; z-index: 1;
+    min-height: 15vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 100px 48px 80px;
+    text-align: center;
+  }
+
+  /* Diagonal decorative lines like landing */
+  .hero::before, .hero::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+  }
+  .hero::before {
+    width: 2px; height: 55%;
+    background: linear-gradient(180deg, transparent, rgba(100,140,255,0.2), transparent);
+    left: 18%; top: 15%;
+    transform: rotate(-35deg);
+  }
+  .hero::after {
+    width: 2px; height: 55%;
+    background: linear-gradient(180deg, transparent, rgba(100,140,255,0.15), transparent);
+    right: 18%; top: 10%;
+    transform: rotate(35deg);
+  }
+
+  .hero-eyebrow {
+    font-family: var(--mono); font-size: 11px; font-weight: 400;
+    color: rgba(255,255,255,0.5); letter-spacing: 0.12em; text-transform: uppercase;
+    margin-bottom: 10px;
+    animation: fadeUp 0.8s ease both;
+  }
+  .hero-eyebrow-sub {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--accent); letter-spacing: 0.04em;
+    margin-bottom: 28px;
+    animation: fadeUp 0.8s 0.05s ease both;
+  }
+  .hero-eyebrow-sub span { color: rgba(255,255,255,0.4); margin: 0 8px; }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(52px, 7vw, 88px);
+    font-weight: 800;
+    line-height: 1.0;
+    letter-spacing: -0.03em;
+    color: #fff;
+    max-width: 860px;
+    animation: fadeUp 0.8s 0.1s ease both;
+  }
+
+  .hero-sub {
+    margin-top: 28px;
+    font-size: 17px;
+    color: rgba(255,255,255,0.55);
+    max-width: 560px;
+    line-height: 1.7;
+    font-weight: 300;
+    animation: fadeUp 0.8s 0.2s ease both;
+  }
+
+  .hero-actions {
+    display: flex; gap: 12px; margin-top: 44px;
+    animation: fadeUp 0.8s 0.3s ease both;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    text-decoration: none; font-family: var(--sans); font-size: 14px; font-weight: 600;
+    padding: 13px 28px; border-radius: 10px;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #001a2e;
+    box-shadow: 0 0 40px rgba(0,224,255,0.35);
+  }
+  .btn-primary:hover {
+    background: #33eaff;
+    box-shadow: 0 0 60px rgba(0,224,255,0.55);
+    transform: translateY(-1px);
+  }
+  .btn-ghost {
+    border: 1px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.7);
+    background: rgba(255,255,255,0.04);
+  }
+  .btn-ghost:hover {
+    border-color: rgba(255,255,255,0.35);
+    color: #fff;
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* Tech tags like landing page */
+  .tech-tags {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 52px;
+    animation: fadeUp 0.8s 0.4s ease both;
+  }
+  .tech-tag {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    border-radius: 100px;
+    padding: 6px 14px;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s;
+  }
+  .tech-tag:hover {
+    color: var(--accent);
+    border-color: rgba(0,224,255,0.3);
+    background: rgba(0,224,255,0.05);
+  }
+  .tech-tag::before {
+    content: '';
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.7;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* SECTION */
+  .section {
+    position: relative; z-index: 1;
+    padding: 0 48px 120px;
+    max-width: 1500px; margin: 0 auto;
+  }
+
+  .section-label {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-family: var(--display); font-size: 36px; font-weight: 700;
+    letter-spacing: -0.03em; margin-bottom: 48px;
+    color: var(--text);
+  }
+
+  /* CARDS GRID */
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s ease;
+    display: flex; flex-direction: column;
+    group: true;
+  }
+  .card:hover {
+    border-color: rgba(79,124,255,0.35);
+    transform: translateY(-4px);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(79,124,255,0.15);
+  }
+
+  .card-preview {
+    height: 220px;
+    background: var(--surface2);
+    overflow: hidden;
+    position: relative;
+  }
+  .card-preview-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .card-preview-inner {
+    position: absolute; inset: 16px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .card-preview-bar {
+    height: 32px;
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 12px;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #febc2e; }
+  .dot-g { background: #28c840; }
+
+  /* Dashboard preview */
+  .preview-dashboard { padding: 12px; }
+  .prev-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 6px;
+    margin-bottom: 4px;
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+  }
+  .prev-row:nth-child(2) { background: rgba(79,124,255,0.08); color: var(--accent); }
+  .prev-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .prev-dot.green { background: #28c840; }
+  .prev-dot.yellow { background: #febc2e; }
+  .prev-dot.red { background: #ff5f57; }
+  .prev-dot.blue { background: var(--accent); }
+  .prev-label { flex: 1; }
+  .prev-badge {
+    font-size: 9px; padding: 2px 7px; border-radius: 4px; font-weight: 600;
+  }
+  .badge-green { background: rgba(40,200,64,0.15); color: #28c840; }
+  .badge-yellow { background: rgba(254,188,46,0.15); color: #febc2e; }
+  .badge-red { background: rgba(255,95,87,0.15); color: #ff5f57; }
+
+  /* PKI preview */
+  .preview-pki { padding: 10px; }
+  .pki-row {
+    font-family: var(--mono); font-size: 9px; color: var(--muted);
+    padding: 3px 6px; margin-bottom: 2px;
+    display: flex; gap: 8px;
+  }
+  .pki-row .cmd { color: var(--accent2); }
+  .pki-row .val { color: #e8ecff; }
+  .pki-row .ok { color: #28c840; }
+  .pki-row .dim { color: rgba(107,122,184,0.5); }
+
+  /* Card glow accent */
+  .card::after {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .card:nth-child(1)::after { background: linear-gradient(90deg, transparent, var(--accent3), transparent); }
+  .card:nth-child(2)::after { background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+  .card:nth-child(3)::after { background: linear-gradient(90deg, transparent, var(--accent2), transparent); }
+  .card:nth-child(4)::after { background: linear-gradient(90deg, transparent, #7ab4ff, transparent); }
+  .card:hover::after { opacity: 1; }
+
+  .card-body { padding: 28px; flex: 1; }
+
+  .card-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 5px; margin-bottom: 14px;
+  }
+  .tag-blue { background: rgba(106,143,255,0.12); color: var(--accent3); }
+  .tag-purple { background: rgba(0,224,255,0.1); color: var(--accent); }
+  .tag-teal { background: rgba(0,229,195,0.1); color: var(--accent2); }
+  .tag-orange { background: rgba(100,160,255,0.12); color: #7ab4ff; }
+
+  .card-title {
+    font-family: var(--display); font-size: 22px; font-weight: 700;
+    letter-spacing: -0.02em; margin-bottom: 10px; color: var(--text);
+  }
+  .card-desc {
+    font-size: 14px; color: var(--muted); line-height: 1.65; font-weight: 300;
+  }
+
+  .card-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 28px;
+    border-top: 1px solid var(--border);
+  }
+  .card-link {
+    font-family: var(--mono); font-size: 12px; color: var(--accent3);
+    display: flex; align-items: center; gap: 6px;
+    transition: gap 0.2s;
+  }
+  .card:hover .card-link { gap: 10px; }
+  .card-link-arrow { font-size: 16px; }
+
+  /* Small cards row */
+  .cards-sm {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 16px; margin-top: 16px;
+  }
+  .card-sm {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.25s;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .card-sm:hover {
+    border-color: rgba(99,140,255,0.25);
+    transform: translateY(-2px);
+    background: var(--surface2);
+  }
+  .card-sm-icon {
+    width: 38px; height: 38px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .card-sm-title { font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+  .card-sm-desc { font-size: 13px; color: var(--muted); line-height: 1.6; font-weight: 300; }
+
+  /* FOOTER */
+  footer {
+    position: relative; z-index: 1;
+    border-top: 1px solid var(--border);
+    padding: 24px 48px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 40px;
+  }
+  footer p {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+  .footer-links { display: flex; gap: 20px; }
+  .footer-links a {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    text-decoration: none; transition: color 0.2s;
+  }
+  .footer-links a:hover { color: var(--text); }
+
+  @media (max-width: 1100px) {
+    nav {
+      padding: 14px 20px;
+    }
+    .nav-center {
+      display: none;
+    }
+    .hero {
+      padding: 110px 28px 64px;
+    }
+    .section {
+      padding: 0 28px 96px;
+    }
+    .cards {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 680px) {
+    .orb-1 {
+      width: 520px;
+      height: 520px;
+      top: -240px;
+      left: -180px;
+    }
+    .orb-2 {
+      width: 360px;
+      height: 360px;
+    }
+    .orb-3 {
+      width: 280px;
+      height: 280px;
+    }
+    nav {
+      padding: 12px 14px;
+      gap: 10px;
+    }
+    .nav-logo {
+      font-size: 15px;
+      gap: 8px;
+    }
+    .nav-right {
+      gap: 8px;
+    }
+    .nav-right a {
+      font-size: 12px;
+      padding: 8px 12px;
+    }
+    .hero {
+      min-height: 12vh;
+      padding: 96px 14px 52px;
+    }
+    .hero::before,
+    .hero::after {
+      display: none;
+    }
+    h1 {
+      font-size: clamp(34px, 12vw, 48px);
+      line-height: 1.02;
+    }
+    .hero-eyebrow-sub {
+      font-size: 11px;
+      margin-bottom: 20px;
+    }
+    .section {
+      padding: 0 14px 72px;
+    }
+    .section-title {
+      font-size: 30px;
+      margin-bottom: 28px;
+    }
+    .card-preview {
+      height: 190px;
+    }
+    .card-body {
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 20px;
+    }
+    .card-footer {
+      padding: 16px 20px;
+    }
+    footer {
+      padding: 20px 14px;
+      margin-top: 24px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .nav-right a {
+      font-size: 11px;
+      padding: 7px 9px;
+    }
+    .hero-eyebrow-sub {
+      letter-spacing: 0.02em;
+    }
+    .card-link {
+      font-size: 11px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow-orb orb-1"></div>
+<div class="glow-orb orb-2"></div>
+<div class="glow-orb orb-3"></div>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style="flex-shrink:0">
+      <rect width="28" height="28" rx="6" fill="url(#ng)"></rect>
+      <text x="14" y="19" text-anchor="middle" font-family="Syne,sans-serif" font-weight="800" font-size="13" fill="white">L</text>
+      <defs><linearGradient id="ng" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse"><stop stop-color="#3060ff"></stop><stop offset="1" stop-color="#00b4ff"></stop></linearGradient></defs>
+    </svg>
+    Lamassu
+  </a>
+  <div class="nav-center">
+    <a href="/#">Plataforma</a>
+    <a href="/#">Funcionalidades</a>
+    <a href="/#">Valor</a>
+    <a href="/#">Casos de éxito</a>
+    <a href="/docs" class="active">Docs</a>
+    <a href="/#">Arch</a>
+    <a href="https://github.com/lamassuiot" target="_blank" rel="noopener noreferrer" style="color:rgba(255,255,255,0.5)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg>
+    </a>
+  </div>
+  <div class="nav-right">
+    <a href="https://lamassu.io" target="_blank" rel="noopener noreferrer" class="nav-btn-fill">Habla con expertos</a>
+    <a href="/docs/manual" class="nav-btn-outline">Inicia sesion</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <p class="hero-eyebrow">LAMASSU IOT</p>
+  <p class="hero-eyebrow-sub">IoT-First PKI Platform <span>·</span> Industrial Certificate Lifecycle Management</p>
+  <h1 style="font-family: 'Space Grotesk', sans-serif;">Welcome to the Docs</h1>
+</section>
+
+<!-- MAIN CARDS -->
+<div class="section">
+  <p class="section-label">// Core guides</p>
+  <h2 class="section-title">Start building</h2>
+
+  <div class="cards">
+    <!-- Dashboard Console -->
+    <a href="/docs/manual" class="card">
+      <div class="card-preview">
+        <img src="/images/lamassu-dashboard.png" alt="Lamassu dashboard" class="card-preview-image">
+      </div>
+      <div class="card-body">
+        <span class="card-tag tag-blue">Dashboard Console</span>
+        <h3 class="card-title">Navigate the platform</h3>
+        <p class="card-desc">Explore core screens and daily workflows. Learn device provisioning, fleet views, and real-time monitoring.</p>
+      </div>
+      <div class="card-footer">
+        <span class="card-link">Open guide <span class="card-link-arrow">→</span></span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--muted);">12 articles</span>
+      </div>
+    </a>
+
+    <!-- PKI Deployment -->
+    <a href="/docs/despliegue/onprem/fastlane" class="card">
+      <div class="card-preview">
+        <div class="card-preview-inner">
+          <div class="card-preview-bar">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:8px;">PKI Deployment</span>
+          </div>
+          <div class="preview-pki">
+            <div class="pki-row"><span class="cmd">$</span><span class="val">lamassu init --mode production</span></div>
+            <div class="pki-row"><span class="ok">✓</span><span class="val">Root CA initialized</span></div>
+            <div class="pki-row"><span class="ok">✓</span><span class="val">Intermediate CA ready</span></div>
+            <div class="pki-row"><span class="cmd">$</span><span class="val">lamassu cert issue --device edge-01</span></div>
+            <div class="pki-row"><span class="ok">✓</span><span class="val">Certificate issued <span class="dim">TTL: 8760h</span></span></div>
+            <div class="pki-row"><span class="cmd">$</span><span class="val">lamassu enroll --fleet prod</span></div>
+            <div class="pki-row"><span class="ok">✓</span><span class="val">48 devices enrolled</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <span class="card-tag tag-purple">PKI Deployment</span>
+        <h3 class="card-title">Deploy your PKI instance</h3>
+        <p class="card-desc">From prerequisites to a running setup. Covers root CA creation, intermediate authorities, and device enrollment.</p>
+      </div>
+      <div class="card-footer">
+        <span class="card-link" style="color:var(--accent);">Open guide <span class="card-link-arrow">→</span></span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--muted);">8 articles</span>
+      </div>
+    </a>
+  </div>
+
+  
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 Lamassu IoT</p>
+  <div class="footer-links">
+    <a href="https://github.com/lamassuiot">GitHub</a>
+  </div>
+</footer>
+
+
+
+</body></html>

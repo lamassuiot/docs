@@ -4,17 +4,9 @@ description: Servicios OCSP y CRL para validación de certificados
 ---
 
 # Validación de certificados – VA
-## Servicio OCSP
-Lamassu ofrece un servicio de validación online del estado del certificado. La ubicación del servicio se incorpora embebida en los certificados emitidos por Lamassu y se puede comprobar desde la pantalla de certificados. 
+Lamassu ofrece dos mecanismos complementarios para validar el estado de los certificados emitidos por la plataforma:
 
-![](/images/manual-servicios-core-validation-servicio-ocsp.png)
+- `OCSP`, para consultas online y en tiempo real del estado del certificado.
+- `CRL`, para distribución y consulta offline de listas de revocación.
 
-Se ofrece la acción “OCSP Check” que permite a los usuarios lanzar una petición OCSP para comprobar el estado del certificado seleccionado. 
-
-![](/images/manual-servicios-core-validation-servicio-ocsp-a.png)
-## Servicio CRL
-Lamassu genera y mantiene actualizadas las listas de revocación(CRL) de cada una de las CA que gestiona. Estas CRLs son accesibles desde el panel de detalles de la CA.
-
-![](/images/manual-servicios-core-validation-servicio-crl.png)
-
-Permite previsualizar sus contenidos y descargarla para usarla de manera offline.
+En el menú lateral del módulo `VA` encontrarás cada capacidad documentada en su propia página.

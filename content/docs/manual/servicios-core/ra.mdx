@@ -1,264 +1,126 @@
 ---
-title: "[RA] Registration Authority"
-description: Configuración y uso del módulo RA para automatizar la emisión de certificados
+title: "[DMS] Device Management Service"
+description: Configuración del DMS para automatizar la inscripción y renovación de certificados de dispositivos IoT
 ---
 
-# Automatización de procesos de emisión de certificados
-Las **Registration Authorities (RA)** o Autoridades de Registro, son un componente clave en una **PKI (Infraestructura de Clave Pública)**. Su principal función es gestionar la identidad de los dispositivos y las políticas para la emisión de certificados. En un entorno IoT, una RA es la encargada de validar la solicitud de un nuevo certificado de un dispositivo antes de que la **Certification Authority (CA)** lo emita, lo que garantiza que solo los dispositivos confiables obtengan certificados.
+# Device Management Service
 
-En el contexto de **Lamassu IoT**, las RA se utilizan para definir reglas y configuraciones específicas para el proceso de *enrollment* (registro) y *re-enrollment* (renovación) de los dispositivos. Esto incluye la selección del protocolo de emisión, la validación de certificados, y la generación de claves, entre otras funciones.
+El **DMS (Device Management Service)** es el componente de Lamassu IoT que actúa como Autoridad de Registro (RA) frente a los dispositivos: recibe las solicitudes de certificado, valida la identidad del solicitante según las políticas configuradas y encarga la emisión a la CA asignada. Esta página describe cómo crear y configurar un DMS y qué acciones de gestión están disponibles.
+
+El protocolo de inscripción que el DMS expone a los dispositivos es EST (RFC 7030). La referencia operativa completa de los endpoints, formatos, autenticación y diagnóstico se encuentra en la página EST.
 
 ![](/images/manual-servicios-core-ra-automatizacion-de-procesos-de-emision-de-certificados.png)
-## Protocolos de Emisión \- EST
-El protocolo de inscripción de certificados **EST (Enrollment over Secure Transport)** es el único protocolo de emisión soportado en la configuración actual de Lamassu IoT. EST es un protocolo estándar, especificado en el **RFC 7030**, diseñado para la inscripción segura de certificados X.509 utilizando un transporte seguro como **TLS (Transport Layer Security)**. Es una alternativa más moderna y segura a protocolos más antiguos como SCEP.
+*Vista general del módulo DMS en la consola de Lamassu IoT.*
 
-En Lamassu IoT, EST se utiliza para la comunicación entre el dispositivo y la PKI, permitiendo que el dispositivo solicite un nuevo certificado o renueve uno existente de forma segura y automatizada. La estructura de los endpoints de EST en Lamassu IoT incluye el nombre de la RA (\{aps\}). Las operaciones clave de EST son:
+## Antes de empezar
 
-* **Enroll**: El dispositivo solicita un nuevo certificado. El proceso de enrollment incluye la validación de la identidad del dispositivo por parte de la RA y la posterior emisión del certificado por la CA.  
-  **Ejemplo de invocación con curl:**
+Para crear un DMS es necesario que exista al menos una CA activa en la plataforma, ya que el DMS requiere seleccionar una CA de enrolamiento. El usuario debe disponer del rol de administrador PKI o de permisos equivalentes sobre el módulo DMS.
 
-```bash
-# Se envía una solicitud de firma de certificado (CSR) al servidor EST mediante el método POST.
-# El servidor procesará la solicitud y, si es válida, devolverá el nuevo certificado.
-# La URL incluye la RA (aps).
-curl -X POST --cacert ca_cert.pem --cert client_cert.pem --key client_key.pem \
--H "Content-Type: application/pkcs10" \
--d @device_csr.pem \
-https://$HOST:$PORT/.well-known/est/$APS/simpleenroll \
--o device_cert.pem
-```
+## Configuración de enrollment
 
-* **Re-enroll**: El dispositivo solicita la renovación de un certificado que está a punto de caducar. Este proceso sigue un flujo similar al de enrollment, pero con políticas de renovación específicas configuradas en la RA.  
-  **Ejemplo de invocación con curl:**
-
-```bash
-# Se utiliza el certificado actual del dispositivo para autenticarse y solicitar la renovación mediante el método POST.
-# El CSR es opcional si se quiere mantener la misma clave.
-# La URL incluye la RA (aps).
-curl -X POST --cacert ca_cert.pem --cert device_cert.pem --key device_key.pem \
--H "Content-Type: application/pkcs10" \
--d @device_csr_renewal.pem \
-https://$HOST:$PORT/.well-known/est/$APS/simplereenroll \
--o new_device_cert.pem
-```
-
-* **CACerts**: Los dispositivos pueden solicitar los certificados de la cadena de confianza completa, lo que les permite validar la identidad de la CA que emitió su certificado y la del propio servidor de Lamassu IoT.  
-  **Ejemplo de invocación con curl:**
-
-```bash
-# Se obtienen los certificados de la CA del servidor mediante una solicitud GET.
-# La URL incluye la RA (aps).
-curl -X GET --cacert ca_cert.pem \
-https://$HOST:$PORT/.well-known/est/$APS/cacerts \
--o est_cacerts.pem
-```
-
-* **ServerKeyGen**: Esta operación permite que el servidor genere el par de claves (pública/privada) en nombre del dispositivo, lo que simplifica el proceso para dispositivos con capacidades de hardware limitadas.  
-  **Ejemplo de invocación con curl:**
-
-```bash
-# Se solicita al servidor que genere un par de claves y devuelva el certificado, usando el método POST.
-# Esto es útil para dispositivos que no pueden generar su propia clave privada.
-# La URL incluye la RA (aps).
-curl -X POST --cacert ca_cert.pem --cert client_auth_cert.pem --key client_auth_key.pem \
--H "Content-Type: application/pkcs10" \
--d @minimal_csr.pem \
-https://$HOST:$PORT/.well-known/est/$APS/serverkeygen \
--o device_cert_and_key.pem
-```
-
-#### Ejemplo de Proceso Completo de Enrollment
-
-El siguiente script de ejemplo demuestra un proceso completo de enrollment en un dispositivo utilizando openssl para la generación de claves y curl para la comunicación con el servidor EST.
-
-```bash
-#!/bin/bash
-
-# Este script demuestra el proceso de enrollment de un dispositivo IoT usando EST.
-
-# Variables de configuración
-HOST="pki.lamassu.com"
-PORT="443"
-APS="test-ra"  # Nombre de la RA
-CA_CERT="ca_cert.pem"
-DEVICE_KEY="device_key.pem"
-DEVICE_CSR="device_csr.pem"
-DEVICE_CERT="device_cert.pem"
-
-# 1. Generar la clave privada del dispositivo
-echo "Generando la clave privada del dispositivo..."
-openssl ecparam -name prime256v1 -genkey -out $DEVICE_KEY
-
-# 2. Generar la solicitud de firma de certificado (CSR)
-echo "Generando la solicitud de firma de certificado (CSR)..."
-# La CSR debe incluir la información del dispositivo, como el nombre común (CN)
-openssl req -new -key $DEVICE_KEY -out $DEVICE_CSR -subj "/CN=iot-device-12345"
-
-# 3. Descargar el certificado de la CA del servidor para validar la conexión TLS
-echo "Descargando certificados de la CA del servidor..."
-curl -X GET --cacert $CA_CERT https://$HOST:$PORT/.well-known/est/$APS/cacerts -o est_cacerts.pem
-
-# 4. Enviar la CSR al servidor EST y obtener el nuevo certificado
-echo "Enviando CSR al servidor EST para enrollment..."
-curl -X POST --cacert $CA_CERT \
--H "Content-Type: application/pkcs10" \
--d @$DEVICE_CSR \
-https://$HOST:$PORT/.well-known/est/$APS/simpleenroll \
--o $DEVICE_CERT
-
-# 5. Verificar si el certificado se recibió correctamente
-if [ -s "$DEVICE_CERT" ]; then
-    echo "¡Enrollment exitoso! Certificado guardado en $DEVICE_CERT."
-    # Opcional: ver el contenido del certificado
-    openssl x509 -in $DEVICE_CERT -text -noout
-else
-    echo "Error en el enrollment. No se recibió el certificado."
-fi
-```
-
-#### Ejemplo de Proceso Completo de Re-enrollment
-
-El siguiente script de ejemplo demuestra un proceso completo de re-enrollment en un dispositivo que ya ha sido enrolado previamente. Este proceso asume que el dispositivo ya tiene una clave privada y un certificado válidos.
-
-```bash
-#!/bin/bash
-
-# Este script demuestra el proceso de re-enrollment de un dispositivo IoT usando EST.
-
-# Variables de configuración
-HOST="pki.lamassu.com"
-PORT="443"
-APS="test-ra"  # Nombre de la RA
-CA_CERT="ca_cert.pem"
-DEVICE_KEY="device_key.pem"
-DEVICE_CERT="device_cert.pem"
-NEW_DEVICE_CERT="new_device_cert.pem"
-DEVICE_CSR="device_csr_renewal.pem"
-
-# 1. Generar la solicitud de firma de certificado (CSR) para la renovación
-echo "Generando la CSR para la renovación..."
-# Se usa la clave privada existente y se especifica la misma información que en el certificado original.
-openssl req -new -key $DEVICE_KEY -out $DEVICE_CSR -subj "/CN=iot-device-12345"
-
-# 2. Enviar la CSR al servidor EST para re-enrollment
-echo "Enviando CSR al servidor EST para re-enrollment..."
-# Se utiliza el certificado y la clave del dispositivo existente para autenticarse.
-curl -X POST --cacert $CA_CERT --cert $DEVICE_CERT --key $DEVICE_KEY \
--H "Content-Type: application/pkcs10" \
--d @$DEVICE_CSR \
-https://$HOST:$PORT/.well-known/est/$APS/simplereenroll \
--o $NEW_DEVICE_CERT
-
-# 3. Verificar si el nuevo certificado se recibió correctamente
-if [ -s "$NEW_DEVICE_CERT" ]; then
-    echo "¡Re-enrollment exitoso! Nuevo certificado guardado en $NEW_DEVICE_CERT."
-    # Opcional: ver el contenido del nuevo certificado
-    openssl x509 -in $NEW_DEVICE_CERT -text -noout
-else
-    echo "Error en el re-enrollment. No se recibió el nuevo certificado."
-fi
-```
-## Configuración de una RA \- Enrollment
-La configuración de un **DMS (Device Management Service)** en el proceso de *Enrollment* define cómo se registrarán los dispositivos nuevos. Esta configuración se encuentra en la sección "Enrollment Device Registration".
+La sección **Enrollment Device Registration** define cómo se registran los dispositivos nuevos y con qué credenciales se autentican.
 
 ![](/images/manual-servicios-core-ra-configuracion-de-una-ra-enrollment.png)
+*Sección de configuración de enrollment del DMS.*
 
-* **Registration Mode**: Determina el método de registro inicial. Lamassu IoT soporta **JITP (Just-in-Time Provisioning)**, donde un dispositivo es provisionado al conectarse por primera vez, y el modo **Pre-registration**, donde el dispositivo ya debe existir en el sistema para autorizar la emisión de su identidad. Esta elección es crítica para la estrategia de despliegue de dispositivos. Por ejemplo, JITP es ideal para grandes despliegues donde no se tiene un control estricto sobre cada dispositivo antes de su conexión, mientras que Pre-registration es preferible para entornos de alta seguridad donde cada dispositivo debe ser conocido y aprobado previamente.  
-* **Tags**: Se pueden asignar etiquetas a los dispositivos registrados para facilitar su organización y gestión. Estas etiquetas son especialmente útiles para agrupar dispositivos por función, ubicación o tipo, permitiendo una gestión más granular y una búsqueda eficiente.  
-* **Device Icon**: Permite asociar un icono y un color por defecto a los dispositivos que se registren a través de esta RA. Esto facilita su identificación visual en el sistema y mejora la experiencia del usuario al gestionar un gran número de dispositivos.
+El **Registration Mode** determina el comportamiento al recibir una inscripción inicial. En modo `JITP` (*Just-In-Time Provisioning*), el dispositivo se crea automáticamente la primera vez que se presenta, aplicando los tags, metadatos e icono definidos en el perfil de aprovisionamiento. En modo `PRE_REGISTRATION`, el dispositivo debe existir previamente en la plataforma; si no existe, la solicitud se rechaza con `device not preregistered`. El modo JITP es adecuado para flotas grandes donde el inventario se construye durante el despliegue; el modo PRE_REGISTRATION encaja en entornos de alta seguridad donde cada dispositivo se aprueba de forma explícita antes de recibir un certificado.
+
+Los campos **Tags** e **Icon** del perfil de aprovisionamiento se aplican a cada dispositivo creado automáticamente por este DMS. Son opcionales y solo tienen efecto en modo JITP.
 
 ![](/images/manual-servicios-core-ra-configuracion-de-una-ra-enrollment-a.png)
+*Parámetros de autenticación y CA de enrollment.*
 
-* **Protocol**: Como se mencionó anteriormente, el protocolo de inscripción es **EST**.  
-* **Enrollment CA**: Se debe seleccionar la Certification Authority que se encargará de emitir los certificados para los dispositivos registrados a través de esta RA.  
-* **Allow Override Enrollment**: Esta opción permite sobrescribir la identidad de un dispositivo que ya ha sido enrolado previamente. Habilitar esta función puede ser útil en escenarios de recuperación de desastres o para reasignar un dispositivo, pero debe usarse con precaución, ya que podría tener implicaciones de seguridad.  
-* **Authentication Mode**: Define cómo se autenticará el dispositivo durante el proceso de registro. Las opciones son:  
-  * **Client Certificate**: El dispositivo debe presentar un certificado de cliente válido. Para este modo, es necesario seleccionar una o varias CAs en el campo **Validation CAs** que actuarán como validadoras de los certificados presentados. Adicionalmente, el campo **Chain Validation Level** permite especificar la longitud de la cadena de validación de certificados que se requiere validar. Un valor de \-1 indica que se debe validar la cadena completa hasta la CA raíz. También, el campo **Allow Authenticating Expired Certificates** indica si se permite a un dispositivo enrolarse presentando un certificado expirado. Esta opción es útil en situaciones donde un dispositivo no pudo renovar su certificado a tiempo debido a problemas de conectividad, permitiéndole recuperarse sin intervención manual.  
-  * **External Webhook**: La autenticación se delega a un servicio externo. Para esto, se debe configurar un *webhook* con la URL del servicio, el nivel de registro y el modo de autenticación del *webhook*.
+La **Enrollment CA** es la CA que firmará los certificados de identidad emitidos a través de este DMS. El protocolo fijado es siempre EST.
+
+La opción **Allow Override Enrollment** (`enable_replaceable_enrollment`) permite que un dispositivo ya enrolado vuelva a inscribirse mediante `/simpleenroll`. Cuando está activa, el certificado anterior se revoca con la razón `superseded` y el slot de identidad se actualiza. Cuando está inactiva, un segundo intento de `simpleenroll` se rechaza con `forbiddenNewEnrollment`. Esta opción debe habilitarse con precaución en entornos de producción, ya que permite sustituir la identidad de un dispositivo sin pasar por el flujo de re-enrollment.
+
+La opción **Verify CSR Signature** (`verify_csr_signature`) controla si el servidor valida la firma del CSR contra la clave pública declarada en él (prueba de posesión PKCS#10). Cuando está inactiva, un solicitante podría enviar un CSR con una clave pública que no controla y obtener un certificado vinculado a ella. Para flotas IoT en redes abiertas debe estar activa.
+
+### Modo de autenticación
+
+El campo **Authentication Mode** define cómo el DMS valida la identidad del dispositivo durante el enrollment. Los cuatro modos disponibles son:
+
+| Modo | Descripción |
+|---|---|
+| `CLIENT_CERTIFICATE` | mTLS. El dispositivo presenta un certificado X.509 emitido por alguna de las CAs declaradas en **Validation CAs**. |
+| `EXTERNAL_WEBHOOK` | La decisión de autorización se delega en un servicio HTTP externo. Solo aplica en `/simpleenroll`; en `/simplereenroll` este modo degrada silenciosamente a `NO_AUTH`. |
+| `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | Combina los dos anteriores: se exige un certificado cliente válido **y** la confirmación del webhook externo. |
+| `NO_AUTH` | Sin autenticación. Cualquier CSR se acepta. **Exclusivo para entornos de laboratorio o redes de aprovisionamiento aisladas**; no debe usarse en producción. |
+
+Cuando el modo es `CLIENT_CERTIFICATE` o `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`, se configuran los siguientes parámetros adicionales:
+
+| Parámetro | Descripción |
+|---|---|
+| **Validation CAs** | Lista de CAs de confianza para validar el certificado bootstrap presentado por el dispositivo. |
+| **Chain Validation Level** | Profundidad máxima de la cadena de validación. El valor `-1` valida la cadena completa hasta la CA raíz. |
+| **Allow Authenticating Expired Certificates** | Si está activo, acepta certificados cliente caducados. Útil en escenarios de recuperación donde el dispositivo no pudo renovar su certificado a tiempo. |
+
+Cuando el modo incluye `EXTERNAL_WEBHOOK`, se configura la URL del servicio, el método HTTP, el timeout de llamada y el modo de autenticación del webhook hacia el servicio externo (ApiKey, OIDC o mTLS).
 
 ![](/images/manual-servicios-core-ra-configuracion-de-una-ra-enrollment-b.png)
-## Configuración de una RA \- ReEnrollment
-El *Re-Enrollment* es el proceso de renovación de un certificado que está a punto de caducar. La configuración de Re-Enrollment en Lamassu IoT permite automatizar y controlar este proceso. Esta configuración se encuentra en la sección "Re-Enrollment Settings".
+*Parámetros de autenticación por certificado cliente.*
+
+## Configuración de re-enrollment
+
+La sección **Re-Enrollment Settings** controla el proceso de renovación de certificados. El re-enrollment puede realizarse cuando el certificado está dentro de la ventana configurada, y opcionalmente también cuando el certificado ya ha caducado.
 
 ![](/images/manual-servicios-core-ra-configuracion-de-una-ra-reenrollment.png)
+*Sección de configuración de re-enrollment.*
 
-* **Revoke On Re-Enroll**: Indica si el certificado anterior del dispositivo debe ser revocado automáticamente una vez que se ha emitido y registrado un nuevo certificado en la renovación.  
-* **Allow Expired Renewal**: Permite que un dispositivo renueve un certificado que ya ha expirado, lo cual es útil en escenarios donde un dispositivo ha estado desconectado por un tiempo.  
-* **Allowed Renewal Delta**: Indica la ventana de tiempo previa a la caducidad en la que se permite el *re-enroll*. Antes del inicio de este periodo, la renovación es rechazada.  
-* **Preventive Renewal Delta**: Indica la ventana de tiempo previa a la expiración en la que se comienzan a lanzar avisos de renovación.  
-* **Critical Renewal Delta**: Establece un umbral de tiempo más cercano al vencimiento que se considera crítico.  
-* **Additional Validation CAs**: Permite añadir CAs adicionales para validar la identidad del dispositivo durante la renovación. Por ejemplo, esta función es útil si se quiere migrar a una nueva CA, ya que se podría validar con la CA anterior y emitir con una nueva.
-## Configuración de una RA \- ServerKeyGen
-La generación de claves es una parte fundamental de la seguridad. Lamassu IoT permite la generación de claves en el lado del servidor, lo que puede simplificar el proceso para algunos dispositivos. Esta configuración se encuentra en la sección "Server Key Generation".
+| Parámetro | Descripción |
+|---|---|
+| **Revoke On Re-Enroll** | Si está activo, el certificado anterior se revoca automáticamente con la razón `superseded` una vez emitido el nuevo. |
+| **Allow Expired Renewal** | Permite renovar un certificado ya caducado. Útil cuando un dispositivo ha estado desconectado y no pudo renovar dentro de la ventana. |
+| **Allowed Renewal Delta** | Ventana de tiempo previa a la caducidad durante la cual se permite el re-enrollment. Antes de que se abra esta ventana, la solicitud se rechaza con `invalid reenroll window`. |
+| **Preventive Renewal Delta** | Tiempo previo a la caducidad a partir del cual se emiten alertas de renovación preventiva. |
+| **Critical Renewal Delta** | Umbral más cercano al vencimiento que activa alertas de estado crítico. |
+| **Additional Validation CAs** | CAs adicionales aceptadas como emisoras del certificado en vigor durante el re-enrollment. Permite migrar a una nueva CA de enrolamiento sin interrumpir la renovación de dispositivos ya enrolados con la CA anterior. |
+
+## Configuración de ServerKeyGen
+
+La sección **Server Key Generation** permite que Lamassu genere el par de claves del dispositivo en el servidor y lo devuelva junto con el certificado emitido. Es útil para dispositivos con capacidad criptográfica limitada.
 
 ![](/images/manual-servicios-core-ra-configuracion-de-una-ra-serverkeygen.png)
+*Sección de configuración de generación de claves en servidor.*
 
-* **Enable Server-Side Key Generation**: Permite que Lamassu genere el par de claves (pública/privada) en nombre del dispositivo. Esto puede ser útil para dispositivos con recursos limitados que no pueden generar sus propias claves.  
-* **Key Type**: Se puede seleccionar el algoritmo criptográfico para la generación de la clave, como **RSA** o **ECDSA**. En el caso de **ECDSA**, el campo **Curve** se utiliza para seleccionar la curva criptográfica, por ejemplo, P-256.
+La opción **Enable Server-Side Key Generation** activa el endpoint `/serverkeygen`. Cuando está inactiva, cualquier llamada a ese endpoint se rechaza con `server key generation not enabled`.
+
+**Key Type** selecciona el algoritmo: `RSA` o `ECDSA`. El campo **Key Size (bits)** determina el tamaño de la clave. Para ECDSA, el tamaño en bits determina también la curva: 256 corresponde a P-256, 384 a P-384 y 521 a P-521. No existe un campo de curva separado.
 
 ![](/images/manual-servicios-core-ra-configuracion-de-una-ra-serverkeygen-a.png)
+*Selección de tipo y tamaño de clave para ServerKeyGen.*
 
-#### Ejemplo de Proceso Completo de ServerKeyGen
+La clave se genera en el motor software del servidor, no en un Crypto Engine de hardware como AWS KMS o PKCS#11. La única protección de la clave en tránsito es el canal TLS; no se aplica cifrado adicional (CMS EnvelopedData) sobre la clave antes de enviarla al dispositivo. Consulte la página EST para conocer el formato exacto de la respuesta y las consideraciones de seguridad de este endpoint.
 
-El siguiente script demuestra el proceso de ServerKeyGen, donde el cliente no genera su propia clave privada, sino que la solicita al servidor EST. El servidor genera el par de claves y devuelve el certificado junto con la clave privada en formato PKCS\#7.
+## Distribución de entidades de confianza
 
-```bash
-#!/bin/bash
-
-# Este script demuestra el proceso de ServerKeyGen de un dispositivo IoT.
-
-# Variables de configuración
-HOST="pki.lamassu.com"
-PORT="443"
-APS="test-ra"  # Nombre de la RA
-CA_CERT="ca_cert.pem"
-AUTH_CERT="client_auth_cert.pem"
-AUTH_KEY="client_auth_key.pem"
-DEVICE_CERT_AND_KEY="device_cert_and_key.p7"
-DEVICE_CERT="device_cert.pem"
-DEVICE_KEY="device_key.pem"
-
-# 1. Crear un CSR mínimo para la solicitud.
-# El CN (Common Name) es el único campo obligatorio para la identidad del dispositivo.
-echo "Generando un CSR mínimo para la solicitud ServerKeyGen..."
-openssl req -new -newkey rsa:2048 -nodes -keyout temp_key.pem -out minimal_csr.pem -subj "/CN=server-key-device-001"
-
-# 2. Enviar la solicitud ServerKeyGen al servidor EST.
-echo "Enviando solicitud ServerKeyGen al servidor EST..."
-# Se utiliza un certificado de autenticación de cliente (previamente obtenido)
-# para asegurar la conexión. El servidor generará la clave y el certificado.
-curl -X POST --cacert $CA_CERT --cert $AUTH_CERT --key $AUTH_KEY \
--H "Content-Type: application/pkcs10" \
--d @minimal_csr.pem \
-https://$HOST:$PORT/.well-known/est/$APS/serverkeygen \
--o $DEVICE_CERT_AND_KEY
-
-# 3. Extraer el certificado y la clave privada del paquete PKCS#7 recibido
-echo "Extrayendo el certificado y la clave privada del paquete PKCS#7..."
-# La respuesta de serverkeygen contiene el certificado y la clave privada del dispositivo.
-# Es necesario separarlos y guardarlos en archivos distintos.
-openssl pkcs7 -in $DEVICE_CERT_AND_KEY -print_certs -out $DEVICE_CERT
-openssl pkcs7 -in $DEVICE_CERT_AND_KEY -nocerts -out $DEVICE_KEY
-
-echo "¡ServerKeyGen exitoso! Certificado en $DEVICE_CERT y clave en $DEVICE_KEY."
-# Limpiar el CSR temporal
-rm temp_key.pem minimal_csr.pem
-```
-## Configuración de una RA \- Distribución de Entidades de Confianza
-La distribución de entidades de confianza es crucial para que los dispositivos puedan validar los certificados que reciben. En Lamassu IoT, esta configuración se encuentra en la sección "CA Distribution".
-
-* **Include Downstream CA**: Habilita la inclusión de la CA del certificado TLS del servidor Lamassu IoT en la respuesta de EST. Esto permite que el dispositivo cliente confíe en el servidor y pueda construir una cadena de confianza completa.  
-* **Include Enrollment CA**: Permite la inclusión del certificado de la CA de inscripción, lo que asegura que el dispositivo confíe en la entidad que emitió su certificado.  
-* **Managed CAs**: Se pueden seleccionar CAs específicas para que se distribuyan a los dispositivos, asegurando que confíen en las CAs correctas del ecosistema.
+La sección **CA Distribution** controla qué certificados de CA recibe el dispositivo al llamar al endpoint `/cacerts`.
 
 ![](/images/manual-servicios-core-ra-configuracion-de-una-ra-distribucion-de-entidades-de-confianza.png)
-## Acciones sobre la RA
-La interfaz de Lamassu IoT permite realizar diversas acciones sobre una RA ya configurada, facilitando su gestión y mantenimiento. Estas acciones se encuentran disponibles en el menú de opciones de cada RA y son las siguientes:
+*Sección de distribución de entidades de confianza.*
 
-* **Edit**: Permite modificar la configuración de la RA, como las políticas de *enrollment*, *re-enrollment* y otras opciones descritas en este manual.  
-* **Go to DMS owned devices**: Redirige al listado de dispositivos gestionados por esta RA en particular, lo que permite visualizar y administrar los dispositivos asociados.  
-* **Show/Edit Metadata**: Proporciona acceso a los metadatos de la RA, donde se puede ver y editar información adicional para usos avanzados.   
-* **EST (RFC-7030)**: Muestra información detallada sobre los endpoints de EST para la RA, incluyendo la URL base, las URLs específicas y comandos para cada operación (*simpleenroll*, *simplereenroll*, etc.), lo que es útil para la integración de dispositivos.  
-* **Delete**: Permite eliminar la RA. Esta acción es irreversible y debe usarse con precaución.
+| Parámetro | Descripción |
+|---|---|
+| **Include Lamassu System CA** | Incluye el certificado TLS del servidor Lamassu en la respuesta de `/cacerts`. Este es el certificado de extremo del servidor, no una CA — útil para *pinning* de la conexión. |
+| **Include Enrollment CA** | Incluye la CA emisora configurada en este DMS, es decir, la que firmará los certificados de dispositivo. |
+| **Managed CAs** | CAs adicionales distribuidas al dispositivo como anclas de confianza. |
+
+## Acciones sobre el DMS
+
+Desde el menú de opciones de cada DMS están disponibles las siguientes acciones:
+
+| Acción | Descripción |
+|---|---|
+| **Edit** | Modifica la configuración del DMS. |
+| **Go to DMS owned devices** | Abre el listado de dispositivos gestionados por este DMS. |
+| **Show/Edit Metadata** | Accede a los metadatos del DMS para usos avanzados. |
+| **EST (RFC-7030)** | Muestra los endpoints EST del DMS con su URL base y ejemplos de invocación. |
+| **Delete** | Elimina el DMS y su configuración. Acción irreversible. |
 
 ![](/images/manual-servicios-core-ra-acciones-sobre-la-ra.png)
+*Menú de acciones sobre el DMS.*
+
+<Cards>
+  <Card title="Protocolo EST — referencia operativa" href="/docs/manual/servicios-core/est" />
+  <Card title="Gestionar dispositivos" href="/docs/manual/servicios-core/devices" />
+</Cards>

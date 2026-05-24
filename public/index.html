@@ -1,664 +1,1375 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lamassu IoT — Docs</title>
-<link rel="preconnect" href="https://fonts.googleapis.com/">
-<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<script>if(localStorage.getItem('ls-theme')==='light')document.documentElement.setAttribute('data-theme','light');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #0b0f2e;
-    --bg2: #0d1540;
-    --surface: #111835;
-    --surface2: #161e42;
-    --border: rgba(100, 140, 255, 0.14);
-    --accent: #00e0ff;
-    --accent2: #00e5c3;
-    --accent3: #6a8fff;
-    --text: #ffffff;
-    --muted: #7a8bbf;
-    --mono: 'DM Mono', monospace;
-    --sans: 'DM Sans', sans-serif;
-    --display: 'Syne', sans-serif;
+    --bg:        #09111f;
+    --surface:   #10192c;
+    --surface-s: #15233a;
+    --border:    #243550;
+    --title:     #edf3ff;
+    --text:      #bcc9df;
+    --muted:     #8fa1c3;
+    --accent:    #7e9cff;
+    --accent-bg: rgba(126,156,255,0.12);
+    --accent-text: #08101e;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Manrope', sans-serif;
+  }
+
+  [data-theme='light'] {
+    --bg:        #f4f6fa;
+    --surface:   #ffffff;
+    --surface-s: #f6f8fd;
+    --border:    #d8deeb;
+    --title:     #0f1728;
+    --text:      #36455f;
+    --muted:     #5f6e8c;
+    --accent:    #405fff;
+    --accent-bg: rgba(64,95,255,0.10);
+    --accent-text: #ffffff;
   }
 
   html { scroll-behavior: smooth; }
 
   body {
-    background: var(--bg);
-    background-image: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(60,100,255,0.35) 0%, transparent 70%),
-      radial-gradient(ellipse 60% 40% at 80% 30%, rgba(0,180,255,0.12) 0%, transparent 60%);
-    color: var(--text);
+    background:
+      radial-gradient(circle at 50% -15%, rgba(98,124,205,0.18), transparent 45%),
+      radial-gradient(circle at 85% 0%,   rgba(47,74,136,0.14),  transparent 28%),
+      var(--bg);
+    color: var(--title);
     font-family: var(--sans);
     min-height: 100vh;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Diagonal line grid like landing */
-  body::before {
-    content: '';
+  /* ── Top stripe ── */
+  .top-stripe {
+    height: 5px;
+    width: 100%;
+    background: linear-gradient(90deg, #2a49f8 0%, #4c7fff 52%, #35b9ff 100%);
+  }
+
+  /* ── Dot-grid background ── */
+  .dot-grid {
     position: fixed;
     inset: 0;
-    background-image:
-      linear-gradient(rgba(100,140,255,0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(100,140,255,0.06) 1px, transparent 1px);
-    background-size: 60px 60px;
+    background-image: radial-gradient(circle, rgba(143,165,228,0.38) 1px, transparent 1px);
+    background-size: 16px 16px;
+    opacity: 0.28;
+    mask-image: linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.24) 48%, transparent 84%);
     pointer-events: none;
     z-index: 0;
   }
 
-  /* Ambient glow blobs */
-  .glow-orb {
-    position: fixed;
-    border-radius: 50%;
-    filter: blur(120px);
-    pointer-events: none;
-    z-index: 0;
-  }
-  .orb-1 {
-    width: 700px; height: 700px;
-    background: radial-gradient(circle, rgba(50,100,255,0.25) 0%, transparent 70%);
-    top: -300px; left: -200px;
-    animation: drift1 20s ease-in-out infinite;
-  }
-  .orb-2 {
-    width: 500px; height: 500px;
-    background: radial-gradient(circle, rgba(0,180,255,0.15) 0%, transparent 70%);
-    bottom: -100px; right: -100px;
-    animation: drift2 25s ease-in-out infinite;
-  }
-  .orb-3 {
-    width: 400px; height: 400px;
-    background: radial-gradient(circle, rgba(0,229,195,0.08) 0%, transparent 70%);
-    top: 40%; right: 15%;
-    animation: drift3 18s ease-in-out infinite;
+  /* ── Shell wrapper ── */
+  .shell {
+    position: relative;
+    z-index: 1;
+    width: min(1360px, calc(100% - 48px));
+    margin: 0 auto;
   }
 
-  @keyframes drift1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(80px,60px)} }
-  @keyframes drift2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-60px,-80px)} }
-  @keyframes drift3 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(40px,-50px)} }
-
-  /* NAV */
-  nav {
-    position: fixed; top: 0; left: 0; right: 0;
-    z-index: 100;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 36px;
-    background: rgba(11,15,46,0.7);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid rgba(100,140,255,0.12);
+  /* ── Header — matches landing SiteHeader exactly ── */
+  .site-shell-header {
+    height: 82px;
+    width: min(1360px, calc(100% - 48px));
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: relative;
+    z-index: 10;
   }
 
-  .nav-logo {
-    display: flex; align-items: center; gap: 10px;
-    font-family: var(--display); font-weight: 700; font-size: 17px;
-    letter-spacing: -0.02em; color: var(--text);
+  .site-shell-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
     text-decoration: none;
-  }
-  .nav-logo img-placeholder {
-    width: 28px; height: 28px;
+    flex-shrink: 0;
   }
 
-  .nav-right {
-    display: flex; align-items: center; gap: 12px;
-  }
-  .nav-right a {
-    text-decoration: none; font-size: 14px; font-weight: 500;
-    padding: 9px 18px; border-radius: 8px;
-    transition: all 0.2s;
-  }
-  .nav-link {
-    color: rgba(255,255,255,0.7);
-    padding: 0;
-    font-size: 13px;
-    font-weight: 400;
-    font-family: var(--mono);
-    letter-spacing: 0.03em;
-  }
-  .nav-link:hover {
-    color: #fff;
-  }
-  .nav-btn {
-    background: var(--accent);
-    color: #001a2e;
-    font-weight: 600;
-    box-shadow: 0 0 22px rgba(0,224,255,0.28);
-  }
-  .nav-btn:hover { background: #33eaff; box-shadow: 0 0 34px rgba(0,224,255,0.45); }
-
-  /* HERO */
-  .hero {
-    position: relative; z-index: 1;
-    min-height: 15vh;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    padding: 100px 48px 80px;
-    text-align: center;
+  .site-shell-logo-full {
+    height: 30px;
+    width: auto;
+    display: block;
   }
 
-  /* Diagonal decorative lines like landing */
-  .hero::before, .hero::after {
+  .site-shell-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .site-shell-nav a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.15s;
+  }
+  .site-shell-nav a:hover,
+  .site-shell-nav a.is-active { color: var(--title); }
+
+  .site-shell-nav a.github-link {
+    display: inline-grid;
+    place-items: center;
+    line-height: 0;
+  }
+  .site-shell-nav a.github-link svg {
+    width: 17px; height: 17px;
+    display: block;
+    fill: currentColor;
+  }
+
+  .site-shell-cta-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Locale switcher */
+  .locale-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 2px;
+    border-bottom: 1px solid rgba(143,172,246,0.18);
+  }
+  .locale-switcher-btn {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 0;
+    padding: 8px 8px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: color 0.18s, opacity 0.18s;
+    position: relative;
+    opacity: 0.72;
+    font-family: var(--sans);
+  }
+  .locale-switcher-btn:hover { color: var(--title); opacity: 1; }
+  .locale-switcher-btn.is-active { color: var(--title); opacity: 1; }
+  .locale-switcher-btn::after {
     content: '';
     position: absolute;
-    pointer-events: none;
+    left: 8px; right: 8px; bottom: -1px;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #7e9cff 0%, #59d0ff 100%);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.18s;
   }
-  .hero::before {
-    width: 2px; height: 55%;
-    background: linear-gradient(180deg, transparent, rgba(100,140,255,0.2), transparent);
-    left: 18%; top: 15%;
-    transform: rotate(-35deg);
+  .locale-switcher-btn.is-active::after { transform: scaleX(1); }
+
+  /* Theme toggle */
+  .theme-toggle {
+    width: 34px; height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    padding: 0;
   }
-  .hero::after {
-    width: 2px; height: 55%;
-    background: linear-gradient(180deg, transparent, rgba(100,140,255,0.15), transparent);
-    right: 18%; top: 10%;
-    transform: rotate(35deg);
+  .theme-toggle:hover { color: var(--title); border-color: var(--muted); }
+  .theme-toggle svg {
+    width: 16px; height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    display: block;
   }
 
-  .hero-eyebrow {
-    font-family: var(--mono); font-size: 11px; font-weight: 400;
-    color: rgba(255,255,255,0.5); letter-spacing: 0.12em; text-transform: uppercase;
-    margin-bottom: 10px;
-    animation: fadeUp 0.8s ease both;
+  /* CTAs */
+  .site-shell-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--title);
+    border-radius: 8px;
+    text-decoration: none;
+    padding: 9px 13px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--sans);
+    transition: border-color 0.15s, background 0.15s;
+    white-space: nowrap;
+    box-sizing: border-box;
+    line-height: 1;
   }
-  .hero-eyebrow-sub {
-    font-family: var(--mono); font-size: 12px;
-    color: var(--accent); letter-spacing: 0.04em;
-    margin-bottom: 28px;
-    animation: fadeUp 0.8s 0.05s ease both;
-  }
-  .hero-eyebrow-sub span { color: rgba(255,255,255,0.4); margin: 0 8px; }
+  .site-shell-cta:hover { border-color: var(--muted); }
 
-  h1 {
-    font-family: var(--display);
-    font-size: clamp(52px, 7vw, 88px);
-    font-weight: 800;
-    line-height: 1.0;
+  .site-shell-cta-login {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: transparent;
+  }
+  .site-shell-cta-login:hover { background: #96b0ff; border-color: transparent; }
+
+  /* Hamburger */
+  .site-shell-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .site-shell-menu-btn:hover { color: var(--title); border-color: var(--muted); }
+  .site-shell-menu-btn svg { width: 18px; height: 18px; display: block; }
+  .site-shell-menu-btn .menu-icon-close { display: none; }
+  .site-shell-menu-btn[aria-expanded='true'] .menu-icon-open { display: none; }
+  .site-shell-menu-btn[aria-expanded='true'] .menu-icon-close { display: block; }
+  .site-shell-menu-btn[aria-expanded='true'] { color: var(--title); border-color: var(--muted); }
+
+  /* Mobile nav panel */
+  .site-shell-mobile-nav {
+    display: none;
+    position: fixed;
+    top: 87px; /* 5px stripe + 82px header */
+    left: 0; right: 0;
+    z-index: 60;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 16px 40px rgba(2,6,18,0.38);
+    padding: 20px 24px;
+    animation: mobileNavIn 180ms ease both;
+  }
+  @keyframes mobileNavIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .site-shell-mobile-nav.is-open { display: block; }
+  body.mobile-nav-open { overflow: hidden; }
+
+  .mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+  }
+  .mobile-nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 10px 0;
+    transition: color 0.15s;
+  }
+  .mobile-nav-links a:hover { color: var(--title); }
+
+  .mobile-nav-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-bottom: 4px;
+  }
+  .mobile-nav-actions .site-shell-cta { flex: 1; min-width: 120px; justify-content: center; }
+
+  /* Sticky pill nav (on scroll past hero) */
+  @keyframes stickyIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes stickyLinkIn {
+    from { opacity: 0; transform: translateY(-3px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (min-width: 941px) {
+    body.header-sticky .site-shell-header {
+      position: fixed;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: auto;
+      height: auto;
+      margin: 0;
+      justify-content: center;
+      gap: 0;
+      z-index: 70;
+    }
+    body.header-sticky .site-shell-brand,
+    body.header-sticky .site-shell-cta-group { display: none; }
+    body.header-sticky .site-shell-nav {
+      gap: 16px;
+      padding: 11px 18px;
+      border: 1px solid rgba(63,80,119,0.72);
+      border-radius: 14px;
+      background: rgba(9,15,28,0.88);
+      box-shadow: 0 12px 30px rgba(2,6,16,0.34);
+      backdrop-filter: blur(8px);
+      animation: stickyIn 230ms ease both;
+    }
+    body.header-sticky .site-shell-nav a {
+      opacity: 0;
+      transform: translateY(-3px);
+      animation: stickyLinkIn 180ms ease forwards;
+    }
+    body.header-sticky .site-shell-nav a:nth-child(1) { animation-delay: 30ms; }
+    body.header-sticky .site-shell-nav a:nth-child(2) { animation-delay: 55ms; }
+    body.header-sticky .site-shell-nav a:nth-child(3) { animation-delay: 80ms; }
+    body.header-sticky .site-shell-nav a:nth-child(4) { animation-delay: 105ms; }
+    body.header-sticky .site-shell-nav a:nth-child(5) { animation-delay: 130ms; }
+    body.header-sticky .site-shell-nav a:nth-child(6) { animation-delay: 155ms; }
+    body.header-sticky .site-shell-nav a:nth-child(7) { animation-delay: 180ms; }
+  }
+
+  /* ── Hero ── */
+  .hero {
+    padding: 72px 0 56px;
+    display: grid;
+    gap: 16px;
+  }
+
+  .hero-kicker {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .hero h1 {
+    margin: 0;
+    color: var(--title);
+    font-size: clamp(38px, 7vw, 64px);
+    line-height: 1.04;
     letter-spacing: -0.03em;
-    color: #fff;
-    max-width: 860px;
-    animation: fadeUp 0.8s 0.1s ease both;
+    font-weight: 800;
   }
 
-  .hero-sub {
-    margin-top: 28px;
-    font-size: 17px;
-    color: rgba(255,255,255,0.55);
+  .hero-lead {
+    margin: 0;
+    color: var(--text);
+    font-size: clamp(16px, 2vw, 19px);
+    line-height: 1.55;
     max-width: 560px;
-    line-height: 1.7;
-    font-weight: 300;
-    animation: fadeUp 0.8s 0.2s ease both;
   }
 
   .hero-actions {
-    display: flex; gap: 12px; margin-top: 44px;
-    animation: fadeUp 0.8s 0.3s ease both;
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
   }
+
   .btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    text-decoration: none; font-family: var(--sans); font-size: 14px; font-weight: 600;
-    padding: 13px 28px; border-radius: 10px;
-    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--title);
+    border-radius: 8px;
+    padding: 11px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--sans);
+    transition: border-color 0.15s, background 0.15s;
     cursor: pointer;
   }
+  .btn:hover { border-color: var(--muted); }
+
   .btn-primary {
     background: var(--accent);
-    color: #001a2e;
-    box-shadow: 0 0 40px rgba(0,224,255,0.35);
+    color: var(--accent-text);
+    border-color: transparent;
   }
   .btn-primary:hover {
-    background: #33eaff;
-    box-shadow: 0 0 60px rgba(0,224,255,0.55);
-    transform: translateY(-1px);
-  }
-  .btn-ghost {
-    border: 1px solid rgba(255,255,255,0.18);
-    color: rgba(255,255,255,0.7);
-    background: rgba(255,255,255,0.04);
-  }
-  .btn-ghost:hover {
-    border-color: rgba(255,255,255,0.35);
-    color: #fff;
-    background: rgba(255,255,255,0.08);
+    background: #96b0ff;
+    border-color: transparent;
   }
 
-  /* Tech tags like landing page */
-  .tech-tags {
-    display: flex; gap: 10px; flex-wrap: wrap;
-    justify-content: center;
-    margin-top: 52px;
-    animation: fadeUp 0.8s 0.4s ease both;
+  .hero-stack {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
-  .tech-tag {
-    font-family: var(--mono); font-size: 10px; font-weight: 500;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    color: rgba(255,255,255,0.5);
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.04);
-    border-radius: 100px;
-    padding: 6px 14px;
-    display: flex; align-items: center; gap: 6px;
-    transition: all 0.2s;
-  }
-  .tech-tag:hover {
-    color: var(--accent);
-    border-color: rgba(0,224,255,0.3);
-    background: rgba(0,224,255,0.05);
-  }
-  .tech-tag::before {
-    content: '';
-    width: 5px; height: 5px; border-radius: 50%;
-    background: var(--accent);
-    opacity: 0.7;
+  .hero-stack span {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface);
   }
 
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(24px); }
-    to { opacity: 1; transform: translateY(0); }
+  /* ── Blue divider ── */
+  .blue-divider {
+    border: none;
+    height: 3px;
+    background: #555efc;
+    margin: 0 0 26px;
+    border-radius: 2px;
   }
 
-  /* SECTION */
+  /* ── Sections ── */
   .section {
-    position: relative; z-index: 1;
-    padding: 0 48px 120px;
-    max-width: 1500px; margin: 0 auto;
+    padding-top: 88px;
   }
 
-  .section-label {
-    font-family: var(--mono); font-size: 11px; font-weight: 500;
-    color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase;
-    margin-bottom: 16px;
+  .section-kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
   }
-  .section-title {
-    font-family: var(--display); font-size: 36px; font-weight: 700;
-    letter-spacing: -0.03em; margin-bottom: 48px;
+
+  .section h2 {
+    margin: 0 0 8px;
+    color: var(--title);
+    font-size: clamp(26px, 4vw, 40px);
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    font-weight: 800;
+  }
+
+  .section-lead {
+    margin: 0 0 36px;
     color: var(--text);
+    font-size: 15px;
+    line-height: 1.6;
   }
 
-  /* CARDS GRID */
-  .cards {
+  /* ── Main guide cards ── */
+  .guide-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: 16px;
   }
 
-  .card {
-    position: relative;
-    background: var(--surface);
+  .guide-card {
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--border);
-    border-radius: 20px;
-    overflow: hidden;
+    border-radius: 14px;
+    background: var(--surface);
     text-decoration: none;
     color: inherit;
-    transition: all 0.3s ease;
-    display: flex; flex-direction: column;
-    group: true;
+    overflow: hidden;
+    transition: border-color 0.15s, background 0.15s;
   }
-  .card:hover {
-    border-color: rgba(79,124,255,0.35);
-    transform: translateY(-4px);
-    box-shadow: 0 24px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(79,124,255,0.15);
+  .guide-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    background: var(--surface-s);
   }
 
-  .card-preview {
-    height: 220px;
-    background: var(--surface2);
+  .guide-preview {
+    height: 210px;
+    background: var(--surface-s);
     overflow: hidden;
     position: relative;
+    border-bottom: 1px solid var(--border);
   }
-  .card-preview-image {
+
+  .guide-preview img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
   }
-  .card-preview-inner {
-    position: absolute; inset: 16px;
+
+  /* Fake terminal preview */
+  .terminal {
+    position: absolute;
+    inset: 16px;
     border-radius: 10px;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(6,10,22,0.82);
   }
-  .card-preview-bar {
-    height: 32px;
-    display: flex; align-items: center; gap: 6px;
+  .terminal-bar {
+    height: 30px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     padding: 0 12px;
     background: rgba(255,255,255,0.04);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
   }
-  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .terminal-dot { width: 8px; height: 8px; border-radius: 50%; }
   .dot-r { background: #ff5f57; }
   .dot-y { background: #febc2e; }
   .dot-g { background: #28c840; }
-
-  /* Dashboard preview */
-  .preview-dashboard { padding: 12px; }
-  .prev-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 8px; border-radius: 6px;
+  .terminal-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    margin-left: 8px;
+  }
+  .terminal-body { padding: 12px; }
+  .t-row {
+    display: flex;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
     margin-bottom: 4px;
-    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    line-height: 1.5;
   }
-  .prev-row:nth-child(2) { background: rgba(79,124,255,0.08); color: var(--accent); }
-  .prev-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .prev-dot.green { background: #28c840; }
-  .prev-dot.yellow { background: #febc2e; }
-  .prev-dot.red { background: #ff5f57; }
-  .prev-dot.blue { background: var(--accent); }
-  .prev-label { flex: 1; }
-  .prev-badge {
-    font-size: 9px; padding: 2px 7px; border-radius: 4px; font-weight: 600;
-  }
-  .badge-green { background: rgba(40,200,64,0.15); color: #28c840; }
-  .badge-yellow { background: rgba(254,188,46,0.15); color: #febc2e; }
-  .badge-red { background: rgba(255,95,87,0.15); color: #ff5f57; }
+  .t-cmd  { color: #7e9cff; }
+  .t-ok   { color: #28c840; }
+  .t-val  { color: #e8ecff; }
 
-  /* PKI preview */
-  .preview-pki { padding: 10px; }
-  .pki-row {
-    font-family: var(--mono); font-size: 9px; color: var(--muted);
-    padding: 3px 6px; margin-bottom: 2px;
-    display: flex; gap: 8px;
-  }
-  .pki-row .cmd { color: var(--accent2); }
-  .pki-row .val { color: #e8ecff; }
-  .pki-row .ok { color: #28c840; }
-  .pki-row .dim { color: rgba(107,122,184,0.5); }
-
-  /* Card glow accent */
-  .card::after {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 1px;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-  .card:nth-child(1)::after { background: linear-gradient(90deg, transparent, var(--accent3), transparent); }
-  .card:nth-child(2)::after { background: linear-gradient(90deg, transparent, var(--accent), transparent); }
-  .card:nth-child(3)::after { background: linear-gradient(90deg, transparent, var(--accent2), transparent); }
-  .card:nth-child(4)::after { background: linear-gradient(90deg, transparent, #7ab4ff, transparent); }
-  .card:hover::after { opacity: 1; }
-
-  .card-body { padding: 28px; flex: 1; }
-
-  .card-tag {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-family: var(--mono); font-size: 10px; font-weight: 500;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    padding: 4px 10px; border-radius: 5px; margin-bottom: 14px;
-  }
-  .tag-blue { background: rgba(106,143,255,0.12); color: var(--accent3); }
-  .tag-purple { background: rgba(0,224,255,0.1); color: var(--accent); }
-  .tag-teal { background: rgba(0,229,195,0.1); color: var(--accent2); }
-  .tag-orange { background: rgba(100,160,255,0.12); color: #7ab4ff; }
-
-  .card-title {
-    font-family: var(--display); font-size: 22px; font-weight: 700;
-    letter-spacing: -0.02em; margin-bottom: 10px; color: var(--text);
-  }
-  .card-desc {
-    font-size: 14px; color: var(--muted); line-height: 1.65; font-weight: 300;
+  .guide-body {
+    padding: 24px 24px 20px;
+    flex: 1;
   }
 
-  .card-footer {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 20px 28px;
+  .guide-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    background: var(--accent-bg);
+    color: var(--accent);
+  }
+
+  .guide-card h3 {
+    margin: 0 0 8px;
+    color: var(--title);
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .guide-desc {
+    margin: 0;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .guide-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
     border-top: 1px solid var(--border);
   }
-  .card-link {
-    font-family: var(--mono); font-size: 12px; color: var(--accent3);
-    display: flex; align-items: center; gap: 6px;
+
+  .guide-link {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 6px;
     transition: gap 0.2s;
   }
-  .card:hover .card-link { gap: 10px; }
-  .card-link-arrow { font-size: 16px; }
+  .guide-card:hover .guide-link { gap: 10px; }
 
-  /* Small cards row */
-  .cards-sm {
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 16px; margin-top: 16px;
+  .guide-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
   }
-  .card-sm {
+
+  /* ── Feature cards (small) ── */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .feature-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 24px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .feature-card:hover {
+    background: var(--surface-s);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .feature-icon svg { width: 20px; height: 20px; display: block; }
+
+  .feature-kicker {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .feature-card h3 {
+    margin: 0;
+    color: var(--title);
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    flex: 1;
+  }
+
+  .feature-body {
+    margin: 0;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .feature-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: auto;
+    width: fit-content;
+    padding: 9px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    background: var(--surface-s);
+    color: var(--title);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .feature-link:hover {
+    background: var(--surface);
+    border-color: var(--muted);
+  }
+
+  /* Featured card variant */
+  .feature-card--featured {
+    background: var(--accent);
+    border-color: transparent;
+  }
+  .feature-card--featured:hover {
+    background: #96b0ff;
+    border-color: transparent;
+  }
+  .feature-card--featured .feature-icon {
+    background: rgba(0,0,0,0.18);
+    border-color: rgba(0,0,0,0.12);
+    color: var(--accent-text);
+  }
+  .feature-card--featured .feature-kicker { color: rgba(8,16,30,0.6); }
+  .feature-card--featured h3,
+  .feature-card--featured .feature-body { color: var(--accent-text); }
+  .feature-card--featured .feature-link {
+    background: var(--accent-text);
+    color: var(--accent);
+    border-color: transparent;
+  }
+  .feature-card--featured .feature-link:hover { opacity: 0.85; }
+
+  /* ── Stack cards ── */
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 16px;
+    margin-top: 32px;
+  }
+
+  .stack-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 28px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 24px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .stack-card:hover {
+    background: var(--surface-s);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
+
+  .stack-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--accent-bg);
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .stack-icon svg { width: 20px; height: 20px; display: block; }
+
+  .stack-card h3 {
+    margin: 0;
+    color: var(--title);
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+
+  .stack-card p {
+    margin: 0;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.65;
+    flex: 1;
+  }
+
+  .stack-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .stack-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface-s);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Footer ── */
+  .site-footer {
+    margin-top: 104px;
+    border-top: 1px solid rgba(143,172,246,0.14);
+    background:
+      radial-gradient(circle at 18% 22%, rgba(34,74,164,0.14), transparent 48%),
+      radial-gradient(circle at 86% 12%, rgba(68,115,255,0.10), transparent 45%),
+      #060914;
+  }
+  .footer-inner {
+    width: min(1360px, calc(100% - 48px));
+    margin: 0 auto;
+    padding: 46px 0 40px;
+  }
+  .footer-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(140px,180px)) auto;
+    justify-content: center;
+    gap: 24px;
+    width: fit-content;
+    margin: 0 auto;
+    align-items: start;
+  }
+  .footer-col {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+  }
+  .footer-col h4 {
+    margin: 0 0 6px;
+    color: #e2e6ef;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .footer-col a {
+    color: #a4adbe;
     text-decoration: none;
-    color: inherit;
-    transition: all 0.25s;
-    display: flex; flex-direction: column; gap: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    transition: color 0.2s;
   }
-  .card-sm:hover {
-    border-color: rgba(99,140,255,0.25);
-    transform: translateY(-2px);
-    background: var(--surface2);
+  .footer-col a:hover { color: #fff; }
+  .footer-social {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    padding-top: 2px;
   }
-  .card-sm-icon {
-    width: 38px; height: 38px; border-radius: 9px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
+  .footer-social a {
+    width: 22px;
+    height: 22px;
+    display: inline-grid;
+    place-items: center;
+    color: #a4adbe;
+    text-decoration: none;
+    transition: color 0.2s, transform 0.2s;
   }
-  .card-sm-title { font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
-  .card-sm-desc { font-size: 13px; color: var(--muted); line-height: 1.6; font-weight: 300; }
+  .footer-social a:hover { color: #fff; transform: translateY(-1px); }
+  .footer-social svg { width: 18px; height: 18px; display: block; fill: currentColor; }
+  .footer-copy {
+    margin: 52px 0 0;
+    color: #8d95a6;
+    font-size: 14px;
+    font-family: var(--sans);
+  }
 
-  /* FOOTER */
-  footer {
-    position: relative; z-index: 1;
-    border-top: 1px solid var(--border);
-    padding: 24px 48px;
-    display: flex; align-items: center; justify-content: space-between;
-    margin-top: 40px;
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
-  footer p {
-    font-family: var(--mono); font-size: 11px; color: var(--muted);
-  }
-  .footer-links { display: flex; gap: 20px; }
-  .footer-links a {
-    font-family: var(--mono); font-size: 11px; color: var(--muted);
-    text-decoration: none; transition: color 0.2s;
-  }
-  .footer-links a:hover { color: var(--text); }
+  .anim-1 { animation: fadeUp 0.6s ease both; }
+  .anim-2 { animation: fadeUp 0.6s 0.07s ease both; }
+  .anim-3 { animation: fadeUp 0.6s 0.14s ease both; }
+  .anim-4 { animation: fadeUp 0.6s 0.21s ease both; }
+  .anim-5 { animation: fadeUp 0.6s 0.28s ease both; }
 
+  /* ── Responsive ── */
   @media (max-width: 1100px) {
-    nav {
-      padding: 14px 20px;
-    }
-    .hero {
-      padding: 110px 28px 64px;
-    }
-    .section {
-      padding: 0 28px 96px;
-    }
-    .cards {
-      grid-template-columns: 1fr;
-    }
+    .feature-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .shell,
+    .site-shell-header { width: min(1360px, calc(100% - 32px)); }
+    .footer-inner { width: min(1360px, calc(100% - 32px)); }
+    .site-shell-nav { gap: 14px; }
+    .locale-switcher-btn { padding: 8px 7px 10px; }
+    .site-shell-logo-full { height: 27px; }
   }
 
-  @media (max-width: 680px) {
-    .orb-1 {
-      width: 520px;
-      height: 520px;
-      top: -240px;
-      left: -180px;
-    }
-    .orb-2 {
-      width: 360px;
-      height: 360px;
-    }
-    .orb-3 {
-      width: 280px;
-      height: 280px;
-    }
-    nav {
-      padding: 12px 14px;
-      gap: 10px;
-    }
-    .nav-logo {
-      font-size: 15px;
-      gap: 8px;
-    }
-    .nav-right {
-      gap: 8px;
-    }
-    .nav-right a {
-      font-size: 12px;
-      padding: 8px 11px;
-    }
-    .nav-link {
-      display: none;
-    }
-    .hero {
-      min-height: 12vh;
-      padding: 96px 14px 52px;
-    }
-    .hero::before,
-    .hero::after {
-      display: none;
-    }
-    h1 {
-      font-size: clamp(34px, 12vw, 48px);
-      line-height: 1.02;
-    }
-    .hero-eyebrow-sub {
-      font-size: 11px;
-      margin-bottom: 20px;
-    }
-    .section {
-      padding: 0 14px 72px;
-    }
-    .section-title {
-      font-size: 30px;
-      margin-bottom: 28px;
-    }
-    .card-preview {
-      height: 190px;
-    }
-    .card-body {
-      padding: 20px;
-    }
-    .card-title {
-      font-size: 20px;
-    }
-    .card-footer {
-      padding: 16px 20px;
-    }
-    footer {
-      padding: 20px 14px;
-      margin-top: 24px;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 10px;
-    }
+  @media (max-width: 940px) {
+    .site-shell-header { height: 72px; }
+    .site-shell-nav { display: none; }
+    .site-shell-menu-btn { display: inline-flex; }
+    .site-shell-mobile-nav { top: 77px; } /* 5px + 72px */
   }
 
-  @media (max-width: 420px) {
-    .nav-right a {
-      font-size: 11px;
-      padding: 7px 9px;
-    }
-    .hero-eyebrow-sub {
-      letter-spacing: 0.02em;
-    }
-    .card-link {
-      font-size: 11px;
-    }
+  @media (max-width: 860px) {
+    .guide-grid { grid-template-columns: 1fr; }
+    .stack-grid { grid-template-columns: 1fr; gap: 14px; }
+    .footer-grid { width: 100%; grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .hero { padding: 48px 0 44px; }
   }
+
+  @media (max-width: 640px) {
+    .shell,
+    .site-shell-header { width: calc(100% - 24px); }
+    .footer-inner { width: calc(100% - 24px); }
+    .feature-grid { grid-template-columns: 1fr; }
+    .hero { padding: 36px 0 36px; }
+    .section { padding-top: 64px; }
+    .site-shell-logo-full { height: 22px; }
+    .site-shell-cta-group { gap: 5px; }
+    .site-shell-cta-talk { display: none; }
+    .locale-switcher { gap: 0; padding: 0 1px; }
+    .locale-switcher-btn { font-size: 10px; padding: 7px 6px 9px; }
+    .site-shell-cta { min-height: 34px; padding: 8px 10px; font-size: 13px; }
+    .site-shell-mobile-nav { padding: 16px 12px; }
+    .footer-grid { grid-template-columns: 1fr; gap: 22px; }
+    .footer-copy { margin-top: 28px; }
+  }
+
+  /* ── Light-mode overrides ── */
+  [data-theme='light'] body {
+    background:
+      radial-gradient(circle at 50% -15%, rgba(98,124,205,0.08), transparent 45%),
+      radial-gradient(circle at 85% 0%,   rgba(47,74,136,0.06),  transparent 28%),
+      var(--bg);
+  }
+
+  [data-theme='light'] .dot-grid {
+    background-image: radial-gradient(circle, rgba(37,55,95,0.34) 1px, transparent 1px);
+    opacity: 0.22;
+  }
+
+  [data-theme='light'] .locale-switcher {
+    border-bottom-color: rgba(85,110,127,0.18);
+  }
+
+  [data-theme='light'] .site-footer {
+    background:
+      radial-gradient(circle at 18% 22%, rgba(34,74,164,0.06), transparent 48%),
+      radial-gradient(circle at 86% 12%, rgba(68,115,255,0.04), transparent 45%),
+      #e8ecf4;
+  }
+
+  [data-theme='light'] .site-footer .footer-col h4 { color: #1a2236; }
+  [data-theme='light'] .site-footer .footer-col a  { color: #4a5570; }
+  [data-theme='light'] .site-footer .footer-col a:hover { color: #0f1728; }
+  [data-theme='light'] .site-footer .footer-social a { color: #4a5570; }
+  [data-theme='light'] .site-footer .footer-social a:hover { color: #0f1728; }
+  [data-theme='light'] .footer-copy { color: #6b778f; }
+
+  [data-theme='light'] body.header-sticky .site-shell-nav {
+    border-color: rgba(197,207,227,0.92);
+    background: rgba(255,255,255,0.94);
+    box-shadow: 0 10px 26px rgba(13,26,51,0.14);
+  }
+
+  /* Theme toggle icon — CSS-driven, no JS needed */
+  .theme-toggle .icon-moon { display: none; }
+  .theme-toggle .icon-sun  { display: block; }
+  [data-theme='light'] .theme-toggle .icon-moon { display: block; }
+  [data-theme='light'] .theme-toggle .icon-sun  { display: none; }
 </style>
 </head>
 <body>
 
-<div class="glow-orb orb-1"></div>
-<div class="glow-orb orb-2"></div>
-<div class="glow-orb orb-3"></div>
+<div class="dot-grid" aria-hidden="true"></div>
 
-<!-- NAV -->
-<nav>
-  <a href="/" class="nav-logo">
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style="flex-shrink:0">
-      <rect width="28" height="28" rx="6" fill="url(#ng)"></rect>
-      <text x="14" y="19" text-anchor="middle" font-family="Syne,sans-serif" font-weight="800" font-size="13" fill="white">L</text>
-      <defs><linearGradient id="ng" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse"><stop stop-color="#3060ff"></stop><stop offset="1" stop-color="#00b4ff"></stop></linearGradient></defs>
+<!-- Top stripe -->
+<div class="top-stripe"></div>
+
+<!-- Header — landing SiteHeader style -->
+<header class="site-shell-header" id="site-header">
+  <a href="/" class="site-shell-brand" aria-label="Lamassu home">
+    <img class="site-shell-logo-full" src="/images/lamassu.svg" alt="Lamassu" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+    <!-- SVG fallback if file is not the full wordmark -->
+    <svg style="display:none;height:30px;width:auto;" viewBox="0 0 140 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="34" height="34" rx="7" fill="url(#hg)"/>
+      <text x="17" y="23" text-anchor="middle" font-family="Manrope,sans-serif" font-weight="800" font-size="17" fill="white">L</text>
+      <text x="46" y="23" font-family="Manrope,sans-serif" font-weight="700" font-size="17" fill="#edf3ff" letter-spacing="-0.5">Lamassu</text>
+      <defs>
+        <linearGradient id="hg" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#2a49f8"/><stop offset="1" stop-color="#35b9ff"/>
+        </linearGradient>
+      </defs>
     </svg>
-    Lamassu
   </a>
-  <div class="nav-right">
-    <a href="/docs/manual" class="nav-btn">Ir a la documentación</a>
-  </div>
-</nav>
 
-<!-- HERO -->
-<section class="hero">
-  <p class="hero-eyebrow">LAMASSU IOT</p>
-  <p class="hero-eyebrow-sub">IoT-First PKI Platform <span>·</span> Industrial Certificate Lifecycle Management</p>
-  <h1 style="font-family: 'Space Grotesk', sans-serif;">Welcome to the Docs</h1>
-</section>
-
-<!-- MAIN CARDS -->
-<div class="section">
-  <p class="section-label">// Core guides</p>
-  <h2 class="section-title">Start building</h2>
-
-  <div class="cards">
-    <!-- Dashboard Console -->
-    <a href="/docs/manual" class="card">
-      <div class="card-preview">
-        <img src="/images/lamassu-dashboard.png" alt="Lamassu dashboard" class="card-preview-image">
-      </div>
-      <div class="card-body">
-        <span class="card-tag tag-blue">Dashboard Console</span>
-        <h3 class="card-title">Navigate the platform</h3>
-        <p class="card-desc">Explore core screens and daily workflows. Learn device provisioning, fleet views, and real-time monitoring.</p>
-      </div>
-      <div class="card-footer">
-        <span class="card-link">Open guide <span class="card-link-arrow">→</span></span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--muted);">12 articles</span>
-      </div>
+  <nav class="site-shell-nav" aria-label="Main navigation">
+    <a href="/docs/manual" class="is-active">Manual</a>
+    <a href="/docs/despliegue">Deployment</a>
+    <a href="https://www.lamassu.io/lamassuiot" target="_blank" rel="noopener">API</a>
+    <a href="https://github.com/lamassuiot" class="github-link" target="_blank" rel="noopener" aria-label="Lamassu GitHub">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path d="M8 0C3.58 0 0 3.67 0 8.2C0 11.82 2.29 14.89 5.47 15.97C5.87 16.05 6.02 15.79 6.02 15.56C6.02 15.35 6.01 14.63 6.01 13.86C4 14.24 3.48 13.36 3.32 12.9C3.23 12.67 2.84 11.95 2.5 11.76C2.22 11.6 1.83 11.2 2.49 11.19C3.11 11.18 3.55 11.78 3.7 12.02C4.41 13.24 5.55 12.9 6.03 12.7C6.1 12.17 6.31 11.81 6.54 11.61C4.76 11.4 2.9 10.7 2.9 7.58C2.9 6.69 3.21 5.97 3.73 5.41C3.65 5.21 3.37 4.39 3.81 3.29C3.81 3.29 4.48 3.07 6.01 4.13C6.65 3.95 7.33 3.86 8.01 3.86C8.69 3.86 9.37 3.95 10.01 4.13C11.54 3.06 12.21 3.29 12.21 3.29C12.65 4.39 12.37 5.21 12.29 5.41C12.81 5.97 13.12 6.68 13.12 7.58C13.12 10.71 11.25 11.4 9.47 11.61C9.76 11.87 10.01 12.37 10.01 13.15C10.01 14.27 10 15.18 10 15.56C10 15.79 10.15 16.06 10.55 15.97C13.72 14.89 16 11.81 16 8.2C16 3.67 12.42 0 8 0Z"/>
+      </svg>
     </a>
+  </nav>
 
-    <!-- PKI Deployment -->
-    <a href="/docs/despliegue/onprem/fastlane" class="card">
-      <div class="card-preview">
-        <div class="card-preview-inner">
-          <div class="card-preview-bar">
-            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
-            <span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:8px;">PKI Deployment</span>
-          </div>
-          <div class="preview-pki">
-            <div class="pki-row"><span class="cmd">$</span><span class="val">lamassu init --mode production</span></div>
-            <div class="pki-row"><span class="ok">✓</span><span class="val">Root CA initialized</span></div>
-            <div class="pki-row"><span class="ok">✓</span><span class="val">Intermediate CA ready</span></div>
-            <div class="pki-row"><span class="cmd">$</span><span class="val">lamassu cert issue --device edge-01</span></div>
-            <div class="pki-row"><span class="ok">✓</span><span class="val">Certificate issued <span class="dim">TTL: 8760h</span></span></div>
-            <div class="pki-row"><span class="cmd">$</span><span class="val">lamassu enroll --fleet prod</span></div>
-            <div class="pki-row"><span class="ok">✓</span><span class="val">48 devices enrolled</span></div>
-          </div>
-        </div>
-      </div>
-      <div class="card-body">
-        <span class="card-tag tag-purple">PKI Deployment</span>
-        <h3 class="card-title">Deploy your PKI instance</h3>
-        <p class="card-desc">From prerequisites to a running setup. Covers root CA creation, intermediate authorities, and device enrollment.</p>
-      </div>
-      <div class="card-footer">
-        <span class="card-link" style="color:var(--accent);">Open guide <span class="card-link-arrow">→</span></span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--muted);">8 articles</span>
-      </div>
-    </a>
+  <div class="site-shell-cta-group">
+    <div class="locale-switcher" aria-label="Language selector">
+      <button type="button" class="locale-switcher-btn is-active" data-lang="en" aria-pressed="true">EN</button>
+      <button type="button" class="locale-switcher-btn" data-lang="es" aria-pressed="false">ES</button>
+    </div>
+
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"/>
+        <line x1="12" y1="2" x2="12" y2="4"/>
+        <line x1="12" y1="20" x2="12" y2="22"/>
+        <line x1="2" y1="12" x2="4" y2="12"/>
+        <line x1="20" y1="12" x2="22" y2="12"/>
+        <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
+        <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
+        <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
+        <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
+      </svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
+
+    <a href="https://lab.lamassu.io" class="site-shell-cta site-shell-cta-talk">Open Lab</a>
+    <a href="/docs/manual" class="site-shell-cta site-shell-cta-login">Go to docs</a>
+
+    <button class="site-shell-menu-btn" id="menu-toggle" aria-expanded="false" aria-controls="mobile-nav" aria-label="Open navigation">
+      <svg class="menu-icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+      <svg class="menu-icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
   </div>
+</header>
 
-  
-
+<!-- Mobile nav panel -->
+<div class="site-shell-mobile-nav" id="mobile-nav" aria-hidden="true">
+  <nav class="mobile-nav-links" aria-label="Main navigation">
+    <a href="/docs/manual">Manual</a>
+    <a href="/docs/despliegue">Deployment</a>
+    <a href="https://www.lamassu.io/lamassuiot" target="_blank" rel="noopener">API</a>
+    <a href="https://github.com/lamassuiot" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+  <div class="mobile-nav-actions">
+    <a href="https://lab.lamassu.io" class="site-shell-cta">Open Lab</a>
+    <a href="/docs/manual" class="site-shell-cta site-shell-cta-login">Go to docs</a>
+  </div>
 </div>
 
-<!-- FOOTER -->
-<footer>
-  <p>© 2026 Lamassu IoT</p>
-  <div class="footer-links">
-    <a href="https://github.com/lamassuiot">GitHub</a>
+<!-- Hero -->
+<div class="shell">
+  <section class="hero">
+    <p class="hero-kicker anim-1">LAMASSU IOT · DOCUMENTATION</p>
+    <h1 class="anim-2">IoT-First PKI<br>Platform Docs</h1>
+    <p class="hero-lead anim-3">Everything you need to deploy, configure, and operate Lamassu — from your first certificate authority to a production-grade IoT fleet.</p>
+    <div class="hero-actions anim-4">
+      <a class="btn btn-primary" href="/docs/manual">Browse the manual</a>
+      <a class="btn" href="/docs/despliegue/onprem/fastlane">Quickstart deployment</a>
+    </div>
+  </section>
+</div>
+
+<!-- Main guide cards -->
+<div class="shell">
+  <section class="section">
+    <hr class="blue-divider">
+    <p class="section-kicker">Core guides</p>
+    <h2>Start building</h2>
+    <p class="section-lead">Pick your starting point — explore the platform UI or go straight to deploying your PKI instance.</p>
+
+    <div class="guide-grid">
+
+      <!-- Dashboard manual -->
+      <a href="/docs/manual" class="guide-card">
+        <div class="guide-preview">
+          <img src="/images/lamassu-dashboard.png" alt="Lamassu dashboard" onerror="this.style.display='none'">
+          <!-- Fallback visual -->
+          <div class="terminal" style="display:flex;flex-direction:column;">
+            <div class="terminal-bar">
+              <div class="terminal-dot dot-r"></div>
+              <div class="terminal-dot dot-y"></div>
+              <div class="terminal-dot dot-g"></div>
+              <span class="terminal-title">Lamassu Dashboard</span>
+            </div>
+            <div class="terminal-body" style="flex:1;display:grid;gap:4px;align-content:start;">
+              <div class="t-row" style="background:rgba(126,156,255,0.08);border-radius:5px;padding:4px 6px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#28c840;flex-shrink:0;margin-top:1px;"></span>
+                <span class="t-val">edge-device-001</span>
+                <span style="margin-left:auto;font-size:9px;background:rgba(40,200,64,0.15);color:#28c840;padding:1px 6px;border-radius:4px;">Active</span>
+              </div>
+              <div class="t-row" style="padding:4px 6px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#febc2e;flex-shrink:0;margin-top:1px;"></span>
+                <span class="t-val">gateway-prod-03</span>
+                <span style="margin-left:auto;font-size:9px;background:rgba(254,188,46,0.15);color:#febc2e;padding:1px 6px;border-radius:4px;">Expiring</span>
+              </div>
+              <div class="t-row" style="padding:4px 6px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#28c840;flex-shrink:0;margin-top:1px;"></span>
+                <span class="t-val">sensor-rail-11</span>
+                <span style="margin-left:auto;font-size:9px;background:rgba(40,200,64,0.15);color:#28c840;padding:1px 6px;border-radius:4px;">Active</span>
+              </div>
+              <div class="t-row" style="padding:4px 6px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#ff5f57;flex-shrink:0;margin-top:1px;"></span>
+                <span class="t-val">controller-bay-07</span>
+                <span style="margin-left:auto;font-size:9px;background:rgba(255,95,87,0.15);color:#ff5f57;padding:1px 6px;border-radius:4px;">Revoked</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="guide-body">
+          <span class="guide-tag">Dashboard Console</span>
+          <h3>Navigate the platform</h3>
+          <p class="guide-desc">Explore core screens and daily workflows. Learn device provisioning, fleet views, certificate lifecycle, and real-time monitoring.</p>
+        </div>
+        <div class="guide-footer">
+          <span class="guide-link">Open guide <span>→</span></span>
+          <span class="guide-meta">12 articles</span>
+        </div>
+      </a>
+
+      <!-- PKI deployment -->
+      <a href="/docs/despliegue/onprem/fastlane" class="guide-card">
+        <div class="guide-preview">
+          <div class="terminal" style="display:flex;flex-direction:column;">
+            <div class="terminal-bar">
+              <div class="terminal-dot dot-r"></div>
+              <div class="terminal-dot dot-y"></div>
+              <div class="terminal-dot dot-g"></div>
+              <span class="terminal-title">PKI Deployment</span>
+            </div>
+            <div class="terminal-body">
+              <div class="t-row"><span class="t-cmd">$</span><span class="t-val">lamassu init --mode production</span></div>
+              <div class="t-row"><span class="t-ok">✓</span><span class="t-val">Root CA initialized</span></div>
+              <div class="t-row"><span class="t-ok">✓</span><span class="t-val">Intermediate CA ready</span></div>
+              <div class="t-row"><span class="t-cmd">$</span><span class="t-val">lamassu cert issue --device edge-01</span></div>
+              <div class="t-row"><span class="t-ok">✓</span><span class="t-val">Certificate issued <span style="color:rgba(107,122,184,0.6)">TTL: 8760h</span></span></div>
+              <div class="t-row"><span class="t-cmd">$</span><span class="t-val">lamassu enroll --fleet prod</span></div>
+              <div class="t-row"><span class="t-ok">✓</span><span class="t-val">48 devices enrolled</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="guide-body">
+          <span class="guide-tag">PKI Deployment</span>
+          <h3>Deploy your PKI instance</h3>
+          <p class="guide-desc">From prerequisites to a running setup. Covers root CA creation, intermediate authorities, and automated device enrollment at scale.</p>
+        </div>
+        <div class="guide-footer">
+          <span class="guide-link">Open guide <span>→</span></span>
+          <span class="guide-meta">8 articles</span>
+        </div>
+      </a>
+
+    </div>
+  </section>
+</div>
+
+<!-- Discipline feature cards -->
+<div class="shell">
+  <section class="section">
+    <p class="section-kicker">What Lamassu covers</p>
+    <h2>Platform capabilities</h2>
+
+    <div class="feature-grid">
+
+      <article class="feature-card">
+        <div class="feature-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="7" y="7" width="10" height="10" rx="1"/><path d="M9 4v3M12 4v3M15 4v3M9 17v3M12 17v3M15 17v3M4 9h3M4 12h3M4 15h3M17 9h3M17 12h3M17 15h3"/>
+          </svg>
+        </div>
+        <p class="feature-kicker">Device Identity</p>
+        <h3>X.509 Lifecycle Management</h3>
+        <p class="feature-body">Issue, renew, and revoke certificates for any IoT device — with full traceability and OCSP/CRL support out of the box.</p>
+        <a href="/docs/manual" class="feature-link">Learn more →</a>
+      </article>
+
+      <article class="feature-card feature-card--featured">
+        <div class="feature-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/>
+          </svg>
+        </div>
+        <p class="feature-kicker">PKI</p>
+        <h3>Root &amp; Intermediate CAs</h3>
+        <p class="feature-body">Build a full certificate authority hierarchy. Plug in AWS KMS, HashiCorp Vault, or a software provider — no lock-in.</p>
+        <a href="/docs/despliegue" class="feature-link">Deployment guide →</a>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 0 1 0 20A10 10 0 0 1 12 2z"/><ellipse cx="12" cy="12" rx="10" ry="4"/><path d="M2 12h20"/>
+          </svg>
+        </div>
+        <p class="feature-kicker">EST Enrollment</p>
+        <h3>Mass Device Onboarding</h3>
+        <p class="feature-body">Enroll thousands of devices automatically via EST (enroll, re-enroll, serverkeygen) without manual intervention.</p>
+        <a href="/docs/manual" class="feature-link">EST docs →</a>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 11.5l10-5M7 12.5l10 5"/>
+          </svg>
+        </div>
+        <p class="feature-kicker">Integrations</p>
+        <h3>Cloud &amp; SIEM Connectors</h3>
+        <p class="feature-body">Sync device identities with AWS IoT Core, publish events to RabbitMQ or EventBridge, and integrate with your existing stack.</p>
+        <a href="/docs/manual" class="feature-link">Connectors →</a>
+      </article>
+
+    </div>
+  </section>
+</div>
+
+<!-- Stack / integrations -->
+<div class="shell">
+  <section class="section">
+    <p class="section-kicker">No lock-in</p>
+    <h2>Fits your stack</h2>
+    <p class="section-lead">Lamassu is provider-agnostic. Swap out key storage, messaging, and cloud connectors without rewriting your infrastructure.</p>
+
+    <div class="stack-grid">
+
+      <article class="stack-card">
+        <div class="stack-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 2H3v16h5v4l4-4h5l4-4V2z"/><path d="M12 8v4M12 16h.01"/>
+          </svg>
+        </div>
+        <h3>Key Storage</h3>
+        <p>Store private keys where your security policy demands — hardware HSM, cloud-managed, or software-based.</p>
+        <div class="stack-badges">
+          <span class="stack-badge">AWS KMS</span>
+          <span class="stack-badge">PKCS#11</span>
+          <span class="stack-badge">HashiCorp Vault</span>
+          <span class="stack-badge">Software</span>
+        </div>
+      </article>
+
+      <article class="stack-card">
+        <div class="stack-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/>
+          </svg>
+        </div>
+        <h3>Persistence &amp; Messaging</h3>
+        <p>Choose your database and event transport. Lamassu adapts to your existing infrastructure without imposing a stack.</p>
+        <div class="stack-badges">
+          <span class="stack-badge">PostgreSQL</span>
+          <span class="stack-badge">RabbitMQ</span>
+          <span class="stack-badge">AWS EventBridge</span>
+        </div>
+      </article>
+
+      <article class="stack-card">
+        <div class="stack-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 15a4 4 0 0 0 4 4h10a4 4 0 0 0 0-8h-.5A5.5 5.5 0 0 0 3 15z"/><path d="M12 9V5M9 8l3-3 3 3"/>
+          </svg>
+        </div>
+        <h3>Cloud Connectors</h3>
+        <p>Keep device identity in sync across cloud IoT platforms via the Lamassu Event Bus and its extensible connector API.</p>
+        <div class="stack-badges">
+          <span class="stack-badge">AWS IoT Core</span>
+          <span class="stack-badge">Extensible API</span>
+        </div>
+      </article>
+
+    </div>
+  </section>
+</div>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <section class="footer-col" aria-label="Documentation">
+        <h4>Documentation</h4>
+        <a href="/docs/manual">Manual</a>
+        <a href="/docs/despliegue">Deployment</a>
+      </section>
+      <section class="footer-col" aria-label="API">
+        <h4>API Definition</h4>
+        <a href="https://www.lamassu.io/lamassuiot" target="_blank" rel="noopener">OpenAPI Spec</a>
+      </section>
+      <section class="footer-col" aria-label="Resources">
+        <h4>Resources</h4>
+        <a href="https://www.lamassu.io/blog/" target="_blank" rel="noopener">Blog</a>
+        <a href="https://www.lamassu.io/slack/" target="_blank" rel="noopener">Slack community</a>
+      </section>
+      <section class="footer-col" style="display:flex;justify-content:center;" aria-label="Social">
+        <div class="footer-social">
+          <a href="https://github.com/lamassuiot" target="_blank" rel="noopener" aria-label="GitHub">
+            <svg viewBox="0 0 16 16">
+              <path d="M8 0C3.58 0 0 3.67 0 8.2C0 11.82 2.29 14.89 5.47 15.97C5.87 16.05 6.02 15.79 6.02 15.56C6.02 15.35 6.01 14.63 6.01 13.86C4 14.24 3.48 13.36 3.32 12.9C3.23 12.67 2.84 11.95 2.5 11.76C2.22 11.6 1.83 11.2 2.49 11.19C3.11 11.18 3.55 11.78 3.7 12.02C4.41 13.24 5.55 12.9 6.03 12.7C6.1 12.17 6.31 11.81 6.54 11.61C4.76 11.4 2.9 10.7 2.9 7.58C2.9 6.69 3.21 5.97 3.73 5.41C3.65 5.21 3.37 4.39 3.81 3.29C3.81 3.29 4.48 3.07 6.01 4.13C6.65 3.95 7.33 3.86 8.01 3.86C8.69 3.86 9.37 3.95 10.01 4.13C11.54 3.06 12.21 3.29 12.21 3.29C12.65 4.39 12.37 5.21 12.29 5.41C12.81 5.97 13.12 6.68 13.12 7.58C13.12 10.71 11.25 11.4 9.47 11.61C9.76 11.87 10.01 12.37 10.01 13.15C10.01 14.27 10 15.18 10 15.56C10 15.79 10.15 16.06 10.55 15.97C13.72 14.89 16 11.81 16 8.2C16 3.67 12.42 0 8 0Z"/>
+            </svg>
+          </a>
+          <a href="https://www.linkedin.com/company/lamassu-iot/" target="_blank" rel="noopener" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24">
+              <path d="M6.94 8.5A1.56 1.56 0 1 1 6.94 5.38A1.56 1.56 0 0 1 6.94 8.5ZM8.5 10.06H5.38V20H8.5V10.06ZM13.44 10.06H10.34V20H13.41V14.78C13.41 12.03 17 11.78 17 14.78V20H20.12V13.72C20.12 8.84 14.53 9.02 13.41 11.42L13.44 10.06Z"/>
+            </svg>
+          </a>
+        </div>
+      </section>
+    </div>
+    <p class="footer-copy">© 2026 Lamassu IoT · IoT-First PKI Platform</p>
   </div>
 </footer>
 
+<script>
+  // ── Theme toggle — icons controlled by CSS [data-theme='light'] ──
+  document.getElementById('theme-toggle')?.addEventListener('click', function () {
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('ls-theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      localStorage.setItem('ls-theme', 'light');
+    }
+  });
 
+  // ── Mobile nav ──
+  (function () {
+    var menuBtn  = document.getElementById('menu-toggle');
+    var mobileNav = document.getElementById('mobile-nav');
 
-</body></html>
+    function openMenu() {
+      mobileNav?.classList.add('is-open');
+      menuBtn?.setAttribute('aria-expanded', 'true');
+      mobileNav?.removeAttribute('aria-hidden');
+      document.body.classList.add('mobile-nav-open');
+    }
+    function closeMenu() {
+      mobileNav?.classList.remove('is-open');
+      menuBtn?.setAttribute('aria-expanded', 'false');
+      mobileNav?.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('mobile-nav-open');
+    }
+
+    menuBtn?.addEventListener('click', function () {
+      mobileNav?.classList.contains('is-open') ? closeMenu() : openMenu();
+    });
+    mobileNav?.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeMenu); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+  })();
+
+  // ── Sticky pill nav ──
+  (function () {
+    var hero = document.querySelector('.hero');
+    function shouldStick() {
+      if (window.innerWidth <= 940) return false;
+      return hero ? hero.getBoundingClientRect().bottom <= 0 : window.scrollY > 180;
+    }
+    function sync() {
+      document.body.classList.toggle('header-sticky', shouldStick());
+    }
+    sync();
+    window.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync);
+  })();
+
+  // ── Locale switcher (cosmetic only — docs are English) ──
+  document.querySelectorAll('.locale-switcher-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.locale-switcher-btn').forEach(function (b) {
+        b.classList.remove('is-active');
+        b.setAttribute('aria-pressed', 'false');
+      });
+      btn.classList.add('is-active');
+      btn.setAttribute('aria-pressed', 'true');
+    });
+  });
+</script>
+</body>
+</html>

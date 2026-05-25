@@ -1,23 +1,61 @@
 import { loader, type InferPageType } from 'fumadocs-core/source';
 import { docs } from 'fumadocs-mdx:collections/server';
-import { createElement } from 'react';
+import { type ComponentType, createElement } from 'react';
+import {
+  KeyRound,
+  ShieldCheck,
+  ClipboardList,
+  BadgeCheck,
+  FileCheck2,
+  Cpu,
+  Bell,
+  Network,
+  SearchCheck,
+  List,
+  Cloud,
+  Server,
+  Zap,
+  Globe,
+} from 'lucide-react';
 
-const iconMap: Record<string, string> = {
+const imgIconMap: Record<string, string> = {
   lamassu: '/images/lamassu.svg',
   k8s: '/images/kubernetes.svg',
+};
+
+const lucideIconMap: Record<string, ComponentType<{ size?: number; className?: string }>> = {
+  kms:     KeyRound,
+  ca:      ShieldCheck,
+  ra:      ClipboardList,
+  va:      BadgeCheck,
+  certs:   FileCheck2,
+  devices: Cpu,
+  alerts:  Bell,
+  est:     Network,
+  ocsp:    SearchCheck,
+  crl:     List,
+  aws:     Cloud,
+  server:  Server,
+  fastlane: Zap,
+  cloud:   Cloud,
+  saas:    Globe,
 };
 
 export const source = loader({
   source: docs.toFumadocsSource(),
   baseUrl: '/docs',
   icon(name) {
-    if (name && name in iconMap) {
+    if (!name) return;
+    if (name in imgIconMap) {
       return createElement('img', {
-        src: iconMap[name],
+        src: imgIconMap[name],
         width: 20,
         height: 20,
         style: { width: '1.25rem', height: '1.25rem', verticalAlign: 'middle', flexShrink: 0, objectFit: 'contain' },
       });
+    }
+    if (name in lucideIconMap) {
+      return createElement(lucideIconMap[name], { size: 16, className: 'shrink-0' });
     }
   },
 });

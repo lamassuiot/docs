@@ -1,5 +1,6 @@
 import type { Route } from './+types/docs';
 import type { ReactNode } from 'react';
+import { KeyRound, ShieldCheck, ClipboardList, BadgeCheck, Cpu, Bell } from 'lucide-react';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/docs/page';
 import { source } from '@/lib/source';
@@ -66,11 +67,12 @@ function clonePageItem(item: PageTreeItem, name: ReactNode, idSuffix: string): P
   };
 }
 
-function createFolder(name: string, children: PageTreeItem[], id: string): PageTreeFolder {
+function createFolder(name: string, children: PageTreeItem[], id: string, icon?: ReactNode): PageTreeFolder {
   return {
     $id: id,
     type: 'folder',
     name,
+    icon,
     defaultOpen: true,
     children,
   };
@@ -107,7 +109,7 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
   }
 
   const groupedChildren: PageTreeNode[] = [
-    createFolder('KMS', [clonePageItem(kms, 'Visión general', 'general')], 'servicios-core-kms'),
+    createFolder('KMS', [clonePageItem(kms, 'Visión general', 'general')], 'servicios-core-kms', <KeyRound size={16} className="shrink-0" />),
     createFolder(
       'CA',
       [
@@ -115,6 +117,7 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
         ...(certificates ? [clonePageItem(certificates, stripBadgeName(certificates.name), 'certificates')] : []),
       ],
       'servicios-core-ca',
+      <ShieldCheck size={16} className="shrink-0" />,
     ),
     createFolder(
       'RA',
@@ -123,6 +126,7 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
         clonePageItem(est, 'EST', 'est'),
       ],
       'servicios-core-ra',
+      <ClipboardList size={16} className="shrink-0" />,
     ),
     createFolder(
       'VA',
@@ -132,6 +136,7 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
         ...(validationCrl ? [clonePageItem(validationCrl, 'CRL', 'crl')] : []),
       ],
       'servicios-core-va',
+      <BadgeCheck size={16} className="shrink-0" />,
     ),
   ];
 
@@ -141,6 +146,7 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
         'Gestion de flotas',
         [clonePageItem(devices, stripBadgeName(devices.name), 'devices')],
         'servicios-core-flotas',
+        <Cpu size={16} className="shrink-0" />,
       ),
     );
   }
@@ -152,6 +158,7 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
         'Otros',
         otherItems.map((item) => clonePageItem(item, stripBadgeName(item.name), item.url.split('/').pop() ?? 'item')),
         'servicios-core-otros',
+        <Bell size={16} className="shrink-0" />,
       ),
     );
   }

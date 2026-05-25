@@ -235,6 +235,9 @@ const clientLoader = browserCollections.docs.createClientLoader({
 
     return (
       <DocsPage
+        breadcrumb={{
+          enabled: false,
+        }}
         toc={filteredToc}
         tableOfContent={{
           style: 'clerk',
@@ -244,7 +247,6 @@ const clientLoader = browserCollections.docs.createClientLoader({
         }}
       >
         <title>{titleParts.badge ? `${titleParts.badge} ${titleParts.text}` : frontmatter.title}</title>
-        <meta name="description" content={frontmatter.description} />
         <DocsTitle className="text-[2.25rem] font-bold tracking-tight">{renderBadgeTitle(frontmatter.title)}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
         <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">

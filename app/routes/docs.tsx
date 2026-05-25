@@ -9,7 +9,6 @@ import type { i as PageTreeRoot, n as PageTreeItem, r as PageTreeNode, t as Page
 import { baseOptions, gitConfig } from '@/lib/layout.shared';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { LLMCopyButton, ViewOptions } from '@/components/ai/page-actions';
-import { redirect } from 'react-router';
 
 function splitBadgeTitle(title: string) {
   const match = /^\[([^\]]+)\]\s*(.+)$/.exec(title.trim());
@@ -206,7 +205,7 @@ function mapPageTree(root: PageTreeRoot): PageTreeRoot {
 
 export async function loader({ params }: Route.LoaderArgs) {
   const slugs = params['*'].split('/').filter((v) => v.length > 0);
-  if (slugs.length === 0) throw redirect('/docs/manual');
+  if (slugs.length === 0) throw new Response('Not found', { status: 404 });
   const page = source.getPage(slugs);
   if (!page) throw new Response('Not found', { status: 404 });
   const pageTree = mapPageTree(source.getPageTree());

@@ -70,12 +70,6 @@ El registro se desencadena estableciendo el valor `registration.status = "REQUES
 
 Una vez recibido el evento, el conector intenta registrar la CA en AWS y actualiza el campo `registration.status` en los metadatos de la CA con el resultado: `"SUCCEEDED"` si el registro fue correcto, o `"FAILED"` acompañado de un mensaje de error en caso contrario. El proceso es asíncrono, por lo que es necesario consultar periódicamente el estado de los metadatos hasta que la operación concluya.
 
-<img src="/images/manual-integraciones-aws-integracion-con-aws-iot-core.png" alt="Vista de la consola durante el registro de la CA" />
-*Imagen: vista de la página de integraciones donde se muestra el estado del registro de la CA con AWS IoT Core.*
-
-<img src="/images/manual-integraciones-aws-configuracion-de-la-integracion.png" alt="Diálogo de configuración del registro de la CA" />
-*Imagen: opciones de configuración del conector, incluyendo la selección de Primary Account o Secondary Account.*
-
 ### Primary Account
 
 Cuando el parámetro `primary_account` es `true`, el conector ejecuta el flujo completo de registro con verificación de posesión de clave privada:
@@ -91,12 +85,6 @@ Los tags que AWS IoT Core aplica al certificado de CA registrado son `LMS.CA.ID`
 ### Secondary Account (SNI-only)
 
 Cuando `primary_account` es `false`, el conector registra la CA usando el modo `CertificateMode: SNI_ONLY`. Este modo no requiere código de verificación ni acceso a la clave privada de la CA, por lo que es la opción adecuada cuando la CA se gestiona desde otra cuenta de AWS o cuando el administrador no dispone de la clave privada. Es el método habitual para registrar la misma CA en varias cuentas de AWS simultáneamente.
-
-<img src="/images/manual-integraciones-aws-configuracion-de-la-integracion-a.png" alt="Estado del registro de la CA en la consola" />
-*Imagen: estado REQUESTED durante el registro asíncrono de la CA. Es necesario recargar la vista para comprobar si el estado ha cambiado a SUCCEEDED.*
-
-<img src="/images/manual-integraciones-aws-configuracion-de-la-integracion-b.png" alt="Estado SUCCEEDED del registro de la CA" />
-*Imagen: estado SUCCEEDED una vez completado el registro. A partir de este momento se habilitan el resto de opciones de configuración del conector.*
 
 ## Configuración del DMS
 
@@ -122,14 +110,11 @@ Una vez completado el aprovisionamiento, el conector almacena el ARN del certifi
 
 ### Modo `jitp`
 
-El modo Just-In-Time Provisioning (JITP) delega el aprovisionamiento en AWS en lugar de hacerlo el conector directamente. Cuando el conector detecta que el DMS está en modo `jitp`, crea una plantilla de aprovisionamiento JITP en AWS IoT Core y la adjunta al certificado de CA registrado. Esta plantilla se crea o actualiza en el momento en que el DMS se crea o actualiza en Lamassu — no en el momento del enrolamiento del dispositivo. A partir de ese momento, cuando un dispositivo con un certificado emitido por esa CA se conecta por primera vez a AWS IoT Core, AWS ejecuta la plantilla automáticamente: crea el Thing, registra el certificado y lo activa.
+El modo Just-In-Time Provisioning (JITP) delega el aprovisionamiento en AWS en lugar de hacerlo el conector directamente. Cuando el conector detecta que el DMS está en modo `jitp`, crea una plantilla de aprovisionamiento JITP en AWS IoT Core y la adjunta al certificado de CA registrado. Esta plantilla se crea o actualiza en el momento en que el DMS se crea o actualiza en Lamassu - no en el momento del enrolamiento del dispositivo. A partir de ese momento, cuando un dispositivo con un certificado emitido por esa CA se conecta por primera vez a AWS IoT Core, AWS ejecuta la plantilla automáticamente: crea el Thing, registra el certificado y lo activa.
 
-El nombre del Thing en la plantilla JITP se deriva de `AWS::IoT::Certificate::CommonName`, que corresponde al CN del certificado del dispositivo — la misma convención que el modo `auto`.
+El nombre del Thing en la plantilla JITP se deriva de `AWS::IoT::Certificate::CommonName`, que corresponde al CN del certificado del dispositivo - la misma convención que el modo `auto`.
 
 Este modo requiere que se configure el campo `jitp_config.provisioning_role_arn` con el ARN de un rol IAM que AWS IoT Core pueda asumir para ejecutar la plantilla. Si no se configura, el conector utiliza el valor por defecto `arn:aws:iam::{account}:role/JITPRole` y registra un aviso en el log. El administrador debe asegurarse de que ese rol existe en la cuenta y tiene los permisos necesarios antes de activar el modo JITP.
-
-<img src="/images/manual-integraciones-aws-configuracion-de-la-integracion-c.png" alt="Sección de Thing Provisioning en la consola" />
-*Imagen: sección de configuración de Thing Provisioning una vez que la CA está registrada con SUCCEEDED. Permite seleccionar el modo de registro, los grupos y las políticas.*
 
 ## Aprovisionamiento de dispositivos (modo automático)
 
@@ -207,7 +192,7 @@ El conector escribe en el campo `desired.identity_actions` del documento shadow.
 
 Existen dos tipos de acciones:
 
-**`UPDATE_CERTIFICATE`**: se escribe cuando la ventana de renovación preventiva de un certificado se activa — es decir, cuando el campo `triggered` de la delta de renovación preventiva pasa de `false` a `true`. Esta acción indica al dispositivo que debe iniciar el proceso de re-enrolamiento para renovar su certificado antes de que expire.
+**`UPDATE_CERTIFICATE`**: se escribe cuando la ventana de renovación preventiva de un certificado se activa - es decir, cuando el campo `triggered` de la delta de renovación preventiva pasa de `false` a `true`. Esta acción indica al dispositivo que debe iniciar el proceso de re-enrolamiento para renovar su certificado antes de que expire.
 
 **`UPDATE_TRUST_ANCHOR_LIST`**: se escribe en todos los dispositivos de un DMS cuando la lista `ManagedCAs` del DMS cambia. Esta acción indica al dispositivo que debe actualizar su almacén de CAs de confianza.
 
@@ -225,9 +210,6 @@ El proceso de escritura en el shadow consiste en leer el shadow actual (`iotdata
   }
 }
 ```
-
-<img src="/images/manual-integraciones-aws-device-shadow-y-automation.png" alt="Sección de Device Shadow en la consola" />
-*Imagen: sección de configuración del Device Shadow en la consola de Lamassu, donde se activa la funcionalidad y se elige entre Classic Shadow y Named Shadow.*
 
 ## Políticas de AWS IoT
 

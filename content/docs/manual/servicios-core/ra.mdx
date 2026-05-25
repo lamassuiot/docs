@@ -1,16 +1,14 @@
 ---
 title: "[DMS] Device Management Service"
-description: Visión general del Device Management Service en Lamassu IoT — concepto, panel de gestión y configuración común a todos los protocolos de enrolamiento.
+description: Visión general del Device Management Service en Lamassu IoT - concepto, panel de gestión y configuración común a todos los protocolos de enrolamiento.
 ---
 
 # Device Management Service
 
 El **DMS (Device Management Service)** es el componente de Lamassu IoT que actúa como Autoridad de Registro (RA) frente a los dispositivos. Cada DMS recibe las solicitudes de certificado, valida la identidad del solicitante según las políticas configuradas y encarga la emisión a la CA asignada. El resultado es un canal de aprovisionamiento controlado e independiente por flota, línea de producto o entorno.
 
-En la práctica, cada DMS representa un punto de entrada diferenciado: tiene su propia CA de enrolamiento, sus propias reglas de autenticación y su propia ventana de renovación. Una organización puede operar varios DMS en paralelo — por ejemplo, uno para dispositivos de campo y otro para pasarelas internas — con políticas completamente distintas en cada caso.
+En la práctica, cada DMS representa un punto de entrada diferenciado: tiene su propia CA de enrolamiento, sus propias reglas de autenticación y su propia ventana de renovación. Una organización puede operar varios DMS en paralelo - por ejemplo, uno para dispositivos de campo y otro para pasarelas internas - con políticas completamente distintas en cada caso.
 
-![](/images/manual-servicios-core-ra-automatizacion-de-procesos-de-emision-de-certificados.png)
-*Vista general del módulo DMS en la consola de Lamassu IoT.*
 
 ## Antes de empezar
 
@@ -28,8 +26,6 @@ El panel lista todos los DMS configurados en la plataforma. Cada entrada muestra
 | **EST (RFC-7030)** | Muestra los endpoints EST del DMS con su URL base y ejemplos de invocación. |
 | **Delete** | Elimina el DMS y su configuración. Acción irreversible. |
 
-![](/images/manual-servicios-core-ra-acciones-sobre-la-ra.png)
-*Menú de acciones sobre el DMS.*
 
 ## Distribución de entidades de confianza
 
@@ -37,19 +33,16 @@ La sección **CA Distribution** controla qué certificados de CA recibe el dispo
 
 | Parámetro | Descripción |
 |---|---|
-| **Include Lamassu System CA** | Incluye el certificado TLS del servidor Lamassu en la respuesta. Este es el certificado de extremo del servidor, no una CA — útil para *pinning* de la conexión. |
+| **Include Lamassu System CA** | Incluye el certificado TLS del servidor Lamassu en la respuesta. Este es el certificado de extremo del servidor, no una CA - útil para *pinning* de la conexión. |
 | **Include Enrollment CA** | Incluye la CA emisora configurada en este DMS, es decir, la que firmará los certificados de dispositivo. |
 | **Managed CAs** | CAs adicionales distribuidas al dispositivo como anclas de confianza. |
 
-![](/images/manual-servicios-core-ra-configuracion-de-una-ra-distribucion-de-entidades-de-confianza.png)
-*Sección de distribución de entidades de confianza.*
 
 ## Protocolos de enrolamiento
 
 El DMS expone un protocolo de enrolamiento a los dispositivos. En la versión actual de Lamassu, el único protocolo soportado es **EST (RFC 7030)**. La configuración del protocolo y la guía de integración para dispositivos se encuentran en las páginas correspondientes.
 
 <Cards>
-  <Card title="EST — Configuración del DMS" href="/docs/manual/servicios-core/est-admin" />
-  <Card title="EST — Referencia para integrador de dispositivos" href="/docs/manual/servicios-core/est" />
+  <Card title="EST (RFC 7030)" href="/docs/manual/servicios-core/est" />
   <Card title="Gestionar dispositivos" href="/docs/manual/servicios-core/devices" />
 </Cards>

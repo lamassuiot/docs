@@ -107,11 +107,11 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
   }
 
   const groupedChildren: PageTreeNode[] = [
-    createFolder('KMS', [clonePageItem(kms, 'General config', 'general')], 'servicios-core-kms'),
+    createFolder('KMS', [clonePageItem(kms, 'Visión general', 'general')], 'servicios-core-kms'),
     createFolder(
       'CA',
       [
-        clonePageItem(cas, 'General config', 'general'),
+        clonePageItem(cas, 'Visión general', 'general'),
         ...(certificates ? [clonePageItem(certificates, stripBadgeName(certificates.name), 'certificates')] : []),
       ],
       'servicios-core-ca',
@@ -119,7 +119,7 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
     createFolder(
       'RA',
       [
-        clonePageItem(ra, 'General config', 'general'),
+        clonePageItem(ra, 'Visión general', 'general'),
         clonePageItem(est, 'EST', 'est'),
       ],
       'servicios-core-ra',
@@ -127,7 +127,7 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
     createFolder(
       'VA',
       [
-        clonePageItem(validation, 'General config', 'general'),
+        clonePageItem(validation, 'Visión general', 'general'),
         ...(validationOcsp ? [clonePageItem(validationOcsp, 'OCSP', 'ocsp')] : []),
         ...(validationCrl ? [clonePageItem(validationCrl, 'CRL', 'crl')] : []),
       ],
@@ -231,10 +231,11 @@ const clientLoader = browserCollections.docs.createClientLoader({
   ) {
     const markdownUrl = `/llms.mdx/docs/${[...slugs, 'index.mdx'].join('/')}`;
     const titleParts = splitBadgeTitle(frontmatter.title);
+    const filteredToc = toc.filter((item) => item.depth !== 1);
 
     return (
       <DocsPage
-        toc={toc}
+        toc={filteredToc}
         tableOfContent={{
           style: 'clerk',
         }}
@@ -244,7 +245,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
       >
         <title>{titleParts.badge ? `${titleParts.badge} ${titleParts.text}` : frontmatter.title}</title>
         <meta name="description" content={frontmatter.description} />
-        <DocsTitle>{renderBadgeTitle(frontmatter.title)}</DocsTitle>
+        <DocsTitle className="text-[2.25rem] font-bold tracking-tight">{renderBadgeTitle(frontmatter.title)}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
         <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
           <LLMCopyButton markdownUrl={markdownUrl} />
@@ -253,7 +254,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
             githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${path}`}
           />
         </div>
-        <DocsBody>
+        <DocsBody className="[&>h1:first-child]:hidden">
           <Mdx components={{ ...defaultMdxComponents }} />
         </DocsBody>
       </DocsPage>

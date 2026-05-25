@@ -5,13 +5,15 @@ description: Gestión y consulta de listas de revocación para validación offli
 
 # Servicio CRL
 
-Una CRL (*Certificate Revocation List*) es una lista firmada que enumera los números de serie de los certificados que han sido revocados antes de su fecha de caducidad. A diferencia de OCSP, la CRL no requiere consulta en tiempo real: la parte que confía descarga la lista periódicamente y la consulta localmente.
+Una CRL (*Certificate Revocation List*) es una lista firmada que contiene los números de serie de los certificados revocados antes de su fecha de caducidad. A diferencia de OCSP, no requiere una consulta en tiempo real: la parte que confía descarga la lista periódicamente y la consulta de forma local.
 
 Lamassu genera y mantiene una CRL por cada CA que gestiona. Cada CRL está firmada con la clave privada de la propia CA emisora y se almacena en el sistema de almacenamiento de objetos configurado en la plataforma.
 
 ## Rol VA y configuración por CA
 
-La CRL de cada CA está gobernada por un *rol VA*, un objeto de configuración que determina el comportamiento de publicación. Los parámetros principales son los siguientes:
+La publicación de la CRL de cada CA se controla mediante un *rol VA*. Este objeto define cómo se genera, cuándo se regenera y qué clave se utiliza para firmarla.
+
+Los parámetros principales son:
 
 | Parámetro | Valor por defecto | Descripción |
 |---|---|---|
@@ -19,19 +21,21 @@ La CRL de cada CA está gobernada por un *rol VA*, un objeto de configuración q
 | `refresh_interval` | ~6 días y 23 horas | Intervalo mínimo entre regeneraciones periódicas programadas. |
 | `regenerate_on_revoke` | `true` | Cuando se revoca un certificado, se genera una nueva CRL de inmediato sin esperar al ciclo periódico. |
 
-El campo `subject_key_id_signer` identifica la CA cuya clave privada firma la CRL. En el comportamiento por defecto, la CA firma su propia CRL.
+El campo `subject_key_id_signer` identifica la CA cuya clave privada firma la CRL. Por defecto, cada CA firma su propia CRL.
 
 Cada CRL lleva un número de versión incremental. Lamassu almacena todas las versiones en la ruta `pki/va/crl/{subject_key_id}/{version}.crl` del almacenamiento de objetos.
 
 ## Regeneración periódica y automática
 
-Un trabajo en segundo plano supervisa periódicamente todos los roles VA activos. Cuando la validez restante de la CRL vigente cae por debajo del período de vigilancia configurado (*blind period*), el trabajo solicita la generación de una nueva CRL. Este mecanismo garantiza que la CRL publicada nunca caduque sin que exista una versión válida disponible.
+Un proceso en segundo plano supervisa los roles VA activos. Cuando la validez restante de la CRL vigente cae por debajo del período de vigilancia configurado (*blind period*), el sistema solicita la generación de una nueva CRL. Así se evita que la CRL publicada caduque sin que exista una versión válida disponible.
 
-Además de la regeneración periódica, cuando `regenerate_on_revoke` está activo (comportamiento por defecto), cualquier operación de revocación de un certificado desencadena inmediatamente el cálculo de una nueva CRL para la CA afectada. Esto minimiza la ventana de tiempo entre la revocación y su reflejo en la CRL accesible públicamente.
+Además, cuando `regenerate_on_revoke` está activo, que es el comportamiento por defecto, cualquier revocación de un certificado desencadena inmediatamente la generación de una nueva CRL para la CA afectada. Esto reduce al mínimo el tiempo entre la revocación y su publicación.
 
 ## Contenido de la CRL
 
-Cada entrada de la CRL incluye el número de serie del certificado revocado, la marca de tiempo de revocación y el código de razón conforme a RFC 5280. La CRL incluye también la extensión *Issuing Distribution Point* (IDP, OID 2.5.29.28), marcada como crítica, que indica la URL pública desde la que se puede obtener la CRL. Esta URL apunta al endpoint `/crl/{subject_key_id}` de cada dominio VA configurado.
+Cada entrada de la CRL incluye el número de serie del certificado revocado, la fecha de revocación y el código de razón conforme a RFC 5280.
+
+La CRL incluye también la extensión *Issuing Distribution Point* (IDP, OID 2.5.29.28), marcada como crítica, que indica la URL pública desde la que puede descargarse. Esa URL apunta al endpoint `/crl/{subject_key_id}` de cada dominio VA configurado.
 
 ## Endpoint público de descarga
 
@@ -65,11 +69,9 @@ La respuesta incluye el campo `latest_crl` con la versión, la fecha de inicio d
 
 Desde el panel de detalle de una CA es posible previsualizar el contenido de la CRL activa y descargarla directamente para su uso offline o para importarla en aplicaciones que realicen validación local.
 
-<img src="/images/manual-servicios-core-validation-servicio-crl.png" alt="Servicio CRL" />
-
 ## Referencias
 
-- RFC 5280 — *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile*
+- RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile*
 
 <Cards>
   <Card title="Servicio OCSP" href="/docs/manual/servicios-core/validation-ocsp" />

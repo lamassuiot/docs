@@ -1,0 +1,90 @@
+---
+title: "[EST] Configuración del DMS"
+description: Guía para el administrador PKI sobre cómo configurar el protocolo EST en un DMS de Lamassu IoT — autenticación, enrolamiento, re-enrolamiento y generación de claves en servidor.
+---
+
+# Configuración EST del DMS
+
+Esta página describe la configuración del protocolo EST (RFC 7030) en un DMS desde la perspectiva del administrador PKI. Cubre los parámetros de autenticación del dispositivo, las políticas de enrolamiento y re-enrolamiento, y la generación de claves en servidor. Para los endpoints, formatos de mensaje y ejemplos de integración, consulte la [referencia para integrador de dispositivos](/docs/manual/servicios-core/est).
+
+## Configuración de enrollment
+
+La sección **Enrollment Device Registration** define cómo se registran los dispositivos nuevos y con qué credenciales se autentican.
+
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-enrollment.png)
+*Sección de configuración de enrollment del DMS.*
+
+El campo **Enrollment CA** identifica la CA que firmará los certificados de identidad emitidos a través de este DMS. Su elección determina la cadena de confianza que el dispositivo recibirá y la raíz contra la que los sistemas de backend validarán los certificados de flota.
+
+El **Registration Mode** determina el comportamiento al recibir una inscripción inicial. En modo `JITP` (*Just-In-Time Provisioning*), el dispositivo se crea automáticamente la primera vez que se presenta, aplicando los tags, metadatos e icono definidos en el perfil de aprovisionamiento. En modo `PRE_REGISTRATION`, el dispositivo debe existir previamente en la plataforma; si no existe, la solicitud se rechaza con `device not preregistered`. El modo JITP es adecuado para flotas grandes donde el inventario se construye durante el despliegue; el modo PRE_REGISTRATION encaja en entornos de alta seguridad donde cada dispositivo se aprueba de forma explícita antes de recibir un certificado.
+
+Los campos **Tags** e **Icon** del perfil de aprovisionamiento se aplican a cada dispositivo creado automáticamente por este DMS. Son opcionales y solo tienen efecto en modo JITP.
+
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-enrollment-a.png)
+*Parámetros de autenticación y CA de enrollment.*
+
+La opción **Allow Override Enrollment** (`enable_replaceable_enrollment`) permite que un dispositivo ya enrolado vuelva a inscribirse mediante `/simpleenroll`. Cuando está activa, el certificado anterior se revoca con la razón `superseded` y el slot de identidad se actualiza. Cuando está inactiva, un segundo intento de `simpleenroll` se rechaza con `forbiddenNewEnrollment`. Esta opción debe habilitarse con precaución en entornos de producción, ya que permite sustituir la identidad de un dispositivo sin pasar por el flujo de re-enrollment.
+
+La opción **Verify CSR Signature** (`verify_csr_signature`) controla si el servidor valida la firma del CSR contra la clave pública declarada en él (prueba de posesión PKCS#10). Cuando está inactiva, un solicitante podría enviar un CSR con una clave pública que no controla y obtener un certificado vinculado a ella. Para flotas IoT en redes abiertas debe estar activa.
+
+### Modo de autenticación
+
+El campo **Authentication Mode** define cómo el DMS valida la identidad del dispositivo durante el enrollment. Los cuatro modos disponibles son:
+
+| Modo | Descripción |
+|---|---|
+| `CLIENT_CERTIFICATE` | mTLS. El dispositivo presenta un certificado X.509 emitido por alguna de las CAs declaradas en **Validation CAs**. |
+| `EXTERNAL_WEBHOOK` | La decisión de autorización se delega en un servicio HTTP externo. Solo aplica en `/simpleenroll`; en `/simplereenroll` este modo degrada silenciosamente a `NO_AUTH`. |
+| `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | Combina los dos anteriores: se exige un certificado cliente válido **y** la confirmación del webhook externo. |
+| `NO_AUTH` | Sin autenticación. Cualquier CSR se acepta. **Exclusivo para entornos de laboratorio o redes de aprovisionamiento aisladas**; no debe usarse en producción. |
+
+Cuando el modo es `CLIENT_CERTIFICATE` o `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`, se configuran los siguientes parámetros adicionales:
+
+| Parámetro | Descripción |
+|---|---|
+| **Validation CAs** | Lista de CAs de confianza para validar el certificado bootstrap presentado por el dispositivo. |
+| **Chain Validation Level** | Profundidad máxima de la cadena de validación. El valor `-1` valida la cadena completa hasta la CA raíz. |
+| **Allow Authenticating Expired Certificates** | Si está activo, acepta certificados cliente caducados. Útil en escenarios de recuperación donde el dispositivo no pudo renovar su certificado a tiempo. |
+
+Cuando el modo incluye `EXTERNAL_WEBHOOK`, se configura la URL del servicio, el método HTTP, el timeout de llamada y el modo de autenticación del webhook hacia el servicio externo (ApiKey, OIDC o mTLS). Nótese que el webhook solo se invoca durante `/simpleenroll`; durante `/simplereenroll` el modo degrada a `NO_AUTH`, lo que implica que la autorización del webhook no protege el flujo de renovación.
+
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-enrollment-b.png)
+*Parámetros de autenticación por certificado cliente.*
+
+## Configuración de re-enrollment
+
+La sección **Re-Enrollment Settings** controla el proceso de renovación de certificados. El re-enrollment puede realizarse cuando el certificado está dentro de la ventana configurada, y opcionalmente también cuando el certificado ya ha caducado.
+
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-reenrollment.png)
+*Sección de configuración de re-enrollment.*
+
+| Parámetro | Descripción |
+|---|---|
+| **Revoke On Re-Enroll** | Si está activo, el certificado anterior se revoca automáticamente con la razón `superseded` una vez emitido el nuevo. |
+| **Allow Expired Renewal** | Permite renovar un certificado ya caducado. Útil cuando un dispositivo ha estado desconectado y no pudo renovar dentro de la ventana. |
+| **Allowed Renewal Delta** | Ventana de tiempo previa a la caducidad durante la cual se permite el re-enrollment. Antes de que se abra esta ventana, la solicitud se rechaza con `invalid reenroll window`. |
+| **Preventive Renewal Delta** | Tiempo previo a la caducidad a partir del cual se emiten alertas de renovación preventiva. |
+| **Critical Renewal Delta** | Umbral más cercano al vencimiento que activa alertas de estado crítico. |
+| **Additional Validation CAs** | CAs adicionales aceptadas como emisoras del certificado en vigor durante el re-enrollment. Permite migrar a una nueva CA de enrolamiento sin interrumpir la renovación de dispositivos ya enrolados con la CA anterior. |
+
+## Configuración de ServerKeyGen
+
+La sección **Server Key Generation** permite que Lamassu genere el par de claves del dispositivo en el servidor y lo devuelva junto con el certificado emitido. Es útil para dispositivos con capacidad criptográfica limitada.
+
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-serverkeygen.png)
+*Sección de configuración de generación de claves en servidor.*
+
+La opción **Enable Server-Side Key Generation** activa el endpoint `/serverkeygen`. Cuando está inactiva, cualquier llamada a ese endpoint se rechaza con `server key generation not enabled`.
+
+**Key Type** selecciona el algoritmo: `RSA` o `ECDSA`. El campo **Key Size (bits)** determina el tamaño de la clave. Para ECDSA, el tamaño en bits determina también la curva: 256 corresponde a P-256, 384 a P-384 y 521 a P-521.
+
+![](/images/manual-servicios-core-ra-configuracion-de-una-ra-serverkeygen-a.png)
+*Selección de tipo y tamaño de clave para ServerKeyGen.*
+
+La clave se genera en el motor software del servidor, no en un Crypto Engine de hardware como AWS KMS o PKCS#11. La única protección de la clave en tránsito es el canal TLS; no se aplica cifrado adicional (CMS EnvelopedData) sobre la clave antes de enviarla al dispositivo. Consulte la [referencia para integrador](/docs/manual/servicios-core/est#serverkeygen) para conocer el formato exacto de la respuesta y las consideraciones de seguridad de este endpoint.
+
+<Cards>
+  <Card title="Visión general del DMS" href="/docs/manual/servicios-core/ra" />
+  <Card title="EST — Referencia para integrador de dispositivos" href="/docs/manual/servicios-core/est" />
+  <Card title="Gestionar dispositivos" href="/docs/manual/servicios-core/devices" />
+</Cards>

@@ -1,7 +1,11 @@
 ---
-title: "[EST] Enrollment over Secure Transport"
+title: "[EST] Referencia para integrador de dispositivos"
 description: "Guía operativa del protocolo EST en Lamassu IoT para integradores de dispositivos: endpoints, autenticación, formatos y ejemplos curl/openssl."
 ---
+
+# EST — Referencia para integrador de dispositivos
+
+Esta página es la referencia operativa del protocolo EST (RFC 7030) para quien integra dispositivos con Lamassu IoT. Describe los endpoints disponibles, los formatos de mensaje, el modelo de autenticación y los casos de error que el firmware o el agente de aprovisionamiento puede encontrar. La configuración del DMS que habilita estos endpoints — modos de autenticación, CA de enrolamiento, ventanas de renovación — está documentada en la [página de configuración EST del DMS](/docs/manual/servicios-core/est-admin), dirigida al administrador PKI.
 
 Lamassu IoT implementa el protocolo **EST (Enrollment over Secure Transport)** descrito en el RFC 7030 como su único mecanismo de inscripción de certificados para dispositivos. Cada DMS configurado en la plataforma realiza el rol de autoridad de registro (RA) frente al cliente EST: expone un conjunto de endpoints y aplica sus propias políticas de autenticación, registro y renovación. La firma del certificado la realiza la CA asociada al DMS, no el DMS en sí.
 
@@ -9,9 +13,9 @@ Los endpoints EST de Lamassu se publican bajo el prefijo `/.well-known/est` y ex
 
 ## Antes de empezar
 
-El integrador debe asegurarse de que existe un DMS configurado por el administrador PKI con el protocolo `EST_RFC7030`, una CA de enrolamiento asignada (`EnrollmentCA` - la CA que firmará los certificados de identidad de los dispositivos a través de este DMS) y al menos un modo de autenticación. Lamassu rechaza el enrolamiento si la configuración del DMS no fija un modo válido o si `EnrollmentProtocol` no es EST (la API devuelve `ErrDMSOnlyEST`).
+El administrador PKI debe haber configurado un DMS con el protocolo `EST_RFC7030`, una CA de enrolamiento asignada y al menos un modo de autenticación. Sin esa configuración previa, Lamassu rechaza cualquier solicitud de enrolamiento. Los detalles de esa configuración se encuentran en la [página de configuración EST del DMS](/docs/manual/servicios-core/est-admin).
 
-Para operar contra los endpoints se necesita la URL del host EST, la cadena de confianza del servidor (necesaria para verificar el TLS de Lamassu) y las credenciales que correspondan al modo de autenticación. Para `/simpleenroll` se utiliza un **certificado bootstrap** emitido por alguna de las CAs declaradas en `AuthOptionsMTLS.ValidationCAs` del DMS - una CA dedicada al provisioning, normalmente distinta de la CA de enrolamiento. Para `/simplereenroll` la credencial es el certificado en vigor del dispositivo, emitido por la `EnrollmentCA` del DMS o por una de las `AdditionalValidationCAs`. Cuando el DMS está en modo `NO_AUTH` o `EXTERNAL_WEBHOOK`, el canal mTLS no aporta autenticación. El identificador `{aps}` que aparece en las URLs equivale al ID del DMS y se lo proporciona el administrador PKI.
+Para operar contra los endpoints, el integrador necesita la URL del host EST, la cadena de confianza del servidor (necesaria para verificar el TLS de Lamassu) y las credenciales que correspondan al modo de autenticación configurado. Para `/simpleenroll` se utiliza un **certificado bootstrap** emitido por alguna de las CAs declaradas en `AuthOptionsMTLS.ValidationCAs` del DMS — una CA dedicada al provisioning, normalmente distinta de la CA de enrolamiento. Para `/simplereenroll` la credencial es el certificado en vigor del dispositivo, emitido por la `EnrollmentCA` del DMS o por una de las `AdditionalValidationCAs`. El identificador `{aps}` que aparece en las URLs equivale al ID del DMS y lo proporciona el administrador PKI.
 
 Sobre TLS: cuando el servidor está configurado con mTLS en la capa HTTPS, está limitado a TLS 1.2 como versión máxima; en despliegues sin mTLS HTTP negocia hasta TLS 1.3. Un cliente cuyo `MinVersion` esté fijado a TLS 1.3 fallará el handshake contra un endpoint con mTLS habilitada. En Go conviene fijar `tls.Config{MinVersion: tls.VersionTLS12}`.
 
@@ -371,7 +375,8 @@ La implementación de Lamassu se ajusta al RFC 7030 en lo esencial pero introduc
 **"La clave devuelta por `/serverkeygen` no se abre"** - La clave viene en PKCS#8 **sin cifrar**. Usar `openssl pkcs8 -inform DER -nocrypt`. No es necesario aportar contraseña ni clave de envoltura.
 
 <Cards>
-  <Card title="Configurar el DMS" href="/docs/manual/servicios-core/ra" />
+  <Card title="Visión general del DMS" href="/docs/manual/servicios-core/ra" />
+  <Card title="EST — Configuración del DMS" href="/docs/manual/servicios-core/est-admin" />
   <Card title="Validación OCSP" href="/docs/manual/servicios-core/validation-ocsp" />
   <Card title="Gestionar dispositivos" href="/docs/manual/servicios-core/devices" />
 </Cards>

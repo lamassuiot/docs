@@ -17,8 +17,6 @@ export default {
       if (!excluded.includes(path)) paths.push(path);
     }
 
-    // Ensure /docs root is prerendered (redirects to /docs/manual)
-    if (!paths.includes('/docs')) paths.push('/docs');
 
     for await (const entry of glob('**/*.mdx', { cwd: 'content/docs' })) {
       const slugs = getSlugs(entry);

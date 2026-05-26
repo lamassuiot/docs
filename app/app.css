@@ -1,3 +1,5 @@
+/* Declare Scalar layers before Tailwind to prevent CSS conflicts */
+@layer scalar-base, scalar-theme, scalar-config, theme, base, components, utilities;
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';

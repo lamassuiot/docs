@@ -25,33 +25,33 @@ Si solo necesita una orientación rápida, este es el recorrido recomendado:
 
 ## Configuración del DMS
 
-*Esta sección está dirigida al administrador PKI.*
-
 ### Requisitos previos
 
 Antes de configurar un DMS para EST, deben existir los siguientes recursos en la plataforma:
 
 - **Una CA disponible**: la CA que actuará como `EnrollmentCA` debe estar creada y en estado activo en Lamassu. Si el modo de autenticación es `CLIENT_CERTIFICATE`, también deben estar creadas las CAs de validación del certificado bootstrap.
 - **Un DMS creado**: el DMS al que se aplicará esta configuración debe existir previamente. La configuración EST se aplica sobre un DMS existente, no lo crea.
-- **Servicio webhook accesible** (solo si `AuthMode` incluye `EXTERNAL_WEBHOOK`): el servicio externo de autorización debe estar operativo y ser alcanzable desde el servidor Lamassu antes de activar el modo.
 
-Conviene separar tres bloques de configuración:
+Conviene separar cuatro bloques de configuración:
 
-- Cómo se realizará el enrollment inicial, incluyendo el modo de alta (`JITP` o `PRE_REGISTRATION`) y la autenticación del cliente.
+- Cómo se realizará el enrollment inicial, incluyendo el modo de alta y la autenticación del cliente.
 - Cómo se gestionará el re-enrollment de certificados ya emitidos.
+- Cómo se configurará el endpoint cacerts para la distribución de las CAs de confianza utilizadas por los dispositivos.
 - Si se habilitará la generación de claves en servidor mediante `ServerKeyGen`.
 
 ### Configuración de enrollment
 
-La sección **Enrollment Device Registration** define cómo se registran los dispositivos nuevos y con qué credenciales se autentican.
+#### Enrollment Device Registration
 
+En esta sección se define cómo se registran los dispositivos nuevos y con qué credenciales se autentican.
+
+- **Registration Mode**: determina el comportamiento al recibir una inscripción inicial. En modo `JITP` (*Just-In-Time Provisioning*), el dispositivo se crea automáticamente la primera vez que se presenta, aplicando los tags, metadatos e icono definidos en el perfil de aprovisionamiento. En modo `PRE_REGISTRATION`, el dispositivo debe existir previamente en la plataforma; si no existe, la solicitud se rechaza con `device not preregistered`. El modo JITP es adecuado para flotas grandes donde el inventario se construye durante el despliegue; el modo `PRE_REGISTRATION` encaja en entornos de alta seguridad donde cada dispositivo se aprueba de forma explícita antes de recibir un certificado.
+- **Tags**: se aplican a cada dispositivo creado automáticamente por este DMS. Son opcionales y solo tienen efecto en modo JITP. Los tags permiten mejorar la búsqueda de dispositivos.
+- **Icon**: se aplica a cada dispositivo creado automáticamente por este DMS. Es opcional y solo tiene efecto en modo JITP. Únicamente visual.
+
+#### Enrollment Settings
 
 - **Enrollment CA**: identifica la CA que firmará los certificados de identidad emitidos a través de este DMS. Su elección determina la cadena de confianza que el dispositivo recibirá y la raíz contra la que los sistemas de backend validarán los certificados de flota.
-- **Registration Mode**: determina el comportamiento al recibir una inscripción inicial. En modo `JITP` (*Just-In-Time Provisioning*), el dispositivo se crea automáticamente la primera vez que se presenta, aplicando los tags, metadatos e icono definidos en el perfil de aprovisionamiento. En modo `PRE_REGISTRATION`, el dispositivo debe existir previamente en la plataforma; si no existe, la solicitud se rechaza con `device not preregistered`. El modo JITP es adecuado para flotas grandes donde el inventario se construye durante el despliegue; el modo `PRE_REGISTRATION` encaja en entornos de alta seguridad donde cada dispositivo se aprueba de forma explícita antes de recibir un certificado.
-- **Tags**: se aplican a cada dispositivo creado automáticamente por este DMS. Son opcionales y solo tienen efecto en modo JITP.
-- **Icon**: se aplica a cada dispositivo creado automáticamente por este DMS. Es opcional y solo tiene efecto en modo JITP.
-
-
 - **Allow Override Enrollment** (`enable_replaceable_enrollment`): permite que un dispositivo ya enrolado vuelva a inscribirse mediante `/simpleenroll`. Cuando está activa, el certificado anterior se revoca con la razón `superseded` y el slot de identidad se actualiza. Cuando está inactiva, un segundo intento de `simpleenroll` se rechaza con `forbiddenNewEnrollment`. Esta opción debe habilitarse con precaución en entornos de producción, ya que permite sustituir la identidad de un dispositivo sin pasar por el flujo de re-enrollment.
 - **Verify CSR Signature** (`verify_csr_signature`): controla si el servidor valida la firma del CSR contra la clave pública declarada en él (prueba de posesión PKCS#10). Cuando está inactiva, un solicitante podría enviar un CSR con una clave pública que no controla y obtener un certificado vinculado a ella. Para flotas IoT en redes abiertas debe estar activa.
 - **Authentication Mode**: define cómo el DMS valida la identidad del dispositivo durante el enrollment. Los cuatro modos disponibles son:
@@ -150,10 +150,6 @@ Antes de realizar la primera llamada, asegúrese de tener:
 | **Certificado bootstrap + clave privada** | Solo para modos `CLIENT_CERTIFICATE` o `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`. Es el certificado de aprovisionamiento emitido por alguna de las `ValidationCAs` del DMS, normalmente una CA dedicada al provisioning y distinta de la CA de enrolamiento. |
 | **ID del DMS** (`{aps}`) | Identificador del DMS que aparece en todas las rutas EST. Lo proporciona el administrador PKI. |
 
-#### Consideraciones TLS
-
-Los endpoints EST exigen siempre HTTPS. Cuando el servidor está configurado con mTLS en la capa HTTPS, negocia únicamente **TLS 1.2** como versión máxima; en despliegues sin mTLS puede negociar hasta TLS 1.3. Un cliente cuyo `MinVersion` esté fijado a TLS 1.3 fallará el handshake contra un endpoint con mTLS habilitada. En Go, fija `tls.Config{MinVersion: tls.VersionTLS12}`.
-
 ### Resumen del flujo
 
 | Caso | Credencial habitual | Endpoint principal | Resultado |
@@ -199,10 +195,6 @@ JWT **no es un modo de autenticación válido en EST**. El extractor de identida
   ```
 
   El valor del campo `csr` es la **codificación base64 del PEM** del CSR (no el DER, y no el PEM en claro). El webhook debe responder con `2xx` y `{"authorized": true}` para continuar; cualquier otra respuesta aborta el enrolamiento con `external webhook denied enrollment`.
-
-  <Callout type="warn" title="Degradación silenciosa en re-enrollment">
-  El webhook **solo se invoca en `/simpleenroll`**. En `/simplereenroll`, el modo `EXTERNAL_WEBHOOK` degrada silenciosamente a `NO_AUTH`: si el cliente no presenta un certificado cliente, el reenroll continúa sin autenticación, con un aviso en el log (`allowing reenroll: using NO AUTH mode`). La decisión de autorización del webhook queda fuera del flujo de renovación. Un DMS configurado con `EXTERNAL_WEBHOOK` no debe usarse en producción para flujos de reenroll a menos que se controle la red de acceso al endpoint. Lamassu IoT no compensa esta degradación con ningún otro control.
-  </Callout>
 
 - **`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`**: combina los dos modos anteriores durante `/simpleenroll` — el cliente debe presentar un certificado mTLS válido y el webhook debe devolver `authorized: true`. En `/simplereenroll` la combinación no se conserva: el chequeo conjunto mTLS + webhook no se mantiene, por lo que el integrador no debe asumir que las mismas garantías del enrollment inicial aplican en reenroll.
 

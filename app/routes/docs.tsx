@@ -10,6 +10,8 @@ import type { i as PageTreeRoot, n as PageTreeItem, r as PageTreeNode, t as Page
 import { baseOptions, gitConfig } from '@/lib/layout.shared';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { LLMCopyButton, ViewOptions } from '@/components/ai/page-actions';
+import { MdxLink } from '@/components/mdx-link';
+import { VersionSelector } from '@/components/version-selector';
 
 function splitBadgeTitle(title: string) {
   const match = /^\[([^\]]+)\]\s*(.+)$/.exec(title.trim());
@@ -264,7 +266,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
           />
         </div>
         <DocsBody className="[&>h1:first-child]:hidden">
-          <Mdx components={{ ...defaultMdxComponents }} />
+          <Mdx components={{ ...defaultMdxComponents, a: MdxLink }} />
         </DocsBody>
       </DocsPage>
     );
@@ -275,7 +277,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
   const { pageTree, ...rest } = useFumadocsLoader(loaderData);
 
   return (
-    <DocsLayout {...baseOptions()} tree={pageTree}>
+    <DocsLayout {...baseOptions()} tree={pageTree} sidebar={{ banner: <VersionSelector /> }}>
       {clientLoader.useContent(loaderData.path, {
         ...rest,
       })}

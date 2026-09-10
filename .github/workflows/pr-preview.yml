@@ -30,24 +30,37 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Mounts the app under /pr-preview/pr-<n>/ instead of the domain root.
-      # See PREVIEW_BASENAME in vite.config.ts and react-router.config.ts.
+      # GitHub Pages serves this repo's gh-pages branch under a
+      # www.lamassu.io/docs/<branch-path> project-site prefix (this custom
+      # domain is shared with another repo's Pages site, which gets the
+      # domain root — verified empirically, not documented anywhere in this
+      # repo). That /docs/ prefix is added by GitHub outside our control and
+      # applies uniformly to every path on the branch, assets included. So
+      # what the browser actually requests (Vite's `base`) must include it,
+      # even though what we publish to gh-pages (DEST_PREFIX below) doesn't
+      # itself contain "docs" — GitHub supplies that part.
       - name: Build preview
         env:
-          PREVIEW_BASENAME: /pr-preview/pr-${{ github.event.pull_request.number }}
+          PREVIEW_BASENAME: /docs/pr-preview/pr-${{ github.event.pull_request.number }}
         run: pnpm build
 
       # Vite's `base` only rewrites the *references* in HTML/JS to the prefixed
-      # path — it doesn't relocate the physical output files. Assemble a
-      # self-contained bundle by copying the static assets alongside the
-      # already-prefixed prerendered pages.
+      # path — it doesn't relocate the physical output files, and React
+      # Router's `basename` physically nests prerendered pages under a
+      # directory matching PREVIEW_BASENAME (SRC_PREFIX below, including the
+      # "docs" segment above). Assemble a self-contained bundle at
+      # DEST_PREFIX — one level up, without that segment, since GitHub's own
+      # project-site prefix will supply it once this is published — combining
+      # those prerendered pages with the static assets, which Vite always
+      # writes at the build root regardless of `base`.
       - name: Assemble self-contained preview bundle
         run: |
           set -euo pipefail
-          PREFIX="pr-preview/pr-${{ github.event.pull_request.number }}"
-          OUT="publish/$PREFIX"
+          SRC_PREFIX="docs/pr-preview/pr-${{ github.event.pull_request.number }}"
+          DEST_PREFIX="pr-preview/pr-${{ github.event.pull_request.number }}"
+          OUT="publish/$DEST_PREFIX"
           mkdir -p "$OUT"
-          cp -r "build/client/$PREFIX/." "$OUT/"
+          cp -r "build/client/$SRC_PREFIX/." "$OUT/"
           cp -r build/client/assets "$OUT/assets"
           cp -r build/client/images "$OUT/images"
           cp build/client/favicon.svg build/client/t.svg "$OUT/"

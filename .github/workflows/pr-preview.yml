@@ -17,10 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Full history, not the default shallow clone -- needed to diff
-          # against the PR's base branch for the diff-mode toggle below.
-          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -33,16 +29,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      # PR-preview-only: per-page unified diff of content/docs/**/*.mdx vs the
-      # PR's base branch, consumed by the diff-mode toggle (app/lib/pr-diffs.ts).
-      # Writes {} (toggle stays hidden everywhere) if this fails for any reason
-      # -- see scripts/generate-pr-diffs.mjs.
-      - name: Generate PR diff data
-        env:
-          PR_DIFF_BASE: origin/${{ github.event.pull_request.base.ref }}
-          PR_DIFF_HEAD: HEAD
-        run: node scripts/generate-pr-diffs.mjs
 
       # GitHub Pages serves this repo's gh-pages branch under a
       # www.lamassu.io/docs/<branch-path> project-site prefix (this custom

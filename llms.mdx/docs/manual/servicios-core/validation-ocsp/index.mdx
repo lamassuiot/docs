@@ -1,0 +1,60 @@
+# [VA] Servicio OCSP (/docs/manual/servicios-core/validation-ocsp)
+
+
+
+Servicio OCSP [#servicio-ocsp]
+
+OCSP (Online Certificate Status Protocol) es el mecanismo que permite a una parte que confía comprobar, en tiempo real, si un certificado concreto está vigente o ha sido revocado. En lugar de descargar una lista completa de certificados revocados, el cliente envía una consulta con el número de serie del certificado y recibe una respuesta firmada con el estado actual.
+
+Lamassu integra un respondedor OCSP propio que atiende estas consultas consultando directamente la base de datos interna de certificados. No se requiere ningún componente externo.
+
+Cómo funciona el respondedor en Lamassu [#cómo-funciona-el-respondedor-en-lamassu]
+
+Cuando un cliente solicita el estado de un certificado, el respondedor localiza el certificado por su número de serie y determina su estado según el registro interno:
+
+* Si el certificado está activo, la respuesta indica `Good`.
+* Si el certificado ha sido revocado, la respuesta indica `Revoked` e incluye la marca de tiempo de revocación y el código de razón conforme a RFC 5280.
+* Si el número de serie no se encuentra o el estado no es reconocible, la respuesta indica `Unknown`.
+
+La respuesta OCSP es firmada por la CA emisora del certificado consultado, utilizando el motor criptográfico asociado a esa CA. Lamassu no utiliza un certificado delegado de firma OCSP: la CA actúa directamente como respondedor.
+
+Cada respuesta tiene una ventana de validez de 24 horas, reflejada en los campos `thisUpdate` y `nextUpdate` de la respuesta. Los clientes que cacheen respuestas deben tener en cuenta esta ventana al determinar durante cuánto tiempo una respuesta sigue siendo válida.
+
+Enlace en los certificados emitidos [#enlace-en-los-certificados-emitidos]
+
+La URL del respondedor OCSP se incorpora automáticamente en la extensión AIA (*Authority Information Access*) de todos los certificados emitidos por Lamassu. Los clientes que verifican certificados pueden leer esta URL directamente del certificado sin necesidad de configuración adicional.
+
+Endpoints HTTP [#endpoints-http]
+
+El respondedor acepta consultas en dos formatos, ambos definidos en RFC 6960:
+
+| Método | Ruta                   | Descripción                                                                                   |
+| ------ | ---------------------- | --------------------------------------------------------------------------------------------- |
+| `GET`  | `/ocsp/{ocsp_request}` | La petición OCSP va codificada en Base64url en la propia URL.                                 |
+| `POST` | `/ocsp`                | La petición OCSP va en el cuerpo de la petición con `Content-Type: application/ocsp-request`. |
+
+Ejemplo de consulta con `curl` mediante POST:
+
+```bash
+curl -X POST https://<LAMASSU_HOST>/ocsp \
+  -H "Content-Type: application/ocsp-request" \
+  --data-binary @request.der \
+  -o response.der
+```
+
+La respuesta tiene `Content-Type: application/ocsp-response` y contiene la respuesta OCSP en formato DER.
+
+Comprobación desde la interfaz [#comprobación-desde-la-interfaz]
+
+Desde la pantalla de certificados de Lamassu es posible lanzar una petición OCSP directamente sobre el certificado seleccionado mediante la acción **OCSP Check**. Esta acción muestra el estado devuelto por el respondedor sin necesidad de herramientas externas.
+
+Referencias [#referencias]
+
+* RFC 6960 - *X.509 Internet Public Key Infrastructure Online Certificate Status Protocol – OCSP*
+* RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile* (razones de revocación, sección 5.3.1)
+
+<Cards>
+  <Card title="Servicio CRL" href="/docs/manual/servicios-core/validation-crl" />
+
+  <Card title="Validación de certificados" href="/docs/manual/servicios-core/validation" />
+</Cards>

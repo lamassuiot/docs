@@ -39,6 +39,17 @@ Cada motor define qué algoritmos soporta, como RSA o ECC/ECDSA, y qué tamaños
 
 Durante el despliegue es obligatorio definir un motor por defecto. Ese motor se utilizará cuando un proceso necesite crear o persistir una clave y el usuario no haya seleccionado uno específico, por ejemplo al crear o importar una CA.
 
+## Claves compartidas entre varios motores
+Una misma clave puede existir en más de un motor criptográfico a la vez. El caso habitual es que la clave privada quede custodiada en un motor aislado (por ejemplo, un HSM air-gapped) mientras una copia de la clave pública se registra en un motor online, disponible para verificar firmas sin necesidad de acceder al HSM.
+
+Cuando esto ocurre, el inventario de claves muestra una fila por cada motor que custodia una copia: comparten el mismo `Key ID`, pero difieren en **Crypto Engine** y en el campo **Public/Private**.
+
+La identidad real de una clave es la combinación de su `Key ID` y el motor que la custodia, no el `Key ID` en solitario:
+
+- El **PKCS#11 URI** (`pkcs11:token-id=<engine_id>;id=<key_id>;type=public|private`) y los **Aliases** identifican siempre una copia concreta, sin ambigüedad.
+- Un `Key ID` por sí solo funciona como atajo de búsqueda, pero sólo mientras exista en un único motor. En cuanto la misma clave se replica en un segundo motor, ese atajo deja de resolver a una copia concreta: cualquier operación por API que dependa de él (reutilizar la clave al crear una CA o un certificado, firmar, actualizar tags o alias, eliminar la clave) debe indicar en su lugar el PKCS#11 URI o un alias.
+- Un alias no puede coincidir con un `Key ID` ya existente en el sistema; Lamassu rechaza el alta o la actualización en ese caso.
+
 ## Inventario de claves
 La pantalla principal de KMS muestra el inventario completo de claves registradas en el sistema. Es la vista de referencia para revisar qué claves existen, dónde están custodiadas y con qué entidades están relacionadas.
 
@@ -100,7 +111,7 @@ La pantalla **View Details** concentra la información técnica y administrativa
 En la pestaña **Overview** se muestran, entre otros, estos campos:
 
 - **Key Name**: nombre descriptivo.
-- **Key Identifier**: identificador único del sistema. Lamassu utiliza formatos de ID basados en PKCS11.
+- **Key Identifier**: identificador PKCS#11 de esta copia de la clave. Es único para esta copia; si la misma clave existe en varios motores, cada una tiene su propio Key Identifier (ver [Claves compartidas entre varios motores](#claves-compartidas-entre-varios-motores)).
 - **Tags**: etiquetas asociadas.
 - **Aliases**: nombres alternativos.
 - **Crypto Engine**: motor en el que reside la clave.

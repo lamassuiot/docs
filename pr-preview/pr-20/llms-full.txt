@@ -1,4 +1,4 @@
-# AWS EC2 · AWS Marketplace (/docs/despliegue/cloud)
+# AWS EC2 · AWS Marketplace (/docs/pr-preview/pr-20/despliegue/cloud)
 
 
 
@@ -20,7 +20,7 @@ Requisitos de infraestructura [#requisitos-de-infraestructura]
 * Security Group con acceso HTTPS desde los dispositivos IoT
 
 
-# Despliegue Lamassu IoT (/docs/despliegue)
+# Despliegue Lamassu IoT (/docs/pr-preview/pr-20/despliegue)
 
 
 
@@ -47,7 +47,7 @@ SaaS · Basada en suscripción [#saas--basada-en-suscripción]
 </Cards>
 
 
-# Fastlane (/docs/despliegue/onprem/fastlane)
+# Fastlane (/docs/pr-preview/pr-20/despliegue/onprem/fastlane)
 
 
 
@@ -335,7 +335,7 @@ Resumen [#resumen]
 Está optimizado para rapidez, reproducibilidad y uso en entornos no productivos, con soporte para escenarios offline y pipelines de CI.
 
 
-# Introducción (/docs/despliegue/onprem)
+# Introducción (/docs/pr-preview/pr-20/despliegue/onprem)
 
 
 
@@ -545,7 +545,7 @@ Versionado y migraciones [#versionado-y-migraciones]
 La serie actual del chart principal es `3.7.x`. Para upgrades entre versiones, el repositorio incluye guías específicas en `charts/lamassu/CHANGELOG/`, especialmente en cambios importantes como la adopción de Envoy Gateway o la introducción del servicio KMS.
 
 
-# SaaS · Suscripción (/docs/despliegue/saas)
+# SaaS · Suscripción (/docs/pr-preview/pr-20/despliegue/saas)
 
 
 
@@ -574,7 +574,7 @@ Contacto [#contacto]
 Para suscribirte o solicitar una demo, contacta con el equipo de Lamassu IoT a través de [lamassu.io](https://lamassu.io).
 
 
-# Manual de Usuario (/docs/manual)
+# Manual de Usuario (/docs/pr-preview/pr-20/manual)
 
 
 
@@ -605,7 +605,7 @@ Integraciones con terceros [#integraciones-con-terceros]
 </Cards>
 
 
-# Integración con AWS IoT Core (/docs/manual/integraciones/aws)
+# Integración con AWS IoT Core (/docs/pr-preview/pr-20/manual/integraciones/aws)
 
 
 
@@ -929,7 +929,7 @@ Solución de problemas [#solución-de-problemas]
 </Cards>
 
 
-# [Alerts] Alertas y Suscripciones (/docs/manual/servicios-core/alerts)
+# [Alerts] Alertas y Suscripciones (/docs/pr-preview/pr-20/manual/servicios-core/alerts)
 
 
 
@@ -1021,7 +1021,7 @@ La siguiente tabla resume los eventos que pueden ser generados por la plataforma
 | **kms.verify.signature**   | Verificación de firma con clave KMS            |
 
 
-# [CA] Gestión de Entidades de Confianza (/docs/manual/servicios-core/cas)
+# [CA] Gestión de Entidades de Confianza (/docs/pr-preview/pr-20/manual/servicios-core/cas)
 
 
 
@@ -1324,7 +1324,7 @@ Consideraciones importantes:
 * Eliminación Permanente: Después de la revocación, tendrás la opción de eliminar permanentemente la CA. Esta acción eliminará la CA del sistema de Lamassu IoT.
 
 
-# [Certs] Gestión de Certificados (/docs/manual/servicios-core/certificates)
+# [Certs] Gestión de Certificados (/docs/pr-preview/pr-20/manual/servicios-core/certificates)
 
 
 
@@ -1346,7 +1346,7 @@ Ya sea desde las acciones del listado de certificados, como desde la vista de de
 Es importante destacar que la única razón reversible es “CertificateHold”, una revocación por cualquier otra  razón no podrá ser revertida. En caso de seleccionar “CertificateHold” se ofrecerá una acción de reactivación.
 
 
-# [Devices] Dispositivos e Identidades (/docs/manual/servicios-core/devices)
+# [Devices] Dispositivos e Identidades (/docs/pr-preview/pr-20/manual/servicios-core/devices)
 
 
 
@@ -1438,7 +1438,7 @@ El proceso se realiza de la siguiente manera:
 * **Confirmar y desactivar**: Al confirmar la desactivación, el sistema revoca el certificado activo del dispositivo con la razón CessationOfOperation y cambia su estado a **Decommissioned**. El dispositivo ya no podrá realizar operaciones con la PKI.
 
 
-# EST: Enrollment over Secure Transport (/docs/manual/servicios-core/est)
+# EST: Enrollment over Secure Transport (/docs/pr-preview/pr-20/manual/servicios-core/est)
 
 
 
@@ -1958,7 +1958,7 @@ La implementación de Lamassu se ajusta al RFC 7030 en lo esencial pero introduc
 </Cards>
 
 
-# [KMS] Gestión de Claves Criptográficas (/docs/manual/servicios-core/kms)
+# [KMS] Gestión de Claves Criptográficas (/docs/pr-preview/pr-20/manual/servicios-core/kms)
 
 
 
@@ -2138,7 +2138,7 @@ Lamassu también ofrece una ayuda específica para integraciones locales mediant
 Esta opción muestra los pasos necesarios para configurar el entorno local, cargar el módulo PKCS#11 y ejecutar firmas con herramientas como OpenSSL sin extraer la clave privada del entorno custodiado.
 
 
-# [DMS] Device Management Service (/docs/manual/servicios-core/ra)
+# [DMS] Device Management Service (/docs/pr-preview/pr-20/manual/servicios-core/ra)
 
 
 
@@ -2185,7 +2185,7 @@ El DMS expone un protocolo de enrolamiento a los dispositivos. En la versión ac
 </Cards>
 
 
-# [VA] Servicio CRL (/docs/manual/servicios-core/validation-crl)
+# [VA] Servicio CRL (/docs/pr-preview/pr-20/manual/servicios-core/validation-crl)
 
 
 
@@ -2266,7 +2266,7 @@ Referencias [#referencias]
 </Cards>
 
 
-# [VA] Servicio OCSP (/docs/manual/servicios-core/validation-ocsp)
+# [VA] Servicio OCSP (/docs/pr-preview/pr-20/manual/servicios-core/validation-ocsp)
 
 
 
@@ -2328,7 +2328,7 @@ Referencias [#referencias]
 </Cards>
 
 
-# [VA] Validación de Certificados (/docs/manual/servicios-core/validation)
+# [VA] Validación de Certificados (/docs/pr-preview/pr-20/manual/servicios-core/validation)
 
 
 
@@ -2342,7 +2342,7 @@ Lamassu ofrece dos mecanismos complementarios para validar el estado de los cert
 En el menú lateral del módulo `VA` encontrarás cada capacidad documentada en su propia página.
 
 
-# Test (/docs/test)
+# Test (/docs/pr-preview/pr-20/test)
 
 
 

@@ -22,12 +22,21 @@ const ssrStubScalar: Plugin = {
   },
 };
 
-// Must match the `basename` in react-router.config.ts — the React Router Vite
-// plugin requires `basename` to be a prefix of Vite's `base`.
+// GitHub Pages serves this repo's gh-pages branch under a "/docs/" project-site
+// prefix (the custom domain www.lamassu.io is shared with another repo that owns
+// the domain root), and that prefix applies to assets too — so built asset URLs
+// must carry it. Note this is only Vite's asset `base`; React Router's
+// `basename` stays at its default, because the app already prefixes its own
+// page routes with /docs (see createGetUrl in react-router.config.ts) and
+// setting both would double it up.
+//
+// PREVIEW_BASENAME overrides it for PR previews, which mount deeper
+// (/docs/pr-preview/pr-<n>) and DO set a matching React Router basename.
 const previewBasename = process.env.PREVIEW_BASENAME;
+const GH_PAGES_BASE = '/docs/';
 
-export default defineConfig({
-  base: previewBasename ? `${previewBasename}/` : '/',
+export default defineConfig(({ command }) => ({
+  base: previewBasename ? `${previewBasename}/` : command === 'build' ? GH_PAGES_BASE : '/',
   plugins: [
     ssrStubScalar,
     mdx(MdxConfig),
@@ -37,4 +46,4 @@ export default defineConfig({
       projects: ['./tsconfig.json'],
     }),
   ],
-});
+}));

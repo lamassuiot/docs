@@ -2,6 +2,7 @@ import { loader, type InferPageType } from 'fumadocs-core/source';
 import { docs } from 'fumadocs-mdx:collections/server';
 import { type ComponentType, createElement } from 'react';
 import { asset } from '@/lib/asset';
+import { DOCS_BASE_PATH } from '@/lib/base-path';
 import {
   KeyRound,
   ShieldCheck,
@@ -44,7 +45,7 @@ const lucideIconMap: Record<string, ComponentType<{ size?: number; className?: s
 
 export const source = loader({
   source: docs.toFumadocsSource(),
-  baseUrl: '/docs',
+  baseUrl: DOCS_BASE_PATH,
   icon(name) {
     if (!name) return;
     if (name in imgIconMap) {

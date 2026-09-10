@@ -22,12 +22,14 @@ const ssrStubScalar: Plugin = {
   },
 };
 
-// Must match the `basename` in react-router.config.ts — the React Router Vite
-// plugin requires `basename` to be a prefix of Vite's `base`.
-const previewBasename = process.env.PREVIEW_BASENAME;
+// Where this build is mounted as the browser sees it — see app/lib/base-path.ts.
+// Assets must carry the same prefix as pages, since GitHub Pages serves this
+// repo under a "/docs/" project-site prefix that applies to assets too.
+// The dev server keeps "/" so localhost doesn't need the prefix.
+const basePath = (process.env.VITE_DOCS_BASE_PATH ?? '/docs').replace(/\/+$/, '');
 
-export default defineConfig({
-  base: previewBasename ? `${previewBasename}/` : '/',
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? `${basePath}/` : '/',
   plugins: [
     ssrStubScalar,
     mdx(MdxConfig),
@@ -37,4 +39,4 @@ export default defineConfig({
       projects: ['./tsconfig.json'],
     }),
   ],
-});
+}));

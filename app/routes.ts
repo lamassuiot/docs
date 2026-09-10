@@ -1,9 +1,16 @@
-import { index, route, type RouteConfig } from '@react-router/dev/routes';
+import { index, type RouteConfig, route } from '@react-router/dev/routes';
+
+// Mount point for this build, without the leading slash — see app/lib/base-path.ts.
+// Read from process.env here because this config is loaded in Node, not bundled.
+const PREFIX = (process.env.VITE_DOCS_BASE_PATH ?? '/docs').replace(
+  /^\/+|\/+$/g,
+  '',
+);
 
 export default [
   index('routes/docs-home.tsx'),
-  route('docs', 'routes/docs-home.tsx', { id: 'docs-home-root' }),
-  route('docs/*', 'routes/docs.tsx'),
+  route(PREFIX, 'routes/docs-home.tsx', { id: 'docs-home-root' }),
+  route(`${PREFIX}/*`, 'routes/docs.tsx'),
   route('api/search', 'routes/search.ts'),
 
   // LLM integration:

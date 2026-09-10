@@ -30,40 +30,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # GitHub Pages serves this repo's gh-pages branch under a
-      # www.lamassu.io/docs/<branch-path> project-site prefix (this custom
-      # domain is shared with another repo's Pages site, which gets the
-      # domain root — verified empirically, not documented anywhere in this
-      # repo). That /docs/ prefix is added by GitHub outside our control and
-      # applies uniformly to every path on the branch, assets included. So
-      # what the browser actually requests (Vite's `base`) must include it,
-      # even though what we publish to gh-pages (DEST_PREFIX below) doesn't
-      # itself contain "docs" — GitHub supplies that part.
+      # One knob drives route paths, page URLs and asset URLs -- see
+      # app/lib/base-path.ts. The leading /docs is GitHub Pages' project-site
+      # prefix for this repo, stripped again when staging since GitHub re-adds it.
       - name: Build preview
         env:
-          PREVIEW_BASENAME: /docs/pr-preview/pr-${{ github.event.pull_request.number }}
+          VITE_DOCS_BASE_PATH: /docs/pr-preview/pr-${{ github.event.pull_request.number }}
         run: pnpm build
 
-      # Vite's `base` only rewrites the *references* in HTML/JS to the prefixed
-      # path — it doesn't relocate the physical output files, and React
-      # Router's `basename` physically nests prerendered pages under a
-      # directory matching PREVIEW_BASENAME (SRC_PREFIX below, including the
-      # "docs" segment above). Assemble a self-contained bundle at
-      # DEST_PREFIX — one level up, without that segment, since GitHub's own
-      # project-site prefix will supply it once this is published — combining
-      # those prerendered pages with the static assets, which Vite always
-      # writes at the build root regardless of `base`.
-      - name: Assemble self-contained preview bundle
-        run: |
-          set -euo pipefail
-          SRC_PREFIX="docs/pr-preview/pr-${{ github.event.pull_request.number }}"
-          DEST_PREFIX="pr-preview/pr-${{ github.event.pull_request.number }}"
-          OUT="publish/$DEST_PREFIX"
-          mkdir -p "$OUT"
-          cp -r "build/client/$SRC_PREFIX/." "$OUT/"
-          cp -r build/client/assets "$OUT/assets"
-          cp -r build/client/images "$OUT/images"
-          cp build/client/favicon.svg build/client/t.svg "$OUT/"
+      - name: Stage preview
+        run: scripts/stage-docs-deploy.sh "/docs/pr-preview/pr-${{ github.event.pull_request.number }}" publish
 
       # Publish additively into the shared gh-pages branch, under a path
       # ("pr-preview/pr-<n>/") that doesn't collide with anything else
@@ -103,7 +79,7 @@ jobs:
         run: |
           set -euo pipefail
           PR=${{ github.event.pull_request.number }}
-          URL="https://www.lamassu.io/docs/pr-preview/pr-$PR/docs/"
+          URL="https://www.lamassu.io/docs/pr-preview/pr-$PR/"
           MARKER="<!-- pr-preview-link -->"
           BODY="$(cat <<EOF
           $MARKER

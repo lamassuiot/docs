@@ -1,0 +1,109 @@
+name: PR preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Mounts the app under /pr-preview/pr-<n>/ instead of the domain root.
+      # See PREVIEW_BASENAME in vite.config.ts and react-router.config.ts.
+      - name: Build preview
+        env:
+          PREVIEW_BASENAME: /pr-preview/pr-${{ github.event.pull_request.number }}
+        run: pnpm build
+
+      # Vite's `base` only rewrites the *references* in HTML/JS to the prefixed
+      # path — it doesn't relocate the physical output files. Assemble a
+      # self-contained bundle by copying the static assets alongside the
+      # already-prefixed prerendered pages.
+      - name: Assemble self-contained preview bundle
+        run: |
+          set -euo pipefail
+          PREFIX="pr-preview/pr-${{ github.event.pull_request.number }}"
+          OUT="publish/$PREFIX"
+          mkdir -p "$OUT"
+          cp -r "build/client/$PREFIX/." "$OUT/"
+          cp -r build/client/assets "$OUT/assets"
+          cp -r build/client/images "$OUT/images"
+          cp build/client/favicon.svg build/client/t.svg "$OUT/"
+
+      # Publish additively into the shared gh-pages branch, under a path
+      # ("pr-preview/pr-<n>/") that doesn't collide with anything else
+      # currently on that branch. Only that one subdirectory is touched.
+      - name: Publish to gh-pages
+        run: |
+          set -euo pipefail
+          PREFIX="pr-preview/pr-${{ github.event.pull_request.number }}"
+          git fetch origin gh-pages
+          git worktree add /tmp/gh-pages origin/gh-pages
+          cd /tmp/gh-pages
+          git checkout -B gh-pages
+
+          for attempt in 1 2 3 4 5; do
+            rm -rf "$PREFIX"
+            mkdir -p "$PREFIX"
+            cp -r "$GITHUB_WORKSPACE/publish/$PREFIX/." "$PREFIX/"
+            git add "$PREFIX"
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "Preview for PR #${{ github.event.pull_request.number }}" --quiet || {
+              echo "Nothing changed, nothing to publish."
+              break
+            }
+            if git push origin gh-pages; then
+              break
+            fi
+            echo "Push rejected (concurrent preview build?), retrying ($attempt/5)..."
+            git reset --soft HEAD~1
+            git fetch origin gh-pages
+            git checkout -B gh-pages origin/gh-pages
+          done
+
+      - name: Comment preview link on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PR=${{ github.event.pull_request.number }}
+          URL="https://lamassuiot.github.io/docs/pr-preview/pr-$PR/docs/"
+          MARKER="<!-- pr-preview-link -->"
+          BODY="$(cat <<EOF
+          $MARKER
+          📖 **Preview:** $URL
+
+          Rebuilt on every push to this PR. May take a minute to appear after GitHub Pages picks up the \`gh-pages\` commit.
+
+          If \`www.lamassu.io/docs\` proxies from somewhere other than this repo's default Pages domain, the equivalent path there may not resolve the same way — use the \`lamassuiot.github.io\` link above to be sure.
+          EOF
+          )"
+          existing=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)
+          if [ -n "$existing" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/$existing" -X PATCH -f body="$BODY"
+          else
+            gh pr comment "$PR" --body "$BODY"
+          fi

@@ -10,10 +10,6 @@ import type { i as PageTreeRoot, n as PageTreeItem, r as PageTreeNode, t as Page
 import { baseOptions, gitConfig } from '@/lib/layout.shared';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { LLMCopyButton, ViewOptions } from '@/components/ai/page-actions';
-import { DiffToggle } from '@/components/diff-toggle';
-import { DiffPanel } from '@/components/diff-panel';
-import { useDiffMode } from '@/lib/diff-mode';
-import { getPageDiff } from '@/lib/pr-diffs';
 
 function splitBadgeTitle(title: string) {
   const match = /^\[([^\]]+)\]\s*(.+)$/.exec(title.trim());
@@ -243,9 +239,6 @@ const clientLoader = browserCollections.docs.createClientLoader({
     const markdownUrl = `/llms.mdx/docs/${[...slugs, 'index.mdx'].join('/')}`;
     const titleParts = splitBadgeTitle(frontmatter.title);
     const filteredToc = toc.filter((item) => item.depth !== 1);
-    const diffLines = getPageDiff(path);
-    // biome-ignore lint/correctness/useHookAtTopLevel: this component() callback is fumadocs' equivalent of a component body, called once per render like any other
-    const [diffMode, setDiffMode] = useDiffMode();
 
     return (
       <DocsPage
@@ -269,9 +262,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
             markdownUrl={markdownUrl}
             githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${path}`}
           />
-          {diffLines && diffLines.length > 0 && <DiffToggle enabled={diffMode} onToggle={setDiffMode} />}
         </div>
-        {diffMode && diffLines && diffLines.length > 0 && <DiffPanel lines={diffLines} />}
         <DocsBody className="[&>h1:first-child]:hidden">
           <Mdx components={{ ...defaultMdxComponents }} />
         </DocsBody>

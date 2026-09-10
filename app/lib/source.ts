@@ -1,6 +1,7 @@
 import { loader, type InferPageType } from 'fumadocs-core/source';
 import { docs } from 'fumadocs-mdx:collections/server';
 import { type ComponentType, createElement } from 'react';
+import { asset } from '@/lib/asset';
 import {
   KeyRound,
   ShieldCheck,
@@ -19,8 +20,8 @@ import {
 } from 'lucide-react';
 
 const imgIconMap: Record<string, string> = {
-  lamassu: '/images/lamassu.svg',
-  k8s: '/images/kubernetes.svg',
+  lamassu: asset('images/lamassu.svg'),
+  k8s: asset('images/kubernetes.svg'),
 };
 
 const lucideIconMap: Record<string, ComponentType<{ size?: number; className?: string }>> = {

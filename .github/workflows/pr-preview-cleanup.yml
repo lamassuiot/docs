@@ -1,0 +1,43 @@
+name: PR preview cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove preview from gh-pages
+        run: |
+          set -euo pipefail
+          PREFIX="pr-preview/pr-${{ github.event.pull_request.number }}"
+          git fetch origin gh-pages
+          git worktree add /tmp/gh-pages origin/gh-pages
+          cd /tmp/gh-pages
+          git checkout -B gh-pages
+
+          for attempt in 1 2 3 4 5; do
+            if [ ! -d "$PREFIX" ]; then
+              echo "Nothing to remove."
+              break
+            fi
+            git rm -r --quiet "$PREFIX"
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "Remove preview for PR #${{ github.event.pull_request.number }}" --quiet
+            if git push origin gh-pages; then
+              break
+            fi
+            echo "Push rejected (concurrent preview build?), retrying ($attempt/5)..."
+            git fetch origin gh-pages
+            git checkout -B gh-pages origin/gh-pages
+          done

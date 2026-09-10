@@ -4,8 +4,13 @@ import { createGetUrl, getSlugs } from 'fumadocs-core/source';
 
 const getUrl = createGetUrl('/docs');
 
+// Set by CI to mount a PR preview build under a non-root path, e.g. "/pr-preview/pr-42".
+// Leave unset for the production build, which is served at the domain root.
+const basename = process.env.PREVIEW_BASENAME || '/';
+
 export default {
   ssr: false,
+  basename,
   future: {
     v8_middleware: true,
   },

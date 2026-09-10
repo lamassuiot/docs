@@ -22,7 +22,12 @@ const ssrStubScalar: Plugin = {
   },
 };
 
+// Must match the `basename` in react-router.config.ts — the React Router Vite
+// plugin requires `basename` to be a prefix of Vite's `base`.
+const previewBasename = process.env.PREVIEW_BASENAME;
+
 export default defineConfig({
+  base: previewBasename ? `${previewBasename}/` : '/',
   plugins: [
     ssrStubScalar,
     mdx(MdxConfig),

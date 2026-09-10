@@ -1,0 +1,2368 @@
+# AWS EC2 · AWS Marketplace (/docs/despliegue/cloud)
+
+
+
+Despliegue en AWS EC2 – AWS Marketplace [#despliegue-en-aws-ec2--aws-marketplace]
+
+Lamassu IoT está disponible en **AWS Marketplace**, lo que permite lanzar una instancia preconfigurada en AWS EC2 con un único clic.
+
+Pasos [#pasos]
+
+1. Acceder a la página del producto de [Lamassu IoT en AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-fyfailowg3ewc)
+2. Seleccionar el tipo de instancia recomendado (`t3.large` o superior)
+3. Configurar el grupo de seguridad: puertos `443`, `8443` y `9443`
+4. Lanzar la instancia y acceder a la consola de administración en `https://<ip-publica>`
+
+Requisitos de infraestructura [#requisitos-de-infraestructura]
+
+* Instancia EC2 `t3.large` mínimo (recomendado `t3.xlarge`)
+* EBS `gp3` de al menos 50 GB
+* Security Group con acceso HTTPS desde los dispositivos IoT
+
+
+# Despliegue Lamassu IoT (/docs/despliegue)
+
+
+
+Bienvenido a la guía de **Despliegue de Lamassu IoT**. Selecciona la modalidad que mejor se adapta a tu infraestructura.
+
+OnPrem & SelfManaged · Kubernetes [#onprem--selfmanaged--kubernetes]
+
+<Cards>
+  <Card title="Introducción" description="Requisitos y arquitectura para despliegue en Kubernetes propio" href="/docs/despliegue/onprem" />
+
+  <Card title="Fastlane" description="Despliegue rápido y automatizado con el script Fastlane" href="/docs/despliegue/onprem/fastlane" />
+</Cards>
+
+Cloud · AWS EC2 · AWS Marketplace [#cloud--aws-ec2--aws-marketplace]
+
+<Cards>
+  <Card title="AWS EC2 · AWS Marketplace" description="Lanza Lamassu IoT en AWS con un clic desde el Marketplace" href="/docs/despliegue/cloud" />
+</Cards>
+
+SaaS · Basada en suscripción [#saas--basada-en-suscripción]
+
+<Cards>
+  <Card title="SaaS · Suscripción" description="Plataforma totalmente gestionada por LKS Next, sin infraestructura propia" href="/docs/despliegue/saas" />
+</Cards>
+
+
+# Fastlane (/docs/despliegue/onprem/fastlane)
+
+
+
+Fastlane - Despliegue automatizado en Kubernetes [#fastlane---despliegue-automatizado-en-kubernetes]
+
+Esta sección documenta el script `scripts/lamassu-fast-lane.sh`, cuyo objetivo es desplegar de forma automatizada una pila completa de Lamassu PKI sobre un clúster Kubernetes ya existente, con intervención manual mínima.
+
+La instalación incluye:
+
+* PostgreSQL
+* Keycloak
+* RabbitMQ
+* Chart Helm de Lamassu
+
+Flags de línea de comandos [#flags-de-línea-de-comandos]
+
+Todos los parámetros son procesados por la función `process_flags`.
+
+| Flag                       | Valor por defecto | Descripción                                             |
+| -------------------------- | ----------------- | ------------------------------------------------------- |
+| `-h`, `--help`             | -                 | Muestra la ayuda y finaliza                             |
+| `-n`, `--non-interactive`  | `false`           | Omite prompts y genera/usa credenciales por defecto     |
+| `-ns`, `--namespace`       | `lamassu-dev`     | Namespace Kubernetes donde se despliegan los recursos   |
+| `-d`, `--domain`           | `dev.lamassu.io`  | Dominio usado para endpoint y certificados TLS          |
+| `-v`, `--version`          | `latest`          | Versión del chart Helm de Lamassu                       |
+| `--https-port`             | `443`             | Puerto HTTPS del gateway                                |
+| `--http-port`              | `80`              | Puerto HTTP del gateway                                 |
+| `--offline`                | `false`           | Activa modo offline                                     |
+| `--tls-crt`                | -                 | Ruta al certificado TLS (PEM)                           |
+| `--tls-key`                | -                 | Ruta a la clave privada TLS (PEM)                       |
+| `--helm-chart-lamassu`     | -                 | Ruta a chart local Lamassu (`.tgz`)                     |
+| `--helm-chart-postgres`    | -                 | Ruta a chart local PostgreSQL (`.tgz`)                  |
+| `--helm-chart-keycloak`    | -                 | Ruta a chart local Keycloak (`.tgz`)                    |
+| `--helm-chart-rabbitmq`    | -                 | Ruta a chart local RabbitMQ (`.tgz`)                    |
+| `-l`, `--local-chart-path` | -                 | Ruta a directorio local descomprimido del chart Lamassu |
+
+Detección de distribución Kubernetes [#detección-de-distribución-kubernetes]
+
+La función `detect_distribution` identifica la distribución con el siguiente orden de prioridad:
+
+1. `microk8s`
+2. `k3s`
+3. `kind`
+4. Kubernetes estándar
+
+Comportamientos específicos:
+
+* En `microk8s`, los comandos se ejecutan con prefijos `microk8s kubectl` y `microk8s helm`.
+* En `kind`, el script muestra una advertencia de uso exclusivo para pruebas.
+
+Verificación de dependencias [#verificación-de-dependencias]
+
+La función `check_dependencies` valida prerequisitos según la distribución detectada.
+
+Requisitos generales:
+
+* `yq`
+* CLI de la distribución detectada
+
+Requisitos específicos:
+
+| Distribución | Herramientas requeridas             |
+| ------------ | ----------------------------------- |
+| `k3s`        | `kubectl`, `helm`                   |
+| `microk8s`   | `microk8s kubectl`, `microk8s helm` |
+
+Addons obligatorios en MicroK8s [#addons-obligatorios-en-microk8s]
+
+Se valida que estén habilitados:
+
+* `helm`
+* `hostpath-storage`
+* `dns`
+* `cert-manager`
+
+También se verifica un release Helm de Envoy Gateway llamado `eg` en el namespace `envoy-gateway-system`.
+Si no existe, se instala automáticamente la versión `v1.3.0` y se crea un `GatewayClass` llamado `eg`.
+
+Modo interactivo vs no interactivo [#modo-interactivo-vs-no-interactivo]
+
+Modo interactivo (por defecto) [#modo-interactivo-por-defecto]
+
+La función `request_config_data` solicita:
+
+* Dominio Lamassu
+* Usuario y contraseña admin PostgreSQL
+* Usuario y contraseña admin RabbitMQ
+* Usuario y contraseña admin Keycloak
+* Namespace Kubernetes
+
+Modo no interactivo (-n) [#modo-no-interactivo--n]
+
+* Se generan credenciales aleatorias de 30 caracteres alfanuméricos.
+* Se usan valores por defecto para dominio y namespace, salvo que se sobrescriban con flags.
+
+Modo online vs offline [#modo-online-vs-offline]
+
+El script admite dos estrategias para obtener charts Helm.
+
+Modo online (por defecto) [#modo-online-por-defecto]
+
+Los charts se descargan desde repositorios remotos.
+
+Modo offline [#modo-offline]
+
+Requiere obligatoriamente rutas a los cuatro charts:
+
+* `--helm-chart-lamassu`
+* `--helm-chart-postgres`
+* `--helm-chart-keycloak`
+* `--helm-chart-rabbitmq`
+
+Si falta cualquiera de ellos, el script finaliza con error.
+
+En este modo se fuerza:
+
+```bash
+imagePullPolicy: Never
+```
+
+Instalación de componentes [#instalación-de-componentes]
+
+PostgreSQL (install_postgresql) [#postgresql-install_postgresql]
+
+* Chart: `oci://registry-1.docker.io/cloudpirates/postgres`
+* Versión del chart: `0.19.0`
+* Release: `postgres`
+* `fullnameOverride: "postgresql"`
+
+Se crea un script SQL de inicialización con estas bases de datos:
+
+| Base de datos   | Servicio       |
+| --------------- | -------------- |
+| `auth`          | Keycloak       |
+| `alerts`        | Alerts         |
+| `ca`            | CA             |
+| `va`            | VA             |
+| `cloudproxy`    | Cloud Proxy    |
+| `devicemanager` | Device Manager |
+| `dmsmanager`    | DMS Manager    |
+| `kms`           | KMS            |
+
+Keycloak (install_keycloak) [#keycloak-install_keycloak]
+
+* Chart: `oci://registry-1.docker.io/cloudpirates/keycloak`
+* Versión del chart: `0.20.0`
+* Release: `auth`
+* Uso de base de datos externa: `postgresql:5432/auth`
+* Imagen de Keycloak fijada en `keycloak/keycloak:26.6.0`
+* `httpRelativePath: /auth/`
+* `proxyHeaders: xforwarded`
+
+Configuración automática del realm `lamassu`:
+
+* Rol: `pki-admin`
+* Usuario inicial: `lamassu` / `lamassu` (cambio obligatorio)
+* Cliente público: `frontend` con `/*` en redirect URIs
+
+En modo online se descarga automáticamente un tema personalizado desde:
+
+* `github.com/lamassuiot/keycloak-theme`
+
+RabbitMQ (install_rabbitmq) [#rabbitmq-install_rabbitmq]
+
+* Chart: `oci://registry-1.docker.io/cloudpirates/rabbitmq`
+* Versión del chart: `0.20.0`
+* Release: `rabbitmq`
+* `fullnameOverride: "rabbitmq"`
+* Credenciales inyectadas dinámicamente mediante `yq`
+
+Lamassu (install_lamassu) [#lamassu-install_lamassu]
+
+Se genera un archivo `lamassu.yaml` que se pasa a `helm install`.
+
+Configuraciones principales:
+
+* PostgreSQL: host `postgresql`, puerto `5432`
+* AMQP: host `rabbitmq`, puerto `5672`, TLS deshabilitado
+* OIDC JWKS:
+  `http://auth-keycloak.<NAMESPACE>/auth/realms/lamassu/protocol/openid-connect/certs`
+* Ruta adicional de gateway: `/auth -> auth-keycloak:8080`
+* Direcciones de gateway: IP(s) obtenidas con `hostname -I`
+* Puertos de gateway: desde `--https-port` y `--http-port`
+* Dominios CA: valor de `--domain`
+
+Cuando se ejecuta en modo online y no se usa `--local-chart-path`, el script añade el repositorio Helm:
+
+```bash
+helm repo add lamassuiot http://www.lamassu.io/lamassu-helm/
+```
+
+Después instala el release `lamassu` usando la versión indicada por `--version` si se ha proporcionado.
+
+Si `--https-port` es distinto de `443`, el puerto se añade al dominio antes de escribirlo en `values`.
+
+Configuración TLS [#configuración-tls]
+
+Certificado externo [#certificado-externo]
+
+Si se proporcionan:
+
+* `--tls-crt`
+* `--tls-key`
+
+Se crea un secret Kubernetes:
+
+* `downstream-provided-crt`
+
+Y se configura:
+
+```yaml
+tls:
+  type: external
+  externalOptions:
+    secretName: downstream-provided-crt
+```
+
+Certificado gestionado por cert-manager [#certificado-gestionado-por-cert-manager]
+
+Si no se proporciona certificado:
+
+```yaml
+tls:
+  type: certManager
+```
+
+Además, el script crea un `Issuer` self-signed y el recurso `Certificate`.
+
+Si el usuario quiere reutilizar un `Issuer` o `ClusterIssuer` corporativo, ese flujo no lo automatiza Fastlane; en ese caso es preferible un despliegue manual del chart con un archivo `values.yaml` propio.
+
+Salida tras la instalación [#salida-tras-la-instalación]
+
+En caso de éxito, se muestra:
+
+* URL de Lamassu UI: `https://<DOMAIN>`
+* Credenciales iniciales: `lamassu / lamassu`
+* Consola Keycloak: `https://<DOMAIN>/auth/admin`
+* Credenciales admin de Keycloak
+
+El usuario `lamassu` se crea con:
+
+```yaml
+requiredActions: [UPDATE_PASSWORD]
+```
+
+Por tanto, debe cambiar contraseña en el primer acceso.
+
+Uso en CI [#uso-en-ci]
+
+El script está pensado también para validaciones rápidas y smoke tests locales. Tras la instalación puede ejecutarse:
+
+```bash
+helm test lamassu -n <namespace>
+```
+
+El chart incluye una prueba que valida conectividad contra `ca`, `dms-manager`, `device-manager`, `va` y `ui`.
+
+Ejemplo:
+
+```bash
+./scripts/lamassu-fast-lane.sh -n -ns lamassu-ci -d ci.lamassu.io -l ./charts/lamassu
+```
+
+En este escenario:
+
+* `-n`: modo no interactivo
+* `-ns`: namespace específico
+* `-d`: dominio de CI
+* `-l`: chart local
+
+Ejemplo rápido [#ejemplo-rápido]
+
+```bash
+./scripts/lamassu-fast-lane.sh \
+  -n \
+  -ns lamassu-dev \
+  -d dev.lamassu.io \
+  -l ./charts/lamassu
+```
+
+Resumen [#resumen]
+
+`lamassu-fast-lane.sh` proporciona un mecanismo totalmente automatizado para desplegar un entorno Lamassu funcional en Kubernetes en pocos minutos, integrando base de datos, autenticación, mensajería, gateway y TLS.
+
+Está optimizado para rapidez, reproducibilidad y uso en entornos no productivos, con soporte para escenarios offline y pipelines de CI.
+
+
+# Introducción (/docs/despliegue/onprem)
+
+
+
+Despliegue OnPrem con Kubernetes [#despliegue-onprem-con-kubernetes]
+
+Lamassu IoT puede desplegarse en infraestructura propia mediante **Kubernetes**, tanto en clústeres gestionados internamente como en entornos self-managed.
+
+La referencia principal para este despliegue es el repositorio `lamassu-helm`, que incluye:
+
+* el chart principal de Lamassu
+* un chart auxiliar de SoftHSM
+* el script de despliegue automatizado `scripts/lamassu-fast-lane.sh`
+
+Quickstart [#quickstart]
+
+Si lo que necesitas es levantar un entorno funcional lo antes posible, la vía más rápida es usar Fastlane desde el repositorio `lamassu-helm`:
+
+```bash
+git clone https://github.com/lamassuiot/lamassu-helm.git
+cd lamassu-helm
+./scripts/lamassu-fast-lane.sh -n -ns lamassu-dev -d dev.lamassu.io -l ./charts/lamassu
+```
+
+Ese flujo:
+
+* crea o reutiliza el namespace indicado
+* instala PostgreSQL, Keycloak y RabbitMQ
+* despliega el chart de Lamassu
+* deja la UI expuesta en `https://<dominio>`
+
+Si buscas un despliegue productivo o más controlado, sigue con la instalación manual mediante Helm que se describe más abajo.
+
+Qué se despliega [#qué-se-despliega]
+
+El chart principal `charts/lamassu`, actualmente en la serie `3.7.x`, despliega estos componentes:
+
+* `ui`
+* `ca`
+* `va`
+* `kms`
+* `device-manager`
+* `dms-manager`
+* `alerts`
+* recursos de Gateway API y políticas de Envoy Gateway
+* job de migraciones de base de datos
+
+Requisitos previos [#requisitos-previos]
+
+* Clúster Kubernetes `1.19+`
+* `kubectl` configurado con acceso al clúster
+* Helm `3.2.0+`
+* `cert-manager 1.14+` para la gestión de certificados cuando se usa `tls.type=certManager`
+* `Envoy Gateway 1.3.0+`, ya que el chart publica servicios mediante Gateway API y no mediante Ingress
+* Acceso a un registro de contenedores o imágenes previamente importadas si se trabaja en modo offline
+* Almacenamiento persistente disponible para PostgreSQL, RabbitMQ, VA y KMS
+
+Opciones de despliegue [#opciones-de-despliegue]
+
+Hay dos formas de desplegar Lamassu on-prem:
+
+1. Despliegue manual con Helm [#1-despliegue-manual-con-helm]
+
+Es la opción recomendada para entornos productivos o controlados, donde PostgreSQL, RabbitMQ, Keycloak, certificados y direccionamiento del Gateway ya están definidos por el equipo de plataforma.
+
+2. Despliegue automatizado con Fastlane [#2-despliegue-automatizado-con-fastlane]
+
+Es la opción más útil para pruebas, demos, CI o bootstrap rápido de un entorno. Fastlane levanta PostgreSQL, Keycloak, RabbitMQ y Lamassu en un único flujo. Su comportamiento está documentado en la página siguiente.
+
+Arquitectura [#arquitectura]
+
+Lamassu IoT se despliega como un conjunto de microservicios Kubernetes independientes. El chart principal crea `Deployment`, `StatefulSet`, `Service`, `ConfigMap`, `HTTPRoute`, `Gateway`, certificados y recursos auxiliares según los valores definidos.
+
+Dependencias externas requeridas por el chart principal:
+
+* PostgreSQL
+* RabbitMQ
+* proveedor OIDC, típicamente Keycloak
+
+El chart no instala estas dependencias por sí solo. Para un despliegue manual hay que provisionarlas antes. Si se busca un entorno funcional rápido para laboratorio o validación, el script Fastlane sí instala PostgreSQL, RabbitMQ y Keycloak además del chart de Lamassu.
+
+Instalación manual con Helm [#instalación-manual-con-helm]
+
+Agregar el repositorio Helm:
+
+```bash
+helm repo add lamassu https://lamassuiot.github.io/lamassu-helm
+helm repo update
+```
+
+O instalar desde una copia local del repositorio:
+
+```bash
+helm install lamassu ./charts/lamassu -n lamassu --create-namespace -f values.yaml
+```
+
+Valores mínimos que deben definirse [#valores-mínimos-que-deben-definirse]
+
+Los valores por defecto del chart son deliberadamente incompletos para dependencias externas. Como mínimo, un despliegue manual debe definir:
+
+* `postgres.hostname`, `postgres.username`, `postgres.password`
+* `amqp.hostname`, `amqp.username`, `amqp.password`
+* `auth.oidc.frontend.authority`
+* `auth.oidc.apiGateway.jwks`
+* `services.ca.domains`
+* `gateway.addresses` o una estrategia equivalente de publicación según el clúster
+* `tls.*` según se use `certManager` o certificado externo
+
+Ejemplo base:
+
+```yaml
+postgres:
+  hostname: postgresql
+  port: 5432
+  username: lamassu
+  password: change-me
+
+amqp:
+  hostname: rabbitmq
+  port: 5672
+  username: lamassu
+  password: change-me
+  tls: false
+
+tls:
+  type: certManager
+  certManagerOptions:
+    issuer: downstream-ca-selfsigned-issuer
+    certSpec:
+      commonName: pki.example.internal
+      hostnames:
+        - pki.example.internal
+      addresses:
+        - 10.0.0.20
+
+gateway:
+  addresses:
+    - 10.0.0.20
+  ports:
+    http: 80
+    https: 443
+  extraRouting:
+    - path: /auth
+      name: auth
+      target:
+        host: auth-keycloak
+        port: 8080
+
+auth:
+  oidc:
+    frontend:
+      clientId: frontend
+      authority: https://pki.example.internal/auth/realms/lamassu
+    apiGateway:
+      jwks:
+        - name: oidc-authn
+          uri: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+
+services:
+  ca:
+    domains:
+      - pki.example.internal
+```
+
+Áreas de configuración más relevantes [#áreas-de-configuración-más-relevantes]
+
+| Área          | Valores clave                                                            | Uso                                            |
+| ------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| TLS           | `tls.type`, `tls.certManagerOptions.*`, `tls.externalOptions.secretName` | Certificado downstream del Gateway             |
+| Gateway       | `gateway.addresses`, `gateway.ports.*`, `gateway.extraRouting`           | Exposición de UI y APIs vía Envoy Gateway      |
+| Base de datos | `postgres.*`                                                             | Conexión a PostgreSQL externa                  |
+| Mensajería    | `amqp.*`                                                                 | Conexión a RabbitMQ                            |
+| OIDC          | `auth.oidc.frontend.*`, `auth.oidc.apiGateway.jwks`                      | Login de UI y validación JWT en el Gateway     |
+| CA            | `services.ca.domains`                                                    | Dominios autorizados para CA y certificados    |
+| KMS           | `services.kms.cryptoEngines.*`                                           | Motor criptográfico y almacenamiento de claves |
+| Alerts        | `services.alerts.smtp_server.*`                                          | Envío de correo para alertas                   |
+
+Verificación del despliegue [#verificación-del-despliegue]
+
+El chart incluye una prueba Helm en `charts/lamassu/templates/tests/test-connections.yml`. Tras instalarlo, puede validarse con:
+
+```bash
+helm test lamassu -n lamassu
+```
+
+La prueba comprueba al menos:
+
+* salud de `ca`
+* salud de `dms-manager`
+* salud de `device-manager`
+* salud de `va`
+* respuesta HTML esperada del servicio `ui`
+
+Repositorio Helm [#repositorio-helm]
+
+El repositorio `lamassu-helm` está organizado en tres bloques principales:
+
+* `charts/lamassu`: chart principal de Lamassu
+* `charts/softhsm`: chart opcional para laboratorios o escenarios de integración con PKCS#11 emulado
+* `scripts/lamassu-fast-lane.sh`: automatización para levantar dependencias y desplegar Lamassu con intervención mínima
+
+SoftHSM como complemento opcional [#softhsm-como-complemento-opcional]
+
+El chart `charts/softhsm` no forma parte del despliegue estándar, pero resulta útil en entornos de laboratorio cuando se necesita simular un HSM compatible con PKCS#11. No sustituye al backend KMS principal; sirve como soporte para pruebas o integraciones concretas.
+
+Versionado y migraciones [#versionado-y-migraciones]
+
+La serie actual del chart principal es `3.7.x`. Para upgrades entre versiones, el repositorio incluye guías específicas en `charts/lamassu/CHANGELOG/`, especialmente en cambios importantes como la adopción de Envoy Gateway o la introducción del servicio KMS.
+
+
+# SaaS · Suscripción (/docs/despliegue/saas)
+
+
+
+Lamassu IoT SaaS – Basada en suscripción [#lamassu-iot-saas--basada-en-suscripción]
+
+La modalidad **SaaS** de Lamassu IoT ofrece acceso completo a la plataforma como servicio totalmente gestionado por LKS Next, sin necesidad de gestionar infraestructura propia.
+
+¿Qué incluye la suscripción? [#qué-incluye-la-suscripción]
+
+* Acceso a la plataforma Lamassu IoT completamente gestionada
+* Alta disponibilidad y backups automáticos
+* Actualizaciones automáticas a las últimas versiones
+* Soporte técnico incluido
+* SLA garantizado
+
+Planes disponibles [#planes-disponibles]
+
+| Plan         | Dispositivos | Soporte      | SLA    |
+| ------------ | ------------ | ------------ | ------ |
+| Starter      | Hasta 1.000  | Email        | 99,5%  |
+| Professional | Hasta 10.000 | Email + Chat | 99,9%  |
+| Enterprise   | Ilimitado    | Dedicado     | 99,99% |
+
+Contacto [#contacto]
+
+Para suscribirte o solicitar una demo, contacta con el equipo de Lamassu IoT a través de [lamassu.io](https://lamassu.io).
+
+
+# Manual de Usuario (/docs/manual)
+
+
+
+Bienvenido al **Manual de Usuario de Lamassu IoT**. Esta documentación cubre todas las funcionalidades de la plataforma para la gestión de identidades digitales en entornos IoT industriales.
+
+Servicios Core [#servicios-core]
+
+<Cards>
+  <Card title="Gestión de Claves (KMS)" description="Motores criptográficos, generación e importación de claves" href="/docs/manual/servicios-core/kms" />
+
+  <Card title="Entidades de Confianza (CAs)" description="Creación, importación y gestión de Autoridades de Certificación" href="/docs/manual/servicios-core/cas" />
+
+  <Card title="Gestión de Certificados" description="Visualización y revocación de certificados emitidos" href="/docs/manual/servicios-core/certificates" />
+
+  <Card title="Validación de Certificados (VA)" description="Servicios OCSP y CRL" href="/docs/manual/servicios-core/validation" />
+
+  <Card title="Registration Authority (RA)" description="Automatización del ciclo de vida de certificados y protocolo EST" href="/docs/manual/servicios-core/ra" />
+
+  <Card title="Dispositivos e Identidades" description="Gestión de End Entities y ciclo de vida de dispositivos IoT" href="/docs/manual/servicios-core/devices" />
+
+  <Card title="Alertas y Suscripciones" description="Monitorización de eventos y notificaciones" href="/docs/manual/servicios-core/alerts" />
+</Cards>
+
+Integraciones con terceros [#integraciones-con-terceros]
+
+<Cards>
+  <Card title="Integración AWS IoT Core" description="Aprovisionamiento de dispositivos en AWS IoT Core" href="/docs/manual/integraciones/aws" />
+</Cards>
+
+
+# Integración con AWS IoT Core (/docs/manual/integraciones/aws)
+
+
+
+La integración de Lamassu con AWS IoT Core cubre el puente entre la PKI gestionada por Lamassu y la plataforma de conectividad de AWS. Cuando un dispositivo obtiene su certificado a través del proceso de enrolamiento EST, el conector se encarga de que ese certificado y la identidad asociada sean reconocidos en AWS IoT Core sin intervención manual. El resultado es que el dispositivo puede autenticarse directamente en AWS con el mismo certificado X.509 que Lamassu emitió.
+
+Desde el punto de vista del protocolo, el dispositivo se autentica ante AWS IoT Core mediante TLS mutuo (mTLS): presenta su certificado X.509 emitido por Lamassu como certificado de cliente, y AWS IoT Core verifica la cadena de certificados hasta llegar a la CA registrada en la cuenta. Lamassu actúa como autoridad de certificación (CA); el conector se encarga de que esa CA esté registrada en AWS y de que el certificado del dispositivo sea conocido por la plataforma antes de que el dispositivo intente conectarse (en modo `auto`) o en su primera conexión (en modo JITP).
+
+Este documento está dirigido tanto al administrador PKI, que necesita configurar el conector y registrar las CAs, como al desarrollador de firmware de dispositivos, que necesita entender cómo se nombran los Things, cómo funciona el Device Shadow y qué ocurre cuando un certificado se revoca. Para el desarrollador de firmware, el dato más importante es que el **nombre del Thing en AWS (ThingName) corresponde siempre al Common Name (CN) del certificado emitido por Lamassu**, independientemente del modo de aprovisionamiento.
+
+Arquitectura del conector [#arquitectura-del-conector]
+
+El conector de AWS IoT Core es un proceso Go independiente, un binario o contenedor separado del núcleo de Lamassu. En un despliegue monolítico se compila por defecto (etiqueta de compilación `!noaws`) y se activa mediante `aws_iot_manager.enabled: true` en el fichero de configuración. En despliegues distribuidos, se ejecuta como un contenedor propio con acceso a los servicios de CA, DMS Manager y Device Manager de Lamassu a través de HTTP.
+
+El conector no sondea los servicios de Lamassu periódicamente. En su lugar, **se suscribe al bus de eventos interno** de Lamassu (AMQP o AWS SQS/SNS, configurable) y reacciona a los eventos que le interesan: creación o actualización de CAs, creación o actualización de DMS, vinculación de identidad de dispositivo, cambio de estado de certificado, actualización de metadatos de certificado y actualización de metadatos de dispositivo. Este modelo orientado a eventos garantiza que la sincronización con AWS sea casi inmediata y no genere carga de sondeo.
+
+Para evitar bucles infinitos, el conector ignora cualquier evento cuyo campo `source` de CloudEvent coincida con su propia URI de origen. Esto previene que las escrituras de metadatos que el propio conector realiza vuelvan a disparar el mismo flujo.
+
+Cuando se ejecutan varios conectores en paralelo, por ejemplo, para distintas cuentas de AWS, cada instancia tiene su propio `connector_id`. Todos los metadatos que el conector escribe en Lamassu se almacenan bajo la clave `lamassu.io/iot/{connector_id}`, lo que permite coexistencia sin colisiones.
+
+Prerrequisitos [#prerrequisitos]
+
+Antes de activar el conector es necesario disponer de una cuenta AWS con los permisos IAM adecuados y tener el conector correctamente configurado. El proceso de despliegue (Docker Compose, Kubernetes o binario) se describe en la [documentación de despliegue](/docs/despliegue).
+
+Permisos IAM necesarios [#permisos-iam-necesarios]
+
+La identidad IAM con la que opera el conector debe tener al mínimo los siguientes permisos sobre los recursos de la cuenta destino:
+
+| Acción IAM                                             | Propósito                                                                   |
+| ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `iot:GetRegistrationCode`                              | Obtener el código de verificación para el registro de CA en Primary Account |
+| `iot:RegisterCACertificate`                            | Registrar la CA en AWS IoT                                                  |
+| `iot:DescribeCACertificate`                            | Consultar el estado del registro de la CA                                   |
+| `iot:CreateThing` / `iot:UpdateThing`                  | Crear o actualizar Things en IoT Core                                       |
+| `iot:RegisterThing`                                    | Aprovisionar Things mediante plantilla                                      |
+| `iot:RegisterCertificate`                              | Registrar certificados de dispositivo                                       |
+| `iot:UpdateCertificate`                                | Cambiar el estado de un certificado (ACTIVE / INACTIVE / REVOKED)           |
+| `iot:CreatePolicy` / `iot:AttachPolicy`                | Crear y adjuntar políticas IoT                                              |
+| `iot:CreateThingGroup` / `iot:AddThingToThingGroup`    | Gestionar grupos de Things                                                  |
+| `iot:CreateProvisioningTemplate`                       | Crear plantillas JITP                                                       |
+| `iotdata:GetThingShadow` / `iotdata:UpdateThingShadow` | Leer y escribir el Device Shadow                                            |
+
+Para el mecanismo de desconexión forzada tras revocación también se requiere acceso a la API del plano de datos de AWS IoT (`iot:Connect` con SigV4 sobre WebSocket), que se negocia de forma implícita con las credenciales del conector.
+
+Parámetros de configuración [#parámetros-de-configuración]
+
+| Parámetro                      | Tipo   | Requerido                     | Descripción                                                                                                                             |
+| ------------------------------ | ------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `connector_id`                 | string | Sí                            | Identificador único de esta instancia del conector. Se usa como espacio de nombres para los metadatos: `lamassu.io/iot/{connector_id}`. |
+| `aws_config.region`            | string | Sí                            | Región AWS donde opera el conector.                                                                                                     |
+| `aws_config.auth_method`       | string | Sí                            | Método de autenticación: `static`, `role` o vacío (cadena de credenciales por defecto del SDK).                                         |
+| `aws_config.access_key_id`     | string | Solo con `auth_method=static` | Clave de acceso AWS.                                                                                                                    |
+| `aws_config.secret_access_key` | string | Solo con `auth_method=static` | Clave secreta AWS.                                                                                                                      |
+| `aws_config.session_token`     | string | No                            | Token de sesión (con `auth_method=static`).                                                                                             |
+| `aws_config.role_arn`          | string | Solo con `auth_method=role`   | ARN del rol a asumir.                                                                                                                   |
+| `aws_config.endpoint_url`      | string | No                            | URL alternativa para todos los servicios AWS (útil con LocalStack en pruebas).                                                          |
+| `subscriber_event_bus`         | objeto | Sí                            | Configuración del bus de eventos al que se suscribe el conector (AMQP o AWS SQS/SNS).                                                   |
+| `dms_manager_client`           | string | Sí                            | URL HTTP del servicio DMS Manager de Lamassu.                                                                                           |
+| `device_manager_client`        | string | Sí                            | URL HTTP del Device Manager de Lamassu.                                                                                                 |
+| `ca_client`                    | string | Sí                            | URL HTTP del servicio de CA de Lamassu.                                                                                                 |
+
+Registro de la CA en AWS IoT Core [#registro-de-la-ca-en-aws-iot-core]
+
+Para que los dispositivos puedan autenticarse en AWS IoT Core con certificados emitidos por una CA de Lamassu, esa CA debe registrarse previamente en la cuenta AWS. El conector gestiona este registro de forma automática en respuesta a los eventos `EventCreateCAKey`, `EventImportCAKey` y `EventUpdateCAMetadataKey`, pero la operación **solo se dispara cuando el administrador la solicita explícitamente** mediante el campo de metadatos de la CA.
+
+Cómo solicitar el registro [#cómo-solicitar-el-registro]
+
+El registro se desencadena estableciendo el valor `registration.status = "REQUESTED"` en la clave `lamassu.io/iot/{connector_id}` de los metadatos de la CA. Esto puede hacerse desde la consola de Lamassu en la sección de gestión de la CA o mediante la API.
+
+Una vez recibido el evento, el conector intenta registrar la CA en AWS y actualiza el campo `registration.status` en los metadatos de la CA con el resultado: `"SUCCEEDED"` si el registro fue correcto, o `"FAILED"` acompañado de un mensaje de error en caso contrario. El proceso es asíncrono, por lo que es necesario consultar periódicamente el estado de los metadatos hasta que la operación concluya.
+
+Primary Account [#primary-account]
+
+Cuando el parámetro `primary_account` es `true`, el conector ejecuta el flujo completo de registro con verificación de posesión de clave privada:
+
+1. Llama a `iot:GetRegistrationCode` para obtener el código de verificación de AWS.
+2. El conector genera internamente un par de claves RSA-2048 efímero y construye un CSR cuyo Common Name es exactamente ese código de registro. A continuación llama al servicio de firma de Lamassu para que la CA registrada emita un certificado de verificación X.509 real firmando ese CSR. La clave privada efímera se usa únicamente para este propósito y no se almacena ni se envía a AWS.
+3. Envía a AWS la CA (en PEM) y el certificado de verificación mediante `iot:RegisterCACertificate`, activando el registro con `AllowAutoRegistration: true`.
+
+Solo una cuenta puede ser propietaria de una CA en una región AWS dada. Si la CA ya está registrada con el mismo número de serie, el conector omite el paso silenciosamente.
+
+Los tags que AWS IoT Core aplica al certificado de CA registrado son `LMS.CA.ID`, `LMS.CA.SN` y `LMS.CA.CN`.
+
+Secondary Account (SNI-only) [#secondary-account-sni-only]
+
+Cuando `primary_account` es `false`, el conector registra la CA usando el modo `CertificateMode: SNI_ONLY`. Este modo no requiere código de verificación ni acceso a la clave privada de la CA, por lo que es la opción adecuada cuando la CA se gestiona desde otra cuenta de AWS o cuando el administrador no dispone de la clave privada. Es el método habitual para registrar la misma CA en varias cuentas de AWS simultáneamente.
+
+Configuración del DMS [#configuración-del-dms]
+
+Cada DMS que participe en la integración con AWS IoT Core debe tener configurada la clave de metadatos `lamassu.io/iot/{connector_id}`. El campo más importante de esa configuración es `registration_mode`, que determina cómo se aprovisionan los dispositivos en AWS.
+
+Existen tres modos de registro, y la elección entre ellos depende de la estrategia de aprovisionamiento de la flota.
+
+Modo none [#modo-none]
+
+En este modo el conector **no crea Things, grupos ni políticas** en AWS IoT Core. Se limita a sincronizar el estado de los certificados (activo, revocado, suspendido) a medida que cambian en Lamassu. Es el modo adecuado cuando el aprovisionamiento de Things en AWS se gestiona por un sistema externo y solo se necesita que Lamassu mantenga el estado de los certificados actualizado.
+
+Modo auto [#modo-auto]
+
+El modo `auto` delega en Lamassu el aprovisionamiento completo del dispositivo en AWS en el momento del enrolamiento. Cuando el dispositivo completa con éxito su enrolamiento EST y Lamassu emite el evento `EventBindDeviceIdentityKey`, el conector ejecuta automáticamente la siguiente secuencia:
+
+1. Crea o actualiza las políticas IoT configuradas en el DMS.
+2. Crea el grupo raíz `LAMASSU` en la cuenta AWS (si no existe) y los grupos hijos configurados en el DMS como subgrupos de `LAMASSU`. Si los grupos ya existen, el error `ResourceAlreadyExistsException` se ignora, por lo que la operación es idempotente.
+3. Si el Thing ya existía en AWS IoT Core, el conector itera todos los certificados (principals) actualmente adjuntos a ese Thing y los marca como `REVOKED` en AWS, para garantizar que los certificados anteriores no puedan seguir siendo usados para autenticarse.
+4. Llama a `iot:RegisterThing` con una plantilla de aprovisionamiento de estilo CloudFormation que crea el Thing, registra el certificado del dispositivo (PEM del certificado del dispositivo y del certificado de la CA emisora) y adjunta las políticas configuradas.
+   Una vez completado el aprovisionamiento, el conector almacena el ARN del certificado resultante en los metadatos del certificado de Lamassu bajo la clave `lamassu.io/iot/{connector_id}` y marca el dispositivo como `Registered: true` en Device Manager.
+
+**El nombre del Thing en AWS es el Common Name (CN) del certificado del dispositivo.** Esta convención es fundamental para el desarrollador de firmware: el valor `/CN=` que el dispositivo incluye en su CSR al enrolarse se convierte en el ThingName con el que deberá identificarse en todas las operaciones MQTT contra AWS IoT Core.
+
+Modo jitp [#modo-jitp]
+
+El modo Just-In-Time Provisioning (JITP) delega el aprovisionamiento en AWS en lugar de hacerlo el conector directamente. Cuando el conector detecta que el DMS está en modo `jitp`, crea una plantilla de aprovisionamiento JITP en AWS IoT Core y la adjunta al certificado de CA registrado. Esta plantilla se crea o actualiza en el momento en que el DMS se crea o actualiza en Lamassu - no en el momento del enrolamiento del dispositivo. A partir de ese momento, cuando un dispositivo con un certificado emitido por esa CA se conecta por primera vez a AWS IoT Core, AWS ejecuta la plantilla automáticamente: crea el Thing, registra el certificado y lo activa.
+
+El nombre del Thing en la plantilla JITP se deriva de `AWS::IoT::Certificate::CommonName`, que corresponde al CN del certificado del dispositivo - la misma convención que el modo `auto`.
+
+Este modo requiere que se configure el campo `jitp_config.provisioning_role_arn` con el ARN de un rol IAM que AWS IoT Core pueda asumir para ejecutar la plantilla. Si no se configura, el conector utiliza el valor por defecto `arn:aws:iam::{account}:role/JITPRole` y registra un aviso en el log. El administrador debe asegurarse de que ese rol existe en la cuenta y tiene los permisos necesarios antes de activar el modo JITP.
+
+Aprovisionamiento de dispositivos (modo automático) [#aprovisionamiento-de-dispositivos-modo-automático]
+
+Para el desarrollador de firmware, el modo `auto` es transparente: el dispositivo realiza su enrolamiento EST de la forma habitual y, como efecto secundario, queda aprovisionado en AWS IoT Core sin ningún paso adicional.
+
+El flujo completo desde el punto de vista del dispositivo es el siguiente:
+
+```bash
+# 1. El dispositivo genera su clave privada y su CSR con el CN que será su ThingName
+openssl ecparam -name prime256v1 -genkey -noout -out device.key
+openssl req -new -key device.key -sha256 -out device.csr \
+  -subj "/CN=mi-dispositivo-001/O=Acme/OU=IoT"
+
+# 2. El dispositivo se enrola en Lamassu vía EST
+openssl req -in device.csr -outform DER | base64 -w 0 > device.csr.b64
+curl -s --cacert lamassu-trust.pem \
+  --cert bootstrap.crt --key bootstrap.key \
+  -H "Content-Type: application/pkcs10" \
+  --data-binary "@device.csr.b64" \
+  "https://<EST_HOST>/.well-known/est/<DMS_ID>/simpleenroll" \
+  -o enroll.b64
+
+# 3. El dispositivo extrae su certificado
+base64 -d -i enroll.b64 | openssl pkcs7 -inform DER -print_certs -out device.crt
+
+# A partir de este punto, el conector crea automáticamente el Thing "mi-dispositivo-001"
+# en AWS IoT Core. El dispositivo puede conectarse a AWS con el mismo certificado.
+```
+
+Una vez que el conector completa el aprovisionamiento, el dispositivo puede conectarse al endpoint AWS IoT Core de MQTT usando su clave privada y el certificado emitido por Lamassu. El ThingName con el que debe identificarse en AWS es exactamente el CN del certificado.
+
+Aprovisionamiento de dispositivos (modo JITP) [#aprovisionamiento-de-dispositivos-modo-jitp]
+
+En el modo JITP el dispositivo también realiza su enrolamiento EST de forma convencional y obtiene su certificado de Lamassu. La diferencia es que AWS IoT Core no conoce al dispositivo hasta que este intenta conectarse por primera vez.
+
+Cuando el dispositivo establece su primera conexión MQTT a AWS IoT Core presentando el certificado emitido por Lamassu, AWS detecta que el certificado pertenece a una CA registrada con una plantilla JITP, ejecuta esa plantilla y crea el Thing automáticamente. La conexión inicial puede fallar o demorarse mientras se ejecuta la plantilla; el firmware debe estar preparado para reintentar la conexión.
+
+Para que el flujo JITP funcione correctamente:
+
+* La CA debe estar registrada en AWS en modo Primary Account (el modo SNI-only no admite JITP).
+* El rol IAM configurado en `jitp_config.provisioning_role_arn` debe existir y tener permisos para crear Things, registrar certificados y adjuntar políticas en la cuenta AWS.
+* El dispositivo debe presentar tanto su certificado como el certificado de la CA emisora en el handshake TLS con AWS IoT Core.
+
+Los certificados aprovisionados mediante JITP **no tienen asociada la clave de metadatos del conector** (`lamassu.io/iot/{connector_id}`) en Lamassu. Como consecuencia, los cambios de estado de esos certificados en Lamassu no se sincronizan automáticamente con AWS a través del mecanismo de sincronización de estado descrito en la siguiente sección.
+
+Sincronización del estado del certificado [#sincronización-del-estado-del-certificado]
+
+El conector escucha el evento `EventUpdateCertificateStatusKey` y, cuando un certificado que tiene la clave de metadatos del conector cambia de estado en Lamassu, replica ese cambio en AWS IoT Core. La tabla siguiente muestra la correspondencia de estados:
+
+| Estado en Lamassu | Razón de revocación  | Estado en AWS IoT Core |
+| ----------------- | -------------------- | ---------------------- |
+| `Active`          | —                    | `ACTIVE`               |
+| `Revoked`         | `certificateHold`    | `INACTIVE`             |
+| `Revoked`         | Cualquier otra razón | `REVOKED`              |
+
+Solo los estados `Active` y `Revoked` producen una llamada a `iot:UpdateCertificate`. Los demás estados del ciclo de vida de Lamassu (`RenewalWindow`, `AboutToExpire`, `Expired`) no se sincronizan con AWS IoT Core; el estado del certificado en AWS permanece sin cambios hasta que el estado en Lamassu sea `Active` o `Revoked`.
+
+Desconexión forzada al revocar [#desconexión-forzada-al-revocar]
+
+Cuando el conector marca un certificado como `REVOKED` o `INACTIVE` en AWS, ejecuta adicionalmente una desconexión forzada del dispositivo. Para ello abre una conexión MQTT sobre WebSocket (con autenticación SigV4 con las credenciales del conector) al endpoint de datos de AWS IoT Core, usando el CN del certificado como identificador de cliente MQTT, y la cierra inmediatamente. Esto termina cualquier sesión MQTT activa que el dispositivo pueda tener en ese momento.
+
+Esta desconexión forzada se produce en el momento en que Lamassu registra el cambio de estado. Si el dispositivo vuelve a intentar conectarse tras la desconexión, AWS IoT Core rechazará la conexión porque el certificado ya figura como `REVOKED` o `INACTIVE`.
+
+Los certificados aprovisionados en modo JITP no disponen de esta sincronización automática, ya que no tienen la clave de metadatos del conector.
+
+Device Shadow y automatización [#device-shadow-y-automatización]
+
+El conector puede escribir en el Device Shadow de AWS IoT Core para enviar señales de acción al firmware del dispositivo. Esta funcionalidad se activa por DMS mediante `shadow_config.enable: true`.
+
+Si `shadow_config.shadow_name` contiene un valor, el conector usa un Named Shadow con ese nombre; en caso contrario, usa el Classic Shadow (shadow predeterminado del Thing).
+
+Qué escribe el conector en el shadow [#qué-escribe-el-conector-en-el-shadow]
+
+El conector escribe en el campo `desired.identity_actions` del documento shadow. Cada entrada contiene un timestamp Unix en milisegundos. El firmware del dispositivo debe leer este campo y actuar en consecuencia.
+
+Existen dos tipos de acciones:
+
+**`UPDATE_CERTIFICATE`**: se escribe cuando la ventana de renovación preventiva de un certificado se activa - es decir, cuando el campo `triggered` de la delta de renovación preventiva pasa de `false` a `true`. Esta acción indica al dispositivo que debe iniciar el proceso de re-enrolamiento para renovar su certificado antes de que expire.
+
+**`UPDATE_TRUST_ANCHOR_LIST`**: se escribe en todos los dispositivos de un DMS cuando la lista `ManagedCAs` del DMS cambia. Esta acción indica al dispositivo que debe actualizar su almacén de CAs de confianza.
+
+El proceso de escritura en el shadow consiste en leer el shadow actual (`iotdata:GetThingShadow`), combinar las nuevas acciones con las existentes y escribir el resultado (`iotdata:UpdateThingShadow`). Si el shadow no existe, el conector lo crea. Tras una escritura correcta, la lista de acciones pendientes en los metadatos del dispositivo en Lamassu se limpia.
+
+```json
+{
+  "state": {
+    "desired": {
+      "identity_actions": {
+        "UPDATE_CERTIFICATE": 1716300000000,
+        "UPDATE_TRUST_ANCHOR_LIST": 1716299000000
+      }
+    }
+  }
+}
+```
+
+Políticas de AWS IoT [#políticas-de-aws-iot]
+
+El conector crea y adjunta las políticas que se configuran en el DMS. Una política típica para un dispositivo que usa MQTT y Device Shadow tiene la siguiente estructura:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Connect"
+      ],
+      "Resource": [
+        "arn:aws:iot:<AWS_REGION>:<AWS_ACCOUNT_ID>:client/${iot:Connection.Thing.ThingName}"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Publish"
+      ],
+      "Resource": [
+        "arn:aws:iot:<AWS_REGION>:<AWS_ACCOUNT_ID>:topic/$aws/things/${iot:Connection.Thing.ThingName}",
+        "arn:aws:iot:<AWS_REGION>:<AWS_ACCOUNT_ID>:topic/$aws/things/${iot:Connection.Thing.ThingName}/shadow/[name/${ShadowName}/]*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Subscribe"
+      ],
+      "Resource": [
+        "arn:aws:iot:<AWS_REGION>:<AWS_ACCOUNT_ID>:topicfilter/$aws/things/${iot:Connection.Thing.ThingName}",
+        "arn:aws:iot:<AWS_REGION>:<AWS_ACCOUNT_ID>:topicfilter/$aws/things/${iot:Connection.Thing.ThingName}/shadow/[name/${ShadowName}/]*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Receive"
+      ],
+      "Resource": [
+        "arn:aws:iot:<AWS_REGION>:<AWS_ACCOUNT_ID>:topic/$aws/things/${iot:Connection.Thing.ThingName}",
+        "arn:aws:iot:<AWS_REGION>:<AWS_ACCOUNT_ID>:topic/$aws/things/${iot:Connection.Thing.ThingName}/shadow/[name/${ShadowName}/]*"
+      ]
+    }
+  ]
+}
+```
+
+En la política anterior, los marcadores `<AWS_REGION>` y `<AWS_ACCOUNT_ID>` deben reemplazarse por la región AWS y el identificador de cuenta de doce dígitos de la cuenta destino antes de aplicar la política. La variable `${iot:Connection.Thing.ThingName}` limita automáticamente cada permiso al Thing al que el dispositivo está conectado, siguiendo el principio de mínimo privilegio. La variable `${ShadowName}` en los ARN de shadow es un marcador que debe reemplazarse con el valor de `shadow_config.shadow_name` configurado en el DMS; si se usa el Classic Shadow, se puede simplificar eliminando el segmento `name/${ShadowName}/`. Las políticas de AWS IoT no admiten expresiones regulares con alternancia; la notación `[name/${ShadowName}/]*` representa la opcionalidad del segmento dentro de las restricciones de la sintaxis de ARN.
+
+El primer statement permite que el dispositivo se conecte usando su ThingName como identificador MQTT. El segundo autoriza la publicación en el topic MQTT genérico del Thing y en los topics del shadow, necesario para que el dispositivo pueda actualizar el estado reportado. Los dos últimos statements otorgan permisos de suscripción y recepción sobre los mismos topics, lo que permite al dispositivo recibir actualizaciones del shadow (por ejemplo, las acciones `UPDATE_CERTIFICATE` y `UPDATE_TRUST_ANCHOR_LIST` escritas por el conector).
+
+Solución de problemas [#solución-de-problemas]
+
+**Síntoma:** El registro de la CA permanece indefinidamente en estado `REQUESTED`.
+
+**Causa:** El conector no está en ejecución o no está suscrito al bus de eventos. También puede indicar credenciales IAM incorrectas, permisos insuficientes o que la clave de metadatos se escribió con un `connector_id` incorrecto.
+
+**Resolución:** Verificar que el proceso del conector está activo y que los logs no muestran errores de comunicación con AWS. Comprobar que el campo de metadatos se escribió bajo la clave exacta `lamassu.io/iot/{connector_id}`. Si el error persiste, el conector actualizará el estado a `FAILED` con un mensaje descriptivo en los metadatos de la CA.
+
+***
+
+**Síntoma:** El estado de un certificado no se sincroniza con AWS tras una revocación.
+
+**Causa:** Lo más habitual es que el certificado fue aprovisionado en modo JITP. Los certificados JITP no tienen la clave de metadatos del conector y quedan fuera del mecanismo de sincronización de estado. Si el DMS está en modo `auto`, puede indicar que el aprovisionamiento inicial no completó correctamente y el ARN de AWS no se almacenó en los metadatos del certificado.
+
+**Resolución:** Para certificados JITP, migrar el DMS a modo `auto` y re-aprovisionar los dispositivos afectados. Para certificados en modo `auto`, verificar que el certificado tiene el ARN de AWS almacenado en sus metadatos; si no lo tiene, repetir el aprovisionamiento.
+
+***
+
+**Síntoma:** La desconexión forzada no termina la sesión MQTT del dispositivo tras la revocación.
+
+**Causa:** El dispositivo usa un client ID MQTT diferente al CN del certificado. La desconexión forzada abre una conexión usando el CN como client ID; si el firmware usa otro identificador, la desconexión no afecta a esa sesión.
+
+**Resolución:** Asegurarse de que el firmware usa exactamente el CN del certificado como identificador de cliente MQTT. Ese CN coincide con el ThingName en AWS IoT Core.
+
+***
+
+**Síntoma:** El dispositivo recibe `CLIENT_ID_REJECTED` al conectarse a AWS IoT Core.
+
+**Causa:** El client ID MQTT no coincide con el ThingName, que es siempre el CN del certificado emitido por Lamassu.
+
+**Resolución:** Verificar que el firmware usa exactamente el valor del campo CN incluido en el CSR de enrolamiento como identificador de cliente MQTT.
+
+***
+
+**Síntoma:** La primera conexión MQTT del dispositivo en modo JITP falla o excede el tiempo de espera.
+
+**Causa:** Es el comportamiento esperado mientras AWS ejecuta la plantilla JITP en la primera conexión del dispositivo.
+
+**Resolución:** El firmware debe implementar reintentos con backoff exponencial para la primera conexión. Si el fallo persiste más allá de unos minutos, verificar que el rol IAM configurado en `jitp_config.provisioning_role_arn` existe en la cuenta y tiene permisos para crear Things, registrar certificados y adjuntar políticas.
+
+***
+
+**Síntoma:** El Device Shadow no se actualiza cuando debería.
+
+**Causa:** La función de shadow está desactivada en la configuración del DMS, las credenciales del conector carecen de permisos sobre la API de datos de IoT, o el firmware lee un shadow diferente al configurado.
+
+**Resolución:** Comprobar que `shadow_config.enable` está a `true` en los metadatos del conector para el DMS correspondiente. Si se usa Named Shadow, verificar que `shadow_config.shadow_name` contiene el nombre correcto y que el firmware lee ese Named Shadow y no el Classic Shadow. Confirmar que las credenciales del conector tienen permisos `iotdata:GetThingShadow` y `iotdata:UpdateThingShadow`.
+
+<Cards>
+  <Card title="Configurar un DMS" href="/docs/manual/servicios-core/ra" />
+
+  <Card title="Enrolamiento de dispositivos (EST)" href="/docs/manual/servicios-core/est" />
+
+  <Card title="Gestión de certificados" href="/docs/manual/servicios-core/certificates" />
+</Cards>
+
+
+# [Alerts] Alertas y Suscripciones (/docs/manual/servicios-core/alerts)
+
+
+
+Alertas [#alertas]
+
+La funcionalidad de **Alertas** en Lamassu IoT es una herramienta avanzada para la monitorización y la observación del estado de la PKI. Va más allá de la simple visualización, permitiendo a los usuarios **reaccionar de forma proactiva y automatizada** a los eventos que ocurren en la infraestructura. Esta capacidad es crucial en entornos de IoT, donde el número de dispositivos y la frecuencia de las operaciones hacen inviable la monitorización manual. A través de la gestión de suscripciones, los administradores pueden asegurarse de que eventos críticos, como la revocación de un certificado o la detección de un intento de registro fallido, no pasen desapercibidos, lo que mejora la seguridad y la resiliencia del sistema.
+
+Eventos y Suscripciones [#eventos-y-suscripciones]
+
+La página principal de alertas presenta una lista exhaustiva de todos los **tipos de eventos** que pueden ser generados por la PKI de Lamassu IoT. Estos eventos cubren un amplio espectro de actividades, desde operaciones de ciclo de vida de certificados y dispositivos hasta cambios de estado en las RA. Para cada tipo de evento, la interfaz proporciona un conjunto de métricas clave que facilitan la toma de decisiones:
+
+* **Last Seen**: Muestra cuándo ocurrió la última instancia del evento. Esto ayuda a identificar si un evento es recurrente o si ha ocurrido recientemente, lo cual es fundamental para el diagnóstico.
+* **Counter**: Indica el número total de veces que el evento ha sido registrado en el sistema. Un contador alto puede señalar una tendencia, un problema subyacente en un dispositivo o una configuración errónea.
+* **Subscriptions**: Informa si ya existen suscripciones activas para ese evento, evitando la creación de suscripciones duplicadas y proporcionando una visión general de la monitorización ya implementada.
+* **Actions**: El botón **Subscribe** permite iniciar el proceso de creación de una nueva suscripción, adaptada a las necesidades específicas del usuario o equipo.
+
+Adicionalmente, al expandir la información de cada evento, se presenta un **ejemplo de la estructura de datos JSON** de la última instancia registrada. Esta información es de gran valor, ya que permite a los desarrolladores y administradores entender con precisión el esquema de la notificación y cómo procesarla en sistemas externos, como un sistema de gestión de incidentes o una aplicación de automatización.
+
+Gestión de Suscripciones [#gestión-de-suscripciones]
+
+Para cada evento, se puede crear una suscripción a la que se envían notificaciones cuando el evento ocurre. Este proceso permite a los administradores del sistema personalizar qué eventos monitorizan y cómo son notificados. La configuración de las suscripciones, incluyendo el destino de las notificaciones, se gestiona de forma individual para cada tipo de evento.
+
+Al pulsar sobre el botón **Subscribe** se abre un modal de configuración que permite seleccionar uno de los tres mecanismos de notificación disponibles en Lamassu IoT.
+
+* **Email Notification**: Envía una notificación por correo electrónico a una dirección específica cada vez que el evento se registra. Para configurar este método, solo es necesario proporcionar la dirección de correo electrónico de destino.
+* **Microsoft Teams Webhook**: Utiliza un webhook para enviar una notificación al canal de Microsoft Teams configurado, lo que permite integrar las alertas directamente en los flujos de trabajo de colaboración. Se debe proporcionar un nombre para la suscripción y la URL del webhook de Microsoft Teams.
+* **Webhook**: Envía una notificación en formato JSON a una URL de webhook personalizada, lo que permite integrar las alertas con cualquier servicio o aplicación que soporte este protocolo. Para este mecanismo, se debe especificar un nombre, el **Método HTTP** (siempre **POST** o **PUT**) y la URL de destino. El documento JSON del evento se entregará como el cuerpo de la solicitud HTTP.
+
+Filtros y condiciones [#filtros-y-condiciones]
+
+Después de seleccionar el mecanismo de notificación, se puede establecer un filtro para determinar las condiciones que deben cumplirse para que el evento sea notificado. Esto permite un control más granular y evita recibir notificaciones irrelevantes. Los formatos de filtro disponibles son:
+
+* **None**: No se aplica ningún filtro. Se enviarán notificaciones para todas las instancias del evento.
+* **JSON Path**: Utiliza la sintaxis de JSON Path para evaluar una condición sobre un campo específico del evento JSON.
+* **JSON Schema**: Permite aplicar un esquema JSON para validar el evento. Las notificaciones solo se enviarán si el evento cumple con el esquema definido. Esto es útil para asegurar que solo se procesen eventos con un formato de datos esperado y consistente.
+* **Javascript**: Permite escribir una función de JavaScript personalizada para evaluar condiciones complejas sobre el evento JSON. Por ejemplo, la función `function (event) { return event.data.status == "NO_IDENTITY"; }` podría usarse para notificar solo cuando el estado de un dispositivo cambia a "No Identity". Esto ofrece la mayor flexibilidad, ya que se pueden aplicar lógicas avanzadas para filtrar los eventos antes de que se envíen las notificaciones.
+
+Confirmación de la suscripción [#confirmación-de-la-suscripción]
+
+El último paso del proceso es la **confirmación**. Una vez que se ha configurado el canal de notificación y el filtro (si corresponde), la interfaz muestra un resumen de la suscripción. Aquí puedes revisar el tipo de evento, el canal de notificación seleccionado y la condición del filtro antes de confirmar.
+
+Al hacer clic en **Confirm Subscription**, la suscripción se activa y Lamassu IoT comenzará a enviar notificaciones basadas en la configuración que has establecido.
+
+Gestión de Suscripciones Existentes [#gestión-de-suscripciones-existentes]
+
+Para gestionar una suscripción que ya está activa, simplemente selecciónala en el listado de la página principal de alertas. Al hacerlo, se abrirá un modal de **Subscription Details** que muestra toda la información de la suscripción. Desde esta ventana, se pueden realizar las siguientes acciones:
+
+* **Ver detalles**: Muestra información completa sobre la suscripción, incluyendo su tipo de evento, el canal de notificación, los detalles de contacto (como la dirección de correo electrónico) y las condiciones de filtrado aplicadas.
+* **Editar**: Permite modificar la configuración de la suscripción, como el canal de notificación o el filtro.
+* **Anular suscripción (Unsubscribe)**: Desactiva y elimina la suscripción. Esta acción es útil cuando una alerta ya no es necesaria.
+
+Catálogo de Eventos del Sistema [#catálogo-de-eventos-del-sistema]
+
+La siguiente tabla resume los eventos que pueden ser generados por la plataforma Lamassu IoT, clasificados por el componente que los origina.
+
+| Evento                     | Descripción                                    |
+| -------------------------- | ---------------------------------------------- |
+| **ca.create**              | Creación de una CA                             |
+| **ca.import**              | Importación de una CA                          |
+| **ca.profile.update**      | Actualización de perfil de CA                  |
+| **ca.reissue**             | Reemisión de una CA                            |
+| **ca.sign.certificate**    | Firma / emisión de certificado                 |
+| **ca.signature.sign**      | Operación de firma criptográfica               |
+| **ca.delete**              | Eliminación de una CA                          |
+| **certificate.delete**     | Eliminación de un certificado                  |
+| **profile.create**         | Creación de perfil de emisión                  |
+| **profile.update**         | Actualización de perfil de emisión             |
+| **profile.delete**         | Eliminación de perfil de emisión               |
+| **dms.create**             | Creación de un DMS                             |
+| **dms.update**             | Actualización de un DMS                        |
+| **dms.delete**             | Eliminación de un DMS                          |
+| **dms.enroll**             | Inscripción (enroll) de dispositivo            |
+| **dms.reenroll**           | Re-inscripción (reenroll) de dispositivo       |
+| **dms.bind-device-id**     | Asociación de identidad a dispositivo          |
+| **device.create**          | Creación de dispositivo                        |
+| **device.identity.update** | Actualización de identidad del dispositivo     |
+| **device.status.update**   | Cambio de estado del dispositivo               |
+| **device.metadata.update** | Actualización de metadatos del dispositivo     |
+| **device.delete**          | Eliminación de un dispositivo                  |
+| **va.role.crl.create**     | Cálculo/creación de CRL                        |
+| **kms.create**             | Creación de clave en KMS                       |
+| **kms.import**             | Importación de una clave KMS                   |
+| **kms.update.metadata**    | Actualización de metadatos de clave KMS        |
+| **kms.update.aliases**     | Actualización de alias de clave KMS            |
+| **kms.update.name**        | Cambio de nombre de una clave KMS              |
+| **kms.update.tags**        | Actualización de etiquetas (tags) de clave KMS |
+| **kms.delete**             | Eliminación de una clave KMS                   |
+| **kms.sign.message**       | Firma de un mensaje con clave KMS              |
+| **kms.verify.signature**   | Verificación de firma con clave KMS            |
+
+
+# [CA] Gestión de Entidades de Confianza (/docs/manual/servicios-core/cas)
+
+
+
+Gestión de entidades de confianza [#gestión-de-entidades-de-confianza]
+
+Creación de entidades de certificación [#creación-de-entidades-de-certificación]
+
+Para acceder a la creación de nuevas entidades certificación se debe acceder la opción de entidades de certificación del menú lateral y luego seleccionar la acción de creación de nueva CA.
+
+Actualmente hay disponibles 3 acciones:
+
+* **Creación de una nueva autoridad de certificación**, esta acción generará un nuevo par de claves para soportar la nueva autoridad de certificación.
+* **Importar una nueva autoridad de certificación generada externamente**, permite importar en Lamassu una autoridad de certificación, cuyo par de claves ha sido generado de manera externa.
+* **Importar un certificado de autoridad de certificación sin clave privada**, en este caso se importa la CA para poder usarla en procesos de validación y no como fuente de nuevos certificados gestionados por Lamassu.
+
+Creación de una nueva autoridad de certificación [#creación-de-una-nueva-autoridad-de-certificación]
+
+La creación de una Autoridad de Certificación (CA) es un proceso fundamental en el establecimiento de una infraestructura de clave pública (PKI). Lamassu IoT permite provisionar tanto autoridades raíz como intermedias mediante la generación automática de pares de claves criptográficas que son gestionados de forma segura por el sistema integrado de gestión de claves.
+
+En el formulario de creación se definen los siguientes bloques de configuración.
+
+**Motor criptográfico**
+
+* **Selector:** Desplegable con motores disponibles, ofrece los configurados en el sistema.
+* **Ejemplo mostrado:** go1.24.3
+* **Función:** Permite seleccionar el motor criptográfico deseado
+
+**Parámetros de clave**
+
+* **Key Type:** RSA / EC (Elliptic Curve)
+* **Key Size:**
+  * RSA: 1024, 2048, 3072, 4096 bits
+  * EC: P-256, P-384, P-521
+* **Recomendado:** EC P-384
+
+**Perfil de emisión del certificado de la CA**
+
+Aquí se puede seleccionar un perfil existente o definir uno en línea para la operación. Ese perfil permite especificar la duración de la CA que se está creando y los `Key Usage` y `Extended Key Usage` del certificado de soporte.
+
+Si no se proporciona ningún perfil se aplicará uno por defecto con los usos de clave básicos.
+
+**Configuración de la CA**
+
+**Tipo de CA**
+
+* **Root CA:** Autoridad raíz autofirmada
+* **Intermediate CA:** Autoridad subordinada
+
+**Emisor**
+
+* **Root CA:** Self-signed (auto-firmada)
+* **Intermediate CA:** Selector desplegable de CA superior disponible
+  * Permite seleccionar la CA padre que firmará la nueva CA intermedia
+
+**Identificación**
+
+* **CA ID:** Generado automáticamente (formato UUID),no puede ser modificado. Estos IDs los gestiona el sistema.
+  * Ejemplo: 8f7c170-c84e-4c08-904f-8d3247c77fc2
+* **CA Name:** Nombre descriptivo (obligatorio)
+  * Ejemplo: Lamassu IoT Secure Services CA
+
+**Subject Distinguished Name (DN)**
+
+Campos opcionales:
+
+* **Country (C):** Código país ISO 3166-1 (2 letras)
+  * Ejemplo: US, ES, DE
+* **State/Province (ST):** Estado o provincia
+  * Ejemplo: California, Madrid
+* **Locality (L):** Ciudad o localidad
+  * Ejemplo: San Francisco, Arrasate
+* **Organization (O):** Nombre de la organización
+  * Ejemplo: Lamassu IoT Corp
+* **Organizational Unit (OU):** Unidad organizacional
+  * Ejemplo: Secure Devices Division
+
+El "Certification Authority Name" configurado se utilizará como Common Name (CN) del subject del certificado de la CA.
+
+**Configuración de expiración**
+La configuración de expiración define la validez temporal tanto del certificado de la propia CA como de los certificados que ésta emitirá por defecto. Si se ha seleccionado un perfil se dará prioridad al dato proporcionado en el perfil.
+
+Para el certificado de la CA (`CA Certificate Expiration`):
+
+* **Función:** Establece la duración de validez del certificado de la Autoridad de Certificación
+* **Implicación:** Una vez expirado, la CA no podrá emitir nuevos certificados válidos
+* **Duración:** Configurable según necesidades organizacionales
+* **Valor por defecto:** 10 años (10y)
+* **Consideración:** Debe ser mayor que la duración de los certificados que emitirá
+
+La expiración de la CA se puede definir como un expresión de duración, fijar una fecha fija, o marcarla como indefinida, lo que en términos prácticos permitirá la emisión de una CA sin caducidad.
+
+En el caso de expresar una duración, las unidades permitidas son: y (años), w (semanas), d (días), h (horas), m (minutos) y s (segundos), pudiendo componer expresiones como la siguiente: *5y 8w 4d 2h 1m 2s*
+
+En caso de elegir la opción de fecha específica, se ofrecerá un calendario para seleccionar la fecha de caducidad.
+
+Para el caso de indefinido, se fijará la fecha de expiración máxima permitida.
+
+Para la expiración por defecto de certificados finales (`Default End-Entity Certificate Issuance Expiration`):
+
+* **Función:** Define la duración predeterminada para certificados emitidos por esta CA
+* **Aplicación:** Se aplica automáticamente a nuevos certificados si no se especifica otra duración
+* **Flexibilidad:** Puede ser modificada individualmente al emitir cada certificado
+* **Valor por defecto:** 1 año (1y)
+
+Se expresa en los mismos términos que la caducidad de la CA.
+
+Una vez creada la CA debe ser visible en el listado de CAs del sistema.
+
+Creación de CAs a partir de claves del KMS [#creación-de-cas-a-partir-de-claves-del-kms]
+
+Lamassu IoT permite la creación de CAs a partir de claves previamente generadas o importadas en el servicio KMS. Una vez seleccionada la opción **Create New CA (Existing Key)** se muestra el formulario de creación de CAs con los siguientes elementos diferenciales respecto a la creación de la CA a partir de un nuevo par de claves descrito en el punto anterior.
+
+En este caso, primero se solicita la selección de la clave de soporte para esta nueva CA.
+
+Se abre un popup que permite al usuario seleccionar la clave deseada de entre las disponibles en el KMS. Una vez seleccionada la clave, el proceso continúa como se describe en el punto anterior.
+
+Importación de autoridades de certificación [#importación-de-autoridades-de-certificación]
+
+La importación de entidades de certificación permite importar en el sistema una CA que ha sido generada de manera externa. Para ello se sigue el siguiente proceso:
+
+Se debe seleccionar el motor que gestionará el par de claves importado.
+
+* **Selector:** Desplegable con motores disponibles, ofrece los configurados en el sistema.
+* **Ejemplo mostrado:** go1.24.3
+* **Función:** Permite seleccionar el motor criptográfico deseado
+
+También se define la expiración por defecto de certificados finales (`Default End-Entity Certificate Issuance Expiration`):
+
+* **Función:** Define la duración predeterminada para certificados emitidos por esta CA
+* **Aplicación:** Se aplica automáticamente a nuevos certificados si no se especifica otra duración
+* **Flexibilidad:** Puede ser modificada individualmente al emitir cada certificado
+* **Valor por defecto:** 1 año (1y)
+
+Se expresa en los mismos términos que la caducidad de la CA.
+
+Se debe proporcionar de manera obligatoria:
+
+* Certificado de la CA en formato PEM. Se comprueba que el certificado importado corresponda con el de una CA.
+* Clave privada de la CA en formato PEM
+
+De manera opcional se proporcionarán en formato PEM la cadena de certificados de la cadena de validación en caso de importar una CA subordinada.
+
+Operando con entidades de confianza [#operando-con-entidades-de-confianza]
+
+Visualización de autoridades de certificación [#visualización-de-autoridades-de-certificación]
+
+Accediendo a la sección de autoridades de certificación se mostrará el listado de CAs registradas en el sistema. El listado permitirá el filtro mediante el nombre de la CA, el estado o el tipo de CA.
+
+La acción de ver detalles da acceso a los detalles de la CA y a diferentes opciones de gestión.
+
+En los detalles se muestra el resumen del estado de los certificados emitidos por la CA: certificados activos, expirados y revocados.
+
+Se ofrecen dos acciones:
+
+* la descarga de la CRL vinculada a la CA que permitirá a otros sistemas realizar comprobaciones de vigencia de los certificados emitidos por la CA de manera desconectada.
+* la acción de revocación de la CA
+
+Se muestra información detallada, el certificado en formato PEM y se da acceso a la relación de certificados emitidos por la CA a través de la pestaña “Issued Certificates”
+
+Emisión de certificados [#emisión-de-certificados]
+
+La acción de emisión de certificados se puede realizar desde la pestaña “Issued Certificates” de los detalles de la CA, mediante la acción “Issue New”.
+
+La funcionalidad de emisión es accesible también desde el listado de CAs mediante la acción correspondiente de emisión.
+
+Y desde la funcionalidad  listado completo de certificados emitidos por Lamassu mediante la acción “Issue Certificate”
+
+En este caso se solicitará la selección de una CA antes de acceder al formulario de emisión.
+
+El formulario de emisión de certificados ofrece 2 opciones para la emisión:
+
+* Emisión a partir de una clave privada y el CSR generado en el browser
+* Emisión a partir de un CSR generado de manera externa
+
+**Emisión a partir de una clave privada y el CSR generados en el browser**
+
+El usuario proporciona la información requerida para la creación del CSR, la consola genera una clave In Place y genera el CSR correspondiente mediante el cual se solicita la emisión del certificado a la CA.
+
+**Método de emisión:** Seleccionar  "Generate Key & CSR in Browser" para la generación del par de claves y la solicitud de certificado (CSR) directamente en el navegador
+
+**Certificate Subject (Sujeto del certificado)**
+
+**Common Name (CN)**
+
+* **Campo:** Obligatorio
+* **Función:** Identifica de forma única al titular del certificado
+* **Ejemplos:**
+  * Para dispositivos: device001.company.com
+  * Para usuarios: [john.doe@company.com](mailto:john.doe@company.com)
+  * Para servicios: api.service.company.com
+
+**Campos Organizacionales**
+
+* **Organizational Unit (OU):** Unidad organizacional del titular
+  * Ejemplo: IT Department, Manufacturing
+* **Organization (O):** Nombre de la organización
+  * Ejemplo: LamassuIoT Corp, Acme Industries
+
+**Información Geográfica**
+
+* **Locality (L):** Ciudad o localidad del titular
+* **State/Province (ST):** Estado o provincia
+* **Country (C):** Código de país ISO 3166-1 (2 letras)
+  * Valor por defecto mostrado: US
+
+**Subject Alternative Names (SANs)**
+Los SANs proporcionan identificadores alternativos para el certificado, permitiendo que un mismo certificado sea válido para múltiples nombres o direcciones.
+
+**Tipos de SAN Disponibles**
+
+* **DNS:** Nombres de dominio
+  * Ejemplo: example.com, \*.example.com
+* **IP Address:** Direcciones IP
+* **Email:** Direcciones de correo electrónico
+* **URI:** Identificadores de recursos uniformes
+
+Es posible añadir múltiples SAN de cada tipo, se selecciona el tipo, añadiendo el valor y pulsando la acción “Add”.
+
+**Key Generation Details (Detalles de generación de claves)**
+Se debe especificar el tipo de clave a ser generada para la solicitud del certificado.
+
+**Algorithm (Algoritmo)**
+
+* **ECDSA:** Algoritmo de curva elíptica, se debe especificar la curva a utilizar
+* **RSA:** Algoritmo RSA tradicional, se debe indicar el tamaño de clave
+
+**Certificate Configuration (Configuración del certificado)**
+
+**Validity Duration (Duración de validez)**
+
+Indica la fecha de expiración del certificado a emitir como una expresión de duración
+
+* **Campo:** Configurable según necesidades
+* **Valor por defecto:** 1 año (1y)
+* **Unidades válidas:** y (años), w (semanas), d (días), h (horas), m (minutos), s (segundos)
+* **Consideración:** No puede exceder la validez de la CA emisora
+
+**Key Usage (Uso de claves)**
+Define los propósitos criptográficos para los que puede utilizarse la clave privada del certificado.
+
+**Usos Básicos**
+
+* **Digital Signature:** ✓ (marcado por defecto) - Firmas digitales
+* **Content Commitment (Non-Repudiation):** No repudio
+* **Key Encipherment:** Cifrado de claves
+* **Data Encipherment:** Cifrado de datos
+* **Key Agreement:** Acuerdo de claves
+* **Certificate Signing:** Firma de certificados
+* **CRL Signing:** Firma de listas de revocación
+* **Encipher Only:** Solo cifrado
+* **Decipher Only:** Solo descifrado
+
+**Uso Extendido de Claves**
+
+Especifica aplicaciones específicas para las que está autorizado el certificado.
+
+* **Server Authentication:** ✓ (marcado por defecto) - Autenticación de servidor
+* **Client Authentication:** ✓ (marcado por defecto) - Autenticación de cliente
+* **Code Signing:** Firma de código
+* **Email Protection:** Protección de correo electrónico
+* **Time Stamping:** Sellado de tiempo
+* **OCSP Signing:** Firma de respuestas OCSP
+
+Una vez completado los campos del formulario se solicita la emisión del certificado obteniendo el certificado y la clave privada generada en formato PEM. Esta clave privada no se almacena debe ser descargada y custodiada por el usuario ya que no se podrá volver a obtener.
+
+**Emisión a partir de un CSR generado de manera externa**
+
+Mediante esta opción se podrá realizar la emisión de certificados a partir de CSRs que hayan sido generados de manera externa. Para ello en el selector de modo del formulario de emisión es necesario seleccionar “Upload Existing CSR”.
+
+Se debe proporcionar un CSR válido que contenga los detalles del certificado a emitir, Subject Name, SANs,..
+
+Adicionalmente se proporcionará la duración deseada para el certificado y los usos permitidos. Con esta información se procederá a la emisión como se describe en el apartado anterior.
+
+Revocación de CAs y certificados [#revocación-de-cas-y-certificados]
+
+La revocación de una Autoridad de Certificación (CA) es una acción crítica que invalida todos los certificados emitidos por esa CA, lo que puede causar interrupciones generalizadas en los dispositivos y servicios que confían en ella. Este proceso es irreversible y debe realizarse con extrema precaución.
+
+Para iniciar el proceso, entra en la sección de Autoridades de Certificación y localiza la CA deseada usando los filtros por **Nombre**, **Estado** y **Tipo**.
+
+Accede a la ficha de detalle de la CA. Allí se muestran la información general, los certificados PEM, los metadatos y los certificados emitidos, además del botón **Revoke CA**.
+
+Al pulsar **Revoke CA** se abre una ventana de confirmación con una advertencia sobre el impacto de la acción. En ese cuadro hay que seleccionar una **Razón de Revocación**. Las opciones incluyen:
+
+* Unspecified (No especificado)
+* KeyCompromise (Compromiso de clave)
+* CACompromise (Compromiso de CA)
+* AffiliationChanged (Afiliación cambiada)
+* Superseded (Sustituida)
+* CessationOfOperation (Cese de operación)
+* CertificateHold (Retención de certificado)
+* RemoveFromCRL (Eliminar de la CRL)
+
+Para evitar revocaciones accidentales, el sistema pedirá confirmar el nombre de la CA. En el campo de texto, escribe el **nombre exacto de la CA** que estás revocando. Una vez introducido correctamente, se habilitará el botón **Confirm Revocation**.
+
+Haz clic en el botón **Confirm Revocation**. Una vez completada la revocación, la CA cambiará su estado a **REVOKED** (Revocada) en la página de detalles, y ya no podrás emitir certificados nuevos con ella. En su lugar, verás la opción **Permanently Delete** (Eliminar Permanentemente).
+
+Consideraciones importantes:
+
+* Impacto: La revocación de una CA es una acción irreversible que afectará a todos los dispositivos y servicios que dependen de ella. Asegúrate de comprender completamente las implicaciones antes de proceder.
+* Eliminación Permanente: Después de la revocación, tendrás la opción de eliminar permanentemente la CA. Esta acción eliminará la CA del sistema de Lamassu IoT.
+
+
+# [Certs] Gestión de Certificados (/docs/manual/servicios-core/certificates)
+
+
+
+Gestión de certificados [#gestión-de-certificados]
+
+Los certificados emitidos por Lamassu son accesibles, tanto desde la pestaña de Issued Certificates de los detalles de una CA como desde la opción “Certificates” del menú lateral.\
+En la pestaña de “Issued Certificates” se muestran los certificados emitidos por la CA seleccionada.
+
+Como desde la opción “Certificates” del menú lateral, donde se presentan todos los certificados emitidos por Lamassu independientemente de la CA que lo haya emitido. Esta pantalla incluye la opción de filtro de los certificados por CN, número de serie, estado y por la CA que lo emitió.
+
+Por cada certificado se incluye un conjunto de acciones vinculadas al certificado.\
+Acceso a los detalles “View Details”, un mecanismo de inspección rápida (Quick Inspect) con la información básica del certificado, la opción de descarga en formato PEM y el acceso a las acciones de revocación.\
+La vista de detalle, proporciona información adicional y el acceso a las acciones de revocación.
+
+Revocación de certificados [#revocación-de-certificados]
+
+Ya sea desde las acciones del listado de certificados, como desde la vista de detalle se puede desencadenar la acción de revocación. Al pulsar sobre “Revoke Certificate” se abre una ventana modal en la que se debe seleccionar la razón de la revocación.
+
+Es importante destacar que la única razón reversible es “CertificateHold”, una revocación por cualquier otra  razón no podrá ser revertida. En caso de seleccionar “CertificateHold” se ofrecerá una acción de reactivación.
+
+
+# [Devices] Dispositivos e Identidades (/docs/manual/servicios-core/devices)
+
+
+
+Dispositivos y gestión de las identidades – End entities [#dispositivos-y-gestión-de-las-identidades--end-entities]
+
+La gestión del ciclo de vida de las identidades de los dispositivos es una funcionalidad central en Lamassu IoT. Esta sección del manual se enfoca en la visualización y administración de las identidades de los dispositivos ya enrolados, conocidos como *End Entities* (entidades finales). Permite una visión completa del estado, los certificados y los eventos históricos de cada dispositivo, facilitando su monitorización y control a lo largo de su ciclo de vida.
+
+Visualización de Dispositivos Gestionados [#visualización-de-dispositivos-gestionados]
+
+La página de **Dispositivos** (Managed Devices) ofrece una vista general de todos los dispositivos registrados en el sistema. Puedes ver un resumen del estado de cada dispositivo, su grupo, la fecha de creación y las etiquetas asociadas. Esta visualización es clave para tener una perspectiva general del parque de dispositivos y su salud respecto al estado de su identidad.
+
+Para facilitar la búsqueda y el seguimiento, la interfaz permite filtrar los dispositivos por **Device ID** y por **Tags**. Además, se puede filtrar por los siguientes estados:
+
+* **Active**: El dispositivo y su certificado están en uso y son válidos.
+* **No Identity**: El dispositivo existe en el sistema, pero no tiene una identidad digital (certificado) asociada.
+* **Renewal Pending**: El dispositivo se encuentra en la ventana de tiempo de renovación y su certificado expirará pronto.
+* **Expiring Soon**: El certificado del dispositivo está a punto de caducar.
+* **Expired**: El certificado del dispositivo ha caducado.
+* **Revoked**: El certificado del dispositivo ha sido revocado.
+* **Decommissioned**: El dispositivo ha sido dado de baja y ya no está en uso.
+
+Detalle del Dispositivo: Historial de Certificados [#detalle-del-dispositivo-historial-de-certificados]
+
+Al seleccionar un dispositivo específico, se accede a su página de detalles. La pestaña de **Historial de Certificados** muestra un registro cronológico de todos los certificados X.509 que han sido asociados a la identidad de ese dispositivo. Aquí se pueden ver detalles como el número de serie, el estado del certificado (por ejemplo, activo, expirado o revocado), el nombre común, la CA emisora y los periodos de validez.
+
+Esta funcionalidad es fundamental para auditar y rastrear la historia de la identidad del dispositivo, lo que permite identificar si un certificado ha sido reemplazado o revocado en algún momento.
+
+Detalle del Dispositivo: Línea de tiempo de eventos [#detalle-del-dispositivo-línea-de-tiempo-de-eventos]
+
+La pestaña de **Línea de tiempo de eventos** (Device Event Timeline) proporciona un registro detallado y cronológico de los eventos más importantes relacionados con el dispositivo y su identidad. Estos eventos pueden incluir el aprovisionamiento inicial, la renovación de certificados o cambios de estado.
+
+Esta línea de tiempo es una herramienta poderosa para el análisis forense y la resolución de problemas, ya que permite ver la secuencia exacta de las acciones que han ocurrido en la vida del dispositivo.
+
+Registro de Nuevos Dispositivos [#registro-de-nuevos-dispositivos]
+
+Además de la gestión de dispositivos ya enrolados, Lamassu IoT permite el registro manual de nuevos dispositivos. Esto es particularmente útil para el modo de registro por **Pre-registration**, donde la identidad del dispositivo debe existir en el sistema antes de que pueda solicitar un certificado.
+
+El proceso de registro de un nuevo dispositivo se realiza a través de un formulario que permite configurar los siguientes campos:
+
+* **Device ID (GUID)**: Es el identificador único del dispositivo, normalmente un GUID (Globally Unique Identifier).
+* **Registration Authority**: Se debe seleccionar la RA a la que se asociará el dispositivo, lo que definirá las políticas de *enrollment* y *re-enrollment* que se aplicarán.
+* **Device Registration Profile**: En esta sección se pueden configurar aspectos visuales para facilitar la identificación del dispositivo.
+  * **Icon**: Permite seleccionar un icono que represente visualmente el tipo de dispositivo.
+  * **Tags**: Se pueden añadir etiquetas para agrupar y organizar el dispositivo con otros de características similares.
+
+Una vez registrado, el dispositivo aparecerá en el listado de dispositivos con el estado **No Identity** hasta que complete el proceso de *enrollment* y obtenga su primer certificado.
+
+Asignación Manual de Identidad [#asignación-manual-de-identidad]
+
+La **Asignación manual de identidad** es una acción que solo está disponible para dispositivos en estado **No Identity**, es decir, que han sido registrados en el sistema pero aún no tienen un certificado asignado. Esta funcionalidad permite vincular un certificado ya existente o emitir uno nuevo de forma manual.
+
+El proceso se lleva a cabo desde la vista de detalles del dispositivo:
+
+* **Iniciar la asignación**: Se hace clic en el botón **Assign Identity**. Esto abrirá una ventana emergente.
+* **Vincular certificado existente**: La aplicación buscará certificados activos con un Common Name (CN) que coincida con el Device ID. Si se encuentra un certificado, se puede seleccionar y vincular al dispositivo.
+* **Emitir un nuevo certificado**: Si no se encuentra un certificado existente, o si se desea emitir uno nuevo, se puede seleccionar la opción **Issue New Instead**. Esto te permite elegir la **Certification Authority** que emitirá el nuevo certificado para el dispositivo. Se muestran por defecto las CAs vinculadas a la RA que gestiona ell dispositivo.
+* **Confirmar y asignar**: Una vez seleccionado el certificado (existente o nuevo), se confirma la asignación. El dispositivo pasará del estado **No Identity** al estado **Active** y el certificado aparecerá en su historial.
+
+Revocación de Identidad [#revocación-de-identidad]
+
+La revocación de la identidad es un proceso crítico para la seguridad que permite invalidar un certificado antes de su fecha de caducidad. Esta acción es irreversible. En Lamassu IoT, la revocación se realiza desde la sección de detalle del dispositivo, específicamente desde la línea de tiempo de eventos.
+
+El proceso de revocación se lleva a cabo de la siguiente manera:
+
+* **Acceder a la revocación**: En la sección **Device Event Timeline**, junto al último certificado **Active**, se encuentra la opción de **Revoke**. Al hacer clic en ella, se abre una ventana de confirmación.
+* **Seleccionar el motivo de revocación**: La ventana emergente solicita seleccionar un motivo de revocación (Revocation Reason). Esto es esencial para el registro de auditoría y la generación de la CRL (Certificate Revocation List). Los motivos disponibles, definidos en el **RFC 5280**, y otros adicionales son:
+  * **Unspecified**: Motivo de revocación no especificado.
+  * **KeyCompromise**: La clave privada del certificado ha sido comprometida.
+  * **CACompromise**: La clave privada de la CA ha sido comprometida.
+  * **AffiliationChanged**: El nombre del sujeto o su afiliación ha cambiado.
+  * **Superseded**: El certificado ha sido reemplazado por uno nuevo.
+  * **CessationOfOperation**: La entidad ha dejado de operar o usar el certificado.
+  * **CertificateHold**: El certificado está temporalmente en espera de revocación.
+  * **RemoveFromCRL**: Se usa en un *delta-CRL* para indicar que el certificado fue previamente puesto en espera y ahora debe ser revocado definitivamente.
+  * **PrivilegeWithdrawn**: Se han retirado los privilegios de la entidad asociada al certificado.
+  * **AACompromise**: La clave de un servidor de autorización de atributos ha sido comprometida.
+  * **WeakAlgorithmOrKey**: La clave o el algoritmo del certificado se consideran débiles o han sido comprometidos.
+* **Confirmar la revocación**: Una vez seleccionado el motivo, se confirma la acción. El estado del certificado cambiará a **Revoked** en la línea de tiempo y en el historial de certificados. El certificado revocado dejará de ser válido.
+  Es importante destacar que, una vez revocado un certificado, la identidad del dispositivo puede ser restaurada asignándole un nuevo certificado válido. En caso de que la razón de revocación sea CertificateHold, se permitirá la reactivación.
+
+Desactivación de Dispositivos (Decommissioning) [#desactivación-de-dispositivos-decommissioning]
+
+El *Decommissioning* es el proceso irreversible de dar de baja un dispositivo de forma definitiva del sistema. A diferencia de la revocación, que sólo invalida el certificado, la desactivación revoca todos los certificados asociados al dispositivo y le impide obtener nuevas identidades en el futuro. Es una acción de seguridad crítica que se utiliza cuando un dispositivo es retirado permanentemente o ya no es de confianza.
+
+El proceso se realiza de la siguiente manera:
+
+* **Acceder a la acción**: Desde la vista de detalles de un dispositivo activo, se hace clic en el botón **Decommission**.
+* **Confirmar la acción irreversible**: Aparecerá una ventana de advertencia que explica que la acción es irreversible y que se revocarán todos los certificados asociados al dispositivo, impidiendo que vuelva a obtener una identidad.
+* **Confirmar y desactivar**: Al confirmar la desactivación, el sistema revoca el certificado activo del dispositivo con la razón CessationOfOperation y cambia su estado a **Decommissioned**. El dispositivo ya no podrá realizar operaciones con la PKI.
+
+
+# EST: Enrollment over Secure Transport (/docs/manual/servicios-core/est)
+
+
+
+EST: Enrollment over Secure Transport [#est-enrollment-over-secure-transport]
+
+Lamassu IoT implementa el protocolo **EST (Enrollment over Secure Transport)** descrito en el RFC 7030 como su único mecanismo de inscripción de certificados para dispositivos. Cada DMS expone los endpoints EST, valida al dispositivo y aplica sus propias políticas de autenticación, registro y renovación — actuando como autoridad de registro (RA) frente al cliente.
+
+La entidad que emite y firma criptográficamente el certificado es siempre la **CA asociada al DMS**, no el DMS. El DMS coordina el proceso: recibe el CSR, autentica al dispositivo y aplica la política de emisión. Esta distinción es relevante para el administrador PKI al seleccionar la `EnrollmentCA` y para el integrador al interpretar la cadena de confianza recibida de `/cacerts`.
+
+Esta guía está dividida en dos partes:
+
+* [Configuración del DMS](#configuración-del-dms), para el administrador PKI.
+* [Integración de dispositivos](#integración-de-dispositivos), para quien consume los endpoints EST desde firmware, scripts o servicios de aprovisionamiento.
+
+Si solo necesita una orientación rápida, este es el recorrido recomendado:
+
+| Perfil                     | Leer primero                                    | Después                                                                                        |
+| -------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Administrador PKI          | [Configuración del DMS](#configuración-del-dms) | [Diagnóstico y compatibilidad](#diagnóstico-y-compatibilidad)                                  |
+| Integrador de dispositivos | [Antes de empezar](#antes-de-empezar)           | Los endpoints `/cacerts`, `/simpleenroll`, `/simplereenroll` o `/serverkeygen`, según el flujo |
+
+***
+
+Configuración del DMS [#configuración-del-dms]
+
+Requisitos previos [#requisitos-previos]
+
+Antes de configurar un DMS para EST, deben existir los siguientes recursos en la plataforma:
+
+* **Una CA disponible**: la CA que actuará como `EnrollmentCA` debe estar creada y en estado activo en Lamassu. Si el modo de autenticación es `CLIENT_CERTIFICATE`, también deben estar creadas las CAs de validación del certificado bootstrap.
+* **Un DMS creado**: el DMS al que se aplicará esta configuración debe existir previamente. La configuración EST se aplica sobre un DMS existente, no lo crea.
+
+Conviene separar cuatro bloques de configuración:
+
+* Cómo se realizará el enrollment inicial, incluyendo el modo de alta y la autenticación del cliente.
+* Cómo se gestionará el re-enrollment de certificados ya emitidos.
+* Cómo se configurará el endpoint cacerts para la distribución de las CAs de confianza utilizadas por los dispositivos.
+* Si se habilitará la generación de claves en servidor mediante `ServerKeyGen`.
+
+Configuración de enrollment [#configuración-de-enrollment]
+
+Enrollment Device Registration [#enrollment-device-registration]
+
+En esta sección se define cómo se registran los dispositivos nuevos y con qué credenciales se autentican.
+
+* **Registration Mode**: determina el comportamiento al recibir una inscripción inicial. En modo `JITP` (*Just-In-Time Provisioning*), el dispositivo se crea automáticamente la primera vez que se presenta, aplicando los tags, metadatos e icono definidos en el perfil de aprovisionamiento. En modo `PRE_REGISTRATION`, el dispositivo debe existir previamente en la plataforma; si no existe, la solicitud se rechaza con `device not preregistered`. El modo JITP es adecuado para flotas grandes donde el inventario se construye durante el despliegue; el modo `PRE_REGISTRATION` encaja en entornos de alta seguridad donde cada dispositivo se aprueba de forma explícita antes de recibir un certificado.
+* **Tags**: se aplican a cada dispositivo creado automáticamente por este DMS. Son opcionales y solo tienen efecto en modo JITP. Los tags permiten mejorar la búsqueda de dispositivos.
+* **Icon**: se aplica a cada dispositivo creado automáticamente por este DMS. Es opcional y solo tiene efecto en modo JITP. Únicamente visual.
+
+Enrollment Settings [#enrollment-settings]
+
+* **Enrollment CA**: identifica la CA que firmará los certificados de identidad emitidos a través de este DMS. Su elección determina la cadena de confianza que el dispositivo recibirá y la raíz contra la que los sistemas de backend validarán los certificados de flota.
+* **Allow Override Enrollment** (`enable_replaceable_enrollment`): permite que un dispositivo ya enrolado vuelva a inscribirse mediante `/simpleenroll`. Cuando está activa, el certificado anterior se revoca con la razón `superseded` y el slot de identidad se actualiza. Cuando está inactiva, un segundo intento de `simpleenroll` se rechaza con `forbiddenNewEnrollment`. Esta opción debe habilitarse con precaución en entornos de producción, ya que permite sustituir la identidad de un dispositivo sin pasar por el flujo de re-enrollment.
+* **Verify CSR Signature** (`verify_csr_signature`): controla si el servidor valida la firma del CSR contra la clave pública declarada en él (prueba de posesión PKCS#10). Cuando está inactiva, un solicitante podría enviar un CSR con una clave pública que no controla y obtener un certificado vinculado a ella. Para flotas IoT en redes abiertas debe estar activa.
+* **Authentication Mode**: define cómo el DMS valida la identidad del dispositivo durante el enrollment. Los cuatro modos disponibles son:
+
+  | Modo                                      | Descripción                                                                                                                                                            |
+  | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `CLIENT_CERTIFICATE`                      | mTLS. El dispositivo presenta un certificado X.509 emitido por alguna de las CAs declaradas en **Validation CAs**.                                                     |
+  | `EXTERNAL_WEBHOOK`                        | La decisión de autorización se delega en un servicio HTTP externo. Solo aplica en `/simpleenroll`; en `/simplereenroll` este modo degrada silenciosamente a `NO_AUTH`. |
+  | `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | Combina los dos anteriores: se exige un certificado cliente válido **y** la confirmación del webhook externo.                                                          |
+  | `NO_AUTH`                                 | Sin autenticación. Cualquier CSR se acepta. **Exclusivo para entornos de laboratorio o redes de aprovisionamiento aisladas**; no debe usarse en producción.            |
+
+Cuando el modo es `CLIENT_CERTIFICATE` o `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`, se configuran además estos parámetros:
+
+* **Validation CAs**: lista de CAs de confianza para validar el certificado bootstrap presentado por el dispositivo.
+* **Chain Validation Level**: profundidad máxima de la cadena de validación. El valor `-1` valida la cadena completa hasta la CA raíz.
+* **Allow Authenticating Expired Certificates**: si está activo, acepta certificados cliente caducados. Es útil en escenarios de recuperación donde el dispositivo no pudo renovar su certificado a tiempo.
+
+Cuando el modo incluye `EXTERNAL_WEBHOOK`, se configuran además estos parámetros:
+
+* **Webhook URL**: dirección del servicio externo que decidirá la autorización.
+* **HTTP Method**: método HTTP utilizado para invocar el webhook. Admite `POST` (por defecto) o `PUT`; ambos son equivalentes para el webhook, solo cambia el verbo con el que Lamassu realiza la llamada.
+* **Timeout**: tiempo máximo de espera de la llamada al webhook. Si no se especifica, el valor por defecto es de **10 segundos**; superado ese plazo sin respuesta, Lamassu deniega la operación.
+* **Webhook Authentication Mode**: modo de autenticación del webhook hacia el servicio externo, por ejemplo `ApiKey`, `OIDC` o `mTLS`.
+
+El contrato exacto que debe implementar el servicio webhook (esquema de petición y respuesta, ejemplos) está publicado como especificación OpenAPI: [referencia del webhook de autorización](/api-reference/enroll-reenroll-webhook).
+
+Perfil de emisión [#perfil-de-emisión]
+
+El comportamiento del certificado emitido no lo determina únicamente el CSR del dispositivo, sino el **perfil de emisión** (`IssuanceProfile`) asociado al DMS. El integrador no configura este perfil, pero sus reglas afectan al contenido del certificado final:
+
+| Campo                    | Tipo     | Efecto sobre el certificado emitido                                                                                                                  |
+| ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HonorSubject`           | booleano | Si `true`, el subject del CSR se traslada literalmente al certificado. Si `false`, la CA aplica la plantilla del perfil e ignora el subject del CSR. |
+| `HonorKeyUsage`          | booleano | Si `true`, el `KeyUsage` del CSR se respeta. Si `false`, se aplica la plantilla del perfil.                                                          |
+| `HonorExtendedKeyUsages` | booleano | Igual que `HonorKeyUsage`, pero para `ExtKeyUsage`.                                                                                                  |
+| `HonorExtensions`        | booleano | Controla si el resto de extensiones del CSR (SAN, CDP, etc.) se incluyen en el certificado.                                                          |
+
+Esto es relevante para el integrador: el `KeyUsage`, `ExtKeyUsage` y los SAN que declara el CSR pueden no aparecer tal cual en el certificado final si el perfil así lo decide. Consulte con el administrador PKI si el certificado emitido no contiene las extensiones esperadas.
+
+Configuración de re-enrollment [#configuración-de-re-enrollment]
+
+La sección **Re-Enrollment Settings** controla el proceso de renovación de certificados. El re-enrollment puede realizarse únicamente cuando el certificado está dentro de la ventana configurada, y opcionalmente también cuando el certificado ya ha caducado.
+
+* **Revoke On Re-Enroll**: si está activo, el certificado anterior se revoca automáticamente con la razón `superseded` una vez emitido el nuevo.
+* **Allow Expired Renewal**: permite renovar un certificado ya caducado. Es útil cuando un dispositivo ha estado desconectado y no pudo renovar dentro de la ventana.
+* **Allowed Renewal Delta**: ventana de tiempo previa a la caducidad durante la cual se permite el re-enrollment. Antes de que se abra esta ventana, la solicitud se rechaza con `invalid reenroll window`.
+* **Preventive Renewal Delta**: tiempo previo a la caducidad a partir del cual se emiten alertas de renovación preventiva.
+* **Critical Renewal Delta**: umbral más cercano al vencimiento que activa alertas de estado crítico.
+* **Additional Validation CAs**: CAs adicionales aceptadas como emisoras del certificado en vigor durante el re-enrollment. Permite migrar a una nueva CA de enrolamiento sin interrumpir la renovación de dispositivos ya enrolados con la CA anterior.
+
+Configuración de ServerKeyGen [#configuración-de-serverkeygen]
+
+La sección **Server Key Generation** permite que Lamassu genere el par de claves del dispositivo en el servidor y lo devuelva junto con el certificado emitido. Es útil para dispositivos con capacidad criptográfica limitada.
+
+La opción **Enable Server-Side Key Generation** activa el endpoint `/serverkeygen`. Cuando está inactiva, cualquier llamada a ese endpoint se rechaza con `server key generation not enabled`.
+
+**Key Type** selecciona el algoritmo: `RSA` o `ECDSA`. El campo **Key Size (bits)** determina el tamaño de la clave. Para ECDSA, el tamaño en bits determina también la curva: 256 corresponde a P-256, 384 a P-384 y 521 a P-521.
+
+La clave se genera en el motor software del servidor, no en un Crypto Engine de hardware como AWS KMS o PKCS#11. La única protección de la clave en tránsito es el canal TLS; no se aplica cifrado adicional (CMS EnvelopedData) sobre la clave antes de enviarla al dispositivo. Consulte el [apartado `/serverkeygen`](#serverkeygen) de la referencia para integrador para conocer el formato exacto de la respuesta y las consideraciones de seguridad.
+
+Verificar la configuración [#verificar-la-configuración]
+
+Una vez aplicados los ajustes de enrollment, re-enrollment y ServerKeyGen, puede confirmar que el DMS está operativo de las siguientes formas:
+
+* **Desde la consola**: accede al detalle del DMS y comprueba que la sección EST muestra la CA de enrolamiento asignada y el modo de autenticación configurado.
+* **Con una solicitud de prueba**: invoca el endpoint `/cacerts` del DMS desde un cliente `curl` con la confianza del servidor. Una respuesta `200 OK` con contenido base64 confirma que el DMS está activo y que la CA de enrolamiento es accesible.
+
+```bash
+curl -s --cacert lamassu-trust.pem \
+  "https://<EST_HOST>/.well-known/est/<DMS_ID>/cacerts" | head -c 100
+```
+
+Si el DMS no existe o la CA no está disponible, el servidor responde con `DMS not found` u otro mensaje de error. Consulte la sección [Diagnóstico y compatibilidad](#diagnóstico-y-compatibilidad) para interpretar los mensajes de error.
+
+***
+
+Integración de dispositivos [#integración-de-dispositivos]
+
+*Esta sección está dirigida al integrador de dispositivos.*
+
+Los endpoints EST de Lamassu se publican bajo el prefijo `/.well-known/est` y exigen siempre la presencia del segmento de ruta `{aps}`, que se interpreta como el identificador del DMS al que se dirige la operación. La asociación es directa: el valor de `{aps}` recibido en la URL se utiliza como ID de DMS al consultar el almacén interno. Las variantes registradas sin `{aps}` (por ejemplo `/.well-known/est/cacerts`) están enrutadas en el código, pero su gestor exige el campo `APS` y devuelve `400 Bad Request` con el mensaje `Field validation for 'APS' failed` cuando el segmento no se proporciona.
+
+Esta parte sigue el orden habitual de trabajo del integrador: primero los requisitos previos y el modelo de autenticación, después la referencia de cada endpoint y, al final, ejemplos completos y material de diagnóstico.
+
+Antes de empezar [#antes-de-empezar]
+
+El administrador PKI debe haber configurado un DMS con el protocolo `EST_RFC7030`, una CA de enrolamiento asignada y al menos un modo de autenticación. Sin esa configuración previa, Lamassu rechaza cualquier solicitud de enrolamiento. Los detalles de esa configuración se encuentran en la [sección de configuración del DMS](#configuración-del-dms) de esta misma página.
+
+Antes de realizar la primera llamada, asegúrese de tener:
+
+| Elemento                                                  | Descripción                                                                                                                                                                                                                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **URL del host EST**                                      | Dirección base del servidor, por ejemplo `https://est.lamassu.example`. La proporciona el administrador PKI.                                                                                                                                                 |
+| **Ancla de confianza del servidor** (`lamassu-trust.pem`) | Certificado raíz o intermedio con el que validar el TLS del servidor Lamassu. Sin él, el cliente rechazará el certificado del servidor.                                                                                                                      |
+| **Certificado bootstrap + clave privada**                 | Solo para modos `CLIENT_CERTIFICATE` o `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`. Es el certificado de aprovisionamiento emitido por alguna de las `ValidationCAs` del DMS, normalmente una CA dedicada al provisioning y distinta de la CA de enrolamiento. |
+| **ID del DMS** (`{aps}`)                                  | Identificador del DMS que aparece en todas las rutas EST. Lo proporciona el administrador PKI.                                                                                                                                                               |
+
+Resumen del flujo [#resumen-del-flujo]
+
+| Caso                       | Credencial habitual                                    | Endpoint principal | Resultado                          |
+| -------------------------- | ------------------------------------------------------ | ------------------ | ---------------------------------- |
+| Alta inicial               | Certificado bootstrap o el modo definido en `AuthMode` | `/simpleenroll`    | Certificado de dispositivo         |
+| Renovación                 | Certificado actual del dispositivo                     | `/simplereenroll`  | Certificado renovado               |
+| Descarga de confianza      | TLS del servidor                                       | `/cacerts`         | PKCS#7 o PEM con certificados      |
+| Clave generada en servidor | Igual que `/simpleenroll`                              | `/serverkeygen`    | Clave privada PKCS#8 + certificado |
+
+Modelo de autenticación del cliente [#modelo-de-autenticación-del-cliente]
+
+La implementación de Lamassu reconoce cuatro configuraciones de autenticación para `/simpleenroll`, expresadas mediante el campo `EnrollmentOptionsESTRFC7030.AuthMode` del DMS. Tres son modos simples (`CLIENT_CERTIFICATE`, `EXTERNAL_WEBHOOK`, `NO_AUTH`) y una combina dos controles (`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`). El cliente debe presentarse en el modo que el DMS espera; cualquier otra combinación genera un fallo en la inscripción.
+
+| Modo (`AuthMode`)                         | Descripción                     | Credencial esperada                                             | Aplica en enroll     | Aplica en reenroll                                           |
+| ----------------------------------------- | ------------------------------- | --------------------------------------------------------------- | -------------------- | ------------------------------------------------------------ |
+| `CLIENT_CERTIFICATE`                      | mTLS con certificado X.509      | Certificado y clave privada cliente                             | Sí                   | Sí (con el certificado en vigor)                             |
+| `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | mTLS más validación por webhook | Certificado y clave privada cliente, más aprobación del webhook | Sí                   | No como combinación; en reenroll no mantiene ambos controles |
+| `EXTERNAL_WEBHOOK`                        | Webhook externo de autorización | Ninguna en el canal TLS                                         | Sí                   | No, degrada a `NO_AUTH`                                      |
+| `NO_AUTH`                                 | Sin autenticación               | Ninguna                                                         | Sí (uso restringido) | Sí (uso restringido)                                         |
+
+JWT **no es un modo de autenticación válido en EST**. El extractor de identidad JWT existe en el código pero solo se evalúa en la API de administración de Lamassu. Cualquier *Bearer token* enviado a `/.well-known/est/...` se ignora silenciosamente. Cuando el DMS está configurado con `AuthMode: CLIENT_CERTIFICATE`, una petición que solo aporte JWT se rechaza por falta de certificado cliente. Cuando el DMS está en `AuthMode: NO_AUTH`, la petición se procesa como tal y el JWT no añade ni resta autorización.
+
+* **`CLIENT_CERTIFICATE`**: el cliente presenta un certificado X.509 emitido por una de las CAs declaradas en `AuthOptionsMTLS.ValidationCAs`. El proceso valida la cadena del certificado contra esas CAs mediante los parámetros `ValidationCAs`, `AllowExpired` y `ChainLevelValidation`. Además, el servicio comprueba el estado de revocación en tres pasos: primero busca el cert en la base de datos local de Lamassu; si no lo encuentra, consulta los responders OCSP listados en la extensión AIA; si OCSP falla, intenta los CRL Distribution Points (CDP). Un certificado revocado interrumpe la inscripción con `certificate is revoked`.
+
+  | Parámetro              | Tipo               | Descripción                                                                                                     |
+  | ---------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------- |
+  | `ValidationCAs`        | lista de IDs de CA | CAs de confianza para validar el certificado bootstrap (en enroll) o el certificado en vigor (en reenroll).     |
+  | `AllowExpired`         | booleano           | Si está activado, acepta certificados cliente caducados. Si es `false`, los certificados expirados se rechazan. |
+  | `ChainLevelValidation` | entero             | Si es mayor que cero, recorta la cadena de validación al número de niveles indicado.                            |
+
+* **`EXTERNAL_WEBHOOK`**: Lamassu delega la decisión de autorización en un servicio HTTP externo. El servidor EST construye una petición `POST` al webhook configurado con un cuerpo JSON que reproduce el contexto de la inscripción.
+
+  ```json
+  {
+    "csr": "<base64 del PEM del CSR, p. ej. 'LS0tLS1CRUdJTi...'>",
+    "aps": "<DMS_ID>",
+    "device_cn": "<CommonName del CSR>",
+    "http_request": {
+      "headers": { "Header-Name": "value" },
+      "url": "/.well-known/est/<DMS_ID>/simpleenroll"
+    }
+  }
+  ```
+
+  El valor del campo `csr` es la **codificación base64 del PEM** del CSR (no el DER, y no el PEM en claro). El webhook debe responder con `2xx` y un cuerpo JSON `{"authorized": true}` para continuar; cualquier otra respuesta aborta el enrolamiento con `external webhook denied enrollment`. Un `204 No Content` **no es una respuesta válida** aunque sea un código `2xx`: Lamassu exige un cuerpo JSON con el campo `authorized`, así que un webhook que responda sin cuerpo deniega la operación igual que un error.
+
+* **`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`**: combina los dos modos anteriores durante `/simpleenroll` — el cliente debe presentar un certificado mTLS válido y el webhook debe devolver `authorized: true`. En `/simplereenroll` la combinación no se conserva: el chequeo conjunto mTLS + webhook no se mantiene, por lo que el integrador no debe asumir que las mismas garantías del enrollment inicial aplican en reenroll.
+
+* **`NO_AUTH`**: el DMS acepta cualquier CSR sin validar identidad del cliente. Lamassu emite un aviso en su log (`DMS is configured with NoAuth, allowing enrollment`) y procede al alta. Debe restringirse a entornos controlados (una red de aprovisionamiento aislada); cualquier red expuesta a internet con un DMS en `NO_AUTH` queda abierta a la emisión de certificados por terceros no autorizados.
+
+Referencia de endpoints [#referencia-de-endpoints]
+
+Las siguientes secciones describen los endpoints en el orden más habitual de uso dentro del ciclo de vida del dispositivo:
+
+* `/cacerts`: descarga de la cadena de confianza.
+* `/simpleenroll`: inscripción inicial del certificado.
+* `/simplereenroll`: renovación de un certificado ya emitido.
+* `/serverkeygen`: inscripción con generación de clave en servidor.
+
+/cacerts [#cacerts]
+
+El endpoint `GET /.well-known/est/{aps}/cacerts` distribuye los certificados que el dispositivo necesita para validar al servidor EST y al resto de las CAs gestionadas por el DMS. Lamassu inserta los certificados en este orden: primero el certificado **downstream** del servidor Lamassu, que es la hoja TLS del servidor y no una CA, útil para pinning si `IncludeLamassuSystemCA` está activado; después la lista `ManagedCAs` declarada en el DMS; y por último la CA de enrolamiento, si `IncludeEnrollmentCA` está activado.
+
+| Campo de `CADistributionSettings` | Tipo               | Descripción                                                                                                                                                          |
+| --------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IncludeLamassuSystemCA`          | booleano           | Incluye el certificado *downstream* del servidor Lamassu, es decir, la hoja TLS que el cliente puede usar para anclar la conexión. Es un cert de extremo, no una CA. |
+| `IncludeEnrollmentCA`             | booleano           | Incluye la CA emisora del DMS, es decir, la que firmará los certificados de dispositivo.                                                                             |
+| `ManagedCAs`                      | lista de IDs de CA | CAs adicionales que se publican como anclas de confianza al dispositivo.                                                                                             |
+
+El formato por defecto es PKCS#7 *degenerate* (sólo certificados) codificado en base64. La respuesta declara `Content-Type: application/pkcs7-mime; smime-type=certs-only` y `Content-Transfer-Encoding: base64`. El base64 viene troceado en líneas de **76 caracteres** terminadas en CRLF, una anchura conforme con S/MIME (RFC 5751), no los 64 que sugieren ciertas guías de RFC 7030. Este troceo aplica únicamente a `/cacerts` y `/simpleenroll`; las partes internas de `/serverkeygen` no llevan wrap, como se explica más abajo.
+
+El PKCS#7 *degenerate* es un **conjunto** de certificados sin orden semántico definido. Aunque Lamassu los inserta en el orden indicado, el integrador no debe asumir ese orden al validar cadenas: la cadena debe construirse por correspondencia `Subject`/`Issuer` (o por AKI/SKI), no por la posición en la respuesta.
+
+```bash
+curl -s --cacert lamassu-trust.pem \
+  "https://<EST_HOST>/.well-known/est/<DMS_ID>/cacerts" \
+  -o cacerts.b64
+
+base64 -d -i cacerts.b64 > cacerts.p7b
+openssl pkcs7 -inform DER -in cacerts.p7b -print_certs -out cacerts.pem
+```
+
+El flag `-i` (ignore garbage) ayuda a tolerar el CRLF que Lamassu añade y es necesario en algunos `base64` (BusyBox, BSD); en GNU coreutils se ignora.
+
+Lamassu añade además una extensión sobre el RFC: si el cliente envía la cabecera `Accept: application/x-pem-file`, el servidor responde con la concatenación PEM de los mismos certificados, sin el envoltorio PKCS#7. Esto facilita el consumo desde scripts. La extensión también funciona en `/simpleenroll` y `/simplereenroll`.
+
+```bash
+curl -s --cacert lamassu-trust.pem \
+  -H "Accept: application/x-pem-file" \
+  "https://<EST_HOST>/.well-known/est/<DMS_ID>/cacerts" \
+  -o cacerts.pem
+```
+
+/simpleenroll [#simpleenroll]
+
+El endpoint `POST /.well-known/est/{aps}/simpleenroll` recibe un CSR y devuelve el certificado emitido. El cuerpo de la petición debe ser el **PKCS#10 (CSR) en DER, codificado en base64** sin saltos de línea. La base64 envuelve directamente al DER, no al PEM. La cabecera `Content-Type` debe valer `application/pkcs10`. Si el `Content-Type` es diferente, el servidor responde `400` con `content-type must be application/pkcs10`; si el cuerpo no es base64 válido, responde `400` con `body payload must be base64 encoded`.
+
+```bash
+openssl req -in device.csr -outform DER | base64 -w 0 > device.csr.b64
+
+curl -s --cacert lamassu-trust.pem \
+  --cert bootstrap.crt --key bootstrap.key \
+  -H "Content-Type: application/pkcs10" \
+  --data-binary "@device.csr.b64" \
+  "https://<EST_HOST>/.well-known/est/<DMS_ID>/simpleenroll" \
+  -o enroll.b64
+```
+
+La respuesta sigue el mismo envoltorio que `/cacerts`: PKCS#7 *degenerate* en base64, con `Content-Type: application/pkcs7-mime; smime-type=certs-only`. El PKCS#7 contiene **únicamente el certificado de hoja** recién emitido; no incluye la CA emisora ni intermediarios. Esto cumple RFC 7030 §4.2.3 (donde la cadena es opcional) pero implica que el integrador debe combinar este certificado con la cadena obtenida de `/cacerts` antes de presentarlo a cualquier relying party que valide cadena completa (por ejemplo, un broker MQTT con mTLS estricta).
+
+```bash
+base64 -d -i enroll.b64 > enroll.p7b
+openssl pkcs7 -inform DER -in enroll.p7b -print_certs -out device.crt
+openssl verify -CAfile cacerts.pem device.crt
+```
+
+Varios campos del DMS gobiernan el comportamiento de `/simpleenroll`. El integrador no los configura, pero conviene conocerlos para interpretar los rechazos.
+
+| Campo                                            | Tipo                        | Efecto                                                                                                                                                                                                                                               |
+| ------------------------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EnrollmentSettings.RegistrationMode`            | `JITP` / `PRE_REGISTRATION` | Decide si el dispositivo se crea automáticamente en la primera inscripción (`JITP`) o si debe existir previamente (`PRE_REGISTRATION`).                                                                                                              |
+| `EnrollmentSettings.EnableReplaceableEnrollment` | booleano                    | Si es `true`, un dispositivo ya enrolado puede volver a inscribirse mediante `/simpleenroll`; el certificado anterior se revoca con razón `superseded`. Si es `false`, el segundo intento se rechaza con `forbiddenNewEnrollment`.                   |
+| `EnrollmentSettings.VerifyCSRSignature`          | booleano                    | Si es `true`, el servidor valida la firma del CSR contra la clave pública declarada en él (proof-of-possession estándar de PKCS#10/RFC 2986). Si es `false`, se omite la prueba de posesión. Para flotas IoT en redes abiertas debe estar en `true`. |
+
+En modo `JITP`, el primer `simpleenroll` con un `CommonName` que aún no existe en Lamassu crea el dispositivo automáticamente. En modo `PRE_REGISTRATION`, el dispositivo debe existir previamente; un `CommonName` desconocido se rechaza con `device not preregistered`. Consulte [Configuración de enrollment](#configuración-de-enrollment) para más detalles sobre ambos modos y el comportamiento del perfil de emisión.
+
+/simplereenroll [#simplereenroll]
+
+El endpoint `POST /.well-known/est/{aps}/simplereenroll` renueva el certificado de un dispositivo ya enrolado. El formato del cuerpo es idéntico al de `/simpleenroll` (DER base64 sin saltos, `Content-Type: application/pkcs10`). La diferencia está en la autenticación: el cliente debe presentar **el certificado en vigor** del dispositivo (no el bootstrap) como credencial mTLS.
+
+<Callout type="warn" title="Modo EXTERNAL_WEBHOOK: degradación a NO_AUTH en reenroll">
+  Si el DMS está configurado con `AuthMode: EXTERNAL_WEBHOOK`, el webhook **no se invoca** durante `/simplereenroll`. El flujo de renovación degrada silenciosamente a `NO_AUTH`: cualquier cliente que conozca un `CommonName` válido puede solicitar reenroll para ese dispositivo sin autenticación (`allowing reenroll: using NO AUTH mode` en el log). Un DMS con `EXTERNAL_WEBHOOK` no debe usarse en producción para flujos de reenroll a menos que se controle la red de acceso al endpoint.
+</Callout>
+
+```bash
+openssl req -in device-renewal.csr -outform DER | base64 -w 0 > device-renewal.csr.b64
+
+curl -s --cacert lamassu-trust.pem \
+  --cert device.crt --key device.key \
+  -H "Content-Type: application/pkcs10" \
+  --data-binary "@device-renewal.csr.b64" \
+  "https://<EST_HOST>/.well-known/est/<DMS_ID>/simplereenroll" \
+  -o reenroll.b64
+```
+
+El comportamiento del reenroll está condicionado por varios campos de `ReEnrollmentSettings`:
+
+| Campo                     | Tipo               | Efecto                                                                                                                                                                                |
+| ------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ReEnrollmentDelta`       | duración           | Define la ventana de renovación: el cliente solo puede renovar a partir de `NotAfter - ReEnrollmentDelta`. Antes de ese instante, el servidor responde con `invalid reenroll window`. |
+| `EnableExpiredRenewal`    | booleano           | Si es `true`, acepta certificados ya caducados como prueba de identidad. Si es `false`, un certificado expirado provoca `expired certificate`.                                        |
+| `RevokeOnReEnrollment`    | booleano           | Si es `true`, revoca automáticamente el certificado anterior tras emitir el nuevo, con la razón `superseded` (código 4 de RFC 5280).                                                  |
+| `AdditionalValidationCAs` | lista de IDs de CA | CAs adicionales que el servidor admite como emisores válidos del certificado en vigor, además de la CA de enrolamiento del DMS.                                                       |
+
+* **Inmutabilidad del subject**: el CSR de renovación debe tener exactamente el mismo subject que el certificado en vigor. Lamassu compara, byte a byte, el `RawSubject` del CSR con el del certificado (`slices.Compare`). Si los bytes difieren, el servidor cae a una comparación semántica de respaldo sobre los atributos `CommonName`, `OrganizationalUnit`, `Organization`, `Locality`, `Province` y `Country`. Si todos esos atributos coinciden, el reenroll continúa pese a la diferencia de bytes (rescata casos donde solo cambia la codificación, `PrintableString` frente a `UTF8String`). Si algún atributo difiere, el reenroll se aborta con `invalid RawSubject bytes`. El integrador debe regenerar el CSR con exactamente el mismo subject que en la inscripción inicial para no depender del comportamiento de fallback.
+
+* **Validación de la cadena del certificado presentado**: la validación se intenta primero contra la CA de enrolamiento del DMS; si falla, recorre las `AdditionalValidationCAs`. La validación es "shallow": cada CA se prueba como ancla, no se compone una cadena multinivel. El cliente debe presentar la cadena completa en el handshake mTLS. Un certificado revocado aborta el reenroll con `certificate is revoked`.
+
+/serverkeygen [#serverkeygen]
+
+El endpoint `POST /.well-known/est/{aps}/serverkeygen` permite que Lamassu genere el par de claves del dispositivo en el servidor y devuelva, en la misma respuesta, la clave privada y el certificado emitido. Es útil para dispositivos con capacidad criptográfica limitada o flujos donde la clave se aprovisiona durante la fabricación.
+
+Este endpoint requiere que `ServerKeyGen.Enabled` valga `true` en el DMS. Si no está activado, el servidor responde con `server key generation not enabled`. La autenticación se aplica igual que en `/simpleenroll`: el integrador presenta la credencial que corresponda al `AuthMode` del DMS.
+
+El algoritmo y el tamaño de la clave generada se deciden por el DMS, no por el cliente.
+
+| Tipo de clave | Parámetro válido                                                              | Curva NIST equivalente                     | Comportamiento ante valores no válidos                                                                                                                                                                                                        |
+| ------------- | ----------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RSA`         | Cualquier número de bits aceptado por `crypto/rsa` (típico: 2048, 3072, 4096) | No aplica                                  | Si el valor no es válido para RSA, la generación falla y devuelve `500`.                                                                                                                                                                      |
+| `ECDSA`       | 224, 256, 384, 521                                                            | P-224 / P-256 (prime256v1) / P-384 / P-521 | Cualquier otro valor degrada **silenciosamente** a P-256, solo con un aviso en log (`invalid key size of N for ECDSA. Defaulting to 256 curve`). El cliente no recibe error: el certificado se emite con una curva distinta de la solicitada. |
+
+El CSR enviado por el cliente sirve únicamente para transportar el subject y las extensiones; la prueba de posesión PKCS#10 no aplica aquí porque el cliente no es quien generó la clave. Lamassu descarta la clave pública del CSR original, genera un par de claves nuevo con su entropía interna, en motor software y no en un Crypto Engine de hardware como AWS KMS o PKCS#11, construye un CSR nuevo con esa clave y procede a una inscripción interna equivalente a `/simpleenroll`.
+
+La respuesta es un `multipart/mixed` con el boundary literal `estServerLamassuBoundary`. Contiene dos partes:
+
+1. La clave privada en formato **PKCS#8 sin cifrar**, codificada en base64 dentro de una parte con `Content-Type: application/pkcs8`.
+2. El certificado emitido en PKCS#7 *degenerate* base64, dentro de una parte con `Content-Type: application/pkcs7-mime; smime-type=certs-only`.
+
+A diferencia de `/cacerts` y `/simpleenroll`, donde el base64 va troceado en líneas de 76 caracteres, cada parte de `/serverkeygen` viaja como **una única línea base64 sin saltos**. Cualquier proxy inverso que reescriba el cuerpo (por ejemplo, normalizando line endings) puede romper el parseo.
+
+<Callout type="warn" title="Aviso crítico de seguridad: clave privada en tránsito">
+  Este endpoint invierte el principio PKI por el que el subscriber controla su clave privada. La clave se serializa en PKCS#8 sin cifrar (`PrivateKeyInfo`, sin `EncryptedPrivateKeyInfo`). No se aplica el envoltorio CMS `EnvelopedData` contemplado en RFC 7030 §4.4.2; no se aplica AES key wrap ni cifrado simétrico por contraseña. La única protección es el TLS del canal. El integrador debe garantizar que: (a) ningún proxy inverso termine TLS y registre el cuerpo de la respuesta; (b) la clave se cifre en reposo inmediatamente tras recibirla; (c) la cuenta de auditoría en el servidor Lamassu queda como punto único de origen de la clave.
+</Callout>
+
+```bash
+curl -s --cacert lamassu-trust.pem \
+  --cert bootstrap.crt --key bootstrap.key \
+  -H "Content-Type: application/pkcs10" \
+  --data-binary "@device.csr.b64" \
+  "https://<EST_HOST>/.well-known/est/<DMS_ID>/serverkeygen" \
+  -o response.mime
+```
+
+Para separar las dos partes, el siguiente fragmento usa `awk` con el boundary literal. Funciona con la estructura exacta de Lamassu (cada parte = headers + línea en blanco + una sola línea base64); cualquier proxy intermedio que reescriba el cuerpo lo romperá.
+
+```bash
+# Extraer la primera parte (clave PKCS#8) - base64 plano en una línea
+awk '/--estServerLamassuBoundary/{i++; next} i==1 && NF{print}' response.mime \
+  | sed -n '/^$/,$p' | tail -n +2 | base64 -d -i > device.key.der
+
+# Extraer la segunda parte (certificado PKCS#7) - base64 plano en una línea
+awk '/--estServerLamassuBoundary/{i++; next} i==2 && NF{print}' response.mime \
+  | sed -n '/^$/,$p' | tail -n +2 | base64 -d -i > device.p7b
+
+# Convertir la clave a PEM (PKCS#8 sin cifrar)
+openssl pkcs8 -inform DER -in device.key.der -nocrypt -out device.key
+
+# Convertir el certificado a PEM
+openssl pkcs7 -inform DER -in device.p7b -print_certs -out device.crt
+```
+
+Flujos completos [#flujos-completos]
+
+Una vez revisados los endpoints por separado, estos ejemplos muestran cómo encadenarlos en dos escenarios habituales: el alta inicial de un dispositivo y la renovación de un certificado ya emitido.
+
+Ejemplo end-to-end: enroll [#ejemplo-end-to-end-enroll]
+
+El siguiente script ilustra el proceso completo de inscripción de un dispositivo con clave EC P-256 generada localmente y autenticación mTLS contra un certificado bootstrap.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+EST_HOST="https://est.lamassu.example"
+DMS_ID="iot-fleet-01"
+TRUST="lamassu-trust.pem"
+BOOTSTRAP_CRT="bootstrap.crt"
+BOOTSTRAP_KEY="bootstrap.key"
+
+DEVICE_CN="device-00001"
+DEVICE_KEY="device.key"
+DEVICE_CSR="device.csr"
+DEVICE_CRT="device.crt"
+CACERTS_PEM="cacerts.pem"
+
+# 1. Generar la clave privada del dispositivo (EC P-256)
+openssl ecparam -name prime256v1 -genkey -noout -out "$DEVICE_KEY"
+
+# 2. Construir el CSR con el subject definitivo (firmado con SHA-256)
+openssl req -new -key "$DEVICE_KEY" -sha256 -out "$DEVICE_CSR" \
+  -subj "/CN=$DEVICE_CN/O=Acme/OU=Fleet"
+
+# 3. Descargar la cadena de confianza del DMS
+curl -s --cacert "$TRUST" \
+  -H "Accept: application/x-pem-file" \
+  "$EST_HOST/.well-known/est/$DMS_ID/cacerts" \
+  -o "$CACERTS_PEM"
+
+# 4. Convertir el CSR a base64 DER sin saltos de línea
+openssl req -in "$DEVICE_CSR" -outform DER | base64 -w 0 > device.csr.b64
+
+# 5. Solicitar el certificado al endpoint /simpleenroll usando mTLS
+curl -s --cacert "$TRUST" \
+  --cert "$BOOTSTRAP_CRT" --key "$BOOTSTRAP_KEY" \
+  -H "Content-Type: application/pkcs10" \
+  --data-binary "@device.csr.b64" \
+  "$EST_HOST/.well-known/est/$DMS_ID/simpleenroll" \
+  -o enroll.b64
+
+# 6. Desempaquetar el PKCS#7 base64 y persistir el certificado
+base64 -d -i enroll.b64 \
+  | openssl pkcs7 -inform DER -print_certs -out "$DEVICE_CRT"
+
+# 7. Validar el certificado contra la cadena descargada
+openssl verify -CAfile "$CACERTS_PEM" "$DEVICE_CRT"
+```
+
+Ejemplo end-to-end: reenroll [#ejemplo-end-to-end-reenroll]
+
+El siguiente script reproduce un proceso de renovación: detecta la expiración del certificado actual, regenera el CSR con el **mismo subject** y se autentica con el certificado en vigor.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+EST_HOST="https://est.lamassu.example"
+DMS_ID="iot-fleet-01"
+TRUST="lamassu-trust.pem"
+
+DEVICE_KEY="device.key"
+DEVICE_CRT="device.crt"
+DEVICE_CRT_NEW="device.new.crt"
+
+# 1. Inspeccionar el subject actual y la fecha de expiración
+CURRENT_SUBJECT=$(openssl x509 -in "$DEVICE_CRT" -noout -subject -nameopt RFC2253 \
+  | sed 's/^subject=//')
+NOT_AFTER=$(openssl x509 -in "$DEVICE_CRT" -noout -enddate | cut -d= -f2)
+echo "Subject actual: $CURRENT_SUBJECT"
+echo "Caduca: $NOT_AFTER"
+
+# 2. Construir el nuevo CSR con el MISMO subject que el certificado en vigor.
+#    Cualquier diferencia en atributos provoca "invalid RawSubject bytes".
+openssl req -new -key "$DEVICE_KEY" -sha256 -out device-renewal.csr \
+  -subj "/CN=device-00001/O=Acme/OU=Fleet"
+
+# 3. Convertir a base64 DER sin saltos
+openssl req -in device-renewal.csr -outform DER | base64 -w 0 > device-renewal.csr.b64
+
+# 4. Invocar /simplereenroll con el certificado en vigor como credencial mTLS
+curl -s --cacert "$TRUST" \
+  --cert "$DEVICE_CRT" --key "$DEVICE_KEY" \
+  -H "Content-Type: application/pkcs10" \
+  --data-binary "@device-renewal.csr.b64" \
+  "$EST_HOST/.well-known/est/$DMS_ID/simplereenroll" \
+  -o reenroll.b64
+
+# 5. Desempaquetar el nuevo certificado y persistirlo
+base64 -d -i reenroll.b64 \
+  | openssl pkcs7 -inform DER -print_certs -out "$DEVICE_CRT_NEW"
+
+echo "Nuevo certificado guardado en $DEVICE_CRT_NEW"
+```
+
+Próximos pasos tras el enrolamiento [#próximos-pasos-tras-el-enrolamiento]
+
+Una vez que el dispositivo ha obtenido su certificado de identidad, los pasos habituales son:
+
+* **Instalar la cadena de confianza** (`cacerts.pem`) en el almacén de confianza del dispositivo. El broker MQTT, el servidor HTTPS o cualquier relying party que valide mTLS necesitará esta cadena.
+* **Combinar el certificado de hoja con la cadena** antes de presentarlo en conexiones mTLS. La respuesta de `/simpleenroll` contiene solo el certificado de hoja; el relying party puede rechazar la conexión si no recibe la cadena completa.
+* **Planificar la renovación**: configurar en el dispositivo un temporizador que invoque `/simplereenroll` dentro de la ventana `ReEnrollmentDelta` antes de la caducidad del certificado. No espere a que caduque salvo que `EnableExpiredRenewal` esté activo.
+
+***
+
+Diagnóstico y compatibilidad [#diagnóstico-y-compatibilidad]
+
+Códigos de error y diagnóstico [#códigos-de-error-y-diagnóstico]
+
+<Callout type="warn" title="HTTP 500 para errores de negocio">
+  Lamassu mapea casi todos los errores de negocio a `500 Internal Server Error`, no a `4xx`. El código de estado HTTP no es suficiente para distinguir entre un error de red y un error de política. El integrador debe inspeccionar el campo `err` del cuerpo JSON (`{"err": "<mensaje>"}`) para determinar la causa exacta del fallo.
+</Callout>
+
+| HTTP | Mensaje                                   | Causa                                                                                                | Acción del integrador                                                                                                   |
+| ---- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 400  | `Field validation for 'APS' failed`       | El segmento `{aps}` falta en la URL.                                                                 | Incluir el ID del DMS en la ruta.                                                                                       |
+| 400  | `content-type must be application/pkcs10` | Cabecera `Content-Type` ausente o incorrecta.                                                        | Fijar `Content-Type: application/pkcs10`.                                                                               |
+| 400  | `body payload must be base64 encoded`     | El cuerpo no es base64 válido.                                                                       | Usar `base64 -w 0` para evitar saltos de línea.                                                                         |
+| 500  | `DMS not found`                           | El valor `{aps}` no se corresponde con ningún DMS.                                                   | Verificar el identificador con el administrador PKI.                                                                    |
+| 500  | `invalid certificate`                     | El certificado cliente no es válido contra `ValidationCAs`.                                          | Comprobar la cadena del certificado bootstrap.                                                                          |
+| 500  | `certificate is revoked`                  | El certificado **presentado como credencial mTLS** está revocado en Lamassu o vía OCSP/CRL externos. | Solicitar un nuevo certificado bootstrap o investigar la revocación.                                                    |
+| 500  | `revoked certificate`                     | En reenroll, el certificado **activo del dispositivo en la base de datos** figura como revocado.     | Revisar el estado del slot de identidad; si la revocación fue intencional, emitir un nuevo enroll en lugar de reenroll. |
+| 500  | `expired certificate`                     | El certificado presentado ha caducado y el DMS no permite `AllowExpired`/`EnableExpiredRenewal`.     | Renovar antes de la caducidad o solicitar habilitar `EnableExpiredRenewal`.                                             |
+| 500  | `forbiddenNewEnrollment`                  | El dispositivo ya está enrolado y `EnableReplaceableEnrollment` es `false`.                          | Usar `/simplereenroll` o pedir al administrador que habilite el flag.                                                   |
+| 500  | `device not preregistered`                | El DMS está en `PRE_REGISTRATION` y el dispositivo no existe.                                        | Registrar el dispositivo antes de inscribirlo.                                                                          |
+| 500  | `invalid reenroll window`                 | Se intenta renovar antes de `NotAfter - ReEnrollmentDelta`.                                          | Esperar a la apertura de la ventana o pedir un `ReEnrollmentDelta` mayor.                                               |
+| 500  | `invalid RawSubject bytes`                | El subject del CSR de renovación no coincide con el del certificado en vigor.                        | Regenerar el CSR con el subject exacto del cert anterior.                                                               |
+| 500  | `external webhook denied enrollment`      | El webhook devolvió un código no `2xx` o `authorized != true`.                                       | Revisar los logs del servicio webhook.                                                                                  |
+| 500  | `server key generation not enabled`       | `/serverkeygen` está deshabilitado en el DMS.                                                        | Pedir al administrador activar `ServerKeyGen.Enabled`.                                                                  |
+
+Para los mensajes que no figuren en esta tabla, los logs del servidor Lamassu (con los campos `func`, `dms`, `device-cn`, `step`, `auth-method`, `auth-status`) son el primer lugar donde buscar la causa.
+
+Notas de compatibilidad [#notas-de-compatibilidad]
+
+La implementación de Lamassu se ajusta al RFC 7030 en lo esencial pero introduce varias particularidades que pueden afectar a clientes EST estrictos o a librerías de terceros:
+
+* Los endpoints `/csrattrs` y `/fullcmc` del RFC 7030 **no están implementados** en Lamassu. Un cliente que invoque `/.well-known/est/<DMS_ID>/csrattrs` recibirá `404 Not Found` en lugar del `204 No Content` que el RFC sugiere para "sin atributos". Las librerías EST estrictas deben configurarse para no intentar `csrattrs`.
+* El base64 de la respuesta de `/cacerts` y `/simpleenroll` se trocea en líneas de **76 caracteres** terminadas con CRLF (conforme con S/MIME, RFC 5751). Las partes de `/serverkeygen` no aplican wrap.
+* El boundary del `multipart/mixed` en `/serverkeygen` está fijado y no se puede negociar.
+* El segmento `{aps}` es **obligatorio** en todas las rutas EST. Las rutas registradas sin `{aps}` están en el código pero responden `400`.
+* El cuerpo de `/cacerts`, `/simpleenroll` y `/simplereenroll` puede devolverse como PEM concatenado si el cliente envía `Accept: application/x-pem-file`. Esta es una extensión específica de Lamassu y no aparece en el RFC.
+* El servidor no rechaza explícitamente CSRs firmados con SHA-1 o MD5; el integrador debe generar el CSR con SHA-256 o superior.
+
+<Cards>
+  <Card title="Visión general del DMS" href="/docs/manual/servicios-core/ra" />
+
+  <Card title="Validación OCSP" href="/docs/manual/servicios-core/validation-ocsp" />
+
+  <Card title="Gestionar dispositivos" href="/docs/manual/servicios-core/devices" />
+</Cards>
+
+
+# [KMS] Gestión de Claves Criptográficas (/docs/manual/servicios-core/kms)
+
+
+
+Gestión de claves criptográficas [#gestión-de-claves-criptográficas]
+
+El servicio de Gestión de Claves Criptográficas (KMS) de Lamassu IoT centraliza la generación, importación, custodia y uso de las claves de la plataforma. Desde aquí se gestionan las claves que soportan a las CAs y al resto de operaciones de firma que dependen de la PKI.
+
+En la configuración actual, Lamassu IoT trabaja exclusivamente con claves asimétricas, como RSA y curvas elípticas. Estas claves se usan para emitir certificados X.509, firmar solicitudes y realizar operaciones de autenticación y validación dentro del sistema.
+
+Qué resuelve el KMS [#qué-resuelve-el-kms]
+
+El KMS unifica la gestión del ciclo de vida de las claves y evita que cada servicio tenga que integrarse directamente con un proveedor criptográfico concreto.
+
+En la práctica, permite:
+
+* Generar nuevos pares de claves desde Lamassu IoT.
+* Importar claves creadas externamente.
+* Delegar la custodia y las operaciones criptográficas en motores externos.
+* Reutilizar claves ya existentes para CAs, CSR y tareas de firma o verificación.
+
+Motores criptográficos [#motores-criptográficos]
+
+Lamassu puede trabajar con distintos motores criptográficos según los requisitos del despliegue. En algunos entornos bastará con un motor software; en otros será necesario delegar la custodia en un HSM, en un servicio cloud o en una plataforma especializada.
+
+Una misma instancia puede tener varios motores configurados al mismo tiempo, incluso varias instancias del mismo tipo. Esto permite adaptar la operación a distintos niveles de seguridad, coste y requisitos regulatorios.
+
+Actualmente, Lamassu soporta los siguientes motores:
+
+| Crypto Engine       | Nivel de seguridad | OnPrem / Cloud        | Coste adicional                                                                                             | Generación de claves                                                                    | Persistencia *at-rest* segura                     | Filtración de claves                                                                       | Consideraciones                                                                                               |
+| :------------------ | :----------------: | :-------------------- | :---------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------- | :------------------------------------------------ | :----------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------ |
+| File System         |          1         | OnPrem y Cloud        | No                                                                                                          | **Entropía software**. La generación se realiza con las librerías criptográficas de Go. | **Insegura**. Delegada en el sistema de archivos. | **Insegura**. Delegada en el sistema de archivos.                                          | No recomendado para producción.                                                                               |
+| HashiCorp Vault     |          2         | OnPrem y Cloud        | No                                                                                                          | Depende de la configuración de Vault.                                                   | **Segura**                                        | **Insegura**. Un administrador con permisos suficientes puede visualizar la clave privada. | Conviene limitar al máximo el acceso administrativo y custodiar correctamente las claves de *unseal*.         |
+| AWS Secrets Manager |          2         | Cloud                 | Sí                                                                                                          | Depende del proceso de alta de la clave.                                                | **Segura**                                        | **Insegura**. Un administrador con permisos suficientes puede visualizar la clave privada. | La protección *at-rest* la proporciona AWS, pero no evita el acceso administrativo al material privado.       |
+| AWS KMS             |          3         | Cloud                 | Sí                                                                                                          | **Entropía hardware**                                                                   | **Segura**                                        | **Segura**                                                                                 | Aunque la clave privada no se expone, un actor con permisos suficientes podría usarla para firmar artefactos. |
+| PKCS11              |         3\*        | AirGap OnPrem y Cloud | Depende del hardware o del servicio usado. Puede integrarse con HSMs OnPrem o con ofertas Key as a Service. | **Entropía hardware**                                                                   | **Segura**\*                                      | Depende del HSM                                                                            | El nivel real depende de la implementación PKCS11 y del HSM utilizado.                                        |
+
+Lamassu muestra en la consola el listado completo de motores habilitados.
+
+Cada motor define qué algoritmos soporta, como RSA o ECC/ECDSA, y qué tamaños de clave puede generar.
+
+Durante el despliegue es obligatorio definir un motor por defecto. Ese motor se utilizará cuando un proceso necesite crear o persistir una clave y el usuario no haya seleccionado uno específico, por ejemplo al crear o importar una CA.
+
+Inventario de claves [#inventario-de-claves]
+
+La pantalla principal de KMS muestra el inventario completo de claves registradas en el sistema. Es la vista de referencia para revisar qué claves existen, dónde están custodiadas y con qué entidades están relacionadas.
+
+La tabla incluye los siguientes campos:
+
+* **Name**: nombre descriptivo de la clave.
+* **Type**: algoritmo y tamaño de clave, por ejemplo RSA 2048 o EC P-256.
+* **Strength**: indicador visual de fortaleza criptográfica.
+* **Public/Private**: indica si Lamassu gestiona el par completo o solo la clave pública.
+* **Crypto Engine**: motor criptográfico que custodia la clave.
+* **Aliases**: nombres alternativos asociados a la clave.
+* **Tags**: etiquetas para clasificación y búsqueda.
+* **Related Entities**: certificados u otras entidades vinculadas a esa clave.
+
+Desde esta vista también se accede a las acciones más habituales:
+
+* **View Details** para consultar metadatos, identificadores y relaciones.
+* **Generate CSR** para crear una solicitud PKCS#10 con la clave seleccionada.
+* **Sign / Verify** para probar operaciones criptográficas sobre la clave.
+* **Delete Key** para eliminar la clave del sistema.
+
+Crear o importar claves [#crear-o-importar-claves]
+
+El alta de claves se realiza desde el asistente que se abre con **Create New Key**.
+
+Generar un nuevo par de claves [#generar-un-nuevo-par-de-claves]
+
+Si la clave va a nacer dentro de Lamassu, el flujo recomendado es generar un nuevo par gestionado directamente por uno de los motores configurados.
+
+En la primera pantalla del asistente, elija **Generate New Key Pair** y después defina los parámetros principales:
+
+* **Key Name**: nombre único y descriptivo.
+* **Crypto Engine**: motor que custodiará la clave.
+* **Key Type** y **Key Size**: algoritmo y tamaño o curva.
+* **Tags**: metadatos para clasificar la clave.
+* **Metadata**: información adicional para usos avanzados.
+
+Importar un par existente [#importar-un-par-existente]
+
+La importación permite registrar en Lamassu una clave generada fuera de la plataforma. Es el flujo habitual en escenarios BYOK, migraciones o integración con material criptográfico que ya está en producción.
+
+* Cuando la clave se ha generado en un entorno aislado o en un HSM externo.
+* Cuando se necesita migrar una PKI existente sin reemitir certificados.
+* Cuando Lamassu debe operar con una raíz de confianza creada por un tercero.
+
+En el asistente, elija **Import Existing Key Pair** y complete los campos solicitados:
+
+* **Key Name**: nombre descriptivo dentro de Lamassu IoT.
+* **Crypto Engine**: motor que custodiará la clave importada.
+* **Tags**: etiquetas para organización y búsqueda.
+* **Metadata**: información adicional opcional.
+* **Private Key (PEM)**: clave privada en formato PEM.
+
+Una vez completado el asistente, la clave queda almacenada en el motor seleccionado y puede utilizarse para firma, generación de CSR y el resto de operaciones soportadas por KMS.
+
+Operaciones sobre una clave [#operaciones-sobre-una-clave]
+
+Cada clave registrada dispone de una vista de detalle y de varias acciones operativas.
+
+Ver detalles [#ver-detalles]
+
+La pantalla **View Details** concentra la información técnica y administrativa de la clave.
+
+En la pestaña **Overview** se muestran, entre otros, estos campos:
+
+* **Key Name**: nombre descriptivo.
+* **Key Identifier**: identificador único del sistema. Lamassu utiliza formatos de ID basados en PKCS11.
+* **Tags**: etiquetas asociadas.
+* **Aliases**: nombres alternativos.
+* **Crypto Engine**: motor en el que reside la clave.
+* **Algorithm, Key Size & Strength**: algoritmo, parámetros y nivel de fortaleza.
+
+La sección **Related Entities** muestra qué objetos de Lamassu dependen de esa clave.
+
+La pestaña **Public Key** presenta la clave pública en formato PEM, lista para consulta o copia.
+
+Firmar y verificar [#firmar-y-verificar]
+
+La acción **Sign / Verify** sirve para validar que la clave y el motor criptográfico funcionan correctamente.
+
+Al abrirla aparecen dos áreas: **Sign** y **Verify**.
+
+Sign [#sign]
+
+Esta pestaña usa la clave privada para generar una firma digital sobre un mensaje o sobre un *digest* ya calculado.
+
+Campos principales:
+
+* **Algorithm**: algoritmo de firma disponible para el tipo de clave.
+* **Message Type**: `Raw` para datos en claro o `Digest` para un hash precalculado.
+* **Payload Encoding**: codificación de entrada, como UTF-8, Hex o Base64.
+* **Message**: contenido que se va a firmar.
+* **Signature**: resultado de la operación, mostrado en hexadecimal.
+
+Verify [#verify]
+
+Esta pestaña comprueba si una firma corresponde a la clave pública asociada.
+
+Campos principales:
+
+* **Algorithm**: debe coincidir con el algoritmo usado para la firma.
+* **Message Type**: `Raw` o `Digest`.
+* **Payload Encoding**: codificación del mensaje.
+* **Message**: mensaje original o hash.
+* **Signature**: firma que se desea comprobar.
+* **Result**: indicador del resultado de la validación.
+
+Generar un CSR [#generar-un-csr]
+
+La acción **Generate CSR** crea una solicitud PKCS#10 firmada con la clave privada custodiada en Lamassu, sin exponerla fuera del motor criptográfico.
+
+Este flujo es útil para:
+
+* Solicitar certificados a una CA externa.
+* Renovar una identidad manteniendo la misma clave.
+
+Al abrir el formulario se solicitan los datos del sujeto y los atributos principales del certificado:
+
+* **Common Name (CN)**: nombre principal de la identidad.
+* **Organization (O)**: organización o empresa.
+* **Organizational Unit (OU)**: departamento o unidad.
+* **Country (C)**: código de país de dos letras.
+* **State / Province (ST)**: estado o provincia.
+* **Locality (L)**: ciudad o localidad.
+* **Email Address**: correo de contacto.
+* **Subject Alternative Names (SANs)**: nombres o identificadores alternativos, como DNS o IP.
+
+Una vez completado el formulario, Lamassu genera la CSR y la presenta para su descarga o copia.
+
+Firma local con PKCS#11 [#firma-local-con-pkcs11]
+
+Lamassu también ofrece una ayuda específica para integraciones locales mediante **Sign locally with OpenSSL & PKCS11 tools**.
+
+Esta opción muestra los pasos necesarios para configurar el entorno local, cargar el módulo PKCS#11 y ejecutar firmas con herramientas como OpenSSL sin extraer la clave privada del entorno custodiado.
+
+
+# [DMS] Device Management Service (/docs/manual/servicios-core/ra)
+
+
+
+Device Management Service [#device-management-service]
+
+El **DMS (Device Management Service)** es el componente de Lamassu IoT que actúa como Autoridad de Registro (RA) frente a los dispositivos. Cada DMS recibe las solicitudes de certificado, valida la identidad del solicitante según las políticas configuradas y encarga la emisión a la CA asignada. El resultado es un canal de aprovisionamiento controlado e independiente por flota, línea de producto o entorno.
+
+En la práctica, cada DMS representa un punto de entrada diferenciado: tiene su propia CA de enrolamiento, sus propias reglas de autenticación y su propia ventana de renovación. Una organización puede operar varios DMS en paralelo - por ejemplo, uno para dispositivos de campo y otro para pasarelas internas - con políticas completamente distintas en cada caso.
+
+Antes de empezar [#antes-de-empezar]
+
+Para crear un DMS es necesario que exista al menos una CA activa en la plataforma, ya que el DMS requiere seleccionar una CA de enrolamiento. El usuario debe disponer del rol de administrador PKI o de permisos equivalentes sobre el módulo DMS.
+
+Panel de DMS [#panel-de-dms]
+
+El panel lista todos los DMS configurados en la plataforma. Cada entrada muestra el nombre del DMS, el protocolo de enrolamiento activo y la CA de enrolamiento asignada. Desde el menú de opciones de cada DMS están disponibles las siguientes acciones:
+
+| Acción                      | Descripción                                                                 |
+| --------------------------- | --------------------------------------------------------------------------- |
+| **Edit**                    | Modifica la configuración del DMS.                                          |
+| **Go to DMS owned devices** | Abre el listado de dispositivos gestionados por este DMS.                   |
+| **Show/Edit Metadata**      | Accede a los metadatos del DMS para usos avanzados.                         |
+| **EST (RFC-7030)**          | Muestra los endpoints EST del DMS con su URL base y ejemplos de invocación. |
+| **Delete**                  | Elimina el DMS y su configuración. Acción irreversible.                     |
+
+Distribución de entidades de confianza [#distribución-de-entidades-de-confianza]
+
+La sección **CA Distribution** controla qué certificados de CA recibe el dispositivo al consultar el endpoint de distribución de confianza del protocolo activo. Esta configuración es independiente del protocolo de enrolamiento: los parámetros tienen el mismo significado con independencia de cómo el dispositivo obtenga sus certificados.
+
+| Parámetro                     | Descripción                                                                                                                                                      |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Include Lamassu System CA** | Incluye el certificado TLS del servidor Lamassu en la respuesta. Este es el certificado de extremo del servidor, no una CA - útil para *pinning* de la conexión. |
+| **Include Enrollment CA**     | Incluye la CA emisora configurada en este DMS, es decir, la que firmará los certificados de dispositivo.                                                         |
+| **Managed CAs**               | CAs adicionales distribuidas al dispositivo como anclas de confianza.                                                                                            |
+
+Protocolos de enrolamiento [#protocolos-de-enrolamiento]
+
+El DMS expone un protocolo de enrolamiento a los dispositivos. En la versión actual de Lamassu, el único protocolo soportado es **EST (RFC 7030)**. La configuración del protocolo y la guía de integración para dispositivos se encuentran en las páginas correspondientes.
+
+<Cards>
+  <Card title="EST (RFC 7030)" href="/docs/manual/servicios-core/est" />
+
+  <Card title="Gestionar dispositivos" href="/docs/manual/servicios-core/devices" />
+</Cards>
+
+
+# [VA] Servicio CRL (/docs/manual/servicios-core/validation-crl)
+
+
+
+Servicio CRL [#servicio-crl]
+
+Una CRL (*Certificate Revocation List*) es una lista firmada que contiene los números de serie de los certificados revocados antes de su fecha de caducidad. A diferencia de OCSP, no requiere una consulta en tiempo real: la parte que confía descarga la lista periódicamente y la consulta de forma local.
+
+Lamassu genera y mantiene una CRL por cada CA que gestiona. Cada CRL está firmada con la clave privada de la propia CA emisora y se almacena en el sistema de almacenamiento de objetos configurado en la plataforma.
+
+Rol VA y configuración por CA [#rol-va-y-configuración-por-ca]
+
+La publicación de la CRL de cada CA se controla mediante un *rol VA*. Este objeto define cómo se genera, cuándo se regenera y qué clave se utiliza para firmarla.
+
+Los parámetros principales son:
+
+| Parámetro              | Valor por defecto   | Descripción                                                                                           |
+| ---------------------- | ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `validity`             | 7 días              | Período de validez de cada CRL emitida, reflejado en el campo `nextUpdate`.                           |
+| `refresh_interval`     | \~6 días y 23 horas | Intervalo mínimo entre regeneraciones periódicas programadas.                                         |
+| `regenerate_on_revoke` | `true`              | Cuando se revoca un certificado, se genera una nueva CRL de inmediato sin esperar al ciclo periódico. |
+
+El campo `subject_key_id_signer` identifica la CA cuya clave privada firma la CRL. Por defecto, cada CA firma su propia CRL.
+
+Cada CRL lleva un número de versión incremental. Lamassu almacena todas las versiones en la ruta `pki/va/crl/{subject_key_id}/{version}.crl` del almacenamiento de objetos.
+
+Regeneración periódica y automática [#regeneración-periódica-y-automática]
+
+Un proceso en segundo plano supervisa los roles VA activos. Cuando la validez restante de la CRL vigente cae por debajo del período de vigilancia configurado (*blind period*), el sistema solicita la generación de una nueva CRL. Así se evita que la CRL publicada caduque sin que exista una versión válida disponible.
+
+Además, cuando `regenerate_on_revoke` está activo, que es el comportamiento por defecto, cualquier revocación de un certificado desencadena inmediatamente la generación de una nueva CRL para la CA afectada. Esto reduce al mínimo el tiempo entre la revocación y su publicación.
+
+Contenido de la CRL [#contenido-de-la-crl]
+
+Cada entrada de la CRL incluye el número de serie del certificado revocado, la fecha de revocación y el código de razón conforme a RFC 5280.
+
+La CRL incluye también la extensión *Issuing Distribution Point* (IDP, OID 2.5.29.28), marcada como crítica, que indica la URL pública desde la que puede descargarse. Esa URL apunta al endpoint `/crl/{subject_key_id}` de cada dominio VA configurado.
+
+Endpoint público de descarga [#endpoint-público-de-descarga]
+
+La CRL más reciente de una CA se puede obtener directamente sin autenticación:
+
+```bash
+curl https://<LAMASSU_HOST>/crl/<CA_SUBJECT_KEY_ID> -o ca.crl
+```
+
+La respuesta tiene `Content-Type: application/pkix-crl` y contiene la CRL en formato DER.
+
+API de gestión del rol VA [#api-de-gestión-del-rol-va]
+
+El rol VA de una CA se puede consultar y actualizar mediante la API:
+
+| Método | Ruta                 | Descripción                                                                                                       |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/v1/roles/{ca-ski}` | Devuelve la configuración del rol VA y los metadatos de la última CRL emitida.                                    |
+| `PUT`  | `/v1/roles/{ca-ski}` | Actualiza los parámetros de la configuración del rol VA (`validity`, `refresh_interval`, `regenerate_on_revoke`). |
+
+Ejemplo de consulta del rol VA:
+
+```bash
+curl https://<LAMASSU_HOST>/v1/roles/<CA_SUBJECT_KEY_ID> \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+La respuesta incluye el campo `latest_crl` con la versión, la fecha de inicio de validez y la fecha de caducidad de la CRL actualmente publicada.
+
+Desde la interfaz [#desde-la-interfaz]
+
+Desde el panel de detalle de una CA es posible previsualizar el contenido de la CRL activa y descargarla directamente para su uso offline o para importarla en aplicaciones que realicen validación local.
+
+Referencias [#referencias]
+
+* RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile*
+
+<Cards>
+  <Card title="Servicio OCSP" href="/docs/manual/servicios-core/validation-ocsp" />
+
+  <Card title="Validación de certificados" href="/docs/manual/servicios-core/validation" />
+</Cards>
+
+
+# [VA] Servicio OCSP (/docs/manual/servicios-core/validation-ocsp)
+
+
+
+Servicio OCSP [#servicio-ocsp]
+
+OCSP (Online Certificate Status Protocol) es el mecanismo que permite a una parte que confía comprobar, en tiempo real, si un certificado concreto está vigente o ha sido revocado. En lugar de descargar una lista completa de certificados revocados, el cliente envía una consulta con el número de serie del certificado y recibe una respuesta firmada con el estado actual.
+
+Lamassu integra un respondedor OCSP propio que atiende estas consultas consultando directamente la base de datos interna de certificados. No se requiere ningún componente externo.
+
+Cómo funciona el respondedor en Lamassu [#cómo-funciona-el-respondedor-en-lamassu]
+
+Cuando un cliente solicita el estado de un certificado, el respondedor localiza el certificado por su número de serie y determina su estado según el registro interno:
+
+* Si el certificado está activo, la respuesta indica `Good`.
+* Si el certificado ha sido revocado, la respuesta indica `Revoked` e incluye la marca de tiempo de revocación y el código de razón conforme a RFC 5280.
+* Si el número de serie no se encuentra o el estado no es reconocible, la respuesta indica `Unknown`.
+
+La respuesta OCSP es firmada por la CA emisora del certificado consultado, utilizando el motor criptográfico asociado a esa CA. Lamassu no utiliza un certificado delegado de firma OCSP: la CA actúa directamente como respondedor.
+
+Cada respuesta tiene una ventana de validez de 24 horas, reflejada en los campos `thisUpdate` y `nextUpdate` de la respuesta. Los clientes que cacheen respuestas deben tener en cuenta esta ventana al determinar durante cuánto tiempo una respuesta sigue siendo válida.
+
+Enlace en los certificados emitidos [#enlace-en-los-certificados-emitidos]
+
+La URL del respondedor OCSP se incorpora automáticamente en la extensión AIA (*Authority Information Access*) de todos los certificados emitidos por Lamassu. Los clientes que verifican certificados pueden leer esta URL directamente del certificado sin necesidad de configuración adicional.
+
+Endpoints HTTP [#endpoints-http]
+
+El respondedor acepta consultas en dos formatos, ambos definidos en RFC 6960:
+
+| Método | Ruta                   | Descripción                                                                                   |
+| ------ | ---------------------- | --------------------------------------------------------------------------------------------- |
+| `GET`  | `/ocsp/{ocsp_request}` | La petición OCSP va codificada en Base64url en la propia URL.                                 |
+| `POST` | `/ocsp`                | La petición OCSP va en el cuerpo de la petición con `Content-Type: application/ocsp-request`. |
+
+Ejemplo de consulta con `curl` mediante POST:
+
+```bash
+curl -X POST https://<LAMASSU_HOST>/ocsp \
+  -H "Content-Type: application/ocsp-request" \
+  --data-binary @request.der \
+  -o response.der
+```
+
+La respuesta tiene `Content-Type: application/ocsp-response` y contiene la respuesta OCSP en formato DER.
+
+Comprobación desde la interfaz [#comprobación-desde-la-interfaz]
+
+Desde la pantalla de certificados de Lamassu es posible lanzar una petición OCSP directamente sobre el certificado seleccionado mediante la acción **OCSP Check**. Esta acción muestra el estado devuelto por el respondedor sin necesidad de herramientas externas.
+
+Referencias [#referencias]
+
+* RFC 6960 - *X.509 Internet Public Key Infrastructure Online Certificate Status Protocol – OCSP*
+* RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile* (razones de revocación, sección 5.3.1)
+
+<Cards>
+  <Card title="Servicio CRL" href="/docs/manual/servicios-core/validation-crl" />
+
+  <Card title="Validación de certificados" href="/docs/manual/servicios-core/validation" />
+</Cards>
+
+
+# [VA] Validación de Certificados (/docs/manual/servicios-core/validation)
+
+
+
+Validación de certificados – VA [#validación-de-certificados--va]
+
+Lamassu ofrece dos mecanismos complementarios para validar el estado de los certificados emitidos por la plataforma:
+
+* `OCSP`, para consultas online y en tiempo real del estado del certificado.
+* `CRL`, para distribución y consulta offline de listas de revocación.
+
+En el menú lateral del módulo `VA` encontrarás cada capacidad documentada en su propia página.
+
+
+# Test (/docs/test)
+
+
+
+Hey there!
+
+Cards [#cards]
+
+<Cards>
+  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
+
+  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+</Cards>
+
+CodeBlock [#codeblock]
+
+```js
+console.log('Hello World');
+```
+
+List [#list]
+
+* Hello
+* World

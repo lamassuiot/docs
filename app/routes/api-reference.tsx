@@ -39,6 +39,12 @@ const SERVICES = [
     description: 'Alerting & notifications',
     url: 'https://www.lamassu.io/lamassuiot/alerts-openapi.yaml',
   },
+  {
+    id: 'enroll-reenroll-webhook',
+    label: 'Enroll/Reenroll Webhook',
+    description: 'External EST enrollment authorization webhook',
+    url: 'https://www.lamassu.io/lamassuiot/enroll-reenroll-webhook-openapi.yaml',
+  },
 ] as const;
 
 function readStoredDark(): boolean {

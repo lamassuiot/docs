@@ -1,0 +1,105 @@
+name: Deploy docs
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve the mount point for this ref
+        id: target
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME}"
+            echo "base_path=/docs/$VERSION" >> "$GITHUB_OUTPUT"
+            echo "label=$VERSION"           >> "$GITHUB_OUTPUT"
+            echo "unstable="                >> "$GITHUB_OUTPUT"
+          else
+            echo "base_path=/docs"          >> "$GITHUB_OUTPUT"
+            echo "label=main (unstable)"    >> "$GITHUB_OUTPUT"
+            echo "unstable=--unstable"      >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        env:
+          VITE_DOCS_BASE_PATH: ${{ steps.target.outputs.base_path }}
+        run: pnpm build
+
+      - name: Stage
+        run: scripts/stage-docs-deploy.sh "${{ steps.target.outputs.base_path }}" publish
+
+      # A tag publishes into its own v<version>/ subtree and touches nothing
+      # else. A main push replaces the branch root, but must leave the version
+      # subtrees, the PR previews and the shared manifest alone.
+      - name: Publish to gh-pages
+        run: |
+          set -euo pipefail
+          BASE_PATH="${{ steps.target.outputs.base_path }}"
+          DEST_PREFIX="${BASE_PATH#/docs}"; DEST_PREFIX="${DEST_PREFIX#/}"
+
+          git fetch origin gh-pages
+          git worktree add /tmp/ghp origin/gh-pages
+          cd /tmp/ghp
+          git checkout -B gh-pages
+
+          for attempt in 1 2 3 4 5; do
+            if [ -n "$DEST_PREFIX" ]; then
+              rm -rf "$DEST_PREFIX"
+              mkdir -p "$DEST_PREFIX"
+              cp -r "$GITHUB_WORKSPACE/publish/$DEST_PREFIX/." "$DEST_PREFIX/"
+            else
+              # Keep: git internals, the Jekyll opt-out, PR previews, the shared
+              # manifest, and every published version subtree (always v-prefixed).
+              for f in $(ls -A | grep -vE '^(\.git|\.nojekyll|pr-preview|versions\.json|v[0-9].*)$'); do
+                rm -rf "$f"
+              done
+              cp -r "$GITHUB_WORKSPACE/publish/." ./
+            fi
+
+            node "$GITHUB_WORKSPACE/scripts/update-versions-manifest.mjs" \
+              versions.json "${{ steps.target.outputs.label }}" "$BASE_PATH" ${{ steps.target.outputs.unstable }}
+
+            git add -A
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "deploy: ${{ steps.target.outputs.label }} ($BASE_PATH)" --quiet || {
+              echo "Nothing changed, nothing to publish."
+              break
+            }
+            if git push origin gh-pages; then
+              break
+            fi
+            echo "Push rejected (concurrent deploy?), retrying ($attempt/5)..."
+            git reset --hard HEAD~1 --quiet
+            git fetch origin gh-pages
+            git checkout -B gh-pages origin/gh-pages
+          done
+
+      - name: Summary
+        run: |
+          echo "Published **${{ steps.target.outputs.label }}** to https://www.lamassu.io${{ steps.target.outputs.base_path }}/" >> "$GITHUB_STEP_SUMMARY"

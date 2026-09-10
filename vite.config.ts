@@ -22,21 +22,14 @@ const ssrStubScalar: Plugin = {
   },
 };
 
-// GitHub Pages serves this repo's gh-pages branch under a "/docs/" project-site
-// prefix (the custom domain www.lamassu.io is shared with another repo that owns
-// the domain root), and that prefix applies to assets too — so built asset URLs
-// must carry it. Note this is only Vite's asset `base`; React Router's
-// `basename` stays at its default, because the app already prefixes its own
-// page routes with /docs (see createGetUrl in react-router.config.ts) and
-// setting both would double it up.
-//
-// PREVIEW_BASENAME overrides it for PR previews, which mount deeper
-// (/docs/pr-preview/pr-<n>) and DO set a matching React Router basename.
-const previewBasename = process.env.PREVIEW_BASENAME;
-const GH_PAGES_BASE = '/docs/';
+// Where this build is mounted as the browser sees it — see app/lib/base-path.ts.
+// Assets must carry the same prefix as pages, since GitHub Pages serves this
+// repo under a "/docs/" project-site prefix that applies to assets too.
+// The dev server keeps "/" so localhost doesn't need the prefix.
+const basePath = (process.env.VITE_DOCS_BASE_PATH ?? '/docs').replace(/\/+$/, '');
 
 export default defineConfig(({ command }) => ({
-  base: previewBasename ? `${previewBasename}/` : command === 'build' ? GH_PAGES_BASE : '/',
+  base: command === 'build' ? `${basePath}/` : '/',
   plugins: [
     ssrStubScalar,
     mdx(MdxConfig),

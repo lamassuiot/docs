@@ -2,15 +2,13 @@ import type { Config } from '@react-router/dev/config';
 import { glob } from 'node:fs/promises';
 import { createGetUrl, getSlugs } from 'fumadocs-core/source';
 
-const getUrl = createGetUrl('/docs');
-
-// Set by CI to mount a PR preview build under a non-root path, e.g. "/pr-preview/pr-42".
-// Leave unset for the production build, which is served at the domain root.
-const basename = process.env.PREVIEW_BASENAME || '/';
+// Mount point for this build — see app/lib/base-path.ts. Read from process.env
+// because this config is loaded in Node, not bundled.
+const basePath = (process.env.VITE_DOCS_BASE_PATH ?? '/docs').replace(/\/+$/, '');
+const getUrl = createGetUrl(basePath);
 
 export default {
   ssr: false,
-  basename,
   future: {
     v8_middleware: true,
   },

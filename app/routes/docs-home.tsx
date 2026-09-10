@@ -1,6 +1,7 @@
 import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { Link } from 'react-router';
 import { asset } from '@/lib/asset';
+import { docsPath } from '@/lib/base-path';
 import { baseOptions } from '@/lib/layout.shared';
 import type { Route } from './+types/docs-home';
 
@@ -16,13 +17,13 @@ const sections = [
     icon: asset('images/lamassu.svg'),
     title: 'Manual de Usuario',
     description: 'Servicios core (KMS, CA, RA, VA), gestión de dispositivos e integraciones con terceros.',
-    href: '/docs/manual',
+    href: docsPath('manual'),
   },
   {
     icon: asset('images/kubernetes.svg'),
     title: 'Despliegue',
     description: 'Instalación y configuración en Kubernetes, AWS EC2 y AWS Marketplace.',
-    href: '/docs/despliegue',
+    href: docsPath('despliegue'),
   },
 ];
 

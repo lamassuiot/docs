@@ -1,0 +1,208 @@
+# Introducción (/docs/pr-preview/pr-23/despliegue/onprem)
+
+
+
+Despliegue OnPrem con Kubernetes [#despliegue-onprem-con-kubernetes]
+
+Lamassu IoT puede desplegarse en infraestructura propia mediante **Kubernetes**, tanto en clústeres gestionados internamente como en entornos self-managed.
+
+La referencia principal para este despliegue es el repositorio `lamassu-helm`, que incluye:
+
+* el chart principal de Lamassu
+* un chart auxiliar de SoftHSM
+* el script de despliegue automatizado `scripts/lamassu-fast-lane.sh`
+
+Quickstart [#quickstart]
+
+Si lo que necesitas es levantar un entorno funcional lo antes posible, la vía más rápida es usar Fastlane desde el repositorio `lamassu-helm`:
+
+```bash
+git clone https://github.com/lamassuiot/lamassu-helm.git
+cd lamassu-helm
+./scripts/lamassu-fast-lane.sh -n -ns lamassu-dev -d dev.lamassu.io -l ./charts/lamassu
+```
+
+Ese flujo:
+
+* crea o reutiliza el namespace indicado
+* instala PostgreSQL, Keycloak y RabbitMQ
+* despliega el chart de Lamassu
+* deja la UI expuesta en `https://<dominio>`
+
+Si buscas un despliegue productivo o más controlado, sigue con la instalación manual mediante Helm que se describe más abajo.
+
+Qué se despliega [#qué-se-despliega]
+
+El chart principal `charts/lamassu`, actualmente en la serie `3.7.x`, despliega estos componentes:
+
+* `ui`
+* `ca`
+* `va`
+* `kms`
+* `device-manager`
+* `dms-manager`
+* `alerts`
+* recursos de Gateway API y políticas de Envoy Gateway
+* job de migraciones de base de datos
+
+Requisitos previos [#requisitos-previos]
+
+* Clúster Kubernetes `1.19+`
+* `kubectl` configurado con acceso al clúster
+* Helm `3.2.0+`
+* `cert-manager 1.14+` para la gestión de certificados cuando se usa `tls.type=certManager`
+* `Envoy Gateway 1.3.0+`, ya que el chart publica servicios mediante Gateway API y no mediante Ingress
+* Acceso a un registro de contenedores o imágenes previamente importadas si se trabaja en modo offline
+* Almacenamiento persistente disponible para PostgreSQL, RabbitMQ, VA y KMS
+
+Opciones de despliegue [#opciones-de-despliegue]
+
+Hay dos formas de desplegar Lamassu on-prem:
+
+1. Despliegue manual con Helm [#1-despliegue-manual-con-helm]
+
+Es la opción recomendada para entornos productivos o controlados, donde PostgreSQL, RabbitMQ, Keycloak, certificados y direccionamiento del Gateway ya están definidos por el equipo de plataforma.
+
+2. Despliegue automatizado con Fastlane [#2-despliegue-automatizado-con-fastlane]
+
+Es la opción más útil para pruebas, demos, CI o bootstrap rápido de un entorno. Fastlane levanta PostgreSQL, Keycloak, RabbitMQ y Lamassu en un único flujo. Su comportamiento está documentado en la página siguiente.
+
+Arquitectura [#arquitectura]
+
+Lamassu IoT se despliega como un conjunto de microservicios Kubernetes independientes. El chart principal crea `Deployment`, `StatefulSet`, `Service`, `ConfigMap`, `HTTPRoute`, `Gateway`, certificados y recursos auxiliares según los valores definidos.
+
+Dependencias externas requeridas por el chart principal:
+
+* PostgreSQL
+* RabbitMQ
+* proveedor OIDC, típicamente Keycloak
+
+El chart no instala estas dependencias por sí solo. Para un despliegue manual hay que provisionarlas antes. Si se busca un entorno funcional rápido para laboratorio o validación, el script Fastlane sí instala PostgreSQL, RabbitMQ y Keycloak además del chart de Lamassu.
+
+Instalación manual con Helm [#instalación-manual-con-helm]
+
+Agregar el repositorio Helm:
+
+```bash
+helm repo add lamassu https://lamassuiot.github.io/lamassu-helm
+helm repo update
+```
+
+O instalar desde una copia local del repositorio:
+
+```bash
+helm install lamassu ./charts/lamassu -n lamassu --create-namespace -f values.yaml
+```
+
+Valores mínimos que deben definirse [#valores-mínimos-que-deben-definirse]
+
+Los valores por defecto del chart son deliberadamente incompletos para dependencias externas. Como mínimo, un despliegue manual debe definir:
+
+* `postgres.hostname`, `postgres.username`, `postgres.password`
+* `amqp.hostname`, `amqp.username`, `amqp.password`
+* `auth.oidc.frontend.authority`
+* `auth.oidc.apiGateway.jwks`
+* `services.ca.domains`
+* `gateway.addresses` o una estrategia equivalente de publicación según el clúster
+* `tls.*` según se use `certManager` o certificado externo
+
+Ejemplo base:
+
+```yaml
+postgres:
+  hostname: postgresql
+  port: 5432
+  username: lamassu
+  password: change-me
+
+amqp:
+  hostname: rabbitmq
+  port: 5672
+  username: lamassu
+  password: change-me
+  tls: false
+
+tls:
+  type: certManager
+  certManagerOptions:
+    issuer: downstream-ca-selfsigned-issuer
+    certSpec:
+      commonName: pki.example.internal
+      hostnames:
+        - pki.example.internal
+      addresses:
+        - 10.0.0.20
+
+gateway:
+  addresses:
+    - 10.0.0.20
+  ports:
+    http: 80
+    https: 443
+  extraRouting:
+    - path: /auth
+      name: auth
+      target:
+        host: auth-keycloak
+        port: 8080
+
+auth:
+  oidc:
+    frontend:
+      clientId: frontend
+      authority: https://pki.example.internal/auth/realms/lamassu
+    apiGateway:
+      jwks:
+        - name: oidc-authn
+          uri: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+
+services:
+  ca:
+    domains:
+      - pki.example.internal
+```
+
+Áreas de configuración más relevantes [#áreas-de-configuración-más-relevantes]
+
+| Área          | Valores clave                                                            | Uso                                            |
+| ------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| TLS           | `tls.type`, `tls.certManagerOptions.*`, `tls.externalOptions.secretName` | Certificado downstream del Gateway             |
+| Gateway       | `gateway.addresses`, `gateway.ports.*`, `gateway.extraRouting`           | Exposición de UI y APIs vía Envoy Gateway      |
+| Base de datos | `postgres.*`                                                             | Conexión a PostgreSQL externa                  |
+| Mensajería    | `amqp.*`                                                                 | Conexión a RabbitMQ                            |
+| OIDC          | `auth.oidc.frontend.*`, `auth.oidc.apiGateway.jwks`                      | Login de UI y validación JWT en el Gateway     |
+| CA            | `services.ca.domains`                                                    | Dominios autorizados para CA y certificados    |
+| KMS           | `services.kms.cryptoEngines.*`                                           | Motor criptográfico y almacenamiento de claves |
+| Alerts        | `services.alerts.smtp_server.*`                                          | Envío de correo para alertas                   |
+
+Verificación del despliegue [#verificación-del-despliegue]
+
+El chart incluye una prueba Helm en `charts/lamassu/templates/tests/test-connections.yml`. Tras instalarlo, puede validarse con:
+
+```bash
+helm test lamassu -n lamassu
+```
+
+La prueba comprueba al menos:
+
+* salud de `ca`
+* salud de `dms-manager`
+* salud de `device-manager`
+* salud de `va`
+* respuesta HTML esperada del servicio `ui`
+
+Repositorio Helm [#repositorio-helm]
+
+El repositorio `lamassu-helm` está organizado en tres bloques principales:
+
+* `charts/lamassu`: chart principal de Lamassu
+* `charts/softhsm`: chart opcional para laboratorios o escenarios de integración con PKCS#11 emulado
+* `scripts/lamassu-fast-lane.sh`: automatización para levantar dependencias y desplegar Lamassu con intervención mínima
+
+SoftHSM como complemento opcional [#softhsm-como-complemento-opcional]
+
+El chart `charts/softhsm` no forma parte del despliegue estándar, pero resulta útil en entornos de laboratorio cuando se necesita simular un HSM compatible con PKCS#11. No sustituye al backend KMS principal; sirve como soporte para pruebas o integraciones concretas.
+
+Versionado y migraciones [#versionado-y-migraciones]
+
+La serie actual del chart principal es `3.7.x`. Para upgrades entre versiones, el repositorio incluye guías específicas en `charts/lamassu/CHANGELOG/`, especialmente en cambios importantes como la adopción de Envoy Gateway o la introducción del servicio KMS.

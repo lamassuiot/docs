@@ -90,15 +90,13 @@ jobs:
         run: |
           set -euo pipefail
           PR=${{ github.event.pull_request.number }}
-          URL="https://lamassuiot.github.io/docs/pr-preview/pr-$PR/docs/"
+          URL="https://www.lamassu.io/docs/pr-preview/pr-$PR/docs/"
           MARKER="<!-- pr-preview-link -->"
           BODY="$(cat <<EOF
           $MARKER
           📖 **Preview:** $URL
 
           Rebuilt on every push to this PR. May take a minute to appear after GitHub Pages picks up the \`gh-pages\` commit.
-
-          If \`www.lamassu.io/docs\` proxies from somewhere other than this repo's default Pages domain, the equivalent path there may not resolve the same way — use the \`lamassuiot.github.io\` link above to be sure.
           EOF
           )"
           existing=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)

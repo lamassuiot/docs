@@ -6,7 +6,42 @@ Gestión de claves criptográficas [#gestión-de-claves-criptográficas]
 
 El servicio de Gestión de Claves Criptográficas (KMS) de Lamassu IoT centraliza la generación, importación, custodia y uso de las claves de la plataforma. Desde aquí se gestionan las claves que soportan a las CAs y al resto de operaciones de firma que dependen de la PKI.
 
-En la configuración actual, Lamassu IoT trabaja <del className="lm-diff-del">exclusivamente </del>con claves asimétricas<del className="lm-diff-del">, como RSA y curvas elípticas</del><ins className="lm-diff-ins"> RSA y de curva elíptica (ECDSA), junto con Ed25519 y con los algoritmos post-cuánticos ML-DSA, SLH-DSA y las variantes híbridas Composite-ML-DSA</ins>. Estas claves se usan para emitir certificados X.509, firmar solicitudes y realizar operaciones de autenticación y validación dentro del sistema.
+En la configuración actual, Lamassu IoT trabaja <del className="lm-diff-del">exclusivamente </del>con claves asimétricas<del className="lm-diff-del">, como RSA y curvas elípticas</del><ins className="lm-diff-ins">. Además de los algoritmos clásicos, RSA y curvas elípticas, el KMS soporta claves Ed25519 y claves de firma post-cuántica (ML-DSA, SLH-DSA y Composite ML-DSA)</ins>. Estas claves se usan para emitir certificados X.509, firmar solicitudes y realizar operaciones de autenticación y validación dentro del sistema.
+
+<div className="lm-diff-ins lm-diff-block">
+  Algoritmos y tamaños de clave soportados [#algoritmos-y-tamaños-de-clave-soportados]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El catálogo de claves que puede gestionar el KMS combina algoritmos clásicos y de firma post-cuántica:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Familia          | Algoritmo (`Algorithm`)  | Tamaños y parámetros (`Size`)             |
+  | :--------------- | :----------------------- | :---------------------------------------- |
+  | RSA              | RSA                      | 1024, 2048, 3072, 4096, 7680 y 15360 bits |
+  | Curvas elípticas | ECDSA                    | P-224, P-256, P-384 y P-521               |
+  | Ed25519          | Ed25519                  | Tamaño fijo de 256 bits                   |
+  | ML-DSA           | ML-DSA                   | Variantes 44, 65 y 87                     |
+  | SLH-DSA          | SLH-DSA                  | Conjuntos de parámetros del 1 al 12       |
+  | Composite ML-DSA | Composite-ML-DSA-RSA     | Variantes 1 a 8                           |
+  | Composite ML-DSA | Composite-ML-DSA-ECDSA   | Variantes 9 a 13                          |
+  | Composite ML-DSA | Composite-ML-DSA-Ed25519 | Variantes 14 a 15                         |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Consideraciones sobre estos algoritmos:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * **ML-DSA** y **SLH-DSA** son los esquemas de firma digital post-cuántica estandarizados por NIST en las publicaciones FIPS 204 y FIPS 205. En ML-DSA el tamaño selecciona el nivel de seguridad (ML-DSA-44, ML-DSA-65 o ML-DSA-87); en SLH-DSA, el valor del 1 al 12 identifica el conjunto de parámetros del esquema.
+  * **Composite ML-DSA** combina ML-DSA con un algoritmo clásico (RSA, ECDSA o Ed25519) en una única clave, lo que facilita la migración post-cuántica manteniendo compatibilidad con las infraestructuras clásicas. El número de variante identifica la combinación exacta de ML-DSA, algoritmo clásico y función hash; por ejemplo, la variante 1 equivale a ML-DSA-44 con RSA 2048 (PSS-SHA256) y la variante 14 a ML-DSA-44 con Ed25519.
+  * **Ed25519** es un esquema de firma de curva elíptica con tamaño fijo; no es necesario indicar un tamaño al crear la clave.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La disponibilidad de estos tipos depende del motor criptográfico seleccionado. Todos los motores trabajan con el catálogo clásico basado en RSA y ECDSA, si bien los tamaños concretos pueden variar según el proveedor o el HSM. Los nuevos tipos (Ed25519, ML-DSA, SLH-DSA y Composite ML-DSA) están soportados de extremo a extremo, tanto en generación como en importación, por el motor File System. Si se solicita a un motor un tipo o tamaño que no soporta, la operación se rechaza con un error.
+</div>
 
 Qué resuelve el KMS [#qué-resuelve-el-kms]
 
@@ -37,30 +72,7 @@ Actualmente, Lamassu soporta los siguientes motores:
 
 Lamassu muestra en la consola el listado completo de motores habilitados.
 
-Cada motor define qué algoritmos soporta<del className="lm-diff-del">, como RSA o ECC/ECDSA, y qué tamaños de clave puede generar</del><ins className="lm-diff-ins"> y qué tamaños o parámetros de clave admite. El motor de software integrado soporta todos los tipos de la tabla siguiente; los motores externos pueden limitar el catálogo disponible, por lo que conviene comprobar las opciones que ofrece cada motor antes de crear o importar una clave</ins>.
-
-<div className="lm-diff-ins lm-diff-block">
-  | Key Type                 | Descripción                       | Key Size                                           |
-  | :----------------------- | :-------------------------------- | :------------------------------------------------- |
-  | RSA                      | RSA clásico                       | 1024, 2048, 3072, 4096 bits                        |
-  | ECDSA                    | Curvas elípticas clásicas         | 224 (P-224), 256 (P-256), 384 (P-384), 521 (P-521) |
-  | Ed25519                  | EdDSA sobre Edwards25519          | 256 (valor fijo)                                   |
-  | ML-DSA                   | Post-cuántica basada en retículos | 44, 65, 87                                         |
-  | SLH-DSA                  | Post-cuántica basada en hash      | Conjunto de parámetros del 1 al 12                 |
-  | Composite-ML-DSA-RSA     | Híbrida: ML-DSA + RSA             | Variante del 1 al 8                                |
-  | Composite-ML-DSA-ECDSA   | Híbrida: ML-DSA + ECDSA           | Variante del 9 al 13                               |
-  | Composite-ML-DSA-Ed25519 | Híbrida: ML-DSA + Ed25519         | Variante del 14 al 15                              |
-</div>
-
-<div className="lm-diff-ins lm-diff-block">
-  Sobre la columna **Key Size**:
-</div>
-
-<div className="lm-diff-ins lm-diff-block">
-  * Para **SLH-DSA**, el tamaño identifica el conjunto de parámetros de firma. Por ejemplo, 1 corresponde a SHA2-128s y 5 a SHA2-256s.
-  * Para las claves **Composite-ML-DSA**, el tamaño identifica la variante concreta, que combina el componente post-cuántico con el clásico. Por ejemplo, la variante 1 corresponde a MLDSA44-RSA2048-PSS-SHA256, la 9 a MLDSA44-ECDSA-P256-SHA256 y la 14 a MLDSA44-Ed25519-SHA512. La variante debe pertenecer a la familia del tipo de clave (RSA, ECDSA o Ed25519).
-  * Una clave **Composite-ML-DSA** contiene un componente post-cuántico ML-DSA y un componente clásico, y firma con ambos a la vez.
-</div>
+Cada motor define qué algoritmos <del className="lm-diff-del">soporta, como RSA o ECC/ECDSA, y qué tamaños de clave puede generar</del><ins className="lm-diff-ins">y tamaños de clave soporta (ver la sección </ins>*<ins className="lm-diff-ins">Algoritmos y tamaños de clave soportados</ins>*<ins className="lm-diff-ins">) y rechaza las operaciones que se le solicitan fuera de ese catálogo</ins>.
 
 Durante el despliegue es obligatorio definir un motor por defecto. Ese motor se utilizará cuando un proceso necesite crear o persistir una clave y el usuario no haya seleccionado uno específico, por ejemplo al crear o importar una CA.
 
@@ -98,9 +110,13 @@ En la primera pantalla del asistente, elija **Generate New Key Pair** y después
 
 * **Key Name**: nombre único y descriptivo.
 * **Crypto Engine**: motor que custodiará la clave.
-* **Key Type** y **Key Size**: algoritmo y tamaño o curva.<ins className="lm-diff-ins"> Las opciones disponibles dependen del motor seleccionado; consulte la tabla de tipos de clave de la sección de motores criptográficos.</ins>
+* **Key Type** y **Key Size**: algoritmo y tamaño o curva.
 * **Tags**: metadatos para clasificar la clave.
 * **Metadata**: información adicional para usos avanzados.
+
+<div className="lm-diff-ins lm-diff-block">
+  Los tipos y tamaños disponibles dependen del motor seleccionado (ver la sección *Algoritmos y tamaños de clave soportados*). Para las claves Ed25519 no es necesario indicar tamaño y para las familias post-cuánticas el tamaño corresponde a la variante del algoritmo.
+</div>
 
 Importar un par existente [#importar-un-par-existente]
 
@@ -119,7 +135,7 @@ En el asistente, elija **Import Existing Key Pair** y complete los campos solici
 * **Private Key (PEM)**: clave privada en formato PEM.
 
 <div className="lm-diff-ins lm-diff-block">
-  La clave privada debe seguir el formato PKCS#8. Además de RSA y ECDSA, se pueden importar claves Ed25519, ML-DSA, SLH-DSA y Composite-ML-DSA cuando el motor seleccionado las admite; el algoritmo y el tamaño se detectan automáticamente a partir del material importado.
+  La clave puede corresponder a cualquiera de los algoritmos soportados por el motor seleccionado, incluidos Ed25519 y los algoritmos post-cuánticos (ML-DSA, SLH-DSA y Composite ML-DSA).
 </div>
 
 Una vez completado el asistente, la clave queda almacenada en el motor seleccionado y puede utilizarse para firma, generación de CSR y el resto de operaciones soportadas por KMS.
@@ -151,10 +167,6 @@ La acción **Sign / Verify** sirve para validar que la clave y el motor criptogr
 
 Al abrirla aparecen dos áreas: **Sign** y **Verify**.
 
-<div className="lm-diff-ins lm-diff-block">
-  Los algoritmos de firma para claves post-cuánticas y Ed25519 siguen la convención *PURE* (por ejemplo, `MLDSA_65_PURE`, `Ed25519_PURE` o `COMPOSITE_MLDSA_ED25519_PURE`). En estos modos el mensaje se procesa tal cual, sin calcular previamente un *digest*, de modo que el campo **Message Type** no es aplicable.
-</div>
-
 Sign [#sign]
 
 Esta pestaña usa la clave privada para generar una firma digital sobre un mensaje o sobre un *digest* ya calculado.
@@ -166,6 +178,10 @@ Campos principales:
 * **Payload Encoding**: codificación de entrada, como UTF-8, Hex o Base64.
 * **Message**: contenido que se va a firmar.
 * **Signature**: resultado de la operación, mostrado en hexadecimal.
+
+<div className="lm-diff-ins lm-diff-block">
+  Para las claves Ed25519 y post-cuánticas (ML-DSA, SLH-DSA y Composite ML-DSA), los algoritmos de firma disponibles operan en modo *pure*: firman el mensaje original directamente, sin necesidad de precalcular un *digest*. Por ello, seleccione `Raw` como **Message Type**, ya que el algoritmo opera directamente sobre el contenido recibido. Los algoritmos correspondientes llevan el sufijo `_PURE`, como `MLDSA_65_PURE`, `SLHDSA_PURE`, `COMPOSITE_MLDSA_RSA_PURE` o `Ed25519_PURE`.
+</div>
 
 Verify [#verify]
 

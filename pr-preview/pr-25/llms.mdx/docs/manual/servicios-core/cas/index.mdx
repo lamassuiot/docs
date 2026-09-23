@@ -28,18 +28,14 @@ En el formulario de creación se definen los siguientes bloques de configuració
 
 **Parámetros de clave**
 
-* **Key Type:** RSA / EC (Elliptic Curve)<ins className="lm-diff-ins">, Ed25519 y los tipos post-cuánticos e híbridos (ML-DSA, SLH-DSA y Composite-ML-DSA), según el motor seleccionado</ins>
+* **Key Type:** RSA / EC (Elliptic Curve)
 * **Key Size:**
   * RSA: 1024, 2048, 3072, 4096 bits
   * EC: P-256, P-384, P-521
-  * Ed25519: tamaño fijo 256
-  * ML-DSA: 44, 65, 87
-  * SLH-DSA: conjunto de parámetros del 1 al 12
-  * Composite-ML-DSA: variante del 1 al 15, según la familia (RSA 1-8, ECDSA 9-13, Ed25519 14-15)
 * **Recomendado:** EC P-384
 
 <div className="lm-diff-ins lm-diff-block">
-  La disponibilidad de estos tipos de clave depende del motor criptográfico seleccionado. Si se elige un tipo de clave que el motor no admite, la creación de la CA se rechaza. Consulte la tabla de tipos de clave del servicio KMS para más detalles.
+  El formulario de la consola ofrece los tipos clásicos RSA y EC. A través de la API se pueden crear CAs con cualquiera de los tipos de clave soportados por el motor seleccionado, incluidos Ed25519 y los algoritmos post-cuánticos (ML-DSA, SLH-DSA y Composite ML-DSA). Consulte la sección de algoritmos de la página de [gestión de claves del KMS](/docs/manual/servicios-core/kms) para conocer el catálogo completo y las restricciones por motor.
 </div>
 
 **Perfil de emisión del certificado de la CA**
@@ -60,6 +56,10 @@ Si no se proporciona ningún perfil se aplicará uno por defecto con los usos de
 * **Root CA:** Self-signed (auto-firmada)
 * **Intermediate CA:** Selector desplegable de CA superior disponible
   * Permite seleccionar la CA padre que firmará la nueva CA intermedia
+
+<div className="lm-diff-ins lm-diff-block">
+  La CA superior seleccionada no está limitada a un algoritmo concreto: Lamassu permite combinar jerarquías con algoritmos distintos, por ejemplo una CA intermedia post-cuántica bajo una raíz clásica o al contrario. Tenga en cuenta que la interoperabilidad de la jerarquía resultante dependerá de que los clientes que validen los certificados soporten los algoritmos utilizados en cada nivel.
+</div>
 
 **Identificación**
 
@@ -123,10 +123,6 @@ En este caso, primero se solicita la selección de la clave de soporte para esta
 
 Se abre un popup que permite al usuario seleccionar la clave deseada de entre las disponibles en el KMS. Una vez seleccionada la clave, el proceso continúa como se describe en el punto anterior.
 
-<div className="lm-diff-ins lm-diff-block">
-  Cualquier clave registrada en el KMS puede servir de soporte a una CA, incluidas las de tipo post-cuántico o híbrido. Esto permite construir jerarquías de confianza en las que el tipo de clave del emisor no tiene por qué coincidir con el del sujeto: por ejemplo, una CA raíz ML-DSA puede emitir certificados sobre claves RSA o ECDSA, y viceversa.
-</div>
-
 Importación de autoridades de certificación [#importación-de-autoridades-de-certificación]
 
 La importación de entidades de certificación permite importar en el sistema una CA que ha sido generada de manera externa. Para ello se sigue el siguiente proceso:
@@ -152,10 +148,6 @@ Se debe proporcionar de manera obligatoria:
 * Clave privada de la CA en formato PEM
 
 De manera opcional se proporcionarán en formato PEM la cadena de certificados de la cadena de validación en caso de importar una CA subordinada.
-
-<div className="lm-diff-ins lm-diff-block">
-  La clave privada se importa a través del mecanismo de importación de claves del servicio KMS (formato PKCS#8), por lo que se admiten los mismos tipos de clave: RSA, ECDSA, Ed25519, ML-DSA, SLH-DSA y Composite-ML-DSA, según el soporte del motor seleccionado. El algoritmo y el tamaño se detectan automáticamente a partir del material importado.
-</div>
 
 Operando con entidades de confianza [#operando-con-entidades-de-confianza]
 
@@ -285,10 +277,6 @@ Una vez completado los campos del formulario se solicita la emisión del certifi
 Mediante esta opción se podrá realizar la emisión de certificados a partir de CSRs que hayan sido generados de manera externa. Para ello en el selector de modo del formulario de emisión es necesario seleccionar “Upload Existing CSR”.
 
 Se debe proporcionar un CSR válido que contenga los detalles del certificado a emitir, Subject Name, SANs,..
-
-<div className="lm-diff-ins lm-diff-block">
-  El CSR externo puede estar firmado con cualquier tipo de clave admitido por la plataforma, incluidos los tipos post-cuánticos e híbridos. No es necesario que el tipo de clave del CSR coincida con el de la CA emisora: por ejemplo, una CA RSA o ECDSA puede emitir certificados sobre claves ML-DSA o Composite-ML-DSA, y viceversa.
-</div>
 
 Adicionalmente se proporcionará la duración deseada para el certificado y los usos permitidos. Con esta información se procederá a la emisión como se describe en el apartado anterior.
 

@@ -28,17 +28,19 @@ En el formulario de creación se definen los siguientes bloques de configuració
 
 **Parámetros de clave**
 
-* **Key Type:** RSA / EC (Elliptic Curve), ML-DSA, SLH-DSA, Ed25519 y firmas compuestas (Composite ML-DSA)
+* **Key Type:** RSA / EC (Elliptic Curve)<ins className="lm-diff-ins">, Ed25519 y los tipos post-cuánticos e híbridos (ML-DSA, SLH-DSA y Composite-ML-DSA), según el motor seleccionado</ins>
 * **Key Size:**
   * RSA: 1024, 2048, 3072, 4096 bits
   * EC: P-256, P-384, P-521
-  * ML-DSA: 44, 65 o 87
-  * SLH-DSA: parámetro 1 a 12
-  * Ed25519: 256
-  * Composite ML-DSA: variante 1 a 15
+  * Ed25519: tamaño fijo 256
+  * ML-DSA: 44, 65, 87
+  * SLH-DSA: conjunto de parámetros del 1 al 12
+  * Composite-ML-DSA: variante del 1 al 15, según la familia (RSA 1-8, ECDSA 9-13, Ed25519 14-15)
 * **Recomendado:** EC P-384
 
-Los tipos de clave disponibles dependen del motor criptográfico seleccionado: los tipos post-cuánticos, Ed25519 y las firmas compuestas solo los soportan el motor software y el motor File System. Consulte [Criptografía post-cuántica (LamassuQ)](/docs/manual/servicios-core/lamassuq) para el detalle de variantes y motores.
+<div className="lm-diff-ins lm-diff-block">
+  La disponibilidad de estos tipos de clave depende del motor criptográfico seleccionado. Si se elige un tipo de clave que el motor no admite, la creación de la CA se rechaza. Consulte la tabla de tipos de clave del servicio KMS para más detalles.
+</div>
 
 **Perfil de emisión del certificado de la CA**
 
@@ -121,6 +123,10 @@ En este caso, primero se solicita la selección de la clave de soporte para esta
 
 Se abre un popup que permite al usuario seleccionar la clave deseada de entre las disponibles en el KMS. Una vez seleccionada la clave, el proceso continúa como se describe en el punto anterior.
 
+<div className="lm-diff-ins lm-diff-block">
+  Cualquier clave registrada en el KMS puede servir de soporte a una CA, incluidas las de tipo post-cuántico o híbrido. Esto permite construir jerarquías de confianza en las que el tipo de clave del emisor no tiene por qué coincidir con el del sujeto: por ejemplo, una CA raíz ML-DSA puede emitir certificados sobre claves RSA o ECDSA, y viceversa.
+</div>
+
 Importación de autoridades de certificación [#importación-de-autoridades-de-certificación]
 
 La importación de entidades de certificación permite importar en el sistema una CA que ha sido generada de manera externa. Para ello se sigue el siguiente proceso:
@@ -145,9 +151,11 @@ Se debe proporcionar de manera obligatoria:
 * Certificado de la CA en formato PEM. Se comprueba que el certificado importado corresponda con el de una CA.
 * Clave privada de la CA en formato PEM
 
-Para las CAs con claves post-cuánticas, Ed25519 o compuestas, la clave privada debe proporcionarse en formato PKCS#8 y el motor seleccionado debe soportar el tipo de clave; consulte [Criptografía post-cuántica (LamassuQ)](/docs/manual/servicios-core/lamassuq#importación-de-claves-post-cuánticas).
-
 De manera opcional se proporcionarán en formato PEM la cadena de certificados de la cadena de validación en caso de importar una CA subordinada.
+
+<div className="lm-diff-ins lm-diff-block">
+  La clave privada se importa a través del mecanismo de importación de claves del servicio KMS (formato PKCS#8), por lo que se admiten los mismos tipos de clave: RSA, ECDSA, Ed25519, ML-DSA, SLH-DSA y Composite-ML-DSA, según el soporte del motor seleccionado. El algoritmo y el tamaño se detectan automáticamente a partir del material importado.
+</div>
 
 Operando con entidades de confianza [#operando-con-entidades-de-confianza]
 
@@ -175,8 +183,6 @@ La funcionalidad de emisión es accesible también desde el listado de CAs media
 Y desde la funcionalidad  listado completo de certificados emitidos por Lamassu mediante la acción “Issue Certificate”
 
 En este caso se solicitará la selección de una CA antes de acceder al formulario de emisión.
-
-El tipo de clave del certificado emitido no tiene por qué coincidir con el de la CA emisora, ya que la firma del certificado la realiza siempre la clave de la CA emisora. Una CA con clave post-cuántica, Ed25519 o compuesta puede emitir certificados para claves tradicionales, y una CA tradicional puede emitir certificados para CSRs con claves post-cuánticas, Ed25519 o compuestas. Consulte [Cadenas de certificados mixtas](/docs/manual/servicios-core/lamassuq#cadenas-de-certificados-mixtas).
 
 El formulario de emisión de certificados ofrece 2 opciones para la emisión:
 
@@ -228,7 +234,7 @@ Los SANs proporcionan identificadores alternativos para el certificado, permitie
 Es posible añadir múltiples SAN de cada tipo, se selecciona el tipo, añadiendo el valor y pulsando la acción “Add”.
 
 **Key Generation Details (Detalles de generación de claves)**
-Se debe especificar el tipo de clave a ser generada para la solicitud del certificado. La generación en el navegador solo está disponible para los algoritmos tradicionales (ECDSA y RSA); para claves post-cuánticas, Ed25519 o compuestas, utilice la opción de emisión a partir de un CSR generado de manera externa.
+Se debe especificar el tipo de clave a ser generada para la solicitud del certificado.
 
 **Algorithm (Algoritmo)**
 
@@ -279,6 +285,10 @@ Una vez completado los campos del formulario se solicita la emisión del certifi
 Mediante esta opción se podrá realizar la emisión de certificados a partir de CSRs que hayan sido generados de manera externa. Para ello en el selector de modo del formulario de emisión es necesario seleccionar “Upload Existing CSR”.
 
 Se debe proporcionar un CSR válido que contenga los detalles del certificado a emitir, Subject Name, SANs,..
+
+<div className="lm-diff-ins lm-diff-block">
+  El CSR externo puede estar firmado con cualquier tipo de clave admitido por la plataforma, incluidos los tipos post-cuánticos e híbridos. No es necesario que el tipo de clave del CSR coincida con el de la CA emisora: por ejemplo, una CA RSA o ECDSA puede emitir certificados sobre claves ML-DSA o Composite-ML-DSA, y viceversa.
+</div>
 
 Adicionalmente se proporcionará la duración deseada para el certificado y los usos permitidos. Con esta información se procederá a la emisión como se describe en el apartado anterior.
 

@@ -585,8 +585,6 @@ Servicios Core [#servicios-core]
 <Cards>
   <Card title="Gestión de Claves (KMS)" description="Motores criptográficos, generación e importación de claves" href="/docs/manual/servicios-core/kms" />
 
-  <Card title="Criptografía post-cuántica (LamassuQ)" description="Tipos de clave post-cuánticos, variantes compuestas, modo PURE y motores compatibles" href="/docs/manual/servicios-core/lamassuq" />
-
   <Card title="Entidades de Confianza (CAs)" description="Creación, importación y gestión de Autoridades de Certificación" href="/docs/manual/servicios-core/cas" />
 
   <Card title="Gestión de Certificados" description="Visualización y revocación de certificados emitidos" href="/docs/manual/servicios-core/certificates" />
@@ -1053,17 +1051,19 @@ En el formulario de creación se definen los siguientes bloques de configuració
 
 **Parámetros de clave**
 
-* **Key Type:** RSA / EC (Elliptic Curve), ML-DSA, SLH-DSA, Ed25519 y firmas compuestas (Composite ML-DSA)
+* **Key Type:** RSA / EC (Elliptic Curve)<ins className="lm-diff-ins">, Ed25519 y los tipos post-cuánticos e híbridos (ML-DSA, SLH-DSA y Composite-ML-DSA), según el motor seleccionado</ins>
 * **Key Size:**
   * RSA: 1024, 2048, 3072, 4096 bits
   * EC: P-256, P-384, P-521
-  * ML-DSA: 44, 65 o 87
-  * SLH-DSA: parámetro 1 a 12
-  * Ed25519: 256
-  * Composite ML-DSA: variante 1 a 15
+  * Ed25519: tamaño fijo 256
+  * ML-DSA: 44, 65, 87
+  * SLH-DSA: conjunto de parámetros del 1 al 12
+  * Composite-ML-DSA: variante del 1 al 15, según la familia (RSA 1-8, ECDSA 9-13, Ed25519 14-15)
 * **Recomendado:** EC P-384
 
-Los tipos de clave disponibles dependen del motor criptográfico seleccionado: los tipos post-cuánticos, Ed25519 y las firmas compuestas solo los soportan el motor software y el motor File System. Consulte [Criptografía post-cuántica (LamassuQ)](/docs/manual/servicios-core/lamassuq) para el detalle de variantes y motores.
+<div className="lm-diff-ins lm-diff-block">
+  La disponibilidad de estos tipos de clave depende del motor criptográfico seleccionado. Si se elige un tipo de clave que el motor no admite, la creación de la CA se rechaza. Consulte la tabla de tipos de clave del servicio KMS para más detalles.
+</div>
 
 **Perfil de emisión del certificado de la CA**
 
@@ -1146,6 +1146,10 @@ En este caso, primero se solicita la selección de la clave de soporte para esta
 
 Se abre un popup que permite al usuario seleccionar la clave deseada de entre las disponibles en el KMS. Una vez seleccionada la clave, el proceso continúa como se describe en el punto anterior.
 
+<div className="lm-diff-ins lm-diff-block">
+  Cualquier clave registrada en el KMS puede servir de soporte a una CA, incluidas las de tipo post-cuántico o híbrido. Esto permite construir jerarquías de confianza en las que el tipo de clave del emisor no tiene por qué coincidir con el del sujeto: por ejemplo, una CA raíz ML-DSA puede emitir certificados sobre claves RSA o ECDSA, y viceversa.
+</div>
+
 Importación de autoridades de certificación [#importación-de-autoridades-de-certificación]
 
 La importación de entidades de certificación permite importar en el sistema una CA que ha sido generada de manera externa. Para ello se sigue el siguiente proceso:
@@ -1170,9 +1174,11 @@ Se debe proporcionar de manera obligatoria:
 * Certificado de la CA en formato PEM. Se comprueba que el certificado importado corresponda con el de una CA.
 * Clave privada de la CA en formato PEM
 
-Para las CAs con claves post-cuánticas, Ed25519 o compuestas, la clave privada debe proporcionarse en formato PKCS#8 y el motor seleccionado debe soportar el tipo de clave; consulte [Criptografía post-cuántica (LamassuQ)](/docs/manual/servicios-core/lamassuq#importación-de-claves-post-cuánticas).
-
 De manera opcional se proporcionarán en formato PEM la cadena de certificados de la cadena de validación en caso de importar una CA subordinada.
+
+<div className="lm-diff-ins lm-diff-block">
+  La clave privada se importa a través del mecanismo de importación de claves del servicio KMS (formato PKCS#8), por lo que se admiten los mismos tipos de clave: RSA, ECDSA, Ed25519, ML-DSA, SLH-DSA y Composite-ML-DSA, según el soporte del motor seleccionado. El algoritmo y el tamaño se detectan automáticamente a partir del material importado.
+</div>
 
 Operando con entidades de confianza [#operando-con-entidades-de-confianza]
 
@@ -1200,8 +1206,6 @@ La funcionalidad de emisión es accesible también desde el listado de CAs media
 Y desde la funcionalidad  listado completo de certificados emitidos por Lamassu mediante la acción “Issue Certificate”
 
 En este caso se solicitará la selección de una CA antes de acceder al formulario de emisión.
-
-El tipo de clave del certificado emitido no tiene por qué coincidir con el de la CA emisora, ya que la firma del certificado la realiza siempre la clave de la CA emisora. Una CA con clave post-cuántica, Ed25519 o compuesta puede emitir certificados para claves tradicionales, y una CA tradicional puede emitir certificados para CSRs con claves post-cuánticas, Ed25519 o compuestas. Consulte [Cadenas de certificados mixtas](/docs/manual/servicios-core/lamassuq#cadenas-de-certificados-mixtas).
 
 El formulario de emisión de certificados ofrece 2 opciones para la emisión:
 
@@ -1253,7 +1257,7 @@ Los SANs proporcionan identificadores alternativos para el certificado, permitie
 Es posible añadir múltiples SAN de cada tipo, se selecciona el tipo, añadiendo el valor y pulsando la acción “Add”.
 
 **Key Generation Details (Detalles de generación de claves)**
-Se debe especificar el tipo de clave a ser generada para la solicitud del certificado. La generación en el navegador solo está disponible para los algoritmos tradicionales (ECDSA y RSA); para claves post-cuánticas, Ed25519 o compuestas, utilice la opción de emisión a partir de un CSR generado de manera externa.
+Se debe especificar el tipo de clave a ser generada para la solicitud del certificado.
 
 **Algorithm (Algoritmo)**
 
@@ -1304,6 +1308,10 @@ Una vez completado los campos del formulario se solicita la emisión del certifi
 Mediante esta opción se podrá realizar la emisión de certificados a partir de CSRs que hayan sido generados de manera externa. Para ello en el selector de modo del formulario de emisión es necesario seleccionar “Upload Existing CSR”.
 
 Se debe proporcionar un CSR válido que contenga los detalles del certificado a emitir, Subject Name, SANs,..
+
+<div className="lm-diff-ins lm-diff-block">
+  El CSR externo puede estar firmado con cualquier tipo de clave admitido por la plataforma, incluidos los tipos post-cuánticos e híbridos. No es necesario que el tipo de clave del CSR coincida con el de la CA emisora: por ejemplo, una CA RSA o ECDSA puede emitir certificados sobre claves ML-DSA o Composite-ML-DSA, y viceversa.
+</div>
 
 Adicionalmente se proporcionará la duración deseada para el certificado y los usos permitidos. Con esta información se procederá a la emisión como se describe en el apartado anterior.
 
@@ -1978,9 +1986,7 @@ Gestión de claves criptográficas [#gestión-de-claves-criptográficas]
 
 El servicio de Gestión de Claves Criptográficas (KMS) de Lamassu IoT centraliza la generación, importación, custodia y uso de las claves de la plataforma. Desde aquí se gestionan las claves que soportan a las CAs y al resto de operaciones de firma que dependen de la PKI.
 
-Lamassu IoT trabaja con claves asimétricas: además de RSA y curvas elípticas, soporta algoritmos post-cuánticos (ML-DSA y SLH-DSA), Ed25519 y firmas compuestas que combinan ML-DSA con un algoritmo tradicional. Estas claves se usan para emitir certificados X.509, firmar solicitudes y realizar operaciones de autenticación y validación dentro del sistema.
-
-Consulte [Criptografía post-cuántica (LamassuQ)](/docs/manual/servicios-core/lamassuq) para conocer los nuevos tipos de clave, sus parámetros y las limitaciones de motor que aplican.
+En la configuración actual, Lamassu IoT trabaja <del className="lm-diff-del">exclusivamente </del>con claves asimétricas<del className="lm-diff-del">, como RSA y curvas elípticas</del><ins className="lm-diff-ins"> RSA y de curva elíptica (ECDSA), junto con Ed25519 y con los algoritmos post-cuánticos ML-DSA, SLH-DSA y las variantes híbridas Composite-ML-DSA</ins>. Estas claves se usan para emitir certificados X.509, firmar solicitudes y realizar operaciones de autenticación y validación dentro del sistema.
 
 Qué resuelve el KMS [#qué-resuelve-el-kms]
 
@@ -2011,11 +2017,30 @@ Actualmente, Lamassu soporta los siguientes motores:
 
 Lamassu muestra en la consola el listado completo de motores habilitados.
 
-Cada motor define qué algoritmos soporta, como RSA o ECC/ECDSA, y qué tamaños de clave puede generar.
+Cada motor define qué algoritmos soporta<del className="lm-diff-del">, como RSA o ECC/ECDSA, y qué tamaños de clave puede generar</del><ins className="lm-diff-ins"> y qué tamaños o parámetros de clave admite. El motor de software integrado soporta todos los tipos de la tabla siguiente; los motores externos pueden limitar el catálogo disponible, por lo que conviene comprobar las opciones que ofrece cada motor antes de crear o importar una clave</ins>.
 
-<Callout type="warn" title="Soporte de tipos de clave según motor">
-  Los algoritmos post-cuánticos, Ed25519 y las firmas compuestas solo pueden generarse e importarse en el motor software (Golang) y en el motor File System. El resto de motores externos rechazan estos tipos de clave con el error `unsupported key type`. Consulte [Motores criptográficos compatibles](/docs/manual/servicios-core/lamassuq#motores-criptográficos-compatibles).
-</Callout>
+<div className="lm-diff-ins lm-diff-block">
+  | Key Type                 | Descripción                       | Key Size                                           |
+  | :----------------------- | :-------------------------------- | :------------------------------------------------- |
+  | RSA                      | RSA clásico                       | 1024, 2048, 3072, 4096 bits                        |
+  | ECDSA                    | Curvas elípticas clásicas         | 224 (P-224), 256 (P-256), 384 (P-384), 521 (P-521) |
+  | Ed25519                  | EdDSA sobre Edwards25519          | 256 (valor fijo)                                   |
+  | ML-DSA                   | Post-cuántica basada en retículos | 44, 65, 87                                         |
+  | SLH-DSA                  | Post-cuántica basada en hash      | Conjunto de parámetros del 1 al 12                 |
+  | Composite-ML-DSA-RSA     | Híbrida: ML-DSA + RSA             | Variante del 1 al 8                                |
+  | Composite-ML-DSA-ECDSA   | Híbrida: ML-DSA + ECDSA           | Variante del 9 al 13                               |
+  | Composite-ML-DSA-Ed25519 | Híbrida: ML-DSA + Ed25519         | Variante del 14 al 15                              |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Sobre la columna **Key Size**:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * Para **SLH-DSA**, el tamaño identifica el conjunto de parámetros de firma. Por ejemplo, 1 corresponde a SHA2-128s y 5 a SHA2-256s.
+  * Para las claves **Composite-ML-DSA**, el tamaño identifica la variante concreta, que combina el componente post-cuántico con el clásico. Por ejemplo, la variante 1 corresponde a MLDSA44-RSA2048-PSS-SHA256, la 9 a MLDSA44-ECDSA-P256-SHA256 y la 14 a MLDSA44-Ed25519-SHA512. La variante debe pertenecer a la familia del tipo de clave (RSA, ECDSA o Ed25519).
+  * Una clave **Composite-ML-DSA** contiene un componente post-cuántico ML-DSA y un componente clásico, y firma con ambos a la vez.
+</div>
 
 Durante el despliegue es obligatorio definir un motor por defecto. Ese motor se utilizará cuando un proceso necesite crear o persistir una clave y el usuario no haya seleccionado uno específico, por ejemplo al crear o importar una CA.
 
@@ -2026,7 +2051,7 @@ La pantalla principal de KMS muestra el inventario completo de claves registrada
 La tabla incluye los siguientes campos:
 
 * **Name**: nombre descriptivo de la clave.
-* **Type**: algoritmo y tamaño de clave, por ejemplo RSA 2048, EC P-256, ML-DSA 65 o Composite-ML-DSA-ECDSA 10.
+* **Type**: algoritmo y tamaño de clave, por ejemplo RSA 2048<del className="lm-diff-del"> o</del><ins className="lm-diff-ins">,</ins> EC P-256<ins className="lm-diff-ins"> o ML-DSA 65</ins>.
 * **Strength**: indicador visual de fortaleza criptográfica.
 * **Public/Private**: indica si Lamassu gestiona el par completo o solo la clave pública.
 * **Crypto Engine**: motor criptográfico que custodia la clave.
@@ -2053,7 +2078,7 @@ En la primera pantalla del asistente, elija **Generate New Key Pair** y después
 
 * **Key Name**: nombre único y descriptivo.
 * **Crypto Engine**: motor que custodiará la clave.
-* **Key Type** y **Key Size**: algoritmo y tamaño o curva. Además de RSA y curvas elípticas, se pueden seleccionar ML-DSA (44, 65 o 87), SLH-DSA (parámetros 1 a 12), Ed25519 y las variantes compuestas; consulte [Criptografía post-cuántica (LamassuQ)](/docs/manual/servicios-core/lamassuq).
+* **Key Type** y **Key Size**: algoritmo y tamaño o curva.<ins className="lm-diff-ins"> Las opciones disponibles dependen del motor seleccionado; consulte la tabla de tipos de clave de la sección de motores criptográficos.</ins>
 * **Tags**: metadatos para clasificar la clave.
 * **Metadata**: información adicional para usos avanzados.
 
@@ -2071,7 +2096,11 @@ En el asistente, elija **Import Existing Key Pair** y complete los campos solici
 * **Crypto Engine**: motor que custodiará la clave importada.
 * **Tags**: etiquetas para organización y búsqueda.
 * **Metadata**: información adicional opcional.
-* **Private Key (PEM)**: clave privada en formato PEM. Para los tipos post-cuánticos, Ed25519 y compuestos, el formato requerido es PKCS#8; consulte [Importación de claves post-cuánticas](/docs/manual/servicios-core/lamassuq#importación-de-claves-post-cuánticas).
+* **Private Key (PEM)**: clave privada en formato PEM.
+
+<div className="lm-diff-ins lm-diff-block">
+  La clave privada debe seguir el formato PKCS#8. Además de RSA y ECDSA, se pueden importar claves Ed25519, ML-DSA, SLH-DSA y Composite-ML-DSA cuando el motor seleccionado las admite; el algoritmo y el tamaño se detectan automáticamente a partir del material importado.
+</div>
 
 Una vez completado el asistente, la clave queda almacenada en el motor seleccionado y puede utilizarse para firma, generación de CSR y el resto de operaciones soportadas por KMS.
 
@@ -2102,6 +2131,10 @@ La acción **Sign / Verify** sirve para validar que la clave y el motor criptogr
 
 Al abrirla aparecen dos áreas: **Sign** y **Verify**.
 
+<div className="lm-diff-ins lm-diff-block">
+  Los algoritmos de firma para claves post-cuánticas y Ed25519 siguen la convención *PURE* (por ejemplo, `MLDSA_65_PURE`, `Ed25519_PURE` o `COMPOSITE_MLDSA_ED25519_PURE`). En estos modos el mensaje se procesa tal cual, sin calcular previamente un *digest*, de modo que el campo **Message Type** no es aplicable.
+</div>
+
 Sign [#sign]
 
 Esta pestaña usa la clave privada para generar una firma digital sobre un mensaje o sobre un *digest* ya calculado.
@@ -2113,10 +2146,6 @@ Campos principales:
 * **Payload Encoding**: codificación de entrada, como UTF-8, Hex o Base64.
 * **Message**: contenido que se va a firmar.
 * **Signature**: resultado de la operación, mostrado en hexadecimal.
-
-<Callout type="info" title="Algoritmos de firma PURE">
-  Los algoritmos post-cuánticos, Ed25519 y las firmas compuestas operan en modo PURE: firman el mensaje tal cual, sin pre-hash. En las pestañas **Sign** y **Verify**, seleccione el tipo de mensaje `Raw`. Consulte [Firmas en modo PURE](/docs/manual/servicios-core/lamassuq#firmas-en-modo-pure) para los identificadores de algoritmo disponibles.
-</Callout>
 
 Verify [#verify]
 
@@ -2158,110 +2187,6 @@ Firma local con PKCS#11 [#firma-local-con-pkcs11]
 Lamassu también ofrece una ayuda específica para integraciones locales mediante **Sign locally with OpenSSL & PKCS11 tools**.
 
 Esta opción muestra los pasos necesarios para configurar el entorno local, cargar el módulo PKCS#11 y ejecutar firmas con herramientas como OpenSSL sin extraer la clave privada del entorno custodiado.
-
-
-# [LamassuQ] Criptografía post-cuántica (/docs/pr-preview/pr-25/manual/servicios-core/lamassuq)
-
-
-
-Criptografía post-cuántica (LamassuQ) [#criptografía-post-cuántica-lamassuq]
-
-LamassuQ incorpora a Lamassu IoT el soporte de criptografía post-cuántica (PQC). La plataforma puede generar, importar y custodiar claves de firma basadas en los algoritmos estandarizados por el NIST, además de firmas compuestas (*composites*) que combinan ML-DSA con un algoritmo tradicional en una única clave y un único certificado. Los algoritmos post-cuánticos están diseñados para resistir los ataques de los ordenadores cuánticos; las firmas compuestas permiten adoptarlos de forma gradual manteniendo la compatibilidad con la criptografía tradicional.
-
-Los nuevos tipos de clave están disponibles en el servicio [KMS](/docs/manual/servicios-core/kms), para generación, importación, firma y verificación, y en la [gestión de entidades de confianza](/docs/manual/servicios-core/cas), para crear e importar CAs y emitir certificados.
-
-Tipos de clave soportados [#tipos-de-clave-soportados]
-
-| Tipo de clave              | Identificador              | Parámetros         | Descripción                                                                                                                                      |
-| :------------------------- | :------------------------- | :----------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
-| ML-DSA                     | `ML-DSA`                   | 44, 65 o 87        | Firma digital post-cuántica basada en retículas (FIPS 204). El valor indica el nivel de seguridad del juego de parámetros.                       |
-| SLH-DSA                    | `SLH-DSA`                  | 1 a 12             | Firma digital post-cuántica basada en funciones hash (FIPS 205). El valor selecciona el juego de parámetros; el valor 1 corresponde a SHA2-128s. |
-| Ed25519                    | `Ed25519`                  | 256                | Firma EdDSA clásica sobre Ed25519.                                                                                                               |
-| Composite ML-DSA + RSA     | `Composite-ML-DSA-RSA`     | 1 a 8 (variante)   | Firma compuesta ML-DSA + RSA.                                                                                                                    |
-| Composite ML-DSA + ECDSA   | `Composite-ML-DSA-ECDSA`   | 9 a 13 (variante)  | Firma compuesta ML-DSA + ECDSA.                                                                                                                  |
-| Composite ML-DSA + Ed25519 | `Composite-ML-DSA-Ed25519` | 14 a 15 (variante) | Firma compuesta ML-DSA + Ed25519.                                                                                                                |
-
-Para las claves compuestas, el valor de **Key Size** se corresponde con la variante del algoritmo compuesto; consulte la tabla de variantes.
-
-Variantes compuestas [#variantes-compuestas]
-
-Cada variante fija el juego de parámetros ML-DSA, el algoritmo tradicional acompañante y la función hash del algoritmo compuesto. Una firma compuesta incluye las firmas de ambos componentes, de forma que el resultado se verifica como una única firma que cubre ambos algoritmos.
-
-| Variante | Familia | Algoritmo compuesto           |
-| :------: | :------ | :---------------------------- |
-|     1    | RSA     | MLDSA44-RSA2048-PSS-SHA256    |
-|     2    | RSA     | MLDSA44-RSA2048-PKCS15-SHA256 |
-|     3    | RSA     | MLDSA65-RSA3072-PSS-SHA512    |
-|     4    | RSA     | MLDSA65-RSA3072-PKCS15-SHA512 |
-|     5    | RSA     | MLDSA65-RSA4096-PSS-SHA512    |
-|     6    | RSA     | MLDSA65-RSA4096-PKCS15-SHA512 |
-|     7    | RSA     | MLDSA87-RSA3072-PSS-SHA512    |
-|     8    | RSA     | MLDSA87-RSA4096-PSS-SHA512    |
-|     9    | ECDSA   | MLDSA44-ECDSA-P256-SHA256     |
-|    10    | ECDSA   | MLDSA65-ECDSA-P256-SHA512     |
-|    11    | ECDSA   | MLDSA65-ECDSA-P384-SHA512     |
-|    12    | ECDSA   | MLDSA87-ECDSA-P384-SHA512     |
-|    13    | ECDSA   | MLDSA87-ECDSA-P521-SHA512     |
-|    14    | Ed25519 | MLDSA44-Ed25519-SHA512        |
-|    15    | Ed25519 | MLDSA65-Ed25519-SHA512        |
-
-Cada variante solo es válida para su familia: las variantes 1 a 8 con el tipo `Composite-ML-DSA-RSA`, las variantes 9 a 13 con `Composite-ML-DSA-ECDSA` y las variantes 14 a 15 con `Composite-ML-DSA-Ed25519`. El KMS rechaza cualquier combinación que no cumpla esta correspondencia.
-
-Motores criptográficos compatibles [#motores-criptográficos-compatibles]
-
-| Motor                                                                                                | Claves post-cuánticas y compuestas                                                                  |
-| :--------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
-| Software (Golang)                                                                                    | Soportadas: generación, importación, firma y verificación.                                          |
-| File System                                                                                          | Soportadas: delega en el motor software.                                                            |
-| AWS KMS, AWS Secrets Manager, Azure KeyVault, Azure KeyVault Secrets, HashiCorp Vault (KV2), PKCS#11 | No soportadas. La generación o importación de estos tipos devuelve el error `unsupported key type`. |
-
-<Callout type="warn" title="Cuidado con el catálogo de motores externos">
-  Los motores AWS Secrets Manager y HashiCorp Vault KV2 anuncian en su catálogo los mismos tipos de clave que el motor software, incluidos los nuevos tipos post-cuánticos y compuestos. La consola o la API pueden aceptar la solicitud, pero la operación falla después con el error `unsupported key type`. Utilice el motor software o File System para estos tipos de clave hasta que el motor externo los soporte de forma nativa.
-</Callout>
-
-Firmas en modo PURE [#firmas-en-modo-pure]
-
-Los algoritmos de firma tradicionales (por ejemplo `RSASSA_PSS_SHA_256` o `ECDSA_SHA_384`) firman un *digest* calculado previamente sobre el mensaje. Los algoritmos post-cuánticos, Ed25519 y las firmas compuestas operan en modo PURE: firman el mensaje tal cual, sin aplicar un pre-hash.
-
-La tabla siguiente resume los identificadores de algoritmo disponibles para cada tipo de clave:
-
-| Tipo de clave            | Algoritmo de firma             |
-| :----------------------- | :----------------------------- |
-| ML-DSA 44                | `MLDSA_44_PURE`                |
-| ML-DSA 65                | `MLDSA_65_PURE`                |
-| ML-DSA 87                | `MLDSA_87_PURE`                |
-| SLH-DSA                  | `SLHDSA_PURE`                  |
-| Ed25519                  | `Ed25519_PURE`                 |
-| Composite-ML-DSA-RSA     | `COMPOSITE_MLDSA_RSA_PURE`     |
-| Composite-ML-DSA-ECDSA   | `COMPOSITE_MLDSA_ECDSA_PURE`   |
-| Composite-ML-DSA-Ed25519 | `COMPOSITE_MLDSA_ED25519_PURE` |
-
-Para ML-DSA, el identificador se deriva del nivel del juego de parámetros de la clave (44, 65 o 87). Para SLH-DSA y las familias compuestas, el identificador es único y no incluye el juego de parámetros ni la variante.
-
-En las operaciones **Sign** y **Verify** de la consola, seleccione el tipo de mensaje `Raw` con estos algoritmos, ya que el mensaje se firma tal cual. Consulte [Firmar y verificar](/docs/manual/servicios-core/kms#firmar-y-verificar) para los detalles de la operación.
-
-Importación de claves post-cuánticas [#importación-de-claves-post-cuánticas]
-
-Las claves generadas fuera de Lamassu IoT pueden importarse mediante el asistente de importación del KMS, igual que las claves tradicionales. Para los nuevos tipos de clave se aplican las siguientes reglas:
-
-* La clave privada debe proporcionarse en formato **PKCS#8** (PEM).
-* Se admiten claves ML-DSA, SLH-DSA, Ed25519 y firmas compuestas.
-* La clave debe usar uno de los juegos de parámetros soportados: ML-DSA 44, 65 o 87, o SLH-DSA con un parámetro entre 1 y 12.
-* Solo pueden importarse en los motores con soporte de estos tipos; consulte la [tabla de motores](#motores-criptográficos-compatibles).
-
-Cadenas de certificados mixtas [#cadenas-de-certificados-mixtas]
-
-Las CAs creadas o importadas con claves post-cuánticas, Ed25519 o compuestas pueden emitir certificados para solicitudes generadas con claves tradicionales, y viceversa. La firma del certificado la realiza siempre la clave de la CA emisora, por lo que la clave del certificado emitido no necesita compartir algoritmo con la de la CA.
-
-Las claves de las CAs se generan e importan a través del KMS, de forma que a la creación o importación de una CA con estos tipos se aplican las mismas restricciones de motor y de parámetros descritas en las secciones anteriores.
-
-Referencias relacionadas [#referencias-relacionadas]
-
-<Cards>
-  <Card title="Gestión de Claves (KMS)" href="/docs/manual/servicios-core/kms" />
-
-  <Card title="Entidades de Confianza (CAs)" href="/docs/manual/servicios-core/cas" />
-</Cards>
 
 
 # [DMS] Device Management Service (/docs/pr-preview/pr-25/manual/servicios-core/ra)

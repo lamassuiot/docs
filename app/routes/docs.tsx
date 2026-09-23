@@ -70,7 +70,7 @@ function clonePageItem(item: PageTreeItem, name: ReactNode, idSuffix: string): P
   };
 }
 
-function createFolder(name: string, children: PageTreeItem[], id: string, icon?: ReactNode): PageTreeFolder {
+function createFolder(name: string, children: PageTreeNode[], id: string, icon?: ReactNode): PageTreeFolder {
   return {
     $id: id,
     type: 'folder',
@@ -79,6 +79,33 @@ function createFolder(name: string, children: PageTreeItem[], id: string, icon?:
     defaultOpen: true,
     children,
   };
+}
+
+/**
+ * The "Servicios Core" groups, in sidebar order. Pages and subfolders pick
+ * their group in content (frontmatter `sidebar.group`, or `group` in a
+ * subfolder's meta.json — see source.config.ts); within a group they keep
+ * their meta.json order. A group name not listed here becomes a new folder
+ * after these; anything without a group goes to "Otros".
+ */
+const SERVICIOS_CORE_GROUPS: { name: string; id: string; icon: ReactNode }[] = [
+  { name: 'KMS', id: 'kms', icon: <KeyRound size={16} className="shrink-0" /> },
+  { name: 'CA', id: 'ca', icon: <ShieldCheck size={16} className="shrink-0" /> },
+  { name: 'RA', id: 'ra', icon: <ClipboardList size={16} className="shrink-0" /> },
+  { name: 'VA', id: 'va', icon: <BadgeCheck size={16} className="shrink-0" /> },
+  { name: 'Gestión de flotas', id: 'flotas', icon: <Cpu size={16} className="shrink-0" /> },
+];
+const OTHER_GROUP = { name: 'Otros', id: 'otros', icon: <Bell size={16} className="shrink-0" /> };
+
+/** Group names match ignoring case and accents, so 'gestion de flotas' still lands in the right folder. */
+function groupKey(name: string): string {
+  return name.normalize('NFD').replace(/\p{M}/gu, '').trim().toLowerCase();
+}
+
+function sidebarPlacement(node: PageTreeNode): { group?: string; label?: string } {
+  if (node.type === 'page') return source.getNodePage(node)?.data.sidebar ?? {};
+  if (node.type === 'folder') return { group: source.getNodeMeta(node)?.data.group };
+  return {};
 }
 
 function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
@@ -93,78 +120,34 @@ function groupServiciosCoreNodes(children: PageTreeNode[]): PageTreeNode[] {
   const nextSeparatorIndex = children.findIndex((node, index) => index > separatorIndex && node.type === 'separator');
   const endIndex = nextSeparatorIndex === -1 ? children.length : nextSeparatorIndex;
   const segment = children.slice(separatorIndex + 1, endIndex);
-  const pageItems = segment.filter((node): node is PageTreeItem => node.type === 'page');
-  const pageBySlug = new Map(pageItems.map((item) => [item.url.split('/').pop() ?? '', item]));
+  const placements = segment.map(sidebarPlacement);
 
-  const kms = pageBySlug.get('kms');
-  const cas = pageBySlug.get('cas');
-  const ra = pageBySlug.get('ra');
-  const est = pageBySlug.get('est');
-  const validation = pageBySlug.get('validation');
-  const validationOcsp = pageBySlug.get('validation-ocsp');
-  const validationCrl = pageBySlug.get('validation-crl');
-  const certificates = pageBySlug.get('certificates');
-  const devices = pageBySlug.get('devices');
-  const alerts = pageBySlug.get('alerts');
-
-  if (!kms || !cas || !ra || !est || !validation) {
+  // Content that declares no groups at all is shown as meta.json lists it.
+  if (!placements.some((placement) => placement.group)) {
     return children;
   }
 
-  const groupedChildren: PageTreeNode[] = [
-    createFolder('KMS', [clonePageItem(kms, 'Visión general', 'general')], 'servicios-core-kms', <KeyRound size={16} className="shrink-0" />),
-    createFolder(
-      'CA',
-      [
-        clonePageItem(cas, 'Visión general', 'general'),
-        ...(certificates ? [clonePageItem(certificates, stripBadgeName(certificates.name), 'certificates')] : []),
-      ],
-      'servicios-core-ca',
-      <ShieldCheck size={16} className="shrink-0" />,
-    ),
-    createFolder(
-      'RA',
-      [
-        clonePageItem(ra, 'Visión general', 'general'),
-        clonePageItem(est, 'EST', 'est'),
-      ],
-      'servicios-core-ra',
-      <ClipboardList size={16} className="shrink-0" />,
-    ),
-    createFolder(
-      'VA',
-      [
-        clonePageItem(validation, 'Visión general', 'general'),
-        ...(validationOcsp ? [clonePageItem(validationOcsp, 'OCSP', 'ocsp')] : []),
-        ...(validationCrl ? [clonePageItem(validationCrl, 'CRL', 'crl')] : []),
-      ],
-      'servicios-core-va',
-      <BadgeCheck size={16} className="shrink-0" />,
-    ),
-  ];
-
-  if (devices) {
-    groupedChildren.push(
-      createFolder(
-        'Gestion de flotas',
-        [clonePageItem(devices, stripBadgeName(devices.name), 'devices')],
-        'servicios-core-flotas',
-        <Cpu size={16} className="shrink-0" />,
-      ),
+  const groups = new Map(SERVICIOS_CORE_GROUPS.map((group) => [groupKey(group.name), { ...group, items: [] as PageTreeNode[] }]));
+  const others = { ...OTHER_GROUP, items: [] as PageTreeNode[] };
+  segment.forEach((node, index) => {
+    const { group: name, label } = placements[index];
+    const key = name ? groupKey(name) : undefined;
+    let group = key === undefined || key === groupKey(OTHER_GROUP.name) ? others : groups.get(key);
+    if (!group && name && key) {
+      group = { name, id: key.replace(/[^a-z0-9]+/g, '-'), icon: undefined, items: [] };
+      groups.set(key, group);
+    }
+    const target = group ?? others;
+    target.items.push(
+      node.type === 'page'
+        ? clonePageItem(node, label ?? stripBadgeName(node.name), node.url.split('/').pop() ?? 'item')
+        : node,
     );
-  }
+  });
 
-  const otherItems = [alerts].filter((item): item is PageTreeItem => Boolean(item));
-  if (otherItems.length > 0) {
-    groupedChildren.push(
-      createFolder(
-        'Otros',
-        otherItems.map((item) => clonePageItem(item, stripBadgeName(item.name), item.url.split('/').pop() ?? 'item')),
-        'servicios-core-otros',
-        <Bell size={16} className="shrink-0" />,
-      ),
-    );
-  }
+  const groupedChildren = [...groups.values(), others]
+    .filter((group) => group.items.length > 0)
+    .map((group) => createFolder(group.name, group.items, `servicios-core-${group.id}`, group.icon));
 
   return [...children.slice(0, separatorIndex + 1), ...groupedChildren, ...children.slice(endIndex)];
 }
@@ -192,7 +175,7 @@ function mapPageTreeNode(node: PageTreeNode): PageTreeNode {
   if (node.type === 'page') {
     return {
       ...node,
-      name: mapTreeNodeName(node.name, true),
+      name: source.getNodePage(node)?.data.sidebar?.label ?? mapTreeNodeName(node.name, true),
     } satisfies PageTreeItem;
   }
 

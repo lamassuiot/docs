@@ -28,19 +28,11 @@ En el formulario de creación se definen los siguientes bloques de configuració
 
 **Parámetros de clave**
 
-* **Key Type:** RSA<del className="lm-diff-del"> /</del><ins className="lm-diff-ins">,</ins> EC (Elliptic Curve)<ins className="lm-diff-ins">, Ed25519 y los algoritmos post-cuánticos ML-DSA, SLH-DSA y Composite-ML-DSA</ins>
+* **Key Type:** RSA / EC (Elliptic Curve)
 * **Key Size:**
   * RSA: 1024, 2048, 3072, 4096 bits
   * EC: P-256, P-384, P-521
-  * Ed25519: 256 bits
-  * ML-DSA: niveles 44, 65 y 87
-  * SLH-DSA: juegos de parámetros del 1 al 12
-  * Composite-ML-DSA: variantes compuestas de ML-DSA con RSA, ECDSA o Ed25519
 * **Recomendado:** EC P-384
-
-<div className="lm-diff-ins lm-diff-block">
-  La disponibilidad de los algoritmos post-cuánticos depende del motor criptográfico seleccionado. Consulte la sección [Tipos de clave y algoritmos soportados](/docs/manual/servicios-core/kms#tipos-de-clave-y-algoritmos-soportados) de la página del KMS para conocer la matriz soportada por cada motor.
-</div>
 
 **Perfil de emisión del certificado de la CA**
 
@@ -146,10 +138,6 @@ Se debe proporcionar de manera obligatoria:
 
 * Certificado de la CA en formato PEM. Se comprueba que el certificado importado corresponda con el de una CA.
 * Clave privada de la CA en formato PEM
-
-<div className="lm-diff-ins lm-diff-block">
-  La clave privada importada puede corresponder a los algoritmos clásicos (RSA, ECDSA, Ed25519) o a los algoritmos post-cuánticos soportados por Lamassu (ML-DSA, SLH-DSA y Composite-ML-DSA), siempre que el motor seleccionado declare soporte para el algoritmo de la clave.
-</div>
 
 De manera opcional se proporcionarán en formato PEM la cadena de certificados de la cadena de validación en caso de importar una CA subordinada.
 

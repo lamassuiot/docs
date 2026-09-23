@@ -1,298 +1,182 @@
 ---
-title: "[CA] Gestión de Entidades de Confianza"
-description: Creación y gestión de Autoridades de Certificación en Lamassu IoT
+title: Autoridades de certificación
+description: Crea, importa y opera las autoridades que establecen la confianza de tu PKI.
 sidebar:
   group: CA
-  label: Visión general
+  label: Autoridades
 ---
 
-# Gestión de entidades de confianza
-## Creación de entidades de certificación
-Para acceder a la creación de nuevas entidades certificación se debe acceder la opción de entidades de certificación del menú lateral y luego seleccionar la acción de creación de nueva CA. 
+Una autoridad de certificación (CA) vincula identidades con claves públicas mediante certificados firmados. En Lamassu puedes crear una jerarquía nueva, utilizar una clave que ya está en el KMS o incorporar una CA externa.
 
-Actualmente hay disponibles 3 acciones:
+## Elige un flujo
 
-- **Creación de una nueva autoridad de certificación**, esta acción generará un nuevo par de claves para soportar la nueva autoridad de certificación.  
-- **Importar una nueva autoridad de certificación generada externamente**, permite importar en Lamassu una autoridad de certificación, cuyo par de claves ha sido generado de manera externa.  
-- **Importar un certificado de autoridad de certificación sin clave privada**, en este caso se importa la CA para poder usarla en procesos de validación y no como fuente de nuevos certificados gestionados por Lamassu.
+| Necesitas | Flujo | Resultado |
+|---|---|---|
+| Crear una raíz de confianza nueva | Nueva CA y nueva clave | Lamassu genera y custodia el par de claves. |
+| Crear una CA con una clave existente | Nueva CA desde KMS | La CA reutiliza una clave ya registrada. |
+| Migrar una CA operativa | Importar CA con clave privada | Lamassu puede emitir con la CA importada. |
+| Confiar en una CA externa | Importar solo el certificado | La CA se usa para validación, no para emitir. |
 
-## Creación de una nueva autoridad de certificación
-La creación de una Autoridad de Certificación (CA) es un proceso fundamental en el establecimiento de una infraestructura de clave pública (PKI). Lamassu IoT permite provisionar tanto autoridades raíz como intermedias mediante la generación automática de pares de claves criptográficas que son gestionados de forma segura por el sistema integrado de gestión de claves.
+¿Es tu primera vez? Sigue [Crea tu primera CA](/docs/manual/inicio/primera-ca) para completar el recorrido mínimo.
 
-En el formulario de creación se definen los siguientes bloques de configuración.
+## Crea una autoridad nueva
 
-**Motor criptográfico**
+### Antes de empezar
 
-* **Selector:** Desplegable con motores disponibles, ofrece los configurados en el sistema.  
-* **Ejemplo mostrado:** go1.24.3   
-* **Función:** Permite seleccionar el motor criptográfico deseado
+- Decide si la CA será raíz o intermedia.
+- Elige el motor que custodiará la clave.
+- Define una validez superior a la de los certificados que emitirá.
+- Para una CA intermedia, asegúrate de que la CA padre esté activa.
 
-**Parámetros de clave**
+<Steps>
+  <Step>
+    ### Abre el asistente
 
-* **Key Type:** RSA / EC (Elliptic Curve)  
-* **Key Size:**  
-  * RSA: 1024, 2048, 3072, 4096 bits  
-  * EC: P-256, P-384, P-521  
-* **Recomendado:** EC P-384
+    En **Certification Authorities**, selecciona **Create New CA** y elige generar un par de claves nuevo.
+  </Step>
 
-**Perfil de emisión del certificado de la CA**
+  <Step>
+    ### Configura la clave
 
-Aquí se puede seleccionar un perfil existente o definir uno en línea para la operación. Ese perfil permite especificar la duración de la CA que se está creando y los `Key Usage` y `Extended Key Usage` del certificado de soporte.
+    Selecciona el motor criptográfico, el algoritmo y el tamaño o curva. Lamassu admite claves RSA y EC según las capacidades del motor.
 
-Si no se proporciona ningún perfil se aplicará uno por defecto con los usos de clave básicos.
+    | Algoritmo | Parámetros disponibles |
+    |---|---|
+    | RSA | 1024, 2048, 3072 o 4096 bits |
+    | EC | P-256, P-384 o P-521 |
+  </Step>
 
-**Configuración de la CA**
+  <Step>
+    ### Elige el tipo de CA
 
-**Tipo de CA**
+    Selecciona **Root CA** para una autoridad autofirmada o **Intermediate CA** para una autoridad firmada por otra CA. En el segundo caso, elige la CA emisora.
+  </Step>
 
-* **Root CA:** Autoridad raíz autofirmada  
-* **Intermediate CA:** Autoridad subordinada
+  <Step>
+    ### Define la identidad
 
-**Emisor**
+    Introduce un **CA Name** único. Este nombre se convierte en el `Common Name` del certificado. Completa los campos del Distinguished Name que necesite tu política:
 
-* **Root CA:** Self-signed (auto-firmada)  
-* **Intermediate CA:** Selector desplegable de CA superior disponible  
-  * Permite seleccionar la CA padre que firmará la nueva CA intermedia
+    - `C`: código de país ISO 3166-1 de dos letras.
+    - `ST`: estado o provincia.
+    - `L`: localidad.
+    - `O`: organización.
+    - `OU`: unidad organizativa.
 
-**Identificación**
-* **CA ID:** Generado automáticamente (formato UUID),no puede ser modificado. Estos IDs los gestiona el sistema.   
-  * Ejemplo: 8f7c170-c84e-4c08-904f-8d3247c77fc2  
-* **CA Name:** Nombre descriptivo (obligatorio)  
-  * Ejemplo: Lamassu IoT Secure Services CA
+    El identificador interno de la CA se genera automáticamente y no se puede modificar.
+  </Step>
 
-**Subject Distinguished Name (DN)**
+  <Step>
+    ### Configura validez y usos
 
-Campos opcionales:
+    Define **CA Certificate Expiration** y **Default End-Entity Certificate Issuance Expiration**. Puedes expresar una duración (`5y 8w 4d`), seleccionar una fecha o utilizar la fecha máxima permitida.
 
-* **Country (C):** Código país ISO 3166-1 (2 letras)  
-  * Ejemplo: US, ES, DE  
-* **State/Province (ST):** Estado o provincia  
-  * Ejemplo: California, Madrid  
-* **Locality (L):** Ciudad o localidad  
-  * Ejemplo: San Francisco, Arrasate  
-* **Organization (O):** Nombre de la organización  
-  * Ejemplo: Lamassu IoT Corp  
-* **Organizational Unit (OU):** Unidad organizacional  
-  * Ejemplo: Secure Devices Division
+    Selecciona un perfil de emisión existente o configura los `Key Usage` y `Extended Key Usage` en el formulario. Si no eliges un perfil, Lamassu aplica los usos básicos predeterminados.
+  </Step>
 
-El "Certification Authority Name" configurado se utilizará como Common Name (CN) del subject del certificado de la CA.
+  <Step>
+    ### Crea y verifica
 
-**Configuración de expiración**
-La configuración de expiración define la validez temporal tanto del certificado de la propia CA como de los certificados que ésta emitirá por defecto. Si se ha seleccionado un perfil se dará prioridad al dato proporcionado en el perfil.
+    Confirma el formulario. La CA debe aparecer en el inventario con su certificado PEM, estado, fecha de expiración y relación de certificados emitidos.
+  </Step>
+</Steps>
 
-Para el certificado de la CA (`CA Certificate Expiration`):
+<Callout type="warn" title="Planifica la validez como una jerarquía">
+  Una CA no puede emitir certificados que superen su propia fecha de expiración. Deja margen suficiente para renovar o sustituir la autoridad sin interrumpir a los consumidores.
+</Callout>
 
-* **Función:** Establece la duración de validez del certificado de la Autoridad de Certificación  
-* **Implicación:** Una vez expirado, la CA no podrá emitir nuevos certificados válidos  
-* **Duración:** Configurable según necesidades organizacionales  
-* **Valor por defecto:** 10 años (10y)  
-* **Consideración:** Debe ser mayor que la duración de los certificados que emitirá
+## Utiliza una clave del KMS
 
-La expiración de la CA se puede definir como un expresión de duración, fijar una fecha fija, o marcarla como indefinida, lo que en términos prácticos permitirá la emisión de una CA sin caducidad. 
+Selecciona **Create New CA (Existing Key)** cuando la clave ya esté registrada en Lamassu. El asistente pide primero la clave de soporte y después muestra la misma configuración de tipo, identidad, validez y perfil.
 
-En el caso de expresar una duración, las unidades permitidas son: y (años), w (semanas), d (días), h (horas), m (minutos) y s (segundos), pudiendo componer expresiones como la siguiente: *5y 8w 4d 2h 1m 2s*
+Este flujo resulta útil cuando la clave se creó previamente en un HSM, se importó mediante BYOK o debe reutilizarse con una política de custodia concreta.
 
-En caso de elegir la opción de fecha específica, se ofrecerá un calendario para seleccionar la fecha de caducidad. 
+## Importa una CA externa
 
-Para el caso de indefinido, se fijará la fecha de expiración máxima permitida. 
+La importación conserva una autoridad creada fuera de Lamassu.
 
-Para la expiración por defecto de certificados finales (`Default End-Entity Certificate Issuance Expiration`):
+<Steps>
+  <Step>
+    ### Selecciona el motor
 
-* **Función:** Define la duración predeterminada para certificados emitidos por esta CA  
-* **Aplicación:** Se aplica automáticamente a nuevos certificados si no se especifica otra duración  
-* **Flexibilidad:** Puede ser modificada individualmente al emitir cada certificado  
-* **Valor por defecto:** 1 año (1y)
+    Elige el motor que custodiará la clave importada.
+  </Step>
 
-Se expresa en los mismos términos que la caducidad de la CA. 
+  <Step>
+    ### Carga el material
 
+    Proporciona el certificado de CA y la clave privada en formato PEM. Para una CA subordinada, añade opcionalmente la cadena de validación.
+  </Step>
 
-Una vez creada la CA debe ser visible en el listado de CAs del sistema.
-## Creación de CAs a partir de claves del KMS
-Lamassu IoT permite la creación de CAs a partir de claves previamente generadas o importadas en el servicio KMS. Una vez seleccionada la opción **Create New CA (Existing Key)** se muestra el formulario de creación de CAs con los siguientes elementos diferenciales respecto a la creación de la CA a partir de un nuevo par de claves descrito en el punto anterior. 
+  <Step>
+    ### Define la emisión predeterminada
 
-En este caso, primero se solicita la selección de la clave de soporte para esta nueva CA.
+    Configura la validez que recibirán los certificados finales cuando una solicitud no indique otra duración.
+  </Step>
 
+  <Step>
+    ### Verifica la importación
 
-Se abre un popup que permite al usuario seleccionar la clave deseada de entre las disponibles en el KMS. Una vez seleccionada la clave, el proceso continúa como se describe en el punto anterior. 
+    Lamassu comprueba que el certificado pertenece a una CA y que el material es coherente antes de registrarlo.
+  </Step>
+</Steps>
 
-## Importación de autoridades de certificación
+Si no dispones de la clave privada, importa únicamente el certificado. La autoridad podrá formar parte de cadenas de confianza y procesos de validación, pero no podrá emitir certificados desde Lamassu.
 
-La importación de entidades de certificación permite importar en el sistema una CA que ha sido generada de manera externa. Para ello se sigue el siguiente proceso:
+## Inspecciona una autoridad
 
-Se debe seleccionar el motor que gestionará el par de claves importado.
+Abre una CA desde el inventario para consultar:
 
-* **Selector:** Desplegable con motores disponibles, ofrece los configurados en el sistema.  
-* **Ejemplo mostrado:** go1.24.3   
-* **Función:** Permite seleccionar el motor criptográfico deseado
+- Estado y periodo de validez.
+- Certificado y cadena en formato PEM.
+- Número de certificados activos, expirados y revocados.
+- Certificados emitidos en **Issued Certificates**.
+- CRL vinculada a la autoridad.
+- Metadatos y motor criptográfico asociado.
 
-También se define la expiración por defecto de certificados finales (`Default End-Entity Certificate Issuance Expiration`):
+Puedes filtrar el inventario por nombre, estado y tipo de CA.
 
-* **Función:** Define la duración predeterminada para certificados emitidos por esta CA  
-* **Aplicación:** Se aplica automáticamente a nuevos certificados si no se especifica otra duración  
-* **Flexibilidad:** Puede ser modificada individualmente al emitir cada certificado  
-* **Valor por defecto:** 1 año (1y)
+## Emite certificados
 
-Se expresa en los mismos términos que la caducidad de la CA. 
+Puedes iniciar una emisión desde **Issued Certificates**, desde la acción de una CA o desde el inventario global de certificados.
 
-Se debe proporcionar de manera obligatoria:
+| Método | Cuándo usarlo | Custodia de la clave |
+|---|---|---|
+| **Generate Key & CSR in Browser** | Operación manual o prueba rápida | El navegador genera la clave; debes descargarla. |
+| **Upload Existing CSR** | La clave debe permanecer en el sistema de destino | Lamassu nunca recibe la clave privada. |
 
-- Certificado de la CA en formato PEM. Se comprueba que el certificado importado corresponda con el de una CA.   
-- Clave privada de la CA en formato PEM
+Sigue [Emite tu primer certificado](/docs/manual/inicio/primer-certificado) para el flujo guiado. La [gestión de certificados](/docs/manual/servicios-core/certificates) explica el inventario, la inspección y la revocación.
 
-De manera opcional se proporcionarán en formato PEM la cadena de certificados de la cadena de validación en caso de importar una CA subordinada. 
-## Operando con entidades de confianza
-### Visualización de autoridades de certificación
-Accediendo a la sección de autoridades de certificación se mostrará el listado de CAs registradas en el sistema. El listado permitirá el filtro mediante el nombre de la CA, el estado o el tipo de CA.  
+## Revoca una CA
 
-La acción de ver detalles da acceso a los detalles de la CA y a diferentes opciones de gestión.
+<Callout type="warn" title="La revocación afecta a toda la cadena dependiente">
+  Revocar una CA invalida la confianza en los certificados que ha emitido y puede interrumpir dispositivos y servicios. La acción es irreversible.
+</Callout>
 
-En los detalles se muestra el resumen del estado de los certificados emitidos por la CA: certificados activos, expirados y revocados.   
+<Steps>
+  <Step>
+    ### Evalúa el impacto
 
-Se ofrecen dos acciones:
+    Identifica los certificados, dispositivos y consumidores que dependen de la CA. Prepara una autoridad y una cadena de sustitución cuando sea necesario.
+  </Step>
 
--  la descarga de la CRL vinculada a la CA que permitirá a otros sistemas realizar comprobaciones de vigencia de los certificados emitidos por la CA de manera desconectada.   
-- la acción de revocación de la CA
+  <Step>
+    ### Inicia la revocación
 
-Se muestra información detallada, el certificado en formato PEM y se da acceso a la relación de certificados emitidos por la CA a través de la pestaña “Issued Certificates”
+    Abre la autoridad y selecciona **Revoke CA**. Elige la razón que describa el incidente, por ejemplo `KeyCompromise`, `CACompromise`, `Superseded` o `CessationOfOperation`.
+  </Step>
 
-### Emisión de certificados
-La acción de emisión de certificados se puede realizar desde la pestaña “Issued Certificates” de los detalles de la CA, mediante la acción “Issue New”.  
+  <Step>
+    ### Confirma la identidad
 
-La funcionalidad de emisión es accesible también desde el listado de CAs mediante la acción correspondiente de emisión.
+    Escribe exactamente el nombre de la CA para habilitar **Confirm Revocation**.
+  </Step>
 
-Y desde la funcionalidad  listado completo de certificados emitidos por Lamassu mediante la acción “Issue Certificate”
+  <Step>
+    ### Comprueba la publicación
 
- En este caso se solicitará la selección de una CA antes de acceder al formulario de emisión.  
+    El estado debe cambiar a **REVOKED** y la CRL debe reflejar la nueva información. La CA deja de poder emitir certificados.
+  </Step>
+</Steps>
 
-El formulario de emisión de certificados ofrece 2 opciones para la emisión:
-
-- Emisión a partir de una clave privada y el CSR generado en el browser  
-- Emisión a partir de un CSR generado de manera externa
-
-**Emisión a partir de una clave privada y el CSR generados en el browser**
-
-El usuario proporciona la información requerida para la creación del CSR, la consola genera una clave In Place y genera el CSR correspondiente mediante el cual se solicita la emisión del certificado a la CA. 
-
-
-**Método de emisión:** Seleccionar  "Generate Key & CSR in Browser" para la generación del par de claves y la solicitud de certificado (CSR) directamente en el navegador
-
-**Certificate Subject (Sujeto del certificado)**
-
-**Common Name (CN)**
-
-* **Campo:** Obligatorio  
-* **Función:** Identifica de forma única al titular del certificado  
-* **Ejemplos:**  
-  * Para dispositivos: device001.company.com  
-  * Para usuarios: john.doe@company.com  
-  * Para servicios: api.service.company.com
-
-**Campos Organizacionales**
-
-* **Organizational Unit (OU):** Unidad organizacional del titular  
-  * Ejemplo: IT Department, Manufacturing  
-* **Organization (O):** Nombre de la organización  
-  * Ejemplo: LamassuIoT Corp, Acme Industries
-
-**Información Geográfica**
-
-* **Locality (L):** Ciudad o localidad del titular  
-* **State/Province (ST):** Estado o provincia  
-* **Country (C):** Código de país ISO 3166-1 (2 letras)  
-  * Valor por defecto mostrado: US
-
-**Subject Alternative Names (SANs)**
-Los SANs proporcionan identificadores alternativos para el certificado, permitiendo que un mismo certificado sea válido para múltiples nombres o direcciones.
-
-**Tipos de SAN Disponibles**
-
-* **DNS:** Nombres de dominio  
-  * Ejemplo: example.com, \*.example.com  
-* **IP Address:** Direcciones IP  
-* **Email:** Direcciones de correo electrónico  
-* **URI:** Identificadores de recursos uniformes
-
-Es posible añadir múltiples SAN de cada tipo, se selecciona el tipo, añadiendo el valor y pulsando la acción “Add”. 
-
-**Key Generation Details (Detalles de generación de claves)**
-Se debe especificar el tipo de clave a ser generada para la solicitud del certificado. 
-
-**Algorithm (Algoritmo)**
-
-* **ECDSA:** Algoritmo de curva elíptica, se debe especificar la curva a utilizar   
-* **RSA:** Algoritmo RSA tradicional, se debe indicar el tamaño de clave
-
-**Certificate Configuration (Configuración del certificado)**
-
-**Validity Duration (Duración de validez)**
-
-Indica la fecha de expiración del certificado a emitir como una expresión de duración
-
-* **Campo:** Configurable según necesidades  
-* **Valor por defecto:** 1 año (1y)  
-* **Unidades válidas:** y (años), w (semanas), d (días), h (horas), m (minutos), s (segundos)  
-* **Consideración:** No puede exceder la validez de la CA emisora
-
-**Key Usage (Uso de claves)**
-Define los propósitos criptográficos para los que puede utilizarse la clave privada del certificado.
-
-**Usos Básicos**
-
-* **Digital Signature:** ✓ (marcado por defecto) \- Firmas digitales  
-* **Content Commitment (Non-Repudiation):** No repudio  
-* **Key Encipherment:** Cifrado de claves  
-* **Data Encipherment:** Cifrado de datos  
-* **Key Agreement:** Acuerdo de claves  
-* **Certificate Signing:** Firma de certificados  
-* **CRL Signing:** Firma de listas de revocación  
-* **Encipher Only:** Solo cifrado  
-* **Decipher Only:** Solo descifrado
-
-**Uso Extendido de Claves**
-
-Especifica aplicaciones específicas para las que está autorizado el certificado.
-
-* **Server Authentication:** ✓ (marcado por defecto) \- Autenticación de servidor  
-* **Client Authentication:** ✓ (marcado por defecto) \- Autenticación de cliente  
-* **Code Signing:** Firma de código  
-* **Email Protection:** Protección de correo electrónico  
-* **Time Stamping:** Sellado de tiempo  
-* **OCSP Signing:** Firma de respuestas OCSP
-
-Una vez completado los campos del formulario se solicita la emisión del certificado obteniendo el certificado y la clave privada generada en formato PEM. Esta clave privada no se almacena debe ser descargada y custodiada por el usuario ya que no se podrá volver a obtener.
-
-
-**Emisión a partir de un CSR generado de manera externa**
-
-Mediante esta opción se podrá realizar la emisión de certificados a partir de CSRs que hayan sido generados de manera externa. Para ello en el selector de modo del formulario de emisión es necesario seleccionar “Upload Existing CSR”.
-
-Se debe proporcionar un CSR válido que contenga los detalles del certificado a emitir, Subject Name, SANs,..   
-
-Adicionalmente se proporcionará la duración deseada para el certificado y los usos permitidos. Con esta información se procederá a la emisión como se describe en el apartado anterior. 
-### Revocación de CAs y certificados
-La revocación de una Autoridad de Certificación (CA) es una acción crítica que invalida todos los certificados emitidos por esa CA, lo que puede causar interrupciones generalizadas en los dispositivos y servicios que confían en ella. Este proceso es irreversible y debe realizarse con extrema precaución.
-
-Para iniciar el proceso, entra en la sección de Autoridades de Certificación y localiza la CA deseada usando los filtros por **Nombre**, **Estado** y **Tipo**.
-
-Accede a la ficha de detalle de la CA. Allí se muestran la información general, los certificados PEM, los metadatos y los certificados emitidos, además del botón **Revoke CA**.
-
-Al pulsar **Revoke CA** se abre una ventana de confirmación con una advertencia sobre el impacto de la acción. En ese cuadro hay que seleccionar una **Razón de Revocación**. Las opciones incluyen:
-
-* Unspecified (No especificado)  
-* KeyCompromise (Compromiso de clave)  
-* CACompromise (Compromiso de CA)  
-* AffiliationChanged (Afiliación cambiada)  
-* Superseded (Sustituida)  
-* CessationOfOperation (Cese de operación)  
-* CertificateHold (Retención de certificado)  
-* RemoveFromCRL (Eliminar de la CRL)
-
-
-Para evitar revocaciones accidentales, el sistema pedirá confirmar el nombre de la CA. En el campo de texto, escribe el **nombre exacto de la CA** que estás revocando. Una vez introducido correctamente, se habilitará el botón **Confirm Revocation**.
-
-Haz clic en el botón **Confirm Revocation**. Una vez completada la revocación, la CA cambiará su estado a **REVOKED** (Revocada) en la página de detalles, y ya no podrás emitir certificados nuevos con ella. En su lugar, verás la opción **Permanently Delete** (Eliminar Permanentemente).
-
-Consideraciones importantes:
-
-* Impacto: La revocación de una CA es una acción irreversible que afectará a todos los dispositivos y servicios que dependen de ella. Asegúrate de comprender completamente las implicaciones antes de proceder.  
-* Eliminación Permanente: Después de la revocación, tendrás la opción de eliminar permanentemente la CA. Esta acción eliminará la CA del sistema de Lamassu IoT.
+La eliminación permanente solo está disponible después de revocar. Elimina el registro únicamente cuando la política de retención y auditoría lo permita.

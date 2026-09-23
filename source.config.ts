@@ -1,16 +1,21 @@
-import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins';
-import { defineConfig, defineDocs, frontmatterSchema, metaSchema } from 'fumadocs-mdx/config';
-import { z } from 'zod';
-import { remarkDocsDiff } from './lib/docs-diff/remark.ts';
-import { transformerDocsDiff } from './lib/docs-diff/shiki.ts';
+import { rehypeCodeDefaultOptions } from "fumadocs-core/mdx-plugins";
+import {
+  defineConfig,
+  defineDocs,
+  frontmatterSchema,
+  metaSchema,
+} from "fumadocs-mdx/config";
+import { z } from "zod";
+import { remarkDocsDiff } from "./lib/docs-diff/remark.ts";
+import { transformerDocsDiff } from "./lib/docs-diff/shiki.ts";
 
-// Sidebar placement inside "Servicios Core", which the site groups into
-// KMS / CA / RA / VA / ... folders (see groupServiciosCoreNodes in
+// Sidebar placement inside "Operar Lamassu", which the site groups into
+// goal-oriented folders (see groupOperationNodes in
 // app/routes/docs.tsx). Lives in content so a docs change can place its own
 // pages: a page sets `sidebar.group` (and optionally `sidebar.label`); a
 // subfolder of related pages sets `group` in its meta.json.
 export const docs = defineDocs({
-  dir: 'content/docs',
+  dir: "content/docs",
   docs: {
     schema: frontmatterSchema.extend({
       sidebar: z
@@ -42,15 +47,23 @@ const diffBase = process.env.VITE_DOCS_DIFF_BASE;
 // Disable remarkImage: images live in /public and are served as static URLs,
 // so they must not be imported as JS modules by the MDX compiler.
 export default defineConfig({
-  remarkImageOptions: false,
-  mdxOptions: diffBase
-    ? {
-        // Appended after Fumadocs' own plugins — see remarkDocsDiff.
-        remarkPlugins: (plugins) => [...plugins, [remarkDocsDiff, { base: diffBase }]],
-        rehypeCodeOptions: {
-          ...rehypeCodeDefaultOptions,
-          transformers: [...(rehypeCodeDefaultOptions.transformers ?? []), transformerDocsDiff()],
-        },
-      }
-    : undefined,
+  mdxOptions: {
+    remarkImageOptions: false,
+    ...(diffBase
+      ? {
+          // Appended after Fumadocs' own plugins — see remarkDocsDiff.
+          remarkPlugins: (plugins) => [
+            ...plugins,
+            [remarkDocsDiff, { base: diffBase }],
+          ],
+          rehypeCodeOptions: {
+            ...rehypeCodeDefaultOptions,
+            transformers: [
+              ...(rehypeCodeDefaultOptions.transformers ?? []),
+              transformerDocsDiff(),
+            ],
+          },
+        }
+      : {}),
+  },
 });

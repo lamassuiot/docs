@@ -15,14 +15,14 @@ export function meta({}: Route.MetaArgs) {
 const sections = [
   {
     icon: asset('images/lamassu.svg'),
-    title: 'Manual de Usuario',
-    description: 'Servicios core (KMS, CA, RA, VA), gestión de dispositivos e integraciones con terceros.',
+    title: 'Plataforma Lamassu IoT',
+    description: 'Primeros pasos, conceptos y guías para gestionar claves, CAs, certificados y dispositivos.',
     href: docsPath('manual'),
   },
   {
     icon: asset('images/kubernetes.svg'),
-    title: 'Despliegue',
-    description: 'Instalación y configuración en Kubernetes, AWS EC2 y AWS Marketplace.',
+    title: 'Despliegue y operación',
+    description: 'Elige entre Kubernetes, AWS Marketplace o SaaS y prepara tu entorno.',
     href: docsPath('despliegue'),
   },
 ];
@@ -71,9 +71,9 @@ export default function DocsHome() {
           >
             <ScalarIcon />
             <div className="min-w-0">
-              <div className="text-sm font-medium text-fd-foreground">OpenAPI 3.0.3</div>
+              <div className="text-sm font-medium text-fd-foreground">Referencia de API</div>
               <div className="mt-1 text-xs leading-relaxed text-fd-muted-foreground">
-                Referencia interactiva de la API REST de Lamassu IoT.
+                Explora de forma interactiva los endpoints REST de Lamassu IoT.
               </div>
             </div>
           </Link>

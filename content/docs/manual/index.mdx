@@ -1,24 +1,48 @@
 ---
-title: Manual de Usuario
-description: Guía completa de uso de la plataforma Lamassu IoT
+title: Plataforma Lamassu IoT
+description: Gestiona la PKI y las identidades digitales de tus dispositivos desde una única plataforma.
 ---
 
-Bienvenido al **Manual de Usuario de Lamassu IoT**. Esta documentación cubre todas las funcionalidades de la plataforma para la gestión de identidades digitales en entornos IoT industriales.
+Lamassu IoT centraliza la emisión, distribución, renovación y revocación de identidades X.509 para dispositivos conectados. Puedes construir una PKI privada, proteger sus claves y automatizar el enrolamiento de una flota sin perder visibilidad sobre cada certificado.
 
-## Servicios Core
+## Empieza aquí
 
 <Cards>
-  <Card title="Gestión de Claves (KMS)" description="Motores criptográficos, generación e importación de claves" href="/docs/manual/servicios-core/kms" />
-  <Card title="Entidades de Confianza (CAs)" description="Creación, importación y gestión de Autoridades de Certificación" href="/docs/manual/servicios-core/cas" />
-  <Card title="Gestión de Certificados" description="Visualización y revocación de certificados emitidos" href="/docs/manual/servicios-core/certificates" />
-  <Card title="Validación de Certificados (VA)" description="Servicios OCSP y CRL" href="/docs/manual/servicios-core/validation" />
-  <Card title="Registration Authority (RA)" description="Automatización del ciclo de vida de certificados y protocolo EST" href="/docs/manual/servicios-core/ra" />
-  <Card title="Dispositivos e Identidades" description="Gestión de End Entities y ciclo de vida de dispositivos IoT" href="/docs/manual/servicios-core/devices" />
-  <Card title="Alertas y Suscripciones" description="Monitorización de eventos y notificaciones" href="/docs/manual/servicios-core/alerts" />
+  <Card title="Primeros pasos" description="Crea una CA, emite un certificado y registra tu primer dispositivo." href="/docs/manual/inicio" />
+  <Card title="Cómo funciona Lamassu" description="Construye el modelo mental de autoridades, claves, identidades y validación." href="/docs/manual/conceptos" />
 </Cards>
 
-## Integraciones con terceros
+## Capacidades principales
+
+### Construye tu jerarquía de confianza
+
+Crea autoridades raíz e intermedias o importa una PKI existente. Define qué autoridad puede emitir cada identidad y conserva la cadena de confianza completa.
+
+### Protege las claves criptográficas
+
+Genera y custodia claves mediante motores software, HSMs PKCS#11 o servicios cloud. Lamassu desacopla las operaciones de la ubicación física de la clave.
+
+### Emite y controla certificados
+
+Emite certificados desde la consola o a partir de un CSR, consulta su estado y revócalos cuando dejan de ser fiables.
+
+### Automatiza identidades de dispositivos
+
+Define políticas de enrolamiento mediante un Device Management Service (DMS) y deja que los dispositivos soliciten o renueven su identidad a través de EST.
+
+### Publica el estado de validación
+
+Ofrece validación online mediante OCSP y distribuye CRLs para consumidores que necesitan comprobar certificados sin conexión.
+
+### Reacciona a los eventos
+
+Suscríbete a cambios del ciclo de vida y envía notificaciones por correo, Microsoft Teams o webhooks.
+
+## Elige tu recorrido
 
 <Cards>
-  <Card title="Integración AWS IoT Core" description="Aprovisionamiento de dispositivos en AWS IoT Core" href="/docs/manual/integraciones/aws" />
+  <Card title="Administro la PKI" description="Configura motores, autoridades, emisión y validación." href="/docs/manual/servicios-core/kms" />
+  <Card title="Integro un dispositivo" description="Configura el DMS y usa EST para obtener una identidad." href="/docs/manual/servicios-core/ra" />
+  <Card title="Opero la plataforma" description="Despliega Lamassu y prepara sus dependencias." href="/docs/despliegue" />
+  <Card title="Integro otro sistema" description="Conecta Lamassu con AWS IoT Core y otros destinos." href="/docs/manual/integraciones/aws" />
 </Cards>

@@ -1,0 +1,63 @@
+---
+title: Crea tu primera CA
+description: Crea una autoridad raíz y comprueba que está preparada para emitir certificados.
+---
+
+En este quickstart crearás una autoridad de certificación raíz con un nuevo par de claves. Al terminar tendrás una CA activa que podrás usar en el siguiente quickstart.
+
+## Antes de empezar
+
+- Acceso a la consola con permisos para gestionar autoridades.
+- Al menos un motor criptográfico disponible.
+- Un nombre que identifique el propósito de la CA, por ejemplo `Acme Device Root CA`.
+
+<Callout type="info" title="Raíz o intermedia">
+  Una CA raíz se autofirma y actúa como ancla de confianza. Para producción suele ser preferible mantener la raíz más protegida y emitir desde una CA intermedia.
+</Callout>
+
+<Steps>
+  <Step>
+    ### Abre el asistente de creación
+
+    En el menú lateral, abre **Certification Authorities** y selecciona **Create New CA**.
+
+    Elige crear una CA con un par de claves nuevo. Si ya tienes la clave en el KMS, usa **Create New CA (Existing Key)**.
+  </Step>
+
+  <Step>
+    ### Selecciona la clave
+
+    Elige el motor criptográfico que custodiará la clave y configura el algoritmo. Para una primera CA puedes usar **EC P-384**, siempre que sea compatible con tus consumidores.
+
+    La clave privada permanecerá bajo el control del motor seleccionado.
+  </Step>
+
+  <Step>
+    ### Define la autoridad
+
+    Selecciona **Root CA** y completa:
+
+    - **CA Name**: un nombre único y reconocible.
+    - **Subject**: al menos la organización y el país que identificarán a la autoridad.
+    - **CA Certificate Expiration**: una validez mayor que la de los certificados que emitirá.
+    - **Default End-Entity Certificate Issuance Expiration**: la validez predeterminada de los certificados finales.
+
+    El nombre de la CA se utilizará como `Common Name` del certificado.
+  </Step>
+
+  <Step>
+    ### Revisa y crea la CA
+
+    Comprueba el algoritmo, el sujeto y las fechas antes de confirmar. Estos valores definen el ancla de confianza y no deberían elegirse como simples datos de prueba en un entorno productivo.
+  </Step>
+
+  <Step>
+    ### Verifica el resultado
+
+    Abre la nueva CA desde el listado. Debe aparecer activa y mostrar su certificado PEM, la fecha de expiración y la pestaña **Issued Certificates**.
+  </Step>
+</Steps>
+
+## Siguiente paso
+
+Usa la autoridad para [emitir tu primer certificado](/docs/manual/inicio/primer-certificado), o consulta la [guía completa de autoridades](/docs/manual/servicios-core/cas) para crear una CA intermedia, importar una CA o definir perfiles avanzados.

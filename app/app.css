@@ -78,7 +78,8 @@ article img,
   margin-right: auto;
 }
 
-/* Justify all text in doc content */
+/* Keep documentation copy easy to scan. Justified text creates uneven word
+   spacing, especially in narrow content columns. */
 .prose p,
 .prose li,
 .prose td,
@@ -88,7 +89,7 @@ article td,
 [class*='prose'] p,
 [class*='prose'] li,
 [class*='prose'] td {
-  text-align: justify;
+  text-align: start;
 }
 
 /* ── PR preview diff ───────────────────────────────────────────────────────

@@ -1,15 +1,23 @@
 ---
-title: "[VA] Validación de Certificados"
-description: Servicios OCSP y CRL para validación de certificados
+title: Validación de certificados
+description: Publica el estado de las identidades mediante OCSP y CRL.
 sidebar:
   group: VA
   label: Visión general
 ---
 
-# Validación de certificados – VA
-Lamassu ofrece dos mecanismos complementarios para validar el estado de los certificados emitidos por la plataforma:
+La emisión demuestra quién firmó un certificado; la validación permite saber si todavía debe aceptarse. Lamassu publica el estado mediante dos mecanismos complementarios.
 
-- `OCSP`, para consultas online y en tiempo real del estado del certificado.
-- `CRL`, para distribución y consulta offline de listas de revocación.
+## Elige un mecanismo
 
-En el menú lateral del módulo `VA` encontrarás cada capacidad documentada en su propia página.
+| Mecanismo | Modelo | Recomendado para |
+|---|---|---|
+| OCSP | Consulta online de un certificado concreto | Consumidores conectados que necesitan el estado más reciente. |
+| CRL | Descarga periódica de una lista firmada | Entornos offline, redes limitadas o validación local masiva. |
+
+Muchos entornos utilizan ambos: OCSP como comprobación primaria y CRL como mecanismo local o de respaldo.
+
+<Cards>
+  <Card title="Validación online con OCSP" description="Consulta estados Good, Revoked y Unknown en tiempo real." href="/docs/manual/servicios-core/validation-ocsp" />
+  <Card title="Listas de revocación" description="Genera, publica y distribuye CRLs por autoridad." href="/docs/manual/servicios-core/validation-crl" />
+</Cards>

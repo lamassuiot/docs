@@ -3,6 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, type Plugin } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import mdx from 'fumadocs-mdx/vite';
+import { changedDocs } from './lib/docs-diff/git.ts';
 import * as MdxConfig from './source.config';
 
 // Stub out @scalar/api-reference-react during the SSR/prerender server build.
@@ -28,8 +29,21 @@ const ssrStubScalar: Plugin = {
 // The dev server keeps "/" so localhost doesn't need the prefix.
 const basePath = (process.env.VITE_DOCS_BASE_PATH ?? '/docs').replace(/\/+$/, '');
 
+// PR previews only: the pages this PR touches, for the "Mostrar cambios"
+// panel — see lib/docs-diff and app/components/diff-toggle.tsx.
+const diffBase = process.env.VITE_DOCS_DIFF_BASE;
+const docsDiff = diffBase ? changedDocs(diffBase) : null;
+
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? `${basePath}/` : '/',
+  define: {
+    __DOCS_DIFF__: JSON.stringify(
+      docsDiff && {
+        pages: [...docsDiff.changed].map(([path, basePath]) => ({ path, isNew: basePath === '' })),
+        removed: docsDiff.removed,
+      },
+    ),
+  },
   plugins: [
     ssrStubScalar,
     mdx(MdxConfig),

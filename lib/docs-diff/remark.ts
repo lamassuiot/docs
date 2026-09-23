@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { diffText, diffTrees, markAllInserted, type MdNode } from './diff.ts';
+import { changedDocs, git, gitRoot } from './git.ts';
 
 /**
  * Remark plugin for PR-preview builds: diffs every page the PR touched
@@ -17,14 +17,15 @@ import { diffText, diffTrees, markAllInserted, type MdNode } from './diff.ts';
 export function remarkDocsDiff(this: { parse(value: string): unknown }, { base }: { base: string }) {
   // Same parser (MDX + GFM) the page itself went through.
   const parse = (value: string) => this.parse(value) as MdNode;
-  const repo = git(['rev-parse', '--show-toplevel']).trim();
-  const changed = changedPages(repo, base);
+  const repo = gitRoot();
+  const { changed } = changedDocs(base, repo);
   console.log(`[docs-diff] diffing ${changed.size} changed page(s) against ${base}`);
 
   return (tree: MdNode, file: VFileLike) => {
     if (!file.path) return;
     const rel = path.relative(repo, path.resolve(file.cwd ?? process.cwd(), file.path)).split(path.sep).join('/');
-    const basePath = changed.get(rel);
+    if (!rel.startsWith('content/docs/')) return;
+    const basePath = changed.get(rel.slice('content/docs/'.length));
     if (basePath === undefined) return;
 
     const headMatter = (file.data.frontmatter ?? {}) as Record<string, unknown>;
@@ -62,38 +63,12 @@ export function remarkDocsDiff(this: { parse(value: string): unknown }, { base }
 
 type VFileLike = { path?: string; cwd?: string; data: Record<string, unknown> };
 
-/**
- * Changed .mdx files under content/docs, mapped to their path at `base`
- * ('' for pages that did not exist there). Compares `base` with the working
- * tree, so it also works for uncommitted local edits.
- */
-function changedPages(repo: string, base: string): Map<string, string> {
-  const pages = new Map<string, string>();
-  const status = git(['diff', '--name-status', '-M', base, '--', 'content/docs'], repo);
-  for (const line of status.split('\n')) {
-    const [code, ...paths] = line.split('\t');
-    if (!code || code.startsWith('D')) continue;
-    const head = paths.at(-1) ?? '';
-    const old = code.startsWith('A') ? '' : paths[0];
-    if (head.endsWith('.mdx')) pages.set(head, old);
-  }
-  const untracked = git(['ls-files', '--others', '--exclude-standard', '--', 'content/docs'], repo);
-  for (const file of untracked.split('\n')) {
-    if (file.endsWith('.mdx')) pages.set(file, '');
-  }
-  return pages;
-}
-
 function show(repo: string, base: string, file: string): string | null {
   try {
     return git(['show', `${base}:${file}`], repo);
   } catch {
     return null;
   }
-}
-
-function git(args: string[], cwd?: string): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 }
 
 /** Same split fumadocs-mdx does before compiling; only flat string fields are needed. */

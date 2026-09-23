@@ -12,7 +12,7 @@ import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { LLMCopyButton, ViewOptions } from '@/components/ai/page-actions';
 import { MdxLink } from '@/components/mdx-link';
 import { VersionSelector } from '@/components/version-selector';
-import { DiffText, DiffToggle, type PageDiff } from '@/components/diff-toggle';
+import { type AffectedPages, DiffText, DiffToggle, type PageDiff } from '@/components/diff-toggle';
 
 function splitBadgeTitle(title: string) {
   const match = /^\[([^\]]+)\]\s*(.+)$/.exec(title.trim());
@@ -223,8 +223,23 @@ export async function loader({ params }: Route.LoaderArgs) {
   return {
     slugs: page.slugs,
     path: page.path,
+    url: page.url,
+    affected: affectedPages(),
     pageTree: await source.serializePageTree(pageTree),
   };
+}
+
+/** PR previews only: every page the PR touches, for the diff panel. */
+function affectedPages(): AffectedPages | undefined {
+  if (!__DOCS_DIFF__) return undefined;
+  const byPath = new Map(source.getPages().map((page) => [page.path, page]));
+  const pages = __DOCS_DIFF__.pages.flatMap(({ path, isNew }) => {
+    const page = byPath.get(path);
+    return page ? [{ url: page.url, title: splitBadgeTitle(page.data.title ?? path).text, isNew }] : [];
+  });
+  // Removed pages no longer build, so all there is to show is where they were.
+  const removed = __DOCS_DIFF__.removed.map((path) => `/${path.replace(/(^|\/)index\.mdx$|\.mdx$/, '')}`);
+  return { pages: pages.sort((a, b) => a.url.localeCompare(b.url)), removed };
 }
 
 const clientLoader = browserCollections.docs.createClientLoader({
@@ -234,9 +249,13 @@ const clientLoader = browserCollections.docs.createClientLoader({
     {
       slugs,
       path,
+      url,
+      affected,
     }: {
       slugs: string[];
       path: string;
+      url: string;
+      affected?: AffectedPages;
     },
   ) {
     const markdownUrl = `/llms.mdx/docs/${[...slugs, 'index.mdx'].join('/')}`;
@@ -265,7 +284,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
         <DocsDescription>
           {diff?.description ? <DiffText diff={diff.description} /> : frontmatter.description}
         </DocsDescription>
-        <DiffToggle diff={diff} />
+        <DiffToggle diff={diff} affected={affected} currentUrl={url} />
         <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
           <LLMCopyButton markdownUrl={markdownUrl} />
           <ViewOptions

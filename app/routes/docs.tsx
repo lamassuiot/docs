@@ -12,6 +12,7 @@ import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { LLMCopyButton, ViewOptions } from '@/components/ai/page-actions';
 import { MdxLink } from '@/components/mdx-link';
 import { VersionSelector } from '@/components/version-selector';
+import { DiffText, DiffToggle, type PageDiff } from '@/components/diff-toggle';
 
 function splitBadgeTitle(title: string) {
   const match = /^\[([^\]]+)\]\s*(.+)$/.exec(title.trim());
@@ -228,7 +229,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 
 const clientLoader = browserCollections.docs.createClientLoader({
   component(
-    { toc, frontmatter, default: Mdx },
+    { toc, frontmatter, default: Mdx, ...exports },
     // you can define props for the component
     {
       slugs,
@@ -241,6 +242,8 @@ const clientLoader = browserCollections.docs.createClientLoader({
     const markdownUrl = `/llms.mdx/docs/${[...slugs, 'index.mdx'].join('/')}`;
     const titleParts = splitBadgeTitle(frontmatter.title);
     const filteredToc = toc.filter((item) => item.depth !== 1);
+    // Only on PR previews, for pages the PR changed — see lib/docs-diff.
+    const diff = (exports as { lmDiff?: PageDiff }).lmDiff;
 
     return (
       <DocsPage
@@ -256,8 +259,13 @@ const clientLoader = browserCollections.docs.createClientLoader({
         }}
       >
         <title>{titleParts.badge ? `${titleParts.badge} ${titleParts.text}` : frontmatter.title}</title>
-        <DocsTitle className="text-[2.25rem] font-bold tracking-tight">{renderBadgeTitle(frontmatter.title)}</DocsTitle>
-        <DocsDescription>{frontmatter.description}</DocsDescription>
+        <DocsTitle className="text-[2.25rem] font-bold tracking-tight">
+          {diff?.title ? <DiffText diff={diff.title} /> : renderBadgeTitle(frontmatter.title)}
+        </DocsTitle>
+        <DocsDescription>
+          {diff?.description ? <DiffText diff={diff.description} /> : frontmatter.description}
+        </DocsDescription>
+        <DiffToggle diff={diff} />
         <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
           <LLMCopyButton markdownUrl={markdownUrl} />
           <ViewOptions

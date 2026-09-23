@@ -16,7 +16,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      # A pull_request checkout is the PR merged into its base branch; one
+      # extra commit of history brings that base (HEAD^1) along, which the
+      # preview's "Mostrar cambios" diff compares against (lib/docs-diff).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: pnpm/action-setup@v4
         with:
@@ -36,7 +41,7 @@ jobs:
       - name: Build preview
         env:
           VITE_DOCS_BASE_PATH: /docs/pr-preview/pr-${{ github.event.pull_request.number }}
-        run: pnpm build
+        run: VITE_DOCS_DIFF_BASE="$(git rev-parse HEAD^1)" pnpm build
 
       - name: Stage preview
         run: scripts/stage-docs-deploy.sh "/docs/pr-preview/pr-${{ github.event.pull_request.number }}" publish

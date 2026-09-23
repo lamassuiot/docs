@@ -9,6 +9,7 @@ import {
 import { RootProvider } from 'fumadocs-ui/provider/react-router';
 import type { Route } from './+types/root';
 import './app.css';
+import { DIFF_ENABLED, diffInitScript } from '@/components/diff-toggle';
 import SearchDialog from '@/components/search';
 import { asset } from '@/lib/asset';
 import NotFound from './routes/not-found';
@@ -35,6 +36,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
         <link rel="icon" href={asset('favicon.svg')} type="image/svg+xml"/>
+        {DIFF_ENABLED && (
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: constant script, no user input
+          <script dangerouslySetInnerHTML={{ __html: diffInitScript }} />
+        )}
       </head>
       <body className="flex flex-col min-h-screen">
         <RootProvider search={{ SearchDialog }} theme={{ defaultTheme: 'dark', enableSystem: false }}>{children}</RootProvider>

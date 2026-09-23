@@ -90,3 +90,113 @@ article td,
 [class*='prose'] td {
   text-align: justify;
 }
+
+/* ── PR preview diff ───────────────────────────────────────────────────────
+   Markup comes from lib/docs-diff (preview builds only). Off by default: the
+   page reads as the PR's final version and removed content is hidden. The
+   "Mostrar cambios" switch sets [data-show-diff] on <html> for every page.
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  --lm-diff-ins-bg: rgb(34 197 94 / 0.22);
+  --lm-diff-ins-edge: rgb(34 197 94 / 0.85);
+  --lm-diff-del-bg: rgb(239 68 68 / 0.22);
+  --lm-diff-del-edge: rgb(239 68 68 / 0.85);
+}
+
+.lm-diff-del {
+  display: none;
+}
+
+ins.lm-diff-ins {
+  text-decoration: none;
+}
+
+html[data-show-diff] .lm-diff-del {
+  display: revert;
+}
+
+html[data-show-diff] ins.lm-diff-ins,
+html[data-show-diff] del.lm-diff-del {
+  border-radius: 0.2em;
+  padding: 0 0.1em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+html[data-show-diff] ins.lm-diff-ins {
+  background: var(--lm-diff-ins-bg);
+}
+
+html[data-show-diff] del.lm-diff-del {
+  background: var(--lm-diff-del-bg);
+  text-decoration: line-through;
+  text-decoration-color: var(--lm-diff-del-edge);
+}
+
+/* Whole blocks: wrapped in a div, or a classed <li>/<tr>. */
+html[data-show-diff] div.lm-diff-block {
+  border-inline-start: 3px solid;
+  border-radius: 0.25rem;
+  padding: 0.05rem 0 0.05rem 0.75rem;
+  margin-inline-start: -0.95rem;
+}
+
+html[data-show-diff] div.lm-diff-block > :first-child {
+  margin-top: 0.5rem;
+}
+
+html[data-show-diff] div.lm-diff-block > :last-child {
+  margin-bottom: 0.5rem;
+}
+
+html[data-show-diff] div.lm-diff-block.lm-diff-ins,
+html[data-show-diff] li.lm-diff-block.lm-diff-ins,
+html[data-show-diff] tr.lm-diff-block.lm-diff-ins > * {
+  background: var(--lm-diff-ins-bg);
+  border-color: var(--lm-diff-ins-edge);
+}
+
+html[data-show-diff] div.lm-diff-block.lm-diff-del,
+html[data-show-diff] li.lm-diff-block.lm-diff-del,
+html[data-show-diff] tr.lm-diff-block.lm-diff-del > * {
+  background: var(--lm-diff-del-bg);
+  border-color: var(--lm-diff-del-edge);
+}
+
+html[data-show-diff] div.lm-diff-block.lm-diff-del {
+  opacity: 0.8;
+}
+
+/* Code: per-line statuses, drawn like Fumadocs' own `// [!code ++]` lines. */
+html[data-show-diff] .lm-diff-line.lm-diff-ins {
+  background: var(--lm-diff-ins-bg);
+}
+
+html[data-show-diff] .lm-diff-line.lm-diff-del {
+  background: var(--lm-diff-del-bg);
+  opacity: 0.75;
+}
+
+html[data-show-diff] .lm-diff-line::before {
+  position: absolute;
+  left: calc(var(--spacing) * 1.5);
+}
+
+html[data-show-diff] .lm-diff-line.lm-diff-ins::before {
+  content: '+';
+  color: var(--lm-diff-ins-edge);
+}
+
+html[data-show-diff] .lm-diff-line.lm-diff-del::before {
+  content: '-';
+  color: var(--lm-diff-del-edge);
+}
+
+.lm-diff-merged,
+html[data-show-diff] .lm-diff-final {
+  display: none;
+}
+
+html[data-show-diff] .lm-diff-merged {
+  display: block;
+}

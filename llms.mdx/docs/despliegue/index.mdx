@@ -1,25 +1,29 @@
-# Despliegue Lamassu IoT (/docs/despliegue)
+# Despliega Lamassu (/docs/despliegue)
 
 
 
-Bienvenido a la guía de **Despliegue de Lamassu IoT**. Selecciona la modalidad que mejor se adapta a tu infraestructura.
+Puedes ejecutar Lamassu en tu propio clúster Kubernetes, desplegar una imagen preparada desde AWS Marketplace o consumir la plataforma como servicio gestionado.
 
-OnPrem & SelfManaged · Kubernetes [#onprem--selfmanaged--kubernetes]
+Elige un modelo [#elige-un-modelo]
 
-<Cards>
-  <Card title="Introducción" description="Requisitos y arquitectura para despliegue en Kubernetes propio" href="/docs/despliegue/onprem" />
-
-  <Card title="Fastlane" description="Despliegue rápido y automatizado con el script Fastlane" href="/docs/despliegue/onprem/fastlane" />
-</Cards>
-
-Cloud · AWS EC2 · AWS Marketplace [#cloud--aws-ec2--aws-marketplace]
+| Modelo                  | Recomendado para                                            | Quién opera la infraestructura | Punto de partida             |
+| ----------------------- | ----------------------------------------------------------- | ------------------------------ | ---------------------------- |
+| Kubernetes self-managed | Producción, entornos regulados y despliegues personalizados | Tu equipo                      | Helm o Fastlane              |
+| AWS Marketplace         | Evaluación o despliegue dedicado dentro de una cuenta AWS   | Tu equipo                      | Imagen preconfigurada en EC2 |
+| SaaS                    | Equipos que quieren utilizar la plataforma sin operarla     | Lamassu                        | Suscripción gestionada       |
 
 <Cards>
-  <Card title="AWS EC2 · AWS Marketplace" description="Lanza Lamassu IoT en AWS con un clic desde el Marketplace" href="/docs/despliegue/cloud" />
+  <Card title="Kubernetes self-managed" description="Controla red, almacenamiento, claves, dependencias y ciclo de actualización." href="/docs/despliegue/onprem" />
+
+  <Card title="AWS Marketplace" description="Lanza una instancia preconfigurada de Lamassu en AWS EC2." href="/docs/despliegue/cloud" />
+
+  <Card title="Lamassu SaaS" description="Utiliza una instancia operada y actualizada como servicio gestionado." href="/docs/despliegue/saas" />
 </Cards>
 
-SaaS · Basada en suscripción [#saas--basada-en-suscripción]
+¿Solo quieres evaluar la plataforma? [#solo-quieres-evaluar-la-plataforma]
 
-<Cards>
-  <Card title="SaaS · Suscripción" description="Plataforma totalmente gestionada por LKS Next, sin infraestructura propia" href="/docs/despliegue/saas" />
-</Cards>
+Usa [Fastlane](/docs/despliegue/onprem/fastlane) para levantar PostgreSQL, Keycloak, RabbitMQ y Lamassu en un clúster Kubernetes mediante un único flujo. Está pensado para laboratorios, demos y bootstrap; para producción, configura las dependencias y los valores Helm de forma explícita.
+
+Después del despliegue [#después-del-despliegue]
+
+Cuando la consola esté disponible, continúa con [Crea tu primera CA](/docs/manual/inicio/primera-ca). Ese quickstart verifica que el motor criptográfico y la emisión funcionan correctamente.

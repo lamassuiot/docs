@@ -1,50 +1,83 @@
-# AWS EC2 · AWS Marketplace (/docs/despliegue/cloud)
+# Despliega desde AWS Marketplace (/docs/despliegue/cloud)
 
 
 
-Despliegue en AWS EC2 – AWS Marketplace [#despliegue-en-aws-ec2--aws-marketplace]
+La oferta de AWS Marketplace reduce la preparación inicial a una instancia EC2 dentro de tu cuenta. Tú mantienes el control de la red, el almacenamiento y la operación de la máquina.
 
-Lamassu IoT está disponible en **AWS Marketplace**, lo que permite lanzar una instancia preconfigurada en AWS EC2 con un único clic.
+Antes de empezar [#antes-de-empezar]
 
-Pasos [#pasos]
-
-1. Acceder a la página del producto de [Lamassu IoT en AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-fyfailowg3ewc)
-2. Seleccionar el tipo de instancia recomendado (`t3.large` o superior)
-3. Configurar el grupo de seguridad: puertos `443`, `8443` y `9443`
-4. Lanzar la instancia y acceder a la consola de administración en `https://<ip-publica>`
+* Permisos para suscribirte a productos de AWS Marketplace y lanzar instancias EC2.
+* Una VPC y una subred desde la que puedan acceder administradores y dispositivos.
+* Un grupo de seguridad que permita los endpoints necesarios.
 
 Requisitos de infraestructura [#requisitos-de-infraestructura]
 
-* Instancia EC2 `t3.large` mínimo (recomendado `t3.xlarge`)
-* EBS `gp3` de al menos 50 GB
-* Security Group con acceso HTTPS desde los dispositivos IoT
+| Recurso   | Mínimo           | Recomendación                             |
+| --------- | ---------------- | ----------------------------------------- |
+| Instancia | `t3.large`       | `t3.xlarge` o superior según la carga     |
+| Volumen   | EBS `gp3`, 50 GB | Ajustar al inventario y la retención      |
+| Red       | HTTPS accesible  | Restringir el acceso a redes de confianza |
+
+<Steps>
+  <Step>
+    Abre la oferta [#abre-la-oferta]
+
+    Accede a [Lamassu IoT en AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-fyfailowg3ewc) y revisa las condiciones antes de suscribirte.
+  </Step>
+
+  <Step>
+    Configura la instancia [#configura-la-instancia]
+
+    Selecciona `t3.large` o superior, asigna al menos 50 GB de almacenamiento `gp3` y elige la VPC y subred de destino.
+  </Step>
+
+  <Step>
+    Limita el acceso de red [#limita-el-acceso-de-red]
+
+    Configura el grupo de seguridad para los puertos `443`, `8443` y `9443`. Restringe los orígenes a las redes administrativas y de dispositivos que realmente necesiten conectarse.
+  </Step>
+
+  <Step>
+    Lanza y verifica [#lanza-y-verifica]
+
+    Inicia la instancia y abre la consola en `https://<ip-publica>`. Comprueba que puedes autenticarte antes de continuar.
+  </Step>
+</Steps>
+
+Siguiente paso [#siguiente-paso]
+
+Continúa con [Crea tu primera CA](/docs/manual/inicio/primera-ca) para validar la configuración criptográfica de la instancia.
 
 
-# Despliegue Lamassu IoT (/docs/despliegue)
+# Despliega Lamassu (/docs/despliegue)
 
 
 
-Bienvenido a la guía de **Despliegue de Lamassu IoT**. Selecciona la modalidad que mejor se adapta a tu infraestructura.
+Puedes ejecutar Lamassu en tu propio clúster Kubernetes, desplegar una imagen preparada desde AWS Marketplace o consumir la plataforma como servicio gestionado.
 
-OnPrem & SelfManaged · Kubernetes [#onprem--selfmanaged--kubernetes]
+Elige un modelo [#elige-un-modelo]
+
+| Modelo                  | Recomendado para                                            | Quién opera la infraestructura | Punto de partida             |
+| ----------------------- | ----------------------------------------------------------- | ------------------------------ | ---------------------------- |
+| Kubernetes self-managed | Producción, entornos regulados y despliegues personalizados | Tu equipo                      | Helm o Fastlane              |
+| AWS Marketplace         | Evaluación o despliegue dedicado dentro de una cuenta AWS   | Tu equipo                      | Imagen preconfigurada en EC2 |
+| SaaS                    | Equipos que quieren utilizar la plataforma sin operarla     | Lamassu                        | Suscripción gestionada       |
 
 <Cards>
-  <Card title="Introducción" description="Requisitos y arquitectura para despliegue en Kubernetes propio" href="/docs/despliegue/onprem" />
+  <Card title="Kubernetes self-managed" description="Controla red, almacenamiento, claves, dependencias y ciclo de actualización." href="/docs/despliegue/onprem" />
 
-  <Card title="Fastlane" description="Despliegue rápido y automatizado con el script Fastlane" href="/docs/despliegue/onprem/fastlane" />
+  <Card title="AWS Marketplace" description="Lanza una instancia preconfigurada de Lamassu en AWS EC2." href="/docs/despliegue/cloud" />
+
+  <Card title="Lamassu SaaS" description="Utiliza una instancia operada y actualizada como servicio gestionado." href="/docs/despliegue/saas" />
 </Cards>
 
-Cloud · AWS EC2 · AWS Marketplace [#cloud--aws-ec2--aws-marketplace]
+¿Solo quieres evaluar la plataforma? [#solo-quieres-evaluar-la-plataforma]
 
-<Cards>
-  <Card title="AWS EC2 · AWS Marketplace" description="Lanza Lamassu IoT en AWS con un clic desde el Marketplace" href="/docs/despliegue/cloud" />
-</Cards>
+Usa [Fastlane](/docs/despliegue/onprem/fastlane) para levantar PostgreSQL, Keycloak, RabbitMQ y Lamassu en un clúster Kubernetes mediante un único flujo. Está pensado para laboratorios, demos y bootstrap; para producción, configura las dependencias y los valores Helm de forma explícita.
 
-SaaS · Basada en suscripción [#saas--basada-en-suscripción]
+Después del despliegue [#después-del-despliegue]
 
-<Cards>
-  <Card title="SaaS · Suscripción" description="Plataforma totalmente gestionada por LKS Next, sin infraestructura propia" href="/docs/despliegue/saas" />
-</Cards>
+Cuando la consola esté disponible, continúa con [Crea tu primera CA](/docs/manual/inicio/primera-ca). Ese quickstart verifica que el motor criptográfico y la emisión funcionan correctamente.
 
 
 # Fastlane (/docs/despliegue/onprem/fastlane)
@@ -335,11 +368,11 @@ Resumen [#resumen]
 Está optimizado para rapidez, reproducibilidad y uso en entornos no productivos, con soporte para escenarios offline y pipelines de CI.
 
 
-# Introducción (/docs/despliegue/onprem)
+# Kubernetes self-managed (/docs/despliegue/onprem)
 
 
 
-Despliegue OnPrem con Kubernetes [#despliegue-onprem-con-kubernetes]
+Despliegue self-managed con Kubernetes [#despliegue-self-managed-con-kubernetes]
 
 Lamassu IoT puede desplegarse en infraestructura propia mediante **Kubernetes**, tanto en clústeres gestionados internamente como en entornos self-managed.
 
@@ -545,67 +578,374 @@ Versionado y migraciones [#versionado-y-migraciones]
 La serie actual del chart principal es `3.7.x`. Para upgrades entre versiones, el repositorio incluye guías específicas en `charts/lamassu/CHANGELOG/`, especialmente en cambios importantes como la adopción de Envoy Gateway o la introducción del servicio KMS.
 
 
-# SaaS · Suscripción (/docs/despliegue/saas)
+# Utiliza Lamassu como SaaS (/docs/despliegue/saas)
 
 
 
-Lamassu IoT SaaS – Basada en suscripción [#lamassu-iot-saas--basada-en-suscripción]
+Lamassu SaaS ofrece las capacidades de la plataforma en un entorno administrado. Es la opción indicada cuando tu equipo quiere centrarse en la PKI y las identidades de los dispositivos, no en mantener la infraestructura que las soporta.
 
-La modalidad **SaaS** de Lamassu IoT ofrece acceso completo a la plataforma como servicio totalmente gestionado por LKS Next, sin necesidad de gestionar infraestructura propia.
+Qué gestiona el servicio [#qué-gestiona-el-servicio]
 
-¿Qué incluye la suscripción? [#qué-incluye-la-suscripción]
+* Disponibilidad y mantenimiento de la plataforma.
+* Copias de seguridad automáticas.
+* Actualizaciones de versión.
+* Soporte técnico y SLA según el plan contratado.
 
-* Acceso a la plataforma Lamassu IoT completamente gestionada
-* Alta disponibilidad y backups automáticos
-* Actualizaciones automáticas a las últimas versiones
-* Soporte técnico incluido
-* SLA garantizado
+Planes [#planes]
 
-Planes disponibles [#planes-disponibles]
+| Plan         | Dispositivos | Soporte      |     SLA |
+| ------------ | -----------: | ------------ | ------: |
+| Starter      |  Hasta 1.000 | Email        |  99,5 % |
+| Professional | Hasta 10.000 | Email y chat |  99,9 % |
+| Enterprise   |   Ilimitados | Dedicado     | 99,99 % |
 
-| Plan         | Dispositivos | Soporte      | SLA    |
-| ------------ | ------------ | ------------ | ------ |
-| Starter      | Hasta 1.000  | Email        | 99,5%  |
-| Professional | Hasta 10.000 | Email + Chat | 99,9%  |
-| Enterprise   | Ilimitado    | Dedicado     | 99,99% |
+Solicita acceso [#solicita-acceso]
 
-Contacto [#contacto]
+Contacta con el equipo de Lamassu a través de [lamassu.io](https://lamassu.io) para solicitar una demo o elegir un plan.
 
-Para suscribirte o solicitar una demo, contacta con el equipo de Lamassu IoT a través de [lamassu.io](https://lamassu.io).
-
-
-# Manual de Usuario (/docs/manual)
+Cuando recibas las credenciales de tu instancia, continúa con [Primeros pasos](/docs/manual/inicio).
 
 
+# Arquitectura de la plataforma (/docs/manual/conceptos/arquitectura)
 
-Bienvenido al **Manual de Usuario de Lamassu IoT**. Esta documentación cubre todas las funcionalidades de la plataforma para la gestión de identidades digitales en entornos IoT industriales.
 
-Servicios Core [#servicios-core]
+
+Lamassu se despliega como un conjunto de servicios independientes. La separación evita que todos los componentes necesiten acceso directo a las claves privadas y permite escalar cada capacidad según la carga.
+
+Plano de control [#plano-de-control]
+
+La consola y las APIs administran autoridades, certificados, DMS, dispositivos, alertas y configuración. Los eventos de dominio permiten que conectores y automatizaciones reaccionen a los cambios sin sondear continuamente la plataforma.
+
+Custodia y operaciones criptográficas [#custodia-y-operaciones-criptográficas]
+
+El KMS ofrece una interfaz común sobre motores software, PKCS#11 y proveedores cloud. El motor seleccionado conserva la clave o delega la operación criptográfica sin que los demás servicios conozcan su implementación.
+
+Emisión y enrolamiento [#emisión-y-enrolamiento]
+
+El servicio de CA emite certificados y mantiene la relación con su autoridad. El DMS aplica las reglas de enrolamiento y expone los flujos EST para que un dispositivo solicite o renueve una identidad.
+
+Estado y validación [#estado-y-validación]
+
+Device Manager conserva la vista operativa del dispositivo y su historial. Validation Authority publica OCSP y CRLs para que otros sistemas decidan si deben confiar en un certificado presentado.
+
+Dependencias de la plataforma [#dependencias-de-la-plataforma]
+
+En un despliegue autogestionado, Lamassu utiliza PostgreSQL para persistencia, RabbitMQ para mensajería y un proveedor OIDC para autenticación. Consulta la [arquitectura de despliegue](/docs/despliegue/onprem#arquitectura) para ver cómo se publican los servicios en Kubernetes.
+
+
+# Ciclo de vida de una identidad (/docs/manual/conceptos/ciclo-identidad)
+
+
+
+Una identidad no termina cuando se emite el certificado. Lamassu mantiene su relación con el dispositivo y registra los cambios necesarios para renovarla, suspenderla o retirarla.
+
+Estados principales [#estados-principales]
+
+| Estado            | Qué significa                                             | Acción habitual                               |
+| ----------------- | --------------------------------------------------------- | --------------------------------------------- |
+| `No Identity`     | El dispositivo está registrado pero no tiene certificado. | Enrolar o asignar una identidad.              |
+| `Active`          | El certificado está vigente y puede utilizarse.           | Monitorizar y preparar su renovación.         |
+| `Renewal Pending` | La identidad ha entrado en la ventana de renovación.      | Iniciar el re-enrolamiento.                   |
+| `Expiring Soon`   | La fecha de expiración está próxima.                      | Renovar con prioridad.                        |
+| `Expired`         | El certificado ha superado su validez.                    | Emitir una nueva identidad.                   |
+| `Revoked`         | El certificado se ha invalidado antes de expirar.         | Investigar la causa y sustituirlo si procede. |
+| `Decommissioned`  | El dispositivo se ha retirado definitivamente.            | No volver a enrolarlo.                        |
+
+Renovación y revocación no son equivalentes [#renovación-y-revocación-no-son-equivalentes]
+
+La **renovación** sustituye una identidad que sigue siendo fiable antes de que expire. La **revocación** comunica que un certificado ya no debe aceptarse. Revoca cuando exista compromiso, retirada o un cambio que invalide la identidad; renueva para mantener la continuidad operativa.
+
+<Callout type="warn" title="Decommission es irreversible">
+  Dar de baja un dispositivo revoca sus certificados y le impide obtener nuevas identidades. Utiliza esta acción únicamente cuando el dispositivo se retire de forma permanente.
+</Callout>
+
+Observabilidad [#observabilidad]
+
+El historial de certificados muestra todas las identidades asociadas a un dispositivo. La línea de tiempo registra enrolamientos, renovaciones y cambios de estado. Las suscripciones permiten enviar estos eventos a correo, Microsoft Teams o webhooks.
+
+
+# Cómo funciona Lamassu (/docs/manual/conceptos)
+
+
+
+Lamassu conecta tres elementos: una **raíz de confianza**, una **política de emisión** y una **entidad que necesita demostrar su identidad**. La plataforma coordina esos elementos durante todo el ciclo de vida del certificado.
+
+El modelo en cinco piezas [#el-modelo-en-cinco-piezas]
+
+| Pieza                           | Responsabilidad                                                        |
+| ------------------------------- | ---------------------------------------------------------------------- |
+| Motor criptográfico             | Genera o custodia claves y ejecuta operaciones privadas.               |
+| Autoridad de certificación (CA) | Firma certificados y establece la cadena de confianza.                 |
+| Device Management Service (DMS) | Define cómo se registran y renuevan los dispositivos.                  |
+| Dispositivo                     | Conserva su clave privada y presenta el certificado para autenticarse. |
+| Validation Authority (VA)       | Publica el estado de los certificados mediante OCSP y CRL.             |
+
+Del alta a la operación [#del-alta-a-la-operación]
+
+1. Un administrador configura un motor criptográfico y crea o importa una CA.
+2. Un DMS relaciona esa CA con una política de enrolamiento.
+3. El dispositivo genera una clave y solicita un certificado mediante EST, o un operador le asigna una identidad.
+4. Lamassu conserva el inventario, el historial y el estado de la identidad.
+5. Los consumidores comprueban la cadena y consultan OCSP o una CRL cuando necesitan conocer su vigencia.
 
 <Cards>
-  <Card title="Gestión de Claves (KMS)" description="Motores criptográficos, generación e importación de claves" href="/docs/manual/servicios-core/kms" />
+  <Card title="Arquitectura" description="Conoce los componentes y dónde termina la responsabilidad de cada uno." href="/docs/manual/conceptos/arquitectura" />
 
-  <Card title="Entidades de Confianza (CAs)" description="Creación, importación y gestión de Autoridades de Certificación" href="/docs/manual/servicios-core/cas" />
-
-  <Card title="Gestión de Certificados" description="Visualización y revocación de certificados emitidos" href="/docs/manual/servicios-core/certificates" />
-
-  <Card title="Validación de Certificados (VA)" description="Servicios OCSP y CRL" href="/docs/manual/servicios-core/validation" />
-
-  <Card title="Registration Authority (RA)" description="Automatización del ciclo de vida de certificados y protocolo EST" href="/docs/manual/servicios-core/ra" />
-
-  <Card title="Dispositivos e Identidades" description="Gestión de End Entities y ciclo de vida de dispositivos IoT" href="/docs/manual/servicios-core/devices" />
-
-  <Card title="Alertas y Suscripciones" description="Monitorización de eventos y notificaciones" href="/docs/manual/servicios-core/alerts" />
+  <Card title="Ciclo de vida de una identidad" description="Sigue un certificado desde el enrolamiento hasta la renovación o revocación." href="/docs/manual/conceptos/ciclo-identidad" />
 </Cards>
 
-Integraciones con terceros [#integraciones-con-terceros]
+
+# Plataforma Lamassu IoT (/docs/manual)
+
+
+
+Lamassu IoT centraliza la emisión, distribución, renovación y revocación de identidades X.509 para dispositivos conectados. Puedes construir una PKI privada, proteger sus claves y automatizar el enrolamiento de una flota sin perder visibilidad sobre cada certificado.
+
+Empieza aquí [#empieza-aquí]
 
 <Cards>
-  <Card title="Integración AWS IoT Core" description="Aprovisionamiento de dispositivos en AWS IoT Core" href="/docs/manual/integraciones/aws" />
+  <Card title="Primeros pasos" description="Crea una CA, emite un certificado y registra tu primer dispositivo." href="/docs/manual/inicio" />
+
+  <Card title="Cómo funciona Lamassu" description="Construye el modelo mental de autoridades, claves, identidades y validación." href="/docs/manual/conceptos" />
+</Cards>
+
+Capacidades principales [#capacidades-principales]
+
+Construye tu jerarquía de confianza [#construye-tu-jerarquía-de-confianza]
+
+Crea autoridades raíz e intermedias o importa una PKI existente. Define qué autoridad puede emitir cada identidad y conserva la cadena de confianza completa.
+
+Protege las claves criptográficas [#protege-las-claves-criptográficas]
+
+Genera y custodia claves mediante motores software, HSMs PKCS#11 o servicios cloud. Lamassu desacopla las operaciones de la ubicación física de la clave.
+
+Emite y controla certificados [#emite-y-controla-certificados]
+
+Emite certificados desde la consola o a partir de un CSR, consulta su estado y revócalos cuando dejan de ser fiables.
+
+Automatiza identidades de dispositivos [#automatiza-identidades-de-dispositivos]
+
+Define políticas de enrolamiento mediante un Device Management Service (DMS) y deja que los dispositivos soliciten o renueven su identidad a través de EST.
+
+Publica el estado de validación [#publica-el-estado-de-validación]
+
+Ofrece validación online mediante OCSP y distribuye CRLs para consumidores que necesitan comprobar certificados sin conexión.
+
+Reacciona a los eventos [#reacciona-a-los-eventos]
+
+Suscríbete a cambios del ciclo de vida y envía notificaciones por correo, Microsoft Teams o webhooks.
+
+Elige tu recorrido [#elige-tu-recorrido]
+
+<Cards>
+  <Card title="Administro la PKI" description="Configura motores, autoridades, emisión y validación." href="/docs/manual/servicios-core/kms" />
+
+  <Card title="Integro un dispositivo" description="Configura el DMS y usa EST para obtener una identidad." href="/docs/manual/servicios-core/ra" />
+
+  <Card title="Opero la plataforma" description="Despliega Lamassu y prepara sus dependencias." href="/docs/despliegue" />
+
+  <Card title="Integro otro sistema" description="Conecta Lamassu con AWS IoT Core y otros destinos." href="/docs/manual/integraciones/aws" />
 </Cards>
 
 
-# Integración con AWS IoT Core (/docs/manual/integraciones/aws)
+# Primeros pasos (/docs/manual/inicio)
+
+
+
+Los quickstarts te llevan desde una instancia preparada hasta una identidad de dispositivo activa. Cada guía produce un resultado verificable y enlaza la explicación detallada cuando necesitas ir más allá.
+
+Ruta recomendada [#ruta-recomendada]
+
+<Cards>
+  <Card title="1. Crea tu primera CA" description="Establece una raíz de confianza capaz de emitir certificados." href="/docs/manual/inicio/primera-ca" />
+
+  <Card title="2. Emite un certificado" description="Crea una identidad X.509 y verifica su contenido." href="/docs/manual/inicio/primer-certificado" />
+
+  <Card title="3. Registra un dispositivo" description="Añade un dispositivo y asígnale su primera identidad." href="/docs/manual/inicio/primer-dispositivo" />
+</Cards>
+
+Antes de empezar [#antes-de-empezar]
+
+Necesitas acceso a la consola de Lamassu IoT y permisos para administrar claves, autoridades y dispositivos. La instancia debe tener al menos un motor criptográfico configurado.
+
+Si todavía no tienes una instancia, elige primero un [modelo de despliegue](/docs/despliegue).
+
+
+# Emite tu primer certificado (/docs/manual/inicio/primer-certificado)
+
+
+
+En este quickstart Lamassu generará la clave y el CSR en el navegador, y la CA emitirá el certificado. Al terminar descargarás el certificado y su clave privada.
+
+Antes de empezar [#antes-de-empezar]
+
+* Una CA activa con permiso para emitir certificados.
+* Un nombre para la identidad, por ejemplo `device-001.example.internal`.
+* Un lugar seguro en el que custodiar la clave privada descargada.
+
+<Callout type="warn" title="La clave privada se entrega una sola vez">
+  En este flujo la clave se genera en el navegador y Lamassu no la almacena. Descárgala y protégela antes de cerrar el resultado de la operación.
+</Callout>
+
+<Steps>
+  <Step>
+    Inicia la emisión [#inicia-la-emisión]
+
+    Abre la CA creada en el quickstart anterior, entra en **Issued Certificates** y selecciona **Issue New**.
+  </Step>
+
+  <Step>
+    Elige el método [#elige-el-método]
+
+    Selecciona **Generate Key & CSR in Browser**. Usa **Upload Existing CSR** cuando la clave privada deba generarse y permanecer en el sistema de destino.
+  </Step>
+
+  <Step>
+    Identifica el certificado [#identifica-el-certificado]
+
+    Introduce el `Common Name` y, si corresponde, la organización, unidad organizativa y ubicación. Añade SANs para cada nombre DNS, dirección IP, correo o URI con el que se vaya a validar la identidad.
+  </Step>
+
+  <Step>
+    Configura clave y usos [#configura-clave-y-usos]
+
+    Elige RSA o ECDSA, define la validez y selecciona los usos de clave. Para una identidad de dispositivo que usa mTLS, habilita **Digital Signature** y **Client Authentication**.
+
+    La validez no puede superar la fecha de expiración de la CA emisora.
+  </Step>
+
+  <Step>
+    Emite y descarga [#emite-y-descarga]
+
+    Confirma la emisión y descarga inmediatamente el certificado y la clave privada en formato PEM.
+  </Step>
+
+  <Step>
+    Verifica el resultado [#verifica-el-resultado]
+
+    El certificado debe aparecer en **Issued Certificates** con estado activo. Comprueba su sujeto, SANs, emisor, usos y periodo de validez.
+  </Step>
+</Steps>
+
+Siguiente paso [#siguiente-paso]
+
+[Registra tu primer dispositivo](/docs/manual/inicio/primer-dispositivo) para asociar la identidad a una entidad gestionada, o consulta la [gestión de certificados](/docs/manual/servicios-core/certificates).
+
+
+# Registra tu primer dispositivo (/docs/manual/inicio/primer-dispositivo)
+
+
+
+En este quickstart registrarás manualmente un dispositivo y le asignarás su primer certificado. Es el recorrido más corto para entender cómo Lamassu relaciona una entidad física con su historial de identidades.
+
+Antes de empezar [#antes-de-empezar]
+
+* Un DMS configurado.
+* Una CA asociada al DMS.
+* Un identificador único para el dispositivo.
+
+<Steps>
+  <Step>
+    Registra el dispositivo [#registra-el-dispositivo]
+
+    Abre **Managed Devices**, selecciona la acción para registrar un dispositivo y completa:
+
+    * **Device ID**: identificador único del dispositivo.
+    * **Registration Authority**: DMS que aplicará las políticas de enrolamiento.
+    * **Icon** y **Tags**: clasificación opcional para localizarlo después.
+  </Step>
+
+  <Step>
+    Comprueba el estado inicial [#comprueba-el-estado-inicial]
+
+    Abre el dispositivo recién creado. Debe aparecer con estado **No Identity**: existe en el inventario, pero todavía no tiene un certificado asociado.
+  </Step>
+
+  <Step>
+    Asigna una identidad [#asigna-una-identidad]
+
+    Selecciona **Assign Identity**. Lamassu buscará certificados activos cuyo `Common Name` coincida con el `Device ID`.
+
+    Selecciona un certificado existente o usa **Issue New Instead** para emitir uno desde una CA vinculada al DMS.
+  </Step>
+
+  <Step>
+    Verifica el dispositivo [#verifica-el-dispositivo]
+
+    Tras confirmar, el estado debe cambiar a **Active**. Revisa **Certificate History** para comprobar la identidad asociada y **Device Event Timeline** para ver el evento de asignación.
+  </Step>
+</Steps>
+
+Automatiza el siguiente dispositivo [#automatiza-el-siguiente-dispositivo]
+
+El registro manual ayuda a entender el modelo, pero una flota debe usar enrolamiento automatizado. Continúa con [Device Management Service](/docs/manual/servicios-core/ra) y la [integración EST](/docs/manual/servicios-core/est).
+
+
+# Crea tu primera CA (/docs/manual/inicio/primera-ca)
+
+
+
+En este quickstart crearás una autoridad de certificación raíz con un nuevo par de claves. Al terminar tendrás una CA activa que podrás usar en el siguiente quickstart.
+
+Antes de empezar [#antes-de-empezar]
+
+* Acceso a la consola con permisos para gestionar autoridades.
+* Al menos un motor criptográfico disponible.
+* Un nombre que identifique el propósito de la CA, por ejemplo `Acme Device Root CA`.
+
+<Callout type="info" title="Raíz o intermedia">
+  Una CA raíz se autofirma y actúa como ancla de confianza. Para producción suele ser preferible mantener la raíz más protegida y emitir desde una CA intermedia.
+</Callout>
+
+<Steps>
+  <Step>
+    Abre el asistente de creación [#abre-el-asistente-de-creación]
+
+    En el menú lateral, abre **Certification Authorities** y selecciona **Create New CA**.
+
+    Elige crear una CA con un par de claves nuevo. Si ya tienes la clave en el KMS, usa **Create New CA (Existing Key)**.
+  </Step>
+
+  <Step>
+    Selecciona la clave [#selecciona-la-clave]
+
+    Elige el motor criptográfico que custodiará la clave y configura el algoritmo. Para una primera CA puedes usar **EC P-384**, siempre que sea compatible con tus consumidores.
+
+    La clave privada permanecerá bajo el control del motor seleccionado.
+  </Step>
+
+  <Step>
+    Define la autoridad [#define-la-autoridad]
+
+    Selecciona **Root CA** y completa:
+
+    * **CA Name**: un nombre único y reconocible.
+    * **Subject**: al menos la organización y el país que identificarán a la autoridad.
+    * **CA Certificate Expiration**: una validez mayor que la de los certificados que emitirá.
+    * **Default End-Entity Certificate Issuance Expiration**: la validez predeterminada de los certificados finales.
+
+    El nombre de la CA se utilizará como `Common Name` del certificado.
+  </Step>
+
+  <Step>
+    Revisa y crea la CA [#revisa-y-crea-la-ca]
+
+    Comprueba el algoritmo, el sujeto y las fechas antes de confirmar. Estos valores definen el ancla de confianza y no deberían elegirse como simples datos de prueba en un entorno productivo.
+  </Step>
+
+  <Step>
+    Verifica el resultado [#verifica-el-resultado]
+
+    Abre la nueva CA desde el listado. Debe aparecer activa y mostrar su certificado PEM, la fecha de expiración y la pestaña **Issued Certificates**.
+  </Step>
+</Steps>
+
+Siguiente paso [#siguiente-paso]
+
+Usa la autoridad para [emitir tu primer certificado](/docs/manual/inicio/primer-certificado), o consulta la [guía completa de autoridades](/docs/manual/servicios-core/cas) para crear una CA intermedia, importar una CA o definir perfiles avanzados.
+
+
+# AWS IoT Core (/docs/manual/integraciones/aws)
 
 
 
@@ -929,516 +1269,417 @@ Solución de problemas [#solución-de-problemas]
 </Cards>
 
 
-# [Alerts] Alertas y Suscripciones (/docs/manual/servicios-core/alerts)
+# Alertas y suscripciones (/docs/manual/servicios-core/alerts)
 
 
 
-Alertas [#alertas]
+Las suscripciones convierten los eventos de Lamassu en notificaciones accionables. Puedes avisar a un equipo, alimentar un sistema de incidentes o activar una automatización cuando cambia una CA, un certificado o un dispositivo.
 
-La funcionalidad de **Alertas** en Lamassu IoT es una herramienta avanzada para la monitorización y la observación del estado de la PKI. Va más allá de la simple visualización, permitiendo a los usuarios **reaccionar de forma proactiva y automatizada** a los eventos que ocurren en la infraestructura. Esta capacidad es crucial en entornos de IoT, donde el número de dispositivos y la frecuencia de las operaciones hacen inviable la monitorización manual. A través de la gestión de suscripciones, los administradores pueden asegurarse de que eventos críticos, como la revocación de un certificado o la detección de un intento de registro fallido, no pasen desapercibidos, lo que mejora la seguridad y la resiliencia del sistema.
+Cómo funciona [#cómo-funciona]
 
-Eventos y Suscripciones [#eventos-y-suscripciones]
+1. Un servicio publica un evento de dominio.
+2. Lamassu evalúa las suscripciones asociadas a ese tipo de evento.
+3. El filtro de cada suscripción decide si debe notificarse.
+4. Lamassu entrega el evento al canal configurado.
 
-La página principal de alertas presenta una lista exhaustiva de todos los **tipos de eventos** que pueden ser generados por la PKI de Lamassu IoT. Estos eventos cubren un amplio espectro de actividades, desde operaciones de ciclo de vida de certificados y dispositivos hasta cambios de estado en las RA. Para cada tipo de evento, la interfaz proporciona un conjunto de métricas clave que facilitan la toma de decisiones:
+El inventario de eventos muestra cuándo se observó cada tipo por última vez, cuántas veces ha ocurrido y cuántas suscripciones tiene. Puedes expandir un evento para inspeccionar un ejemplo de su payload JSON antes de crear el filtro.
 
-* **Last Seen**: Muestra cuándo ocurrió la última instancia del evento. Esto ayuda a identificar si un evento es recurrente o si ha ocurrido recientemente, lo cual es fundamental para el diagnóstico.
-* **Counter**: Indica el número total de veces que el evento ha sido registrado en el sistema. Un contador alto puede señalar una tendencia, un problema subyacente en un dispositivo o una configuración errónea.
-* **Subscriptions**: Informa si ya existen suscripciones activas para ese evento, evitando la creación de suscripciones duplicadas y proporcionando una visión general de la monitorización ya implementada.
-* **Actions**: El botón **Subscribe** permite iniciar el proceso de creación de una nueva suscripción, adaptada a las necesidades específicas del usuario o equipo.
+Canales disponibles [#canales-disponibles]
 
-Adicionalmente, al expandir la información de cada evento, se presenta un **ejemplo de la estructura de datos JSON** de la última instancia registrada. Esta información es de gran valor, ya que permite a los desarrolladores y administradores entender con precisión el esquema de la notificación y cómo procesarla en sistemas externos, como un sistema de gestión de incidentes o una aplicación de automatización.
+| Canal           | Configuración                       | Uso habitual                                                  |
+| --------------- | ----------------------------------- | ------------------------------------------------------------- |
+| Email           | Dirección de destino                | Avisos para personas o listas operativas.                     |
+| Microsoft Teams | Nombre y URL de webhook             | Notificaciones en un canal de colaboración.                   |
+| Webhook         | Nombre, método `POST` o `PUT` y URL | Integración con automatización, SIEM o gestión de incidentes. |
 
-Gestión de Suscripciones [#gestión-de-suscripciones]
+Crea una suscripción [#crea-una-suscripción]
 
-Para cada evento, se puede crear una suscripción a la que se envían notificaciones cuando el evento ocurre. Este proceso permite a los administradores del sistema personalizar qué eventos monitorizan y cómo son notificados. La configuración de las suscripciones, incluyendo el destino de las notificaciones, se gestiona de forma individual para cada tipo de evento.
+<Steps>
+  <Step>
+    Elige el evento [#elige-el-evento]
 
-Al pulsar sobre el botón **Subscribe** se abre un modal de configuración que permite seleccionar uno de los tres mecanismos de notificación disponibles en Lamassu IoT.
+    Abre **Alerts**, localiza el tipo de evento y selecciona **Subscribe**. Revisa el último ejemplo JSON para identificar los campos que necesitarás filtrar.
+  </Step>
 
-* **Email Notification**: Envía una notificación por correo electrónico a una dirección específica cada vez que el evento se registra. Para configurar este método, solo es necesario proporcionar la dirección de correo electrónico de destino.
-* **Microsoft Teams Webhook**: Utiliza un webhook para enviar una notificación al canal de Microsoft Teams configurado, lo que permite integrar las alertas directamente en los flujos de trabajo de colaboración. Se debe proporcionar un nombre para la suscripción y la URL del webhook de Microsoft Teams.
-* **Webhook**: Envía una notificación en formato JSON a una URL de webhook personalizada, lo que permite integrar las alertas con cualquier servicio o aplicación que soporte este protocolo. Para este mecanismo, se debe especificar un nombre, el **Método HTTP** (siempre **POST** o **PUT**) y la URL de destino. El documento JSON del evento se entregará como el cuerpo de la solicitud HTTP.
+  <Step>
+    Configura el destino [#configura-el-destino]
 
-Filtros y condiciones [#filtros-y-condiciones]
+    Selecciona Email, Microsoft Teams o Webhook e introduce los datos del canal.
+  </Step>
 
-Después de seleccionar el mecanismo de notificación, se puede establecer un filtro para determinar las condiciones que deben cumplirse para que el evento sea notificado. Esto permite un control más granular y evita recibir notificaciones irrelevantes. Los formatos de filtro disponibles son:
+  <Step>
+    Limita las notificaciones [#limita-las-notificaciones]
 
-* **None**: No se aplica ningún filtro. Se enviarán notificaciones para todas las instancias del evento.
-* **JSON Path**: Utiliza la sintaxis de JSON Path para evaluar una condición sobre un campo específico del evento JSON.
-* **JSON Schema**: Permite aplicar un esquema JSON para validar el evento. Las notificaciones solo se enviarán si el evento cumple con el esquema definido. Esto es útil para asegurar que solo se procesen eventos con un formato de datos esperado y consistente.
-* **Javascript**: Permite escribir una función de JavaScript personalizada para evaluar condiciones complejas sobre el evento JSON. Por ejemplo, la función `function (event) { return event.data.status == "NO_IDENTITY"; }` podría usarse para notificar solo cuando el estado de un dispositivo cambia a "No Identity". Esto ofrece la mayor flexibilidad, ya que se pueden aplicar lógicas avanzadas para filtrar los eventos antes de que se envíen las notificaciones.
+    Añade un filtro si no quieres recibir todas las instancias del evento.
 
-Confirmación de la suscripción [#confirmación-de-la-suscripción]
+    | Filtro          | Cuándo utilizarlo                                             |
+    | --------------- | ------------------------------------------------------------- |
+    | **None**        | Cada instancia del evento es relevante.                       |
+    | **JSON Path**   | Una condición depende de uno o varios campos concretos.       |
+    | **JSON Schema** | Solo deben aceptarse payloads con una estructura determinada. |
+    | **JavaScript**  | La condición necesita lógica personalizada.                   |
 
-El último paso del proceso es la **confirmación**. Una vez que se ha configurado el canal de notificación y el filtro (si corresponde), la interfaz muestra un resumen de la suscripción. Aquí puedes revisar el tipo de evento, el canal de notificación seleccionado y la condición del filtro antes de confirmar.
+    Por ejemplo, `function (event) { return event.data.status == "NO_IDENTITY"; }` limita una suscripción a dispositivos sin identidad.
+  </Step>
 
-Al hacer clic en **Confirm Subscription**, la suscripción se activa y Lamassu IoT comenzará a enviar notificaciones basadas en la configuración que has establecido.
+  <Step>
+    Revisa y activa [#revisa-y-activa]
 
-Gestión de Suscripciones Existentes [#gestión-de-suscripciones-existentes]
+    Comprueba el evento, el canal y el filtro en el resumen. Selecciona **Confirm Subscription** para comenzar la entrega.
+  </Step>
+</Steps>
 
-Para gestionar una suscripción que ya está activa, simplemente selecciónala en el listado de la página principal de alertas. Al hacerlo, se abrirá un modal de **Subscription Details** que muestra toda la información de la suscripción. Desde esta ventana, se pueden realizar las siguientes acciones:
+Gestiona una suscripción [#gestiona-una-suscripción]
 
-* **Ver detalles**: Muestra información completa sobre la suscripción, incluyendo su tipo de evento, el canal de notificación, los detalles de contacto (como la dirección de correo electrónico) y las condiciones de filtrado aplicadas.
-* **Editar**: Permite modificar la configuración de la suscripción, como el canal de notificación o el filtro.
-* **Anular suscripción (Unsubscribe)**: Desactiva y elimina la suscripción. Esta acción es útil cuando una alerta ya no es necesaria.
+Abre una suscripción existente para consultar su destino y filtro, modificar la configuración o seleccionar **Unsubscribe**. Elimina las suscripciones que ya no tengan un propietario operativo para evitar entregas ignoradas o endpoints obsoletos.
 
-Catálogo de Eventos del Sistema [#catálogo-de-eventos-del-sistema]
+Familias de eventos [#familias-de-eventos]
 
-La siguiente tabla resume los eventos que pueden ser generados por la plataforma Lamassu IoT, clasificados por el componente que los origina.
+| Área         | Ejemplos                                                          |
+| ------------ | ----------------------------------------------------------------- |
+| Autoridades  | `ca.create`, `ca.import`, `ca.reissue`, `ca.delete`               |
+| Certificados | `ca.sign.certificate`, `certificate.delete`                       |
+| Perfiles     | `profile.create`, `profile.update`, `profile.delete`              |
+| Enrolamiento | `dms.create`, `dms.update`, `dms.enroll`, `dms.reenroll`          |
+| Dispositivos | `device.create`, `device.identity.update`, `device.status.update` |
+| Validación   | `va.role.crl.create`                                              |
+| Claves       | `kms.create`, `kms.import`, `kms.sign.message`, `kms.delete`      |
 
-| Evento                     | Descripción                                    |
-| -------------------------- | ---------------------------------------------- |
-| **ca.create**              | Creación de una CA                             |
-| **ca.import**              | Importación de una CA                          |
-| **ca.profile.update**      | Actualización de perfil de CA                  |
-| **ca.reissue**             | Reemisión de una CA                            |
-| **ca.sign.certificate**    | Firma / emisión de certificado                 |
-| **ca.signature.sign**      | Operación de firma criptográfica               |
-| **ca.delete**              | Eliminación de una CA                          |
-| **certificate.delete**     | Eliminación de un certificado                  |
-| **profile.create**         | Creación de perfil de emisión                  |
-| **profile.update**         | Actualización de perfil de emisión             |
-| **profile.delete**         | Eliminación de perfil de emisión               |
-| **dms.create**             | Creación de un DMS                             |
-| **dms.update**             | Actualización de un DMS                        |
-| **dms.delete**             | Eliminación de un DMS                          |
-| **dms.enroll**             | Inscripción (enroll) de dispositivo            |
-| **dms.reenroll**           | Re-inscripción (reenroll) de dispositivo       |
-| **dms.bind-device-id**     | Asociación de identidad a dispositivo          |
-| **device.create**          | Creación de dispositivo                        |
-| **device.identity.update** | Actualización de identidad del dispositivo     |
-| **device.status.update**   | Cambio de estado del dispositivo               |
-| **device.metadata.update** | Actualización de metadatos del dispositivo     |
-| **device.delete**          | Eliminación de un dispositivo                  |
-| **va.role.crl.create**     | Cálculo/creación de CRL                        |
-| **kms.create**             | Creación de clave en KMS                       |
-| **kms.import**             | Importación de una clave KMS                   |
-| **kms.update.metadata**    | Actualización de metadatos de clave KMS        |
-| **kms.update.aliases**     | Actualización de alias de clave KMS            |
-| **kms.update.name**        | Cambio de nombre de una clave KMS              |
-| **kms.update.tags**        | Actualización de etiquetas (tags) de clave KMS |
-| **kms.delete**             | Eliminación de una clave KMS                   |
-| **kms.sign.message**       | Firma de un mensaje con clave KMS              |
-| **kms.verify.signature**   | Verificación de firma con clave KMS            |
+Utiliza el catálogo que muestra la consola como fuente para los tipos disponibles en la versión que tienes desplegada.
 
 
-# [CA] Gestión de Entidades de Confianza (/docs/manual/servicios-core/cas)
+# Autoridades de certificación (/docs/manual/servicios-core/cas)
 
 
 
-Gestión de entidades de confianza [#gestión-de-entidades-de-confianza]
+Una autoridad de certificación (CA) vincula identidades con claves públicas mediante certificados firmados. En Lamassu puedes crear una jerarquía nueva, utilizar una clave que ya está en el KMS o incorporar una CA externa.
 
-Creación de entidades de certificación [#creación-de-entidades-de-certificación]
+Elige un flujo [#elige-un-flujo]
 
-Para acceder a la creación de nuevas entidades certificación se debe acceder la opción de entidades de certificación del menú lateral y luego seleccionar la acción de creación de nueva CA.
+| Necesitas                            | Flujo                         | Resultado                                     |
+| ------------------------------------ | ----------------------------- | --------------------------------------------- |
+| Crear una raíz de confianza nueva    | Nueva CA y nueva clave        | Lamassu genera y custodia el par de claves.   |
+| Crear una CA con una clave existente | Nueva CA desde KMS            | La CA reutiliza una clave ya registrada.      |
+| Migrar una CA operativa              | Importar CA con clave privada | Lamassu puede emitir con la CA importada.     |
+| Confiar en una CA externa            | Importar solo el certificado  | La CA se usa para validación, no para emitir. |
 
-Actualmente hay disponibles 3 acciones:
+¿Es tu primera vez? Sigue [Crea tu primera CA](/docs/manual/inicio/primera-ca) para completar el recorrido mínimo.
 
-* **Creación de una nueva autoridad de certificación**, esta acción generará un nuevo par de claves para soportar la nueva autoridad de certificación.
-* **Importar una nueva autoridad de certificación generada externamente**, permite importar en Lamassu una autoridad de certificación, cuyo par de claves ha sido generado de manera externa.
-* **Importar un certificado de autoridad de certificación sin clave privada**, en este caso se importa la CA para poder usarla en procesos de validación y no como fuente de nuevos certificados gestionados por Lamassu.
+Crea una autoridad nueva [#crea-una-autoridad-nueva]
 
-Creación de una nueva autoridad de certificación [#creación-de-una-nueva-autoridad-de-certificación]
+Antes de empezar [#antes-de-empezar]
 
-La creación de una Autoridad de Certificación (CA) es un proceso fundamental en el establecimiento de una infraestructura de clave pública (PKI). Lamassu IoT permite provisionar tanto autoridades raíz como intermedias mediante la generación automática de pares de claves criptográficas que son gestionados de forma segura por el sistema integrado de gestión de claves.
+* Decide si la CA será raíz o intermedia.
+* Elige el motor que custodiará la clave.
+* Define una validez superior a la de los certificados que emitirá.
+* Para una CA intermedia, asegúrate de que la CA padre esté activa.
 
-En el formulario de creación se definen los siguientes bloques de configuración.
+<Steps>
+  <Step>
+    Abre el asistente [#abre-el-asistente]
 
-**Motor criptográfico**
+    En **Certification Authorities**, selecciona **Create New CA** y elige generar un par de claves nuevo.
+  </Step>
 
-* **Selector:** Desplegable con motores disponibles, ofrece los configurados en el sistema.
-* **Ejemplo mostrado:** go1.24.3
-* **Función:** Permite seleccionar el motor criptográfico deseado
+  <Step>
+    Configura la clave [#configura-la-clave]
 
-**Parámetros de clave**
+    Selecciona el motor criptográfico, el algoritmo y el tamaño o curva. Lamassu admite claves RSA y EC según las capacidades del motor.
 
-* **Key Type:** RSA / EC (Elliptic Curve)
-* **Key Size:**
-  * RSA: 1024, 2048, 3072, 4096 bits
-  * EC: P-256, P-384, P-521
-* **Recomendado:** EC P-384
+    | Algoritmo | Parámetros disponibles       |
+    | --------- | ---------------------------- |
+    | RSA       | 1024, 2048, 3072 o 4096 bits |
+    | EC        | P-256, P-384 o P-521         |
+  </Step>
 
-**Perfil de emisión del certificado de la CA**
+  <Step>
+    Elige el tipo de CA [#elige-el-tipo-de-ca]
 
-Aquí se puede seleccionar un perfil existente o definir uno en línea para la operación. Ese perfil permite especificar la duración de la CA que se está creando y los `Key Usage` y `Extended Key Usage` del certificado de soporte.
+    Selecciona **Root CA** para una autoridad autofirmada o **Intermediate CA** para una autoridad firmada por otra CA. En el segundo caso, elige la CA emisora.
+  </Step>
 
-Si no se proporciona ningún perfil se aplicará uno por defecto con los usos de clave básicos.
+  <Step>
+    Define la identidad [#define-la-identidad]
 
-**Configuración de la CA**
+    Introduce un **CA Name** único. Este nombre se convierte en el `Common Name` del certificado. Completa los campos del Distinguished Name que necesite tu política:
 
-**Tipo de CA**
+    * `C`: código de país ISO 3166-1 de dos letras.
+    * `ST`: estado o provincia.
+    * `L`: localidad.
+    * `O`: organización.
+    * `OU`: unidad organizativa.
 
-* **Root CA:** Autoridad raíz autofirmada
-* **Intermediate CA:** Autoridad subordinada
+    El identificador interno de la CA se genera automáticamente y no se puede modificar.
+  </Step>
 
-**Emisor**
+  <Step>
+    Configura validez y usos [#configura-validez-y-usos]
 
-* **Root CA:** Self-signed (auto-firmada)
-* **Intermediate CA:** Selector desplegable de CA superior disponible
-  * Permite seleccionar la CA padre que firmará la nueva CA intermedia
+    Define **CA Certificate Expiration** y **Default End-Entity Certificate Issuance Expiration**. Puedes expresar una duración (`5y 8w 4d`), seleccionar una fecha o utilizar la fecha máxima permitida.
 
-**Identificación**
+    Selecciona un perfil de emisión existente o configura los `Key Usage` y `Extended Key Usage` en el formulario. Si no eliges un perfil, Lamassu aplica los usos básicos predeterminados.
+  </Step>
 
-* **CA ID:** Generado automáticamente (formato UUID),no puede ser modificado. Estos IDs los gestiona el sistema.
-  * Ejemplo: 8f7c170-c84e-4c08-904f-8d3247c77fc2
-* **CA Name:** Nombre descriptivo (obligatorio)
-  * Ejemplo: Lamassu IoT Secure Services CA
+  <Step>
+    Crea y verifica [#crea-y-verifica]
 
-**Subject Distinguished Name (DN)**
+    Confirma el formulario. La CA debe aparecer en el inventario con su certificado PEM, estado, fecha de expiración y relación de certificados emitidos.
+  </Step>
+</Steps>
 
-Campos opcionales:
+<Callout type="warn" title="Planifica la validez como una jerarquía">
+  Una CA no puede emitir certificados que superen su propia fecha de expiración. Deja margen suficiente para renovar o sustituir la autoridad sin interrumpir a los consumidores.
+</Callout>
 
-* **Country (C):** Código país ISO 3166-1 (2 letras)
-  * Ejemplo: US, ES, DE
-* **State/Province (ST):** Estado o provincia
-  * Ejemplo: California, Madrid
-* **Locality (L):** Ciudad o localidad
-  * Ejemplo: San Francisco, Arrasate
-* **Organization (O):** Nombre de la organización
-  * Ejemplo: Lamassu IoT Corp
-* **Organizational Unit (OU):** Unidad organizacional
-  * Ejemplo: Secure Devices Division
+Utiliza una clave del KMS [#utiliza-una-clave-del-kms]
 
-El "Certification Authority Name" configurado se utilizará como Common Name (CN) del subject del certificado de la CA.
+Selecciona **Create New CA (Existing Key)** cuando la clave ya esté registrada en Lamassu. El asistente pide primero la clave de soporte y después muestra la misma configuración de tipo, identidad, validez y perfil.
 
-**Configuración de expiración**
-La configuración de expiración define la validez temporal tanto del certificado de la propia CA como de los certificados que ésta emitirá por defecto. Si se ha seleccionado un perfil se dará prioridad al dato proporcionado en el perfil.
+Este flujo resulta útil cuando la clave se creó previamente en un HSM, se importó mediante BYOK o debe reutilizarse con una política de custodia concreta.
 
-Para el certificado de la CA (`CA Certificate Expiration`):
+Importa una CA externa [#importa-una-ca-externa]
 
-* **Función:** Establece la duración de validez del certificado de la Autoridad de Certificación
-* **Implicación:** Una vez expirado, la CA no podrá emitir nuevos certificados válidos
-* **Duración:** Configurable según necesidades organizacionales
-* **Valor por defecto:** 10 años (10y)
-* **Consideración:** Debe ser mayor que la duración de los certificados que emitirá
+La importación conserva una autoridad creada fuera de Lamassu.
 
-La expiración de la CA se puede definir como un expresión de duración, fijar una fecha fija, o marcarla como indefinida, lo que en términos prácticos permitirá la emisión de una CA sin caducidad.
+<Steps>
+  <Step>
+    Selecciona el motor [#selecciona-el-motor]
 
-En el caso de expresar una duración, las unidades permitidas son: y (años), w (semanas), d (días), h (horas), m (minutos) y s (segundos), pudiendo componer expresiones como la siguiente: *5y 8w 4d 2h 1m 2s*
+    Elige el motor que custodiará la clave importada.
+  </Step>
 
-En caso de elegir la opción de fecha específica, se ofrecerá un calendario para seleccionar la fecha de caducidad.
+  <Step>
+    Carga el material [#carga-el-material]
 
-Para el caso de indefinido, se fijará la fecha de expiración máxima permitida.
+    Proporciona el certificado de CA y la clave privada en formato PEM. Para una CA subordinada, añade opcionalmente la cadena de validación.
+  </Step>
 
-Para la expiración por defecto de certificados finales (`Default End-Entity Certificate Issuance Expiration`):
+  <Step>
+    Define la emisión predeterminada [#define-la-emisión-predeterminada]
 
-* **Función:** Define la duración predeterminada para certificados emitidos por esta CA
-* **Aplicación:** Se aplica automáticamente a nuevos certificados si no se especifica otra duración
-* **Flexibilidad:** Puede ser modificada individualmente al emitir cada certificado
-* **Valor por defecto:** 1 año (1y)
+    Configura la validez que recibirán los certificados finales cuando una solicitud no indique otra duración.
+  </Step>
 
-Se expresa en los mismos términos que la caducidad de la CA.
+  <Step>
+    Verifica la importación [#verifica-la-importación]
 
-Una vez creada la CA debe ser visible en el listado de CAs del sistema.
+    Lamassu comprueba que el certificado pertenece a una CA y que el material es coherente antes de registrarlo.
+  </Step>
+</Steps>
 
-Creación de CAs a partir de claves del KMS [#creación-de-cas-a-partir-de-claves-del-kms]
+Si no dispones de la clave privada, importa únicamente el certificado. La autoridad podrá formar parte de cadenas de confianza y procesos de validación, pero no podrá emitir certificados desde Lamassu.
 
-Lamassu IoT permite la creación de CAs a partir de claves previamente generadas o importadas en el servicio KMS. Una vez seleccionada la opción **Create New CA (Existing Key)** se muestra el formulario de creación de CAs con los siguientes elementos diferenciales respecto a la creación de la CA a partir de un nuevo par de claves descrito en el punto anterior.
+Inspecciona una autoridad [#inspecciona-una-autoridad]
 
-En este caso, primero se solicita la selección de la clave de soporte para esta nueva CA.
+Abre una CA desde el inventario para consultar:
 
-Se abre un popup que permite al usuario seleccionar la clave deseada de entre las disponibles en el KMS. Una vez seleccionada la clave, el proceso continúa como se describe en el punto anterior.
+* Estado y periodo de validez.
+* Certificado y cadena en formato PEM.
+* Número de certificados activos, expirados y revocados.
+* Certificados emitidos en **Issued Certificates**.
+* CRL vinculada a la autoridad.
+* Metadatos y motor criptográfico asociado.
 
-Importación de autoridades de certificación [#importación-de-autoridades-de-certificación]
+Puedes filtrar el inventario por nombre, estado y tipo de CA.
 
-La importación de entidades de certificación permite importar en el sistema una CA que ha sido generada de manera externa. Para ello se sigue el siguiente proceso:
+Emite certificados [#emite-certificados]
 
-Se debe seleccionar el motor que gestionará el par de claves importado.
+Puedes iniciar una emisión desde **Issued Certificates**, desde la acción de una CA o desde el inventario global de certificados.
 
-* **Selector:** Desplegable con motores disponibles, ofrece los configurados en el sistema.
-* **Ejemplo mostrado:** go1.24.3
-* **Función:** Permite seleccionar el motor criptográfico deseado
+| Método                            | Cuándo usarlo                                     | Custodia de la clave                             |
+| --------------------------------- | ------------------------------------------------- | ------------------------------------------------ |
+| **Generate Key & CSR in Browser** | Operación manual o prueba rápida                  | El navegador genera la clave; debes descargarla. |
+| **Upload Existing CSR**           | La clave debe permanecer en el sistema de destino | Lamassu nunca recibe la clave privada.           |
 
-También se define la expiración por defecto de certificados finales (`Default End-Entity Certificate Issuance Expiration`):
+Sigue [Emite tu primer certificado](/docs/manual/inicio/primer-certificado) para el flujo guiado. La [gestión de certificados](/docs/manual/servicios-core/certificates) explica el inventario, la inspección y la revocación.
 
-* **Función:** Define la duración predeterminada para certificados emitidos por esta CA
-* **Aplicación:** Se aplica automáticamente a nuevos certificados si no se especifica otra duración
-* **Flexibilidad:** Puede ser modificada individualmente al emitir cada certificado
-* **Valor por defecto:** 1 año (1y)
+Revoca una CA [#revoca-una-ca]
 
-Se expresa en los mismos términos que la caducidad de la CA.
+<Callout type="warn" title="La revocación afecta a toda la cadena dependiente">
+  Revocar una CA invalida la confianza en los certificados que ha emitido y puede interrumpir dispositivos y servicios. La acción es irreversible.
+</Callout>
 
-Se debe proporcionar de manera obligatoria:
+<Steps>
+  <Step>
+    Evalúa el impacto [#evalúa-el-impacto]
 
-* Certificado de la CA en formato PEM. Se comprueba que el certificado importado corresponda con el de una CA.
-* Clave privada de la CA en formato PEM
+    Identifica los certificados, dispositivos y consumidores que dependen de la CA. Prepara una autoridad y una cadena de sustitución cuando sea necesario.
+  </Step>
 
-De manera opcional se proporcionarán en formato PEM la cadena de certificados de la cadena de validación en caso de importar una CA subordinada.
+  <Step>
+    Inicia la revocación [#inicia-la-revocación]
 
-Operando con entidades de confianza [#operando-con-entidades-de-confianza]
+    Abre la autoridad y selecciona **Revoke CA**. Elige la razón que describa el incidente, por ejemplo `KeyCompromise`, `CACompromise`, `Superseded` o `CessationOfOperation`.
+  </Step>
 
-Visualización de autoridades de certificación [#visualización-de-autoridades-de-certificación]
+  <Step>
+    Confirma la identidad [#confirma-la-identidad]
 
-Accediendo a la sección de autoridades de certificación se mostrará el listado de CAs registradas en el sistema. El listado permitirá el filtro mediante el nombre de la CA, el estado o el tipo de CA.
+    Escribe exactamente el nombre de la CA para habilitar **Confirm Revocation**.
+  </Step>
 
-La acción de ver detalles da acceso a los detalles de la CA y a diferentes opciones de gestión.
+  <Step>
+    Comprueba la publicación [#comprueba-la-publicación]
 
-En los detalles se muestra el resumen del estado de los certificados emitidos por la CA: certificados activos, expirados y revocados.
+    El estado debe cambiar a **REVOKED** y la CRL debe reflejar la nueva información. La CA deja de poder emitir certificados.
+  </Step>
+</Steps>
 
-Se ofrecen dos acciones:
+La eliminación permanente solo está disponible después de revocar. Elimina el registro únicamente cuando la política de retención y auditoría lo permita.
 
-* la descarga de la CRL vinculada a la CA que permitirá a otros sistemas realizar comprobaciones de vigencia de los certificados emitidos por la CA de manera desconectada.
-* la acción de revocación de la CA
 
-Se muestra información detallada, el certificado en formato PEM y se da acceso a la relación de certificados emitidos por la CA a través de la pestaña “Issued Certificates”
+# Certificados (/docs/manual/servicios-core/certificates)
 
-Emisión de certificados [#emisión-de-certificados]
 
-La acción de emisión de certificados se puede realizar desde la pestaña “Issued Certificates” de los detalles de la CA, mediante la acción “Issue New”.
 
-La funcionalidad de emisión es accesible también desde el listado de CAs mediante la acción correspondiente de emisión.
+El inventario de certificados ofrece una vista global de las identidades emitidas por todas las autoridades. También puedes abrir **Issued Certificates** dentro de una CA para limitar la vista a ese emisor.
 
-Y desde la funcionalidad  listado completo de certificados emitidos por Lamassu mediante la acción “Issue Certificate”
+Busca un certificado [#busca-un-certificado]
 
-En este caso se solicitará la selección de una CA antes de acceder al formulario de emisión.
+Abre **Certificates** y filtra por:
 
-El formulario de emisión de certificados ofrece 2 opciones para la emisión:
+* `Common Name` del sujeto.
+* Número de serie.
+* Estado.
+* Autoridad emisora.
 
-* Emisión a partir de una clave privada y el CSR generado en el browser
-* Emisión a partir de un CSR generado de manera externa
+Utiliza **Quick Inspect** para una comprobación rápida o **View Details** para ver el sujeto, SANs, usos, cadena, periodo de validez y metadatos completos.
 
-**Emisión a partir de una clave privada y el CSR generados en el browser**
+Descarga el certificado [#descarga-el-certificado]
 
-El usuario proporciona la información requerida para la creación del CSR, la consola genera una clave In Place y genera el CSR correspondiente mediante el cual se solicita la emisión del certificado a la CA.
+La acción de descarga entrega el certificado en formato PEM. Si el certificado se emitió mediante un CSR externo, la clave privada permanece en el sistema que generó ese CSR. Si se generó en el navegador, la clave solo estuvo disponible al finalizar la emisión.
 
-**Método de emisión:** Seleccionar  "Generate Key & CSR in Browser" para la generación del par de claves y la solicitud de certificado (CSR) directamente en el navegador
+Revoca un certificado [#revoca-un-certificado]
 
-**Certificate Subject (Sujeto del certificado)**
+Revoca una identidad cuando la clave se haya comprometido, el sujeto ya no esté autorizado o el certificado deba dejar de aceptarse antes de expirar.
 
-**Common Name (CN)**
+<Steps>
+  <Step>
+    Abre la acción [#abre-la-acción]
 
-* **Campo:** Obligatorio
-* **Función:** Identifica de forma única al titular del certificado
-* **Ejemplos:**
-  * Para dispositivos: device001.company.com
-  * Para usuarios: [john.doe@company.com](mailto:john.doe@company.com)
-  * Para servicios: api.service.company.com
+    En el inventario o la vista de detalle, selecciona **Revoke Certificate**.
+  </Step>
 
-**Campos Organizacionales**
+  <Step>
+    Elige una razón [#elige-una-razón]
 
-* **Organizational Unit (OU):** Unidad organizacional del titular
-  * Ejemplo: IT Department, Manufacturing
-* **Organization (O):** Nombre de la organización
-  * Ejemplo: LamassuIoT Corp, Acme Industries
+    Selecciona la razón que represente el incidente. Esta información se publica en OCSP y en la CRL.
+  </Step>
 
-**Información Geográfica**
+  <Step>
+    Confirma y verifica [#confirma-y-verifica]
 
-* **Locality (L):** Ciudad o localidad del titular
-* **State/Province (ST):** Estado o provincia
-* **Country (C):** Código de país ISO 3166-1 (2 letras)
-  * Valor por defecto mostrado: US
+    Confirma la operación y comprueba que el estado sea **Revoked**. Si la CA regenera la CRL al revocar, verifica también que exista una versión nueva.
+  </Step>
+</Steps>
 
-**Subject Alternative Names (SANs)**
-Los SANs proporcionan identificadores alternativos para el certificado, permitiendo que un mismo certificado sea válido para múltiples nombres o direcciones.
+<Callout type="warn" title="Solo CertificateHold es reversible">
+  Una revocación con la razón `CertificateHold` puede reactivarse. Las demás razones producen una revocación definitiva.
+</Callout>
 
-**Tipos de SAN Disponibles**
+Continúa [#continúa]
 
-* **DNS:** Nombres de dominio
-  * Ejemplo: example.com, \*.example.com
-* **IP Address:** Direcciones IP
-* **Email:** Direcciones de correo electrónico
-* **URI:** Identificadores de recursos uniformes
+<Cards>
+  <Card title="Validar con OCSP" description="Consulta el estado de un certificado en tiempo real." href="/docs/manual/servicios-core/validation-ocsp" />
 
-Es posible añadir múltiples SAN de cada tipo, se selecciona el tipo, añadiendo el valor y pulsando la acción “Add”.
+  <Card title="Distribuir una CRL" description="Publica el estado para validación offline." href="/docs/manual/servicios-core/validation-crl" />
+</Cards>
 
-**Key Generation Details (Detalles de generación de claves)**
-Se debe especificar el tipo de clave a ser generada para la solicitud del certificado.
 
-**Algorithm (Algoritmo)**
+# Dispositivos e identidades (/docs/manual/servicios-core/devices)
 
-* **ECDSA:** Algoritmo de curva elíptica, se debe especificar la curva a utilizar
-* **RSA:** Algoritmo RSA tradicional, se debe indicar el tamaño de clave
 
-**Certificate Configuration (Configuración del certificado)**
 
-**Validity Duration (Duración de validez)**
+Un dispositivo gestionado representa una entidad de tu flota y conserva el historial de los certificados que ha utilizado. Lamassu separa el dispositivo de su identidad actual para que puedas renovar o sustituir certificados sin perder trazabilidad.
 
-Indica la fecha de expiración del certificado a emitir como una expresión de duración
+Estados del dispositivo [#estados-del-dispositivo]
 
-* **Campo:** Configurable según necesidades
-* **Valor por defecto:** 1 año (1y)
-* **Unidades válidas:** y (años), w (semanas), d (días), h (horas), m (minutos), s (segundos)
-* **Consideración:** No puede exceder la validez de la CA emisora
+| Estado              | Significado                                             |
+| ------------------- | ------------------------------------------------------- |
+| **Active**          | El dispositivo tiene una identidad válida.              |
+| **No Identity**     | Está registrado, pero no tiene un certificado asociado. |
+| **Renewal Pending** | Ha entrado en la ventana de renovación.                 |
+| **Expiring Soon**   | Su certificado está próximo a expirar.                  |
+| **Expired**         | La identidad ha superado su fecha de validez.           |
+| **Revoked**         | El certificado actual se ha revocado.                   |
+| **Decommissioned**  | El dispositivo se ha retirado de forma permanente.      |
 
-**Key Usage (Uso de claves)**
-Define los propósitos criptográficos para los que puede utilizarse la clave privada del certificado.
+El inventario permite filtrar por `Device ID`, etiquetas y estado.
 
-**Usos Básicos**
+Inspecciona un dispositivo [#inspecciona-un-dispositivo]
 
-* **Digital Signature:** ✓ (marcado por defecto) - Firmas digitales
-* **Content Commitment (Non-Repudiation):** No repudio
-* **Key Encipherment:** Cifrado de claves
-* **Data Encipherment:** Cifrado de datos
-* **Key Agreement:** Acuerdo de claves
-* **Certificate Signing:** Firma de certificados
-* **CRL Signing:** Firma de listas de revocación
-* **Encipher Only:** Solo cifrado
-* **Decipher Only:** Solo descifrado
+La vista de detalle separa dos perspectivas:
 
-**Uso Extendido de Claves**
+* **Certificate History** conserva todos los certificados asociados, con su número de serie, emisor, estado y periodo de validez.
+* **Device Event Timeline** ordena cronológicamente registros, enrolamientos, renovaciones y cambios de estado.
 
-Especifica aplicaciones específicas para las que está autorizado el certificado.
+Utiliza el historial para auditoría y la línea de tiempo para reconstruir un incidente o diagnosticar una transición inesperada.
 
-* **Server Authentication:** ✓ (marcado por defecto) - Autenticación de servidor
-* **Client Authentication:** ✓ (marcado por defecto) - Autenticación de cliente
-* **Code Signing:** Firma de código
-* **Email Protection:** Protección de correo electrónico
-* **Time Stamping:** Sellado de tiempo
-* **OCSP Signing:** Firma de respuestas OCSP
+Registra un dispositivo manualmente [#registra-un-dispositivo-manualmente]
 
-Una vez completado los campos del formulario se solicita la emisión del certificado obteniendo el certificado y la clave privada generada en formato PEM. Esta clave privada no se almacena debe ser descargada y custodiada por el usuario ya que no se podrá volver a obtener.
+El registro previo es útil cuando la política exige que el dispositivo exista antes de solicitar su primer certificado.
 
-**Emisión a partir de un CSR generado de manera externa**
+<Steps>
+  <Step>
+    Crea el dispositivo [#crea-el-dispositivo]
 
-Mediante esta opción se podrá realizar la emisión de certificados a partir de CSRs que hayan sido generados de manera externa. Para ello en el selector de modo del formulario de emisión es necesario seleccionar “Upload Existing CSR”.
+    Desde **Managed Devices**, abre el formulario de registro.
+  </Step>
 
-Se debe proporcionar un CSR válido que contenga los detalles del certificado a emitir, Subject Name, SANs,..
+  <Step>
+    Define su pertenencia [#define-su-pertenencia]
 
-Adicionalmente se proporcionará la duración deseada para el certificado y los usos permitidos. Con esta información se procederá a la emisión como se describe en el apartado anterior.
+    Introduce un **Device ID** único y selecciona el DMS que aplicará las políticas de enrolamiento y renovación.
+  </Step>
 
-Revocación de CAs y certificados [#revocación-de-cas-y-certificados]
+  <Step>
+    Clasifica el dispositivo [#clasifica-el-dispositivo]
 
-La revocación de una Autoridad de Certificación (CA) es una acción crítica que invalida todos los certificados emitidos por esa CA, lo que puede causar interrupciones generalizadas en los dispositivos y servicios que confían en ella. Este proceso es irreversible y debe realizarse con extrema precaución.
+    Añade un icono y etiquetas si necesitas agruparlo por modelo, ubicación, entorno u otro criterio operativo.
+  </Step>
 
-Para iniciar el proceso, entra en la sección de Autoridades de Certificación y localiza la CA deseada usando los filtros por **Nombre**, **Estado** y **Tipo**.
+  <Step>
+    Verifica el alta [#verifica-el-alta]
 
-Accede a la ficha de detalle de la CA. Allí se muestran la información general, los certificados PEM, los metadatos y los certificados emitidos, además del botón **Revoke CA**.
+    El dispositivo debe aparecer con estado **No Identity** hasta que complete el enrolamiento o reciba una identidad manual.
+  </Step>
+</Steps>
 
-Al pulsar **Revoke CA** se abre una ventana de confirmación con una advertencia sobre el impacto de la acción. En ese cuadro hay que seleccionar una **Razón de Revocación**. Las opciones incluyen:
+Asigna una identidad manualmente [#asigna-una-identidad-manualmente]
 
-* Unspecified (No especificado)
-* KeyCompromise (Compromiso de clave)
-* CACompromise (Compromiso de CA)
-* AffiliationChanged (Afiliación cambiada)
-* Superseded (Sustituida)
-* CessationOfOperation (Cese de operación)
-* CertificateHold (Retención de certificado)
-* RemoveFromCRL (Eliminar de la CRL)
+La acción **Assign Identity** está disponible mientras el dispositivo permanece en **No Identity**.
 
-Para evitar revocaciones accidentales, el sistema pedirá confirmar el nombre de la CA. En el campo de texto, escribe el **nombre exacto de la CA** que estás revocando. Una vez introducido correctamente, se habilitará el botón **Confirm Revocation**.
+1. Abre el dispositivo y selecciona **Assign Identity**.
+2. Elige un certificado activo cuyo `Common Name` coincida con el `Device ID`.
+3. Si no existe, selecciona **Issue New Instead** y elige una CA vinculada al DMS.
+4. Confirma la asignación.
 
-Haz clic en el botón **Confirm Revocation**. Una vez completada la revocación, la CA cambiará su estado a **REVOKED** (Revocada) en la página de detalles, y ya no podrás emitir certificados nuevos con ella. En su lugar, verás la opción **Permanently Delete** (Eliminar Permanentemente).
+El dispositivo debe cambiar a **Active** y el certificado debe aparecer en su historial.
 
-Consideraciones importantes:
+Revoca la identidad actual [#revoca-la-identidad-actual]
 
-* Impacto: La revocación de una CA es una acción irreversible que afectará a todos los dispositivos y servicios que dependen de ella. Asegúrate de comprender completamente las implicaciones antes de proceder.
-* Eliminación Permanente: Después de la revocación, tendrás la opción de eliminar permanentemente la CA. Esta acción eliminará la CA del sistema de Lamassu IoT.
+En **Device Event Timeline**, localiza el último certificado activo y selecciona **Revoke**. Elige una razón conforme a tu política y confirma la operación.
 
+La revocación invalida el certificado, pero no elimina el dispositivo. Puedes restaurar su operación asignándole una identidad nueva. `CertificateHold` permite reactivar el certificado retenido; el resto de razones son definitivas.
 
-# [Certs] Gestión de Certificados (/docs/manual/servicios-core/certificates)
+Retira un dispositivo [#retira-un-dispositivo]
 
+<Callout type="warn" title="Decommission es irreversible">
+  Esta acción revoca todos los certificados del dispositivo e impide que vuelva a obtener una identidad.
+</Callout>
 
+Usa **Decommission** únicamente cuando el dispositivo haya dejado de operar o ya no sea fiable. Tras confirmar, Lamassu revoca la identidad activa con `CessationOfOperation` y cambia el estado a **Decommissioned**.
 
-Gestión de certificados [#gestión-de-certificados]
+Automatiza el enrolamiento [#automatiza-el-enrolamiento]
 
-Los certificados emitidos por Lamassu son accesibles, tanto desde la pestaña de Issued Certificates de los detalles de una CA como desde la opción “Certificates” del menú lateral.\
-En la pestaña de “Issued Certificates” se muestran los certificados emitidos por la CA seleccionada.
+<Cards>
+  <Card title="Configura un DMS" description="Define la CA, confianza y políticas de la flota." href="/docs/manual/servicios-core/ra" />
 
-Como desde la opción “Certificates” del menú lateral, donde se presentan todos los certificados emitidos por Lamassu independientemente de la CA que lo haya emitido. Esta pantalla incluye la opción de filtro de los certificados por CN, número de serie, estado y por la CA que lo emitió.
+  <Card title="Integra EST" description="Permite que el dispositivo solicite y renueve su identidad." href="/docs/manual/servicios-core/est" />
+</Cards>
 
-Por cada certificado se incluye un conjunto de acciones vinculadas al certificado.\
-Acceso a los detalles “View Details”, un mecanismo de inspección rápida (Quick Inspect) con la información básica del certificado, la opción de descarga en formato PEM y el acceso a las acciones de revocación.\
-La vista de detalle, proporciona información adicional y el acceso a las acciones de revocación.
 
-Revocación de certificados [#revocación-de-certificados]
-
-Ya sea desde las acciones del listado de certificados, como desde la vista de detalle se puede desencadenar la acción de revocación. Al pulsar sobre “Revoke Certificate” se abre una ventana modal en la que se debe seleccionar la razón de la revocación.
-
-Es importante destacar que la única razón reversible es “CertificateHold”, una revocación por cualquier otra  razón no podrá ser revertida. En caso de seleccionar “CertificateHold” se ofrecerá una acción de reactivación.
-
-
-# [Devices] Dispositivos e Identidades (/docs/manual/servicios-core/devices)
-
-
-
-Dispositivos y gestión de las identidades – End entities [#dispositivos-y-gestión-de-las-identidades--end-entities]
-
-La gestión del ciclo de vida de las identidades de los dispositivos es una funcionalidad central en Lamassu IoT. Esta sección del manual se enfoca en la visualización y administración de las identidades de los dispositivos ya enrolados, conocidos como *End Entities* (entidades finales). Permite una visión completa del estado, los certificados y los eventos históricos de cada dispositivo, facilitando su monitorización y control a lo largo de su ciclo de vida.
-
-Visualización de Dispositivos Gestionados [#visualización-de-dispositivos-gestionados]
-
-La página de **Dispositivos** (Managed Devices) ofrece una vista general de todos los dispositivos registrados en el sistema. Puedes ver un resumen del estado de cada dispositivo, su grupo, la fecha de creación y las etiquetas asociadas. Esta visualización es clave para tener una perspectiva general del parque de dispositivos y su salud respecto al estado de su identidad.
-
-Para facilitar la búsqueda y el seguimiento, la interfaz permite filtrar los dispositivos por **Device ID** y por **Tags**. Además, se puede filtrar por los siguientes estados:
-
-* **Active**: El dispositivo y su certificado están en uso y son válidos.
-* **No Identity**: El dispositivo existe en el sistema, pero no tiene una identidad digital (certificado) asociada.
-* **Renewal Pending**: El dispositivo se encuentra en la ventana de tiempo de renovación y su certificado expirará pronto.
-* **Expiring Soon**: El certificado del dispositivo está a punto de caducar.
-* **Expired**: El certificado del dispositivo ha caducado.
-* **Revoked**: El certificado del dispositivo ha sido revocado.
-* **Decommissioned**: El dispositivo ha sido dado de baja y ya no está en uso.
-
-Detalle del Dispositivo: Historial de Certificados [#detalle-del-dispositivo-historial-de-certificados]
-
-Al seleccionar un dispositivo específico, se accede a su página de detalles. La pestaña de **Historial de Certificados** muestra un registro cronológico de todos los certificados X.509 que han sido asociados a la identidad de ese dispositivo. Aquí se pueden ver detalles como el número de serie, el estado del certificado (por ejemplo, activo, expirado o revocado), el nombre común, la CA emisora y los periodos de validez.
-
-Esta funcionalidad es fundamental para auditar y rastrear la historia de la identidad del dispositivo, lo que permite identificar si un certificado ha sido reemplazado o revocado en algún momento.
-
-Detalle del Dispositivo: Línea de tiempo de eventos [#detalle-del-dispositivo-línea-de-tiempo-de-eventos]
-
-La pestaña de **Línea de tiempo de eventos** (Device Event Timeline) proporciona un registro detallado y cronológico de los eventos más importantes relacionados con el dispositivo y su identidad. Estos eventos pueden incluir el aprovisionamiento inicial, la renovación de certificados o cambios de estado.
-
-Esta línea de tiempo es una herramienta poderosa para el análisis forense y la resolución de problemas, ya que permite ver la secuencia exacta de las acciones que han ocurrido en la vida del dispositivo.
-
-Registro de Nuevos Dispositivos [#registro-de-nuevos-dispositivos]
-
-Además de la gestión de dispositivos ya enrolados, Lamassu IoT permite el registro manual de nuevos dispositivos. Esto es particularmente útil para el modo de registro por **Pre-registration**, donde la identidad del dispositivo debe existir en el sistema antes de que pueda solicitar un certificado.
-
-El proceso de registro de un nuevo dispositivo se realiza a través de un formulario que permite configurar los siguientes campos:
-
-* **Device ID (GUID)**: Es el identificador único del dispositivo, normalmente un GUID (Globally Unique Identifier).
-* **Registration Authority**: Se debe seleccionar la RA a la que se asociará el dispositivo, lo que definirá las políticas de *enrollment* y *re-enrollment* que se aplicarán.
-* **Device Registration Profile**: En esta sección se pueden configurar aspectos visuales para facilitar la identificación del dispositivo.
-  * **Icon**: Permite seleccionar un icono que represente visualmente el tipo de dispositivo.
-  * **Tags**: Se pueden añadir etiquetas para agrupar y organizar el dispositivo con otros de características similares.
-
-Una vez registrado, el dispositivo aparecerá en el listado de dispositivos con el estado **No Identity** hasta que complete el proceso de *enrollment* y obtenga su primer certificado.
-
-Asignación Manual de Identidad [#asignación-manual-de-identidad]
-
-La **Asignación manual de identidad** es una acción que solo está disponible para dispositivos en estado **No Identity**, es decir, que han sido registrados en el sistema pero aún no tienen un certificado asignado. Esta funcionalidad permite vincular un certificado ya existente o emitir uno nuevo de forma manual.
-
-El proceso se lleva a cabo desde la vista de detalles del dispositivo:
-
-* **Iniciar la asignación**: Se hace clic en el botón **Assign Identity**. Esto abrirá una ventana emergente.
-* **Vincular certificado existente**: La aplicación buscará certificados activos con un Common Name (CN) que coincida con el Device ID. Si se encuentra un certificado, se puede seleccionar y vincular al dispositivo.
-* **Emitir un nuevo certificado**: Si no se encuentra un certificado existente, o si se desea emitir uno nuevo, se puede seleccionar la opción **Issue New Instead**. Esto te permite elegir la **Certification Authority** que emitirá el nuevo certificado para el dispositivo. Se muestran por defecto las CAs vinculadas a la RA que gestiona ell dispositivo.
-* **Confirmar y asignar**: Una vez seleccionado el certificado (existente o nuevo), se confirma la asignación. El dispositivo pasará del estado **No Identity** al estado **Active** y el certificado aparecerá en su historial.
-
-Revocación de Identidad [#revocación-de-identidad]
-
-La revocación de la identidad es un proceso crítico para la seguridad que permite invalidar un certificado antes de su fecha de caducidad. Esta acción es irreversible. En Lamassu IoT, la revocación se realiza desde la sección de detalle del dispositivo, específicamente desde la línea de tiempo de eventos.
-
-El proceso de revocación se lleva a cabo de la siguiente manera:
-
-* **Acceder a la revocación**: En la sección **Device Event Timeline**, junto al último certificado **Active**, se encuentra la opción de **Revoke**. Al hacer clic en ella, se abre una ventana de confirmación.
-* **Seleccionar el motivo de revocación**: La ventana emergente solicita seleccionar un motivo de revocación (Revocation Reason). Esto es esencial para el registro de auditoría y la generación de la CRL (Certificate Revocation List). Los motivos disponibles, definidos en el **RFC 5280**, y otros adicionales son:
-  * **Unspecified**: Motivo de revocación no especificado.
-  * **KeyCompromise**: La clave privada del certificado ha sido comprometida.
-  * **CACompromise**: La clave privada de la CA ha sido comprometida.
-  * **AffiliationChanged**: El nombre del sujeto o su afiliación ha cambiado.
-  * **Superseded**: El certificado ha sido reemplazado por uno nuevo.
-  * **CessationOfOperation**: La entidad ha dejado de operar o usar el certificado.
-  * **CertificateHold**: El certificado está temporalmente en espera de revocación.
-  * **RemoveFromCRL**: Se usa en un *delta-CRL* para indicar que el certificado fue previamente puesto en espera y ahora debe ser revocado definitivamente.
-  * **PrivilegeWithdrawn**: Se han retirado los privilegios de la entidad asociada al certificado.
-  * **AACompromise**: La clave de un servidor de autorización de atributos ha sido comprometida.
-  * **WeakAlgorithmOrKey**: La clave o el algoritmo del certificado se consideran débiles o han sido comprometidos.
-* **Confirmar la revocación**: Una vez seleccionado el motivo, se confirma la acción. El estado del certificado cambiará a **Revoked** en la línea de tiempo y en el historial de certificados. El certificado revocado dejará de ser válido.
-  Es importante destacar que, una vez revocado un certificado, la identidad del dispositivo puede ser restaurada asignándole un nuevo certificado válido. En caso de que la razón de revocación sea CertificateHold, se permitirá la reactivación.
-
-Desactivación de Dispositivos (Decommissioning) [#desactivación-de-dispositivos-decommissioning]
-
-El *Decommissioning* es el proceso irreversible de dar de baja un dispositivo de forma definitiva del sistema. A diferencia de la revocación, que sólo invalida el certificado, la desactivación revoca todos los certificados asociados al dispositivo y le impide obtener nuevas identidades en el futuro. Es una acción de seguridad crítica que se utiliza cuando un dispositivo es retirado permanentemente o ya no es de confianza.
-
-El proceso se realiza de la siguiente manera:
-
-* **Acceder a la acción**: Desde la vista de detalles de un dispositivo activo, se hace clic en el botón **Decommission**.
-* **Confirmar la acción irreversible**: Aparecerá una ventana de advertencia que explica que la acción es irreversible y que se revocarán todos los certificados asociados al dispositivo, impidiendo que vuelva a obtener una identidad.
-* **Confirmar y desactivar**: Al confirmar la desactivación, el sistema revoca el certificado activo del dispositivo con la razón CessationOfOperation y cambia su estado a **Decommissioned**. El dispositivo ya no podrá realizar operaciones con la PKI.
-
-
-# EST: Enrollment over Secure Transport (/docs/manual/servicios-core/est)
+# Enrolamiento de dispositivos con EST (/docs/manual/servicios-core/est)
 
 
 
@@ -1958,7 +2199,7 @@ La implementación de Lamassu se ajusta al RFC 7030 en lo esencial pero introduc
 </Cards>
 
 
-# [KMS] Gestión de Claves Criptográficas (/docs/manual/servicios-core/kms)
+# Claves y motores criptográficos (/docs/manual/servicios-core/kms)
 
 
 
@@ -2138,54 +2379,83 @@ Lamassu también ofrece una ayuda específica para integraciones locales mediant
 Esta opción muestra los pasos necesarios para configurar el entorno local, cargar el módulo PKCS#11 y ejecutar firmas con herramientas como OpenSSL sin extraer la clave privada del entorno custodiado.
 
 
-# [DMS] Device Management Service (/docs/manual/servicios-core/ra)
+# Device Management Service (/docs/manual/servicios-core/ra)
 
 
 
-Device Management Service [#device-management-service]
+Un **Device Management Service (DMS)** actúa como autoridad de registro frente a una flota. Recibe solicitudes, aplica la política de autenticación y encarga la emisión a la CA configurada.
 
-El **DMS (Device Management Service)** es el componente de Lamassu IoT que actúa como Autoridad de Registro (RA) frente a los dispositivos. Cada DMS recibe las solicitudes de certificado, valida la identidad del solicitante según las políticas configuradas y encarga la emisión a la CA asignada. El resultado es un canal de aprovisionamiento controlado e independiente por flota, línea de producto o entorno.
-
-En la práctica, cada DMS representa un punto de entrada diferenciado: tiene su propia CA de enrolamiento, sus propias reglas de autenticación y su propia ventana de renovación. Una organización puede operar varios DMS en paralelo - por ejemplo, uno para dispositivos de campo y otro para pasarelas internas - con políticas completamente distintas en cada caso.
+Cada DMS es un límite operativo independiente: puede representar una línea de producto, un entorno o un tipo de dispositivo con su propia CA, reglas de autenticación, confianza distribuida y ventana de renovación.
 
 Antes de empezar [#antes-de-empezar]
 
-Para crear un DMS es necesario que exista al menos una CA activa en la plataforma, ya que el DMS requiere seleccionar una CA de enrolamiento. El usuario debe disponer del rol de administrador PKI o de permisos equivalentes sobre el módulo DMS.
+* Crea o importa al menos una CA activa.
+* Decide cómo se autenticarán los dispositivos durante el primer enrolamiento.
+* Define qué autoridades debe recibir el dispositivo como anclas de confianza.
+* Asegúrate de tener permisos para administrar DMS.
 
-Panel de DMS [#panel-de-dms]
+Configura un DMS [#configura-un-dms]
 
-El panel lista todos los DMS configurados en la plataforma. Cada entrada muestra el nombre del DMS, el protocolo de enrolamiento activo y la CA de enrolamiento asignada. Desde el menú de opciones de cada DMS están disponibles las siguientes acciones:
+<Steps>
+  <Step>
+    Identifica la flota [#identifica-la-flota]
 
-| Acción                      | Descripción                                                                 |
-| --------------------------- | --------------------------------------------------------------------------- |
-| **Edit**                    | Modifica la configuración del DMS.                                          |
-| **Go to DMS owned devices** | Abre el listado de dispositivos gestionados por este DMS.                   |
-| **Show/Edit Metadata**      | Accede a los metadatos del DMS para usos avanzados.                         |
-| **EST (RFC-7030)**          | Muestra los endpoints EST del DMS con su URL base y ejemplos de invocación. |
-| **Delete**                  | Elimina el DMS y su configuración. Acción irreversible.                     |
+    Asigna al DMS un nombre que describa su alcance, por ejemplo una familia de dispositivos o un entorno.
+  </Step>
 
-Distribución de entidades de confianza [#distribución-de-entidades-de-confianza]
+  <Step>
+    Selecciona la CA de enrolamiento [#selecciona-la-ca-de-enrolamiento]
 
-La sección **CA Distribution** controla qué certificados de CA recibe el dispositivo al consultar el endpoint de distribución de confianza del protocolo activo. Esta configuración es independiente del protocolo de enrolamiento: los parámetros tienen el mismo significado con independencia de cómo el dispositivo obtenga sus certificados.
+    Elige la autoridad que emitirá las identidades. Su política y periodo de validez condicionan los certificados que podrá obtener la flota.
+  </Step>
 
-| Parámetro                     | Descripción                                                                                                                                                      |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Include Lamassu System CA** | Incluye el certificado TLS del servidor Lamassu en la respuesta. Este es el certificado de extremo del servidor, no una CA - útil para *pinning* de la conexión. |
-| **Include Enrollment CA**     | Incluye la CA emisora configurada en este DMS, es decir, la que firmará los certificados de dispositivo.                                                         |
-| **Managed CAs**               | CAs adicionales distribuidas al dispositivo como anclas de confianza.                                                                                            |
+  <Step>
+    Configura EST [#configura-est]
 
-Protocolos de enrolamiento [#protocolos-de-enrolamiento]
+    Define la autenticación de `enroll`, la política de `reenroll`, la ventana de renovación y, si se necesita, `serverkeygen`.
+  </Step>
 
-El DMS expone un protocolo de enrolamiento a los dispositivos. En la versión actual de Lamassu, el único protocolo soportado es **EST (RFC 7030)**. La configuración del protocolo y la guía de integración para dispositivos se encuentran en las páginas correspondientes.
+  <Step>
+    Distribuye la confianza [#distribuye-la-confianza]
+
+    Configura **CA Distribution** para controlar la respuesta del endpoint `cacerts`.
+  </Step>
+
+  <Step>
+    Verifica los endpoints [#verifica-los-endpoints]
+
+    Desde el menú del DMS, abre **EST (RFC-7030)** y comprueba la URL base y los ejemplos de invocación antes de integrar el firmware.
+  </Step>
+</Steps>
+
+Distribución de confianza [#distribución-de-confianza]
+
+| Parámetro                     | Qué distribuye                                                                            |
+| ----------------------------- | ----------------------------------------------------------------------------------------- |
+| **Include Lamassu System CA** | Certificado TLS del servidor Lamassu, útil para pinning. No representa una CA de emisión. |
+| **Include Enrollment CA**     | Autoridad configurada para emitir las identidades del DMS.                                |
+| **Managed CAs**               | Autoridades adicionales que el dispositivo debe confiar.                                  |
+
+Opera el inventario de DMS [#opera-el-inventario-de-dms]
+
+| Acción                      | Resultado                                                 |
+| --------------------------- | --------------------------------------------------------- |
+| **Edit**                    | Modifica la política del DMS.                             |
+| **Go to DMS owned devices** | Abre únicamente los dispositivos de esa flota.            |
+| **Show/Edit Metadata**      | Gestiona configuración avanzada y datos de integraciones. |
+| **EST (RFC-7030)**          | Muestra endpoints y ejemplos específicos del DMS.         |
+| **Delete**                  | Elimina el DMS; la acción es irreversible.                |
+
+Integra los dispositivos [#integra-los-dispositivos]
 
 <Cards>
-  <Card title="EST (RFC 7030)" href="/docs/manual/servicios-core/est" />
+  <Card title="Enrolamiento EST" description="Configura autenticación, endpoints y flujos para firmware." href="/docs/manual/servicios-core/est" />
 
-  <Card title="Gestionar dispositivos" href="/docs/manual/servicios-core/devices" />
+  <Card title="Dispositivos e identidades" description="Consulta estados, historial y acciones operativas." href="/docs/manual/servicios-core/devices" />
 </Cards>
 
 
-# [VA] Servicio CRL (/docs/manual/servicios-core/validation-crl)
+# Listas de revocación (CRL) (/docs/manual/servicios-core/validation-crl)
 
 
 
@@ -2266,7 +2536,7 @@ Referencias [#referencias]
 </Cards>
 
 
-# [VA] Servicio OCSP (/docs/manual/servicios-core/validation-ocsp)
+# Validación online con OCSP (/docs/manual/servicios-core/validation-ocsp)
 
 
 
@@ -2328,18 +2598,26 @@ Referencias [#referencias]
 </Cards>
 
 
-# [VA] Validación de Certificados (/docs/manual/servicios-core/validation)
+# Validación de certificados (/docs/manual/servicios-core/validation)
 
 
 
-Validación de certificados – VA [#validación-de-certificados--va]
+La emisión demuestra quién firmó un certificado; la validación permite saber si todavía debe aceptarse. Lamassu publica el estado mediante dos mecanismos complementarios.
 
-Lamassu ofrece dos mecanismos complementarios para validar el estado de los certificados emitidos por la plataforma:
+Elige un mecanismo [#elige-un-mecanismo]
 
-* `OCSP`, para consultas online y en tiempo real del estado del certificado.
-* `CRL`, para distribución y consulta offline de listas de revocación.
+| Mecanismo | Modelo                                     | Recomendado para                                              |
+| --------- | ------------------------------------------ | ------------------------------------------------------------- |
+| OCSP      | Consulta online de un certificado concreto | Consumidores conectados que necesitan el estado más reciente. |
+| CRL       | Descarga periódica de una lista firmada    | Entornos offline, redes limitadas o validación local masiva.  |
 
-En el menú lateral del módulo `VA` encontrarás cada capacidad documentada en su propia página.
+Muchos entornos utilizan ambos: OCSP como comprobación primaria y CRL como mecanismo local o de respaldo.
+
+<Cards>
+  <Card title="Validación online con OCSP" description="Consulta estados Good, Revoked y Unknown en tiempo real." href="/docs/manual/servicios-core/validation-ocsp" />
+
+  <Card title="Listas de revocación" description="Genera, publica y distribuye CRLs por autoridad." href="/docs/manual/servicios-core/validation-crl" />
+</Cards>
 
 
 # Test (/docs/test)

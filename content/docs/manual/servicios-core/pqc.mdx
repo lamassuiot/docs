@@ -1,0 +1,295 @@
+---
+title: "[PQC] Criptografía post-cuántica (LamassuQ)"
+description: Soporte de criptografía post-cuántica en el KMS, la CA y el SDK de Lamassu IoT
+sidebar:
+  group: PQC
+  label: Visión general
+---
+
+# Criptografía post-cuántica (LamassuQ)
+
+LamassuQ incorpora soporte de criptografía post-cuántica (PQC) a la plataforma: el servicio [KMS](/docs/manual/servicios-core/kms) puede generar e importar claves post-cuánticas, firmar y verificar con ellas, y el servicio de [CA](/docs/manual/servicios-core/cas) puede emitir certificados X.509 apoyados en estas claves, incluidas cadenas de certificación mixtas en las que conviven algoritmos clásicos y post-cuánticos.
+
+El objetivo es preparar la PKI ante la amenaza de un computador cuántico suficiente para romper la criptografía asimétrica actual, manteniendo al mismo tiempo la compatibilidad con los algoritmos clásicos ya desplegados.
+
+## Qué aporta LamassuQ
+
+- **Nuevos algoritmos de firma** en el KMS: ML-DSA, SLH-DSA y firmas compuestas (*composite*) que combinan ML-DSA con RSA, ECDSA o Ed25519.
+- **Generación e importación de claves** post-cuánticas a través del flujo habitual de claves del KMS.
+- **Firma y verificación** con los nuevos algoritmos, sobre el mensaje en claro (*pure signing*).
+- **CAs post-cuánticas**: creación e importación de autoridades de certificación con claves ML-DSA, SLH-DSA o compuestas, y emisión de certificados a partir de ellas.
+- **Cadenas mixtas**: un motor X.509 puede firmar certificados cruzando familias de algoritmos (por ejemplo, una CA SLH-DSA que emite una hoja ECDSA, o una CA ECDSA que firma un CSR firmado con SLH-DSA).
+
+## Alcance y limitaciones
+
+- La funcionalidad se expone a través de la **API REST y el SDK de Go**. Los ejemplos de esta página utilizan ambos canales.
+- El soporte PQC está disponible de forma completa en el **motor criptográfico software** (y en el motor File System, que delega en él). Consulte la [matriz de compatibilidad](#compatibilidad-con-motores-criptográficos) para conocer el estado del resto de motores.
+- Los algoritmos PQC de Lamassu son **algoritmos de firma**. No se ha añadido soporte de cifrado/encapsulación de claves (ML-KEM) ni mecanismos de cifrado post-cuántico.
+- LamassuQ se distribuye mediante **imágenes de contenedor específicas** y una **imagen de Go con soporte PQC**. Consulte la sección de [despliegue](#despliegue).
+
+## Algoritmos soportados
+
+El KMS identifica cada tipo de clave con un valor de `algorithm` y un parámetro `size`. Los algoritmos añadidos por LamassuQ son los siguientes:
+
+| Algoritmo (`algorithm`) | Parámetros (`size`) | Estándar | Descripción |
+| :--- | :--- | :--- | :--- |
+| `ML-DSA` | 44, 65, 87 | FIPS 204 (ML-DSA-44/65/87) | Firma post-cuántica basada en retículos (*lattice*). |
+| `SLH-DSA` | 1–12 (conjunto de parámetros) | FIPS 205 | Firma post-cuántica basada en hash (*stateless hash-based*), considerada el enfoque más conservador. |
+| `Composite-ML-DSA-RSA` | variante 1–8 | firma híbrida | Combina ML-DSA con una firma RSA (RSA-PSS o RSA-PKCS#1 v1.5). |
+| `Composite-ML-DSA-ECDSA` | variante 9–13 | firma híbrida | Combina ML-DSA con una firma ECDSA. |
+| `Composite-ML-DSA-Ed25519` | variante 14–15 | firma híbrida | Combina ML-DSA con Ed25519. |
+| `Ed25519` | 256 (fijo) | firma clásica | Incluido en el mismo flujo de generación e importación. |
+
+Las firmas compuestas (*composite*) producen una única firma que valida contra las dos claves del par: la post-cuántica y la clásica. Son útiles durante la migración, cuando el verificador aún no soporta algoritmos PQC o se exige redundancia criptográfica.
+
+### Conjuntos de parámetros SLH-DSA
+
+Para `SLH-DSA` el valor de `size` selecciona el conjunto de parámetros FIPS 205:
+
+| `size` | Conjunto de parámetros |
+| :--- | :--- |
+| 1 | SLH-DSA-SHA2-128s |
+| 2 | SLH-DSA-SHA2-128f |
+| 3 | SLH-DSA-SHA2-192s |
+| 4 | SLH-DSA-SHA2-192f |
+| 5 | SLH-DSA-SHA2-256s |
+| 6 | SLH-DSA-SHA2-256f |
+| 7 | SLH-DSA-SHAKE-128s |
+| 8 | SLH-DSA-SHAKE-128f |
+| 9 | SLH-DSA-SHAKE-192s |
+| 10 | SLH-DSA-SHAKE-192f |
+| 11 | SLH-DSA-SHAKE-256s |
+| 12 | SLH-DSA-SHAKE-256f |
+
+Los conjuntos terminados en `s` (*small*) optimizan el tamaño de firma y los terminados en `f` (*fast*) la velocidad de firma.
+
+### Variantes compuestas
+
+Para las claves compuestas, el valor de `size` selecciona la variante dentro del registro de algoritmos compuestos de la librería criptográfica con la que se ha construido Lamassu (un *fork* con soporte PQC de la librería estándar de Go):
+
+| Familia | Variantes admitidas | Composiciones disponibles |
+| :--- | :--- | :--- |
+| `Composite-ML-DSA-RSA` | 1–8 | MLDSA44_RSA2048_PSS_SHA256, MLDSA44_RSA2048_PKCS15_SHA256, MLDSA65_RSA3072_PSS_SHA512, MLDSA65_RSA3072_PKCS15_SHA512, MLDSA65_RSA4096_PSS_SHA512, MLDSA65_RSA4096_PKCS15_SHA512, MLDSA87_RSA3072_PSS_SHA512, MLDSA87_RSA4096_PSS_SHA512 |
+| `Composite-ML-DSA-ECDSA` | 9–13 | MLDSA44_ECDSA_P256_SHA256, MLDSA65_ECDSA_P256_SHA512, MLDSA65_ECDSA_P384_SHA512, MLDSA87_ECDSA_P384_SHA512, MLDSA87_ECDSA_P521_SHA512 |
+| `Composite-ML-DSA-Ed25519` | 14–15 | MLDSA44_Ed25519_SHA512, MLDSA65_Ed25519_SHA512 |
+
+La primera parte del nombre indica la variante ML-DSA (44, 65 o 87) y la segunda el algoritmo clásico que la acompaña. El algoritmo exacto asociado a cada variante queda reflejado en los metadatos de la clave y en los certificados que se emitan con ella.
+
+## Compatibilidad con motores criptográficos
+
+Al crear o importar una clave, Lamassu comprueba que la especificación de clave (tipo y tamaño) esté declarada como soportada por el motor criptográfico seleccionado.
+
+| Motor | Claves PQC en su catálogo | Crear / importar claves PQC | Firmar / verificar con PQC |
+| :--- | :--- | :--- | :--- |
+| Software (Go) | Sí | Sí | Sí |
+| File System | Sí | Sí | Sí |
+| HashiCorp Vault KV2 | Sí* | No | Sí |
+| AWS Secrets Manager | Sí* | No | Sí |
+| AWS KMS | No | No | No |
+| Azure KeyVault | No | No | No |
+| Azure KeyVault Secrets | No | No | No |
+| PKCS#11 | No | No | No |
+
+El motor Software admite la matriz completa: RSA 1024–15360, ECDSA P-224/P-256/P-384/P-521, ML-DSA 44/65/87, SLH-DSA 1–12, compuestas 1–15 y Ed25519. El motor File System delega la generación, la importación y la firma en el motor software, por lo que hereda su soporte completo.
+
+<Callout type="warn" title="Motores con catálogo PQC pero sin generación ni importación">
+
+HashiCorp Vault KV2 y AWS Secrets Manager anuncian el mismo catálogo de tipos de clave que el motor software, por lo que las claves PQC **aparecen en sus listados**. Sin embargo, sus operaciones de generación e importación de claves PQC no están implementadas todavía y devuelven errores del tipo `vaultvk2: unsupported key type (ML-DSA)` o `aws/secretsmanager: unsupported key type (ML-DSA)`.
+
+Estos motores **sí pueden custodiar y firmar** con una clave PQC: el motor descarga la clave privada del almacén y las operaciones de firma se ejecutan mediante las primitivas PQC del motor software. La limitación afecta a la creación y a la importación, no al uso posterior de la clave.
+
+</Callout>
+
+Los motores AWS KMS, Azure KeyVault, Azure KeyVault Secrets y PKCS#11 no incluyen tipos de clave PQC en su catálogo y rechazan cualquier especificación de clave post-cuántica con un error de tipo *unsupported key type*. Para despliegues con HSM, considere una estrategia híbrida: claves clásicas custodiadas en el HSM y claves PQC en el motor software (consulte [Recomendaciones de migración](#recomendaciones-de-migración-a-pqc)).
+
+## Crear claves post-cuánticas
+
+La generación de claves PQC utiliza el mismo endpoint del KMS que los algoritmos clásicos: `POST /v1/keys`. El cuerpo de la petición indica el algoritmo y el tamaño o variante:
+
+```json
+POST /v1/keys
+{
+  "algorithm": "ML-DSA",
+  "size": 65,
+  "engine_id": "default",
+  "name": "pqc-signing-key",
+  "tags": ["pqc", "fips204"],
+  "metadata": {}
+}
+```
+
+Valores admitidos de `algorithm` y `size`:
+
+| `algorithm` | `size` |
+| :--- | :--- |
+| `ML-DSA` | 44, 65 o 87 |
+| `SLH-DSA` | 1 a 12 |
+| `Composite-ML-DSA-RSA` | 1 a 8 |
+| `Composite-ML-DSA-ECDSA` | 9 a 13 |
+| `Composite-ML-DSA-Ed25519` | 14 a 15 |
+| `Ed25519` | 256 (se aplica automáticamente) |
+
+Si no se indica `engine_id`, la clave se crea en el motor por defecto configurado en el despliegue. Para las claves compuestas, la variante debe pertenecer a la familia indicada en `algorithm`; por ejemplo, la variante 9 (ECDSA) no es válida para `Composite-ML-DSA-RSA`.
+
+<Callout type="warn" title="Errores frecuentes">
+
+- `invalid MLDSA key size`: el tamaño indicado no es 44, 65 ni 87.
+- `invalid SLH-DSA parameter set (use 1-12)`: el conjunto de parámetros está fuera del rango 1–12.
+- `invalid Composite-ML-DSA variant (use 1-15)`: la variante está fuera del rango 1–15.
+- `composite variant N is not valid for key type X`: la variante existe, pero pertenece a otra familia compuesta.
+- *unsupported key type* procedente del motor: el motor seleccionado no admite la especificación de clave PQC. Consulte la [matriz de compatibilidad](#compatibilidad-con-motores-criptográficos).
+
+</Callout>
+
+Con el SDK de Go, la misma operación se realiza con `CreateKey`, que admite exactamente los mismos valores de algoritmo y tamaño:
+
+```go
+key, err := kmsClient.CreateKey(ctx, services.CreateKeyInput{
+    Algorithm: "ML-DSA",
+    Size:      65,
+    EngineID:  "default",
+    Name:      "pqc-signing-key",
+    Tags:      []string{"pqc", "fips204"},
+    Metadata:  map[string]any{},
+})
+```
+
+## Importar claves post-cuánticas
+
+La importación también reutiliza el endpoint clásico del KMS: `POST /v1/keys/import`. Lamassu parsea la clave privada en formato **PKCS#8** (PEM, codificada en Base64 en el campo `private_key`) e identifica automáticamente el algoritmo y los parámetros:
+
+```json
+POST /v1/keys/import
+{
+  "private_key": "<PEM de la clave privada en Base64>",
+  "engine_id": "default",
+  "name": "pqc-imported-key",
+  "tags": ["pqc"],
+  "metadata": {}
+}
+```
+
+Al parsear la clave, Lamassu deduce el tipo y el tamaño sin que sea necesario indicarlos:
+
+- Claves ML-DSA: se reconocen los parámetros ML-DSA-44, ML-DSA-65 y ML-DSA-87.
+- Claves SLH-DSA: se reconocen a partir del nombre del esquema del parámetro, con el prefijo `SLH-DSA-` (por ejemplo, `SLH-DSA-SHA2-128s`). El nombre del esquema se traduce al conjunto de parámetros correspondiente de la [tabla anterior](#conjuntos-de-parámetros-slh-dsa).
+- Claves compuestas: se reconoce el algoritmo compuesto del par ML-DSA + clásico y se deriva la variante correspondiente.
+- Claves Ed25519: tamaño fijo 256.
+
+Como en el caso de la generación, la especificación deducida debe estar soportada por el motor de destino.
+
+## Firmar y verificar con claves post-cuánticas
+
+Las operaciones de firma y verificación se realizan con los endpoints habituales del KMS (`POST /v1/keys/:id/sign` y `POST /v1/keys/:id/verify`). Los algoritmos de firma disponibles para claves PQC son los siguientes:
+
+| Clave | Algoritmo de firma |
+| :--- | :--- |
+| ML-DSA 44 | `MLDSA_44_PURE` |
+| ML-DSA 65 | `MLDSA_65_PURE` |
+| ML-DSA 87 | `MLDSA_87_PURE` |
+| SLH-DSA | `SLHDSA_PURE` |
+| Composite-ML-DSA-RSA | `COMPOSITE_MLDSA_RSA_PURE` |
+| Composite-ML-DSA-ECDSA | `COMPOSITE_MLDSA_ECDSA_PURE` |
+| Composite-ML-DSA-Ed25519 | `COMPOSITE_MLDSA_ED25519_PURE` |
+| Ed25519 | `Ed25519_PURE` |
+
+Todos estos algoritmos son de modo *pure*: la firma se calcula **directamente sobre el mensaje en claro**, sin un paso previo de resumen (*digest*). Por ello, la petición debe usar el tipo de mensaje `raw`; los algoritmos PQC no aceptan firmar sobre un hash precalculado. El campo `message` es un array de bytes, por lo que el mensaje se envía codificado en **Base64**:
+
+```json
+POST /v1/keys/{key_id}/sign
+{
+  "algorithm": "MLDSA_65_PURE",
+  "message": "bWVuc2FqZSBhIGZpcm1hcg==",
+  "message_type": "raw"
+}
+```
+
+En el caso de las claves compuestas, la firma devuelta es la firma compuesta completa, y la verificación valida simultáneamente la parte ML-DSA y la parte clásica (RSA, ECDSA o Ed25519) según la variante de la clave.
+
+La verificación (`POST /v1/keys/:id/verify`) usa el mismo cuerpo que la firma, añadiendo el campo `signature` (también en Base64) con la firma que se desea comprobar, obtenida del endpoint de firma.
+
+## Autoridades de certificación post-cuánticas
+
+### Crear una CA con clave PQC
+
+La creación de una CA utiliza el endpoint `POST /v1/cas` con el bloque `key_metadata`, que indica el tipo de clave y su tamaño o variante. Lamassu genera la clave en el motor indicado reutilizando el flujo de [creación de claves](#crear-claves-post-cuánticas):
+
+```json
+POST /v1/cas
+{
+  "id": "pqc-root-ca",
+  "subject": {
+    "common_name": "PQC Root CA"
+  },
+  "key_metadata": {
+    "type": "SLH-DSA",
+    "bits": 1
+  },
+  "engine_id": "default",
+  "profile_id": "b1a7d0c3-4e2f-4a8b-9c6d-5f0e1a2b3c4d",
+  "ca_expiration": {
+    "type": "Duration",
+    "duration": "1y"
+  }
+}
+```
+
+Los valores admitidos en `key_metadata.type` son los mismos que los algoritmos del KMS: `ML-DSA`, `SLH-DSA`, `Composite-ML-DSA-RSA`, `Composite-ML-DSA-ECDSA`, `Composite-ML-DSA-Ed25519`, junto con los clásicos `RSA`, `ECDSA` y `Ed25519`. En `bits` se indica el tamaño o variante según la [tabla de algoritmos](#algoritmos-soportados).
+
+El campo `profile_id` es obligatorio y debe referenciar un perfil de emisión de tipo CA existente: si se omite, la petición responde con un error de validación (400), y si el perfil indicado no existe, con un 404. La expiración se expresa con el bloque `ca_expiration`, que admite una duración relativa (`"type": "Duration"`, con valores como `"1y"`, `"6m"` o `"30d"`) o una fecha absoluta (`"type": "Time"`).
+
+### Importar una CA con clave PQC
+
+La importación de CAs (`POST /v1/cas/import`) admite claves privadas post-cuánticas generadas externamente. La clave privada se envía en formato PEM codificado en Base64 y el SDK la serializa internamente a PKCS#8, soportando los mismos tipos de clave que la importación de claves del KMS: ML-DSA, SLH-DSA, compuestas y Ed25519, además de RSA y ECDSA.
+
+### Cadenas de certificación mixtas
+
+El motor X.509 de Lamassu puede firmar certificados cruzando familias de algoritmos entre la CA emisora y el certificado emitido. Esto habilita arquitecturas de migración graduales, entre otras:
+
+- CA raíz SLH-DSA que emite certificados de hoja ECDSA.
+- CA ECDSA que firma solicitudes de certificado (CSR) firmadas con SLH-DSA.
+- Cadenas en las que raíz e intermedia son post-cuánticas y la hoja es clásica, o viceversa.
+
+La cadena elegida debe ser verificable por los consumidores finales de los certificados: si un dispositivo o servicio no soporta todavía los algoritmos PQC, las firmas compuestas pueden servir como punto de transición.
+
+<Callout type="warn" title="Expiración e inconsistencias con claves PQC">
+
+Durante la creación o importación de una CA, el servicio puede devolver el error `incompatible expiration time ref` si la referencia temporal de validez no es compatible con el certificado que se intenta registrar. El SDK de Go lo mapea a un error de tipo `400` (y `500` en la creación de CA) para facilitar su gestión desde las integraciones.
+
+</Callout>
+
+## SDK de Go y utilidades criptográficas
+
+El SDK de Go de LamassuQ expone la funcionalidad PQC a través de los mismos clientes de KMS y CA, además de añadir utilidades criptográficas para generar material PQC de forma local:
+
+- `GenerateMLDSAKey(dimensions)`: genera una clave ML-DSA (44, 65 o 87).
+- `GenerateSLHDSAKey(paramSet)`: genera una clave SLH-DSA para el conjunto de parámetros indicado.
+- `GenerateCompositeMLDSAKey(variant)`: genera una clave compuesta para la variante 1–15. Se mantiene también el alias `GenerateCompositeMLDSARSAKey(variant)` por compatibilidad.
+- `GenerateEd25519Key()`: genera una clave Ed25519.
+- `ValidateCertAndPrivKey(...)`: valida que un certificado y su clave privada coincidan, extendida para admitir claves ML-DSA y Ed25519 junto a RSA y ECDSA.
+
+Estas utilidades son útiles para preparar material de prueba, automatizar la importación de claves o construir CSR firmadas con algoritmos PQC antes de registrarlas en la plataforma.
+
+## Despliegue
+
+LamassuQ se construye sobre una cadena de herramientas con soporte criptográfico post-cuántico:
+
+- Las imágenes de los servicios se compilan con la imagen de Go con soporte PQC `ghcr.io/lamassuiot/golang-pqc:latest`, que incluye las primitivas ML-DSA (paquete `crypto/mldsa` del *fork* de la librería estándar de Go) y las primitivas SLH-DSA y compuestas de la librería `cloudflare/circl`.
+- Las imágenes de contenedor de cada servicio se publican con la etiqueta `:pqc`, por ejemplo `ghcr.io/lamassuiot/lamassu-ca:pqc` o `ghcr.io/lamassuiot/lamassu-kms:pqc`.
+- Existe una imagen *monolítica* adicional (`ci/monolithic.dockerfile`) que agrupa los servicios en un único contenedor.
+
+El script `deploy-lamassuq.sh` automatiza la construcción y publicación de las imágenes `:pqc` de cada servicio a partir de los ficheros `ci/pq_<componente>.dockerfile`. La cadena de herramientas se basa en Go 1.27.
+
+<Callout type="warn" title="Migración del despliegue">
+
+Para activar el soporte PQC, las imágenes de los servicios y la imagen de Go de compilación deben actualizarse a las versiones PQC. Un despliegue que mezcle imágenes PQC y no-PQC puede provocar inconsistencias, ya que los binarios no-PQC no reconocen los algoritmos añadidos.
+
+</Callout>
+
+## Recomendaciones de migración a PQC
+
+- **Inventariar el estado actual**: identifique las CAs, las claves y los perfiles de emisión que operan con RSA y ECDSA, y los consumidores que dependen de ellos.
+- **Empezar por los motores soportados**: despliegue un motor Software o File System para alojar las primeras claves PQC de prueba. Hasta que los motores externos y los HSM soporten PQC, mantenga las claves clásicas de producción en sus motores actuales.
+- **Usar firmas compuestas como puente**: durante la transición, las claves compuestas ML-DSA + RSA/ECDSA/Ed25519 permiten emitir certificados verificables tanto por consumidores clásicos como por consumidores preparados para PQC.
+- **Probar cadenas mixtas**: antes de migrar una raíz de confianza, valide en un entorno de pruebas que los dispositivos y servicios objetivo verifican correctamente las cadenas mixtas y las firmas *pure*.
+- **Planificar la renovación de las raíces**: la migración definitiva exige emitir nuevas raíces e intermedias post-cuánticas y reemplazar progresivamente las clásicas, respetando los periodos de vida de los certificados ya emitidos.

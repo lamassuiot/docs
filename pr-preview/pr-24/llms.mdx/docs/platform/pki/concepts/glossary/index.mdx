@@ -1,0 +1,100 @@
+# Glosario (/docs/pr-preview/pr-24/platform/pki/concepts/glossary)
+
+
+
+A–C [#ac]
+
+**AKI (Authority Key Identifier)**\
+Identificador de la clave pública de la autoridad que firmó un certificado. Ayuda a construir la cadena hacia el emisor correcto.
+
+**Ancla de confianza**\
+Certificado, normalmente de una CA raíz, que un consumidor acepta de forma explícita como punto final de una cadena.
+
+**CA (Certification Authority)**\
+Autoridad que firma certificados y vincula una identidad con una clave pública.
+
+**CA intermedia**\
+CA firmada por otra autoridad. Se utiliza para emitir sin exponer la raíz a la operación diaria.
+
+**CA raíz**\
+CA autofirmada que inicia una jerarquía de confianza.
+
+**Certificado X.509**\
+Documento firmado que contiene una clave pública, un sujeto, un emisor, un periodo de validez y extensiones que delimitan su uso.
+
+**CRL (Certificate Revocation List)**\
+Lista firmada de certificados revocados publicada por una CA.
+
+**CSR (Certificate Signing Request)**\
+Solicitud PKCS#10 que contiene una clave pública y atributos solicitados. La firma de la CSR demuestra posesión de la clave privada correspondiente.
+
+D–K [#dk]
+
+**DMS (Device Management Service)**\
+Configuración que agrupa reglas de registro, enrolamiento, re-enrolamiento, emisión y distribución de CAs para una flota.
+
+**Distinguished Name (DN)**\
+Conjunto de atributos del sujeto o emisor, como `CN`, `O`, `OU`, `C`, `ST` y `L`.
+
+**EST (Enrollment over Secure Transport)**\
+Protocolo definido en RFC 7030 para obtener CAs, enrolar y re-enrolar certificados sobre HTTPS.
+
+**Extended Key Usage (EKU)**\
+Extensión que acota finalidades como autenticación de cliente, autenticación de servidor, firma de código u OCSP.
+
+**Identidad de dispositivo**\
+Relación entre un dispositivo y uno de sus certificados. Un dispositivo puede conservar un historial de identidades.
+
+**Identity slot**\
+Posición lógica en un dispositivo donde Lamassu vincula una identidad activa o histórica.
+
+**JITP (Just-in-Time Provisioning)**\
+Registro automático de un dispositivo cuando completa correctamente su primer enrolamiento.
+
+**KMS (Key Management Service)**\
+Servicio de Lamassu que normaliza generación, importación y uso de claves sobre distintos motores criptográficos.
+
+**Key Usage**\
+Extensión X.509 que permite operaciones básicas como firma digital, cifrado de clave o firma de certificados.
+
+M–R [#mr]
+
+**mTLS (Mutual TLS)**\
+TLS donde cliente y servidor presentan certificados. Un DMS puede usar el certificado cliente como método de autenticación.
+
+**OCSP (Online Certificate Status Protocol)**\
+Protocolo para consultar en línea si un certificado está vigente, revocado o es desconocido.
+
+**Perfil de emisión**\
+Política reutilizable que define cómo Lamassu construye un certificado y qué claves acepta.
+
+**Principal**\
+Identidad de operador o cliente de API reconocida por el servicio de autorización. Lamassu admite principales OIDC y X.509.
+
+**Política**\
+Conjunto de permisos asignable a uno o varios principales.
+
+**RA (Registration Authority)**\
+Componente que verifica al solicitante antes de pedir a una CA que emita. El DMS cumple este papel en los flujos de enrolamiento de dispositivos.
+
+**Relying party**\
+Sistema consumidor que decide si acepta un certificado presentado.
+
+**Revocación**\
+Invalidación de un certificado antes de su fecha de expiración.
+
+S–Z [#sz]
+
+**SAN (Subject Alternative Name)**\
+Extensión que añade identidades como nombres DNS, direcciones IP, correos o URIs.
+
+**SKI (Subject Key Identifier)**\
+Identificador derivado de la clave pública del propio certificado.
+
+**VA (Validation Authority)**\
+Servicio de Lamassu responsable de las respuestas OCSP y la generación o publicación de CRLs.
+
+**Ventana de renovación**\
+Periodo anterior a la expiración durante el que un dispositivo puede o debe solicitar otra identidad.
+
+¿Falta un término operativo? Consulta primero [Cómo funciona Lamassu](/docs/platform/pki/concepts/overview) y el [Modelo de confianza](/docs/platform/pki/concepts/trust-model), donde estos conceptos aparecen conectados.

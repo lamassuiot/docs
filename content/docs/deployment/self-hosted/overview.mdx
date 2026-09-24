@@ -34,7 +34,7 @@ Si buscas un despliegue productivo o más controlado, sigue con la instalación 
 
 ## Qué se despliega
 
-El chart principal `charts/lamassu`, actualmente en la serie `3.7.x`, despliega estos componentes:
+El chart principal `charts/lamassu`, actualmente en la versión `4.0.0`, despliega estos componentes:
 
 - `ui`
 - `ca`
@@ -43,17 +43,19 @@ El chart principal `charts/lamassu`, actualmente en la serie `3.7.x`, despliega 
 - `device-manager`
 - `dms-manager`
 - `alerts`
+- `authz`, el servicio de autorización que decide qué peticiones del Gateway están permitidas
+- `wfx`, el servicio de flujos de trabajo Siemens WFX, expuesto bajo `/api/wfx/`
 - recursos de Gateway API y políticas de Envoy Gateway
 - job de migraciones de base de datos
 
 ## Requisitos previos
 
-- Clúster Kubernetes `1.19+`
+- Clúster Kubernetes `1.24+`. El chart declara `kubeVersion: ">=1.24.0-0"`, por lo que Helm rechaza la instalación en versiones anteriores. La integración con HSM mediante `services.kms.pkcs11Sidecar` requiere además Kubernetes `1.29+`, por su dependencia de los sidecars nativos de init container.
 - `kubectl` configurado con acceso al clúster
 - Helm `3.2.0+`
 - `cert-manager 1.14+` para la gestión de certificados cuando se usa `tls.type=certManager`
-- `Envoy Gateway 1.3.0+`, ya que el chart publica servicios mediante Gateway API y no mediante Ingress
-- Acceso a un registro de contenedores o imágenes previamente importadas si se trabaja en modo offline
+- `Envoy Gateway v1.8.0+`, ya que el chart publica servicios mediante Gateway API y no mediante Ingress. La autorización externa (`auth.externalAuthorization.path`) exige esta versión.
+- Acceso al registro de contenedores de Lamassu, o a un registro espejo propio, desde los nodos del clúster
 - Almacenamiento persistente disponible para PostgreSQL, RabbitMQ, VA y KMS
 
 ## Opciones de despliegue
@@ -127,7 +129,7 @@ amqp:
 tls:
   type: certManager
   certManagerOptions:
-    issuer: downstream-ca-selfsigned-issuer
+    issuer: ""
     certSpec:
       commonName: pki.example.internal
       hostnames:
@@ -181,6 +183,8 @@ services:
               value: pki-admin
 ```
 
+Con `tls.certManagerOptions.issuer` vacío, el chart `4.0.0` crea un `Issuer` self-signed con nombre dependiente del release (por ejemplo, `lamassu-downstream-ca-selfsigned-issuer` con `helm install lamassu`). El valor legado `downstream-ca-selfsigned-issuer` sigue resolviendo al mismo emisor, pero se recomienda dejarlo vacío o apuntar a tu propio `Issuer`/`ClusterIssuer` mediante `tls.certManagerOptions.clusterIssuer`.
+
 ## Provisiona el primer administrador
 
 No hay un superusuario implícito. Antes de instalar, crea el rol `pki-admin` en el proveedor OIDC y asígnalo al grupo que administrará Lamassu. El principal del ejemplo concede la política `SUPER ADMIN` a cualquier token que contenga ese rol.
@@ -196,13 +200,14 @@ Consulta [Control de acceso](/docs/platform/pki/access-control) para diseñar pr
 ## Áreas de configuración más relevantes
 
 - **TLS:** `tls.type`, `tls.certManagerOptions.*` y `tls.externalOptions.secretName` controlan el certificado *downstream* del Gateway.
-- **Gateway:** `gateway.addresses`, `gateway.ports.*` y `gateway.extraRouting` publican la UI y las APIs mediante Envoy Gateway.
+- **Gateway:** `gateway.addresses`, `gateway.ports.*`, `gateway.className` y `gateway.extraRouting` publican la UI y las APIs mediante Envoy Gateway. `gateway.responseOverride` reescribe las respuestas `401`/`403` con cuerpos JSON propios (habilitado por defecto).
 - **Persistencia:** `postgres.*` define la conexión a PostgreSQL.
 - **Mensajería:** `amqp.*` configura la conexión a RabbitMQ.
-- **Identidad y autorización:** `auth.oidc.*`, `services.authz.jwkUrl` y `services.authz.bootstrap` configuran login, validación JWT y permisos iniciales.
+- **Identidad y autorización:** `auth.oidc.*`, `auth.externalAuthorization.*`, `services.authz.jwkUrl` y `services.authz.bootstrap` configuran login, validación JWT, el control de acceso en el Gateway y los permisos iniciales.
 - **Autoridades:** `services.ca.domains` establece los dominios autorizados para CA y certificados.
 - **Claves:** `services.kms.cryptoEngines.*` configura los motores criptográficos y su almacenamiento.
 - **Alertas:** `services.alerts.smtp_server.*` prepara el envío de correo.
+- **Observabilidad:** `observability.*` habilita la instrumentación OpenTelemetry (trazas y logs) en todos los servicios.
 
 ## Verificación del despliegue
 
@@ -212,13 +217,7 @@ El chart incluye una prueba Helm en `charts/lamassu/templates/tests/test-connect
 helm test lamassu -n lamassu
 ```
 
-La prueba comprueba al menos:
-
-- salud de `ca`
-- salud de `dms-manager`
-- salud de `device-manager`
-- salud de `va`
-- respuesta HTML esperada del servicio `ui`
+La prueba lanza un pod efímero llamado `<release>-connectivity-test` (imagen configurable con `connectivityTest.image`) que comprueba el endpoint `/health` de `ca`, `dms-manager`, `device-manager` y `va`, y que la respuesta del servicio `ui` contiene el título `LamassuIoT Certificate Manager`.
 
 ## Repositorio Helm
 
@@ -230,8 +229,21 @@ El repositorio `lamassu-helm` está organizado en tres bloques principales:
 
 ## SoftHSM como complemento opcional
 
-El chart `charts/softhsm` no forma parte del despliegue estándar, pero resulta útil en entornos de laboratorio cuando se necesita simular un HSM compatible con PKCS#11. No sustituye al backend KMS principal; sirve como soporte para pruebas o integraciones concretas.
+El chart `charts/softhsm` no forma parte del despliegue estándar, pero resulta útil en entornos de laboratorio cuando se necesita simular un HSM compatible con PKCS#11. No sustituye a un HSM real en producción; sirve como soporte para pruebas o integraciones concretas.
+
+En la versión `4.0.0` del chart, el servicio KMS puede consumir ese token PKCS#11 mediante el sidecar `services.kms.pkcs11Sidecar`, que expone el socket PKCS#11 en un volumen compartido del pod (requiere Kubernetes `1.29+`). El script Fastlane automatiza la integración completa con `--with-hsm` (ver [Fastlane](/docs/deployment/self-hosted/fastlane)).
+
+## Actualizar desde 3.8.x
+
+La versión `4.0.0` del chart introduce cambios que rompen la compatibilidad con los despliegues `3.8.x`. La guía completa está en [`charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`](https://github.com/lamassuiot/lamassu-helm/blob/main/charts/lamassu/CHANGELOG/3.8.0->4.0.0.md) del repositorio `lamassu-helm`. Los puntos que más afectan a un despliegue manual:
+
+- **Nombres dependientes del release:** los recursos del chart pasan a llamarse `<release>-<componente>` (por ejemplo, `lamassu-kms`) en lugar de usar nombres fijos. Los PVC de KMS y VA cambian de nombre; si usas motores KMS con almacenamiento en sistema de ficheros o el `fileStore` local de VA, los datos requieren una migración manual descrita en la guía del CHANGELOG: tras `helm upgrade`, los StatefulSets nuevos arrancan con PVC vacíos y hay que copiar el contenido con un pod de ayuda (`alpine:3.20`) ajustando la propiedad a `65532:65532`. Si es una instalación nueva o no usas esos backends, no hay nada que migrar.
+- **`services.authz` es obligatorio:** el nuevo servicio de autorización no existía en `3.8.0`. El Job de migraciones crea sus esquemas y precarga políticas, pero no crea la base de datos `pki`; provisiona esa base de datos y concede acceso al usuario de Lamassu antes de actualizar.
+- **Validación estricta de valores:** el chart incorpora `values.schema.json` y rechaza claves de nivel superior desconocidas. Elimina bloques obsoletos (por ejemplo, `toolbox`) antes de ejecutar `helm upgrade`.
+- **`services.connectors` ahora es un mapa:** cada entrada se indexa por el identificador del conector y debe definir `type` e `image`.
+- **Por defecto más seguros:** los pods pasan a ejecutarse como usuario no root `65532:65532`, sin montaje del token del service account, con seccomp `RuntimeDefault` y capacidades eliminadas. Las sobrecargas por servicio de `runAsUser`/`runAsGroup` se han eliminado.
+- **`toolbox` pasa a `connectivityTest`:** el contenedor auxiliar de verificación de conectividad se configura en `connectivityTest.image`.
 
 ## Versionado y migraciones
 
-La versión actual del chart en el repositorio es `3.8.0`. Para upgrades entre versiones, consulta las guías de `charts/lamassu/CHANGELOG/` y revisa especialmente las migraciones de base de datos y el bootstrap de authz.
+La versión actual del chart en el repositorio es `4.0.0`. Para upgrades entre versiones, consulta las guías de `charts/lamassu/CHANGELOG/` y revisa especialmente las migraciones de base de datos y el bootstrap de authz.

@@ -1,0 +1,22 @@
+---
+title: Validación de certificados
+description: Publica el estado de las identidades mediante OCSP y CRL.
+sidebar:
+  group: VA
+  label: Visión general
+---
+
+La emisión demuestra quién firmó un certificado; la validación permite saber si todavía debe aceptarse. Lamassu publica el estado mediante dos mecanismos complementarios.
+
+## Elige un mecanismo
+
+Usa **OCSP** cuando el consumidor esté conectado y necesite consultar el estado más reciente de un certificado concreto.
+
+Usa una **CRL** cuando la validación deba realizarse localmente, sin conexión o sobre un volumen elevado de certificados. El consumidor descarga periódicamente una lista firmada y la conserva hasta la siguiente actualización.
+
+Muchos entornos utilizan ambos: OCSP como comprobación primaria y CRL como mecanismo local o de respaldo.
+
+<Cards>
+  <Card title="Validación online con OCSP" description="Consulta estados Good, Revoked y Unknown en tiempo real." href="/docs/platform/pki/ocsp" />
+  <Card title="Listas de revocación" description="Genera, publica y distribuye CRLs por autoridad." href="/docs/platform/pki/crl" />
+</Cards>

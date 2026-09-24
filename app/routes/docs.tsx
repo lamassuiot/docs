@@ -24,6 +24,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { redirect } from "react-router";
 import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions";
 import {
   type AffectedPages,
@@ -33,6 +34,7 @@ import {
 } from "@/components/diff-toggle";
 import { MdxLink } from "@/components/mdx-link";
 import { VersionSelector } from "@/components/version-selector";
+import { docsPath } from "@/lib/base-path";
 import { baseOptions, gitConfig } from "@/lib/layout.shared";
 import { source } from "@/lib/source";
 import type { Route } from "./+types/docs";
@@ -310,9 +312,51 @@ function mapPageTree(root: PageTreeRoot): PageTreeRoot {
   };
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+const DOC_REDIRECTS: Record<string, string> = {
+  "platform/pki": "platform/pki/overview",
+  "platform/pki/quickstarts": "platform/pki/quickstarts/overview",
+  "platform/pki/concepts": "platform/pki/concepts/overview",
+  deployment: "deployment/overview",
+  "deployment/self-hosted": "deployment/self-hosted/overview",
+  manual: "platform/pki/overview",
+  "manual/inicio": "platform/pki/quickstarts/overview",
+  "manual/inicio/primera-ca":
+    "platform/pki/quickstarts/create-certificate-authority",
+  "manual/inicio/primer-certificado":
+    "platform/pki/quickstarts/issue-certificate",
+  "manual/inicio/primer-dispositivo":
+    "platform/pki/quickstarts/register-device",
+  "manual/conceptos": "platform/pki/concepts/overview",
+  "manual/conceptos/arquitectura": "platform/pki/concepts/architecture",
+  "manual/conceptos/ciclo-identidad":
+    "platform/pki/concepts/certificate-lifecycle",
+  "manual/servicios-core/kms": "platform/pki/key-management",
+  "manual/servicios-core/cas": "platform/pki/certificate-authorities",
+  "manual/servicios-core/certificates": "platform/pki/certificates",
+  "manual/servicios-core/validation": "platform/pki/certificate-validation",
+  "manual/servicios-core/validation-ocsp": "platform/pki/ocsp",
+  "manual/servicios-core/validation-crl": "platform/pki/crl",
+  "manual/servicios-core/ra": "platform/pki/device-enrollment",
+  "manual/servicios-core/est": "platform/pki/est-enrollment",
+  "manual/servicios-core/devices": "platform/pki/device-management",
+  "manual/servicios-core/alerts": "platform/pki/alerts",
+  "manual/integraciones/aws": "platform/pki/integrations/aws-iot-core",
+  despliegue: "deployment/overview",
+  "despliegue/onprem": "deployment/self-hosted/overview",
+  "despliegue/onprem/fastlane": "deployment/self-hosted/fastlane",
+  "despliegue/cloud": "deployment/aws-marketplace",
+  "despliegue/saas": "deployment/saas",
+};
+
+export async function loader({ params, request }: Route.LoaderArgs) {
   const slugs = params["*"].split("/").filter((v) => v.length > 0);
   if (slugs.length === 0) throw new Response("Not found", { status: 404 });
+  const legacyPath = slugs.join("/");
+  const redirectPath = DOC_REDIRECTS[legacyPath];
+  if (redirectPath) {
+    const search = new URL(request.url).search;
+    throw redirect(`${docsPath(redirectPath)}${search}`, 301);
+  }
   const page = source.getPage(slugs);
   if (!page) throw new Response("Not found", { status: 404 });
   const pageTree = mapPageTree(source.getPageTree());

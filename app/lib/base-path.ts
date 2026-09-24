@@ -24,7 +24,7 @@ function normalize(value: string): string {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
-/** Join a path onto the mount point, e.g. docsPath('manual') -> '/docs/manual'. */
+/** Join a path onto the mount point, e.g. docsPath('platform/pki/overview') -> '/docs/platform/pki/overview'. */
 export function docsPath(path = ''): string {
   const suffix = path.replace(/^\//, '');
   return suffix ? `${DOCS_BASE_PATH}/${suffix}` : DOCS_BASE_PATH;
@@ -38,7 +38,7 @@ export function docsPath(path = ''): string {
  */
 export const VERSIONS_MANIFEST_URL = `/${DOCS_BASE_PATH.split('/')[1]}/versions.json`;
 
-/** The path of the current build within its version, e.g. 'manual/servicios-core/est'. */
+/** The path of the current build within its version, e.g. 'platform/pki/est-enrollment'. */
 export function pathWithinVersion(pathname: string): string {
   return pathname.startsWith(DOCS_BASE_PATH)
     ? pathname.slice(DOCS_BASE_PATH.length).replace(/^\//, '')

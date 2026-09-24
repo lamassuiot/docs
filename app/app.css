@@ -92,6 +92,23 @@ article td,
   text-align: start;
 }
 
+/* MDX callouts are notices, not cards: retain the severity rail and icon while
+   removing the enclosing card affordances. The muted yellow surface keeps them
+   immediately noticeable without competing with the document content. */
+.prose div[style*='--callout-color'] {
+  --lm-callout-background: #fffbeb;
+
+  border: 0;
+  border-radius: 0;
+  background-color: var(--lm-callout-background);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.dark .prose div[style*='--callout-color'] {
+  --lm-callout-background: hsl(48, 52%, 22%);
+}
+
 /* ── PR preview diff ───────────────────────────────────────────────────────
    Markup comes from lib/docs-diff (preview builds only). Off by default: the
    page reads as the PR's final version and removed content is hidden. The

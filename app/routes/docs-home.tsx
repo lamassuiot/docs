@@ -17,13 +17,13 @@ const sections = [
     icon: asset('images/lamassu.svg'),
     title: 'Plataforma Lamassu IoT',
     description: 'Primeros pasos, conceptos y guías para gestionar claves, CAs, certificados y dispositivos.',
-    href: docsPath('manual'),
+    href: docsPath('platform/pki/overview'),
   },
   {
     icon: asset('images/kubernetes.svg'),
     title: 'Despliegue y operación',
     description: 'Elige entre Kubernetes, AWS Marketplace o SaaS y prepara tu entorno.',
-    href: docsPath('despliegue'),
+    href: docsPath('deployment/overview'),
   },
 ];
 

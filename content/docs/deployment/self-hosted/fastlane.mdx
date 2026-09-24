@@ -14,6 +14,8 @@ La instalación incluye:
 - RabbitMQ
 - Chart Helm de Lamassu
 
+De forma opcional, también puede desplegar un backend HSM con soporte PKCS#11 (`--with-hsm`) y una pila de observabilidad con OpenTelemetry (`--otel`). El orden de ejecución es: PostgreSQL → Keycloak → RabbitMQ → observabilidad (opcional) → SoftHSM/NetHSM (opcional) → Lamassu → datos de ejemplo (opcional).
+
 ## Flags de línea de comandos
 
 Todos los parámetros son procesados por la función `process_flags`.
@@ -21,20 +23,23 @@ Todos los parámetros son procesados por la función `process_flags`.
 | Flag | Valor por defecto | Descripción |
 |---|---|---|
 | `-h`, `--help` | - | Muestra la ayuda y finaliza |
-| `-n`, `--non-interactive` | `false` | Omite prompts y genera/usa credenciales por defecto |
+| `-c`, `--context` | - | Contexto Kubernetes a usar por `kubectl` y `helm`; debe existir en `kubectl config get-contexts` |
+| `-n`, `--non-interactive` | `false` | Omite prompts y genera credenciales aleatorias para Keycloak, PostgreSQL y RabbitMQ |
 | `-ns`, `--namespace` | `lamassu-dev` | Namespace Kubernetes donde se despliegan los recursos |
 | `-d`, `--domain` | `dev.lamassu.io` | Dominio usado para endpoint y certificados TLS |
 | `-v`, `--version` | `latest` | Versión del chart Helm de Lamassu |
 | `--https-port` | `443` | Puerto HTTPS del gateway |
 | `--http-port` | `80` | Puerto HTTP del gateway |
-| `--offline` | `false` | Activa modo offline |
-| `--tls-crt` | - | Ruta al certificado TLS (PEM) |
-| `--tls-key` | - | Ruta a la clave privada TLS (PEM) |
-| `--helm-chart-lamassu` | - | Ruta a chart local Lamassu (`.tgz`) |
-| `--helm-chart-postgres` | - | Ruta a chart local PostgreSQL (`.tgz`) |
-| `--helm-chart-keycloak` | - | Ruta a chart local Keycloak (`.tgz`) |
-| `--helm-chart-rabbitmq` | - | Ruta a chart local RabbitMQ (`.tgz`) |
+| `--tls-crt` | - | Ruta al certificado TLS (PEM) para comunicaciones downstream |
+| `--tls-key` | - | Ruta a la clave privada TLS (PEM) para comunicaciones downstream |
 | `-l`, `--local-chart-path` | - | Ruta a directorio local descomprimido del chart Lamassu |
+| `-ip`, `--gateway-ip` | - | Dirección IP que se fija como dirección del Envoy Gateway (sobrescribe las IPs detectadas del host) |
+| `--otel` | `false` | Despliega VictoriaLogs, VictoriaTraces, Jaeger y un collector OTel, y configura OpenTelemetry en todos los servicios de Lamassu |
+| `--sample-data` | `false` | Puebla Lamassu con datos de ejemplo (CAs, perfiles, certificados, DMS y dispositivos) tras la instalación |
+| `--softhsm-chart-path` | `./charts/softhsm` | Ruta al chart local de SoftHSM |
+| `--with-hsm` | `false` | Instala SoftHSM y NetHSM, y configura el KMS de Lamassu para usar PKCS#11 (NetHSM se omite en clústeres ARM: imagen solo amd64) |
+
+Cuando se indica `-c/--context`, tiene precedencia sobre la detección de MicroK8s y todas las llamadas a `kubectl` y `helm` se ejecutan con ese contexto.
 
 ## Detección de distribución Kubernetes
 
@@ -52,14 +57,14 @@ Comportamientos específicos:
 
 ## Verificación de dependencias
 
-La función `check_dependencies` valida prerequisitos según la distribución detectada.
+La función `check_dependencies` valida prerequisitos según la distribución detectada:
 
-Requisitos generales:
+- `yq` (siempre)
+- `jq` (solo con `--sample-data`)
+- `ssh-keygen` (solo con `--with-hsm`)
+- `kubectl` y `helm` en `k3s`, `kind` y Kubernetes estándar; `microk8s kubectl` y `microk8s helm` en MicroK8s
 
-- `yq`
-- CLI de la distribución detectada
-
-Los requisitos específicos dependen de la distribución: `k3s` necesita `kubectl` y `helm`, mientras que `microk8s` utiliza `microk8s kubectl` y `microk8s helm`.
+Si se indica `-c/--context` fuera de MicroK8s, el script comprueba que el contexto exista en `kubectl config get-contexts` y finaliza con error en caso contrario.
 
 ### Addons obligatorios en MicroK8s
 
@@ -70,8 +75,15 @@ Se valida que estén habilitados:
 - `dns`
 - `cert-manager`
 
-También se verifica un release Helm de Envoy Gateway llamado `eg` en el namespace `envoy-gateway-system`.
-Si no existe, se instala automáticamente la versión `v1.3.0` y se crea un `GatewayClass` llamado `eg`.
+### Gateway API y Envoy Gateway
+
+En todas las distribuciones, el script garantiza el soporte de Gateway API:
+
+1. Aplica los CRD de Envoy Gateway y de Gateway API (canal `experimental`) con el chart `oci://docker.io/envoyproxy/gateway-crds-helm`, versión `v1.8.0`, mediante `kubectl apply --server-side --force-conflicts`.
+2. Si ya existe el release `eg` en el namespace `envoy-gateway-system`, lo actualiza; si no existe, lo instala (`oci://docker.io/envoyproxy/gateway-helm`, versión `v1.8.0`).
+3. Crea el `GatewayClass` `eg` si no existe.
+
+La versión de referencia es Envoy Gateway `v1.8.0`, requisito de la autorización externa que configura el chart (ver [Requisitos previos](/docs/deployment/self-hosted/overview#requisitos-previos)).
 
 ## Modo interactivo vs no interactivo
 
@@ -90,69 +102,70 @@ La función `request_config_data` solicita:
 - Se generan credenciales aleatorias de 30 caracteres alfanuméricos.
 - Se usan valores por defecto para dominio y namespace, salvo que se sobrescriban con flags.
 
-## Modo online vs offline
+## Obtención de charts
 
-El script admite dos estrategias para obtener charts Helm.
-
-### Modo online (por defecto)
-
-Los charts se descargan desde repositorios remotos.
-
-### Modo offline
-
-Requiere obligatoriamente rutas a los cuatro charts:
-
-- `--helm-chart-lamassu`
-- `--helm-chart-postgres`
-- `--helm-chart-keycloak`
-- `--helm-chart-rabbitmq`
-
-Si falta cualquiera de ellos, el script finaliza con error.
-
-En este modo se fuerza:
-
-```bash
-imagePullPolicy: Never
-```
+El script siempre descarga los charts desde repositorios remotos: los charts de PostgreSQL, Keycloak y RabbitMQ desde registros OCI públicos, y el chart de Lamassu desde el repositorio `http://www.lamassu.io/lamassu-helm/` (o desde la ruta local indicada con `-l/--local-chart-path`). No existe modo offline; si el clúster no tiene acceso de red a estos orígenes, usa un despliegue manual del chart con `values.yaml` propio.
 
 ## Instalación de componentes
 
 ### PostgreSQL (`install_postgresql`)
 
-- Chart: `oci://registry-1.docker.io/cloudpirates/postgres`
-- Versión del chart: `0.19.0`
+- Chart: `oci://registry-1.docker.io/cloudpirates/postgres`, versión `0.19.5` (imagen PostgreSQL `18.4`)
 - Release: `postgres`
 - `fullnameOverride: "postgresql"`
 
-El script SQL de inicialización crea una base de datos por servicio: `auth` para Keycloak, `alerts` para Alerts, `ca` para CA, `va` para VA, `cloudproxy` para Cloud Proxy, `devicemanager` para Device Manager, `dmsmanager` para DMS Manager y `kms` para KMS.
+El script SQL de inicialización crea las bases de datos `auth` (Keycloak), `pki` (servicios de Lamassu), `authz` (autorización) y `wfx` (workflow), y dentro de la base de datos `pki` crea los esquemas `alerts`, `ca`, `va`, `devicemanager`, `dmsmanager` y `kms`.
 
 ### Keycloak (`install_keycloak`)
 
-- Chart: `oci://registry-1.docker.io/cloudpirates/keycloak`
-- Versión del chart: `0.20.0`
-- Release: `auth`
+- Chart: `oci://registry-1.docker.io/cloudpirates/keycloak`, versión `0.21.9` (imagen `keycloak/keycloak:26.6.2`)
+- Release: `auth`, con `service.httpPort: 80`
 - Uso de base de datos externa: `postgresql:5432/auth`
-- Imagen de Keycloak fijada en `keycloak/keycloak:26.6.0`
-- `httpRelativePath: /auth/`
+- `httpRelativePath: /auth`
 - `proxyHeaders: xforwarded`
+- Variables adicionales: `KC_HOSTNAME_STRICT=false`, `KC_HEALTH_ENABLED=true`, proveedor de lookup de certificados X.509 `envoy` y access log HTTP activado
 
 Configuración automática del realm `lamassu`:
 
+- Tema de inicio de sesión: `lamassu-theme-v3` (JAR `lamassu-theme` 3.0.0 descargado por un init container desde `github.com/lamassuiot/keycloak-theme`)
 - Rol: `pki-admin`
-- Usuario inicial: `lamassu` / `lamassu` (cambio obligatorio)
+- Usuario inicial: `lamassu` / `lamassu` (cambio obligatorio en el primer acceso)
 - Cliente público: `frontend` con `/*` en redirect URIs
 
-En modo online se descarga automáticamente un tema personalizado desde:
-
-- `github.com/lamassuiot/keycloak-theme`
+Con `--sample-data`, el realm incorpora además la cuenta de servicio `service-account-sample-data` (cliente confidencial `sample-data` con su secret) con el rol `pki-admin`.
 
 ### RabbitMQ (`install_rabbitmq`)
 
-- Chart: `oci://registry-1.docker.io/cloudpirates/rabbitmq`
-- Versión del chart: `0.20.0`
+- Chart: `oci://registry-1.docker.io/cloudpirates/rabbitmq`, versión `0.21.4` (imagen RabbitMQ `4.3.0`)
 - Release: `rabbitmq`
 - `fullnameOverride: "rabbitmq"`
 - Credenciales inyectadas dinámicamente mediante `yq`
+
+### Observabilidad (`--otel`)
+
+Con `--otel`, antes de Lamassu se despliega una pila de trazas y logs en el mismo namespace:
+
+- **VictoriaLogs** (`vm/victoria-logs-single`, release `victoria-logs`) y **VictoriaTraces** (`vm/victoria-traces-single`, release `victoria-traces`), sin volumen persistente.
+- **Jaeger** (`jaegertracing/jaeger`, release `jaeger`) con receptor OTLP y UI en `/infra/jaeger`.
+- **Collector OTel** (`open-telemetry/opentelemetry-collector`, release `otel-collector`) que recibe OTLP de los servicios de Lamassu y envía trazas a Jaeger y a VictoriaTraces.
+
+Además, se activa `observability.enabled: true` en el `values` de Lamassu. Las UIs quedan expuestas a través del gateway en las rutas `/infra/logs`, `/infra/traces` y `/infra/jaeger` (ver `observability.routes` en `values.yaml`).
+
+### SoftHSM y NetHSM (`--with-hsm`)
+
+La opción `--with-hsm` configura el KMS de Lamassu para usar PKCS#11. El flujo tiene tres pasos:
+
+1. **Preparación de credenciales SSH**: el script genera un par de claves SSH ed25519 con `ssh-keygen` y lo usa para el reenvío del socket PKCS#11.
+2. **Instalación del chart de SoftHSM**: se despliega el release `hsm` desde la ruta indicada en `--softhsm-chart-path` (por defecto `./charts/softhsm`), con los PIN, slot y token preconfigurados y la clave pública SSH autorizada.
+3. **Configuración de Lamassu**: se crea el secret `kms-pkcs11-sidecar-ssh-key` con la clave privada y se fusionan en el `values` de Lamassu tres bloques: `kms.pkcs11Sidecar` (sidecar `p11-kit-ssh-sidecar` que expone el socket PKCS#11 en un volumen compartido), `kms.pkcs11Modules` (init containers que preparan los módulos PKCS#11 en volúmenes compartidos: `p11-kit-client` siempre y `nethsm` solo cuando se despliega NetHSM) y `kms.cryptoEngines` (motor `pkcs11-softhsm` como motor por defecto, `pkcs11-nethsm` si NetHSM está habilitado y `filesystem-1`).
+
+NetHSM solo se despliega si todos los nodos del clúster admiten la arquitectura `amd64` (su imagen no existe para ARM). Antes de instalar, `detect_nethsm_support` consulta la arquitectura de cada nodo con `kubectl get nodes`:
+
+- Clúster solo ARM (o sin ningún nodo `amd64`): se omite NetHSM y se despliega solo SoftHSM/PKCS#11.
+- Clúster mixto amd64 + ARM: NetHSM se restringe a los nodos amd64.
+- Arquitectura desconocida o no soportada: el script aborta sin desplegar NetHSM.
+
+Para detalles del sidecar PKCS#11 y sus requisitos de Kubernetes, ver [SoftHSM como complemento opcional](/docs/deployment/self-hosted/overview#softhsm-como-complemento-opcional).
 
 ### Lamassu (`install_lamassu`)
 
@@ -160,16 +173,19 @@ Se genera un archivo `lamassu.yaml` que se pasa a `helm install`.
 
 Configuraciones principales:
 
-- PostgreSQL: host `postgresql`, puerto `5432`
+- PostgreSQL: host `postgresql`, puerto `5432`; las mismas credenciales se reutilizan en `services.authz.credentials` para las bases de datos `pki` y `authz`
 - AMQP: host `rabbitmq`, puerto `5672`, TLS deshabilitado
+- CA: motor criptográfico `fs-1` de tipo `filesystem` (`/crypto/fs`); `--with-hsm` no lo modifica, reconfigura el KMS (`services.kms.cryptoEngines`), que pasa a usar PKCS#11 con `pkcs11-softhsm` como motor por defecto (y `pkcs11-nethsm` si se despliega NetHSM), conservando `filesystem-1`
+- Autorización: principales bootstrap `oidc:lamassu` con la política `SUPER ADMIN` (claim `preferred_username=lamassu`); con `--sample-data` se añade `oidc:service-account-sample-data`
 - OIDC JWKS:
-  `http://auth-keycloak.<NAMESPACE>/auth/realms/lamassu/protocol/openid-connect/certs`
-- Ruta adicional de gateway: `/auth -> auth-keycloak:8080`
-- Direcciones de gateway: IP(s) obtenidas con `hostname -I`
+  `http://auth-keycloak.<NAMESPACE>.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs`
+- Ruta adicional de gateway: `/auth -> auth-keycloak:80`
+- Direcciones de gateway: la IP indicada con `-ip/--gateway-ip` o, en su defecto, las IP(s) detectadas con `hostname -I`
 - Puertos de gateway: desde `--https-port` y `--http-port`
 - Dominios CA: valor de `--domain`
+- Observabilidad: con `--otel`, `observability.enabled: true`
 
-Cuando se ejecuta en modo online y no se usa `--local-chart-path`, el script añade el repositorio Helm:
+Si no se usa `-l/--local-chart-path`, el script añade el repositorio Helm:
 
 ```bash
 helm repo add lamassuiot http://www.lamassu.io/lamassu-helm/
@@ -208,9 +224,11 @@ Si no se proporciona certificado:
 ```yaml
 tls:
   type: certManager
+  certManagerOptions:
+    issuer: ""
 ```
 
-Además, el script crea un `Issuer` self-signed y el recurso `Certificate`.
+Con `issuer: ""`, el chart deja que el despliegue cree un `Issuer` self-signed con nombre dependiente del release (`lamassu-downstream-ca-selfsigned-issuer` con el release por defecto `lamassu`). El script también configura el `Certificate` con el common name y las direcciones IP del gateway.
 
 Si el usuario quiere reutilizar un `Issuer` o `ClusterIssuer` corporativo, ese flujo no lo automatiza Fastlane; en ese caso es preferible un despliegue manual del chart con un archivo `values.yaml` propio.
 
@@ -231,7 +249,9 @@ requiredActions: [UPDATE_PASSWORD]
 
 Por tanto, debe cambiar contraseña en el primer acceso.
 
-Fastlane también provisiona un principal de autorización `oidc:lamassu` que coincide con el claim `preferred_username=lamassu` y le concede la política `SUPER ADMIN`. Si activas los datos de ejemplo, crea además un principal independiente para la cuenta de servicio correspondiente.
+Con `--sample-data`, tras instalar Lamassu el script ejecuta `sample-data.sh` contra `https://<DOMAIN>` usando el cliente confidencial `sample-data` y su secret, y puebla el sistema con CAs, perfiles, certificados, DMS y dispositivos de ejemplo.
+
+Fastlane también provisiona un principal de autorización `oidc:lamassu` que coincide con el claim `preferred_username=lamassu` y le concede la política `SUPER ADMIN`. Si activas los datos de ejemplo, crea además el principal independiente `oidc:service-account-sample-data` para la cuenta de servicio.
 
 Este bootstrap está pensado para laboratorio, demos y CI. En producción, sustituye el principal por un rol o grupo administrado en tu proveedor OIDC y sigue [Control de acceso](/docs/platform/pki/access-control).
 
@@ -243,7 +263,7 @@ El script está pensado también para validaciones rápidas y smoke tests locale
 helm test lamassu -n <namespace>
 ```
 
-El chart incluye una prueba que valida conectividad contra `ca`, `dms-manager`, `device-manager`, `va` y `ui`.
+El chart incluye una prueba de conectividad con el hook `helm test` (`<release>-connectivity-test`), que verifica los endpoints `/health` de `ca`, `dms-manager`, `device-manager` y `va`, y comprueba que la UI responde con el título `LamassuIoT Certificate Manager`.
 
 Ejemplo:
 
@@ -272,4 +292,4 @@ En este escenario:
 
 `lamassu-fast-lane.sh` proporciona un mecanismo totalmente automatizado para desplegar un entorno Lamassu funcional en Kubernetes en pocos minutos, integrando base de datos, autenticación, mensajería, gateway y TLS.
 
-Está optimizado para rapidez, reproducibilidad y uso en entornos no productivos, con soporte para escenarios offline y pipelines de CI.
+Está optimizado para rapidez, reproducibilidad y uso en entornos no productivos y pipelines de CI; para despliegues productivos con requisitos propios (TLS corporativo, HSM, OIDC gestionado), usa un despliegue manual del chart con un `values.yaml` específico.

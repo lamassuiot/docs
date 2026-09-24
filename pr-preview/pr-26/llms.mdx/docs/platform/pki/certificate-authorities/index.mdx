@@ -1,0 +1,174 @@
+# Autoridades de certificación (/docs/pr-preview/pr-26/platform/pki/certificate-authorities)
+
+
+
+Una autoridad de certificación (CA) vincula identidades con claves públicas mediante certificados firmados. En Lamassu puedes crear una jerarquía nueva, utilizar una clave que ya está en el KMS o incorporar una CA externa.
+
+Para diseñar una cadena completa o sustituir una autoridad en producción, consulta [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation). Si necesitas estandarizar qué puede firmar cada autoridad, utiliza [Perfiles de certificado](/docs/platform/pki/certificate-profiles).
+
+Elige un flujo [#elige-un-flujo]
+
+* **Nueva CA y nueva clave:** crea una raíz de confianza desde cero. Lamassu genera y custodia el par de claves.
+* **Nueva CA desde KMS:** reutiliza una clave que ya está registrada en la plataforma.
+* **Importar CA con clave privada:** incorpora una autoridad externa con la que Lamassu podrá emitir.
+* **Importar solo el certificado:** añade una autoridad para construir cadenas y validar, pero no para emitir.
+
+¿Es tu primera vez? Sigue [Crea tu primera CA](/docs/platform/pki/quickstarts/create-certificate-authority) para completar el recorrido mínimo.
+
+Crea una autoridad nueva [#crea-una-autoridad-nueva]
+
+Antes de empezar [#antes-de-empezar]
+
+* Decide si la CA será raíz o intermedia.
+* Elige el motor que custodiará la clave.
+* Define una validez superior a la de los certificados que emitirá.
+* Para una CA intermedia, asegúrate de que la CA padre esté activa.
+
+<Steps>
+  <Step>
+    Abre el asistente [#abre-el-asistente]
+
+    En **Certification Authorities**, selecciona **Create New CA** y elige generar un par de claves nuevo.
+  </Step>
+
+  <Step>
+    Configura la clave [#configura-la-clave]
+
+    Selecciona el motor criptográfico, el algoritmo y el tamaño o curva. Lamassu admite claves RSA y EC según las capacidades del motor.
+
+    Para RSA puedes elegir 1024, 2048, 3072 o 4096 bits. Para EC están disponibles las curvas P-256, P-384 y P-521.
+  </Step>
+
+  <Step>
+    Elige el tipo de CA [#elige-el-tipo-de-ca]
+
+    Selecciona **Root CA** para una autoridad autofirmada o **Intermediate CA** para una autoridad firmada por otra CA. En el segundo caso, elige la CA emisora.
+  </Step>
+
+  <Step>
+    Define la identidad [#define-la-identidad]
+
+    Introduce un **CA Name** único. Este nombre se convierte en el `Common Name` del certificado. Completa los campos del Distinguished Name que necesite tu política:
+
+    * `C`: código de país ISO 3166-1 de dos letras.
+    * `ST`: estado o provincia.
+    * `L`: localidad.
+    * `O`: organización.
+    * `OU`: unidad organizativa.
+
+    El identificador interno de la CA se genera automáticamente y no se puede modificar.
+  </Step>
+
+  <Step>
+    Configura validez y usos [#configura-validez-y-usos]
+
+    Define **CA Certificate Expiration** y **Default End-Entity Certificate Issuance Expiration**. Puedes expresar una duración (`5y 8w 4d`), seleccionar una fecha o utilizar la fecha máxima permitida.
+
+    Selecciona un perfil de emisión existente o configura los `Key Usage` y `Extended Key Usage` en el formulario. Si no eliges un perfil, Lamassu aplica los usos básicos predeterminados.
+  </Step>
+
+  <Step>
+    Crea y verifica [#crea-y-verifica]
+
+    Confirma el formulario. La CA debe aparecer en el inventario con su certificado PEM, estado, fecha de expiración y relación de certificados emitidos.
+  </Step>
+</Steps>
+
+<Callout type="warn" title="Planifica la validez como una jerarquía">
+  Una CA no puede emitir certificados que superen su propia fecha de expiración. Deja margen suficiente para renovar o sustituir la autoridad sin interrumpir a los consumidores.
+</Callout>
+
+Utiliza una clave del KMS [#utiliza-una-clave-del-kms]
+
+Selecciona **Create New CA (Existing Key)** cuando la clave ya esté registrada en Lamassu. El asistente pide primero la clave de soporte y después muestra la misma configuración de tipo, identidad, validez y perfil.
+
+Este flujo resulta útil cuando la clave se creó previamente en un HSM, se importó mediante BYOK o debe reutilizarse con una política de custodia concreta.
+
+Importa una CA externa [#importa-una-ca-externa]
+
+La importación conserva una autoridad creada fuera de Lamassu.
+
+<Steps>
+  <Step>
+    Selecciona el motor [#selecciona-el-motor]
+
+    Elige el motor que custodiará la clave importada.
+  </Step>
+
+  <Step>
+    Carga el material [#carga-el-material]
+
+    Proporciona el certificado de CA y la clave privada en formato PEM. Para una CA subordinada, añade opcionalmente la cadena de validación.
+  </Step>
+
+  <Step>
+    Define la emisión predeterminada [#define-la-emisión-predeterminada]
+
+    Configura la validez que recibirán los certificados finales cuando una solicitud no indique otra duración.
+  </Step>
+
+  <Step>
+    Verifica la importación [#verifica-la-importación]
+
+    Lamassu comprueba que el certificado pertenece a una CA y que el material es coherente antes de registrarlo.
+  </Step>
+</Steps>
+
+Si no dispones de la clave privada, importa únicamente el certificado. La autoridad podrá formar parte de cadenas de confianza y procesos de validación, pero no podrá emitir certificados desde Lamassu.
+
+Inspecciona una autoridad [#inspecciona-una-autoridad]
+
+Abre una CA desde el inventario para consultar:
+
+* Estado y periodo de validez.
+* Certificado y cadena en formato PEM.
+* Número de certificados activos, expirados y revocados.
+* Certificados emitidos en **Issued Certificates**.
+* CRL vinculada a la autoridad.
+* Metadatos y motor criptográfico asociado.
+
+Puedes filtrar el inventario por nombre, estado y tipo de CA.
+
+Emite certificados [#emite-certificados]
+
+Puedes iniciar una emisión desde **Issued Certificates**, desde la acción de una CA o desde el inventario global de certificados.
+
+**Generate Key & CSR in Browser** resulta útil para una operación manual o una prueba rápida. El navegador genera la clave y debes descargarla al finalizar.
+
+**Upload Existing CSR** es la opción adecuada cuando la clave debe permanecer en el sistema de destino. Lamassu recibe la solicitud, pero nunca la clave privada.
+
+Sigue [Emite tu primer certificado](/docs/platform/pki/quickstarts/issue-certificate) para el flujo guiado. La [gestión de certificados](/docs/platform/pki/certificates) explica el inventario, la inspección y la revocación.
+
+Revoca una CA [#revoca-una-ca]
+
+<Callout type="warn" title="La revocación afecta a toda la cadena dependiente">
+  Revocar una CA invalida la confianza en los certificados que ha emitido y puede interrumpir dispositivos y servicios. La acción es irreversible.
+</Callout>
+
+<Steps>
+  <Step>
+    Evalúa el impacto [#evalúa-el-impacto]
+
+    Identifica los certificados, dispositivos y consumidores que dependen de la CA. Prepara una autoridad y una cadena de sustitución cuando sea necesario.
+  </Step>
+
+  <Step>
+    Inicia la revocación [#inicia-la-revocación]
+
+    Abre la autoridad y selecciona **Revoke CA**. Elige la razón que describa el incidente, por ejemplo `KeyCompromise`, `CACompromise`, `Superseded` o `CessationOfOperation`.
+  </Step>
+
+  <Step>
+    Confirma la identidad [#confirma-la-identidad]
+
+    Escribe exactamente el nombre de la CA para habilitar **Confirm Revocation**.
+  </Step>
+
+  <Step>
+    Comprueba la publicación [#comprueba-la-publicación]
+
+    El estado debe cambiar a **REVOKED** y la CRL debe reflejar la nueva información. La CA deja de poder emitir certificados.
+  </Step>
+</Steps>
+
+La eliminación permanente solo está disponible después de revocar. Elimina el registro únicamente cuando la política de retención y auditoría lo permita.

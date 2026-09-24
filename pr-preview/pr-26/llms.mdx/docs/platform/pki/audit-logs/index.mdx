@@ -1,0 +1,103 @@
+# Registros de auditoría (/docs/pr-preview/pr-26/platform/pki/audit-logs)
+
+
+
+Lamassu instrumenta las operaciones mutables de sus servicios con eventos de auditoría. Cada evento describe la operación, los principales que coincidieron, la entrada, el resultado y si terminó con error.
+
+Qué contiene un evento [#qué-contiene-un-evento]
+
+El cuerpo de auditoría incluye:
+
+* <code>input</code>: datos recibidos por la operación;
+* <code>has\_error</code>: indica si el servicio devolvió un error;
+* <code>output</code>: resultado producido o mensaje de error;
+* <code>principals</code>: identificadores de los principales que coincidieron con la petición.
+
+Las operaciones correctas usan un tipo con prefijo <code>audit.</code>. Los fallos publican el tipo de operación con sufijo <code>.error</code>. El evento CloudEvents añade, además, fuente, identificador, fecha y tipo.
+
+<Callout type="info" title="Se auditan también los intentos fallidos">
+  Los middlewares publican el registro después de ejecutar la operación, tanto si tuvo éxito como si devolvió un error. Esto permite investigar intentos además de cambios confirmados.
+</Callout>
+
+Cobertura [#cobertura]
+
+El backend aplica auditoría a mutaciones de:
+
+* autoridades, certificados y perfiles de emisión;
+* claves y motores KMS;
+* dispositivos e identidades;
+* DMS y operaciones de enrolamiento;
+* funciones de validación y CRL;
+* principales, políticas y concesiones de autorización.
+
+No confundas estos eventos con los eventos de dominio. Un evento de dominio comunica que un recurso cambió para que otro componente reaccione; el evento de auditoría conserva contexto de entrada, salida y principal para investigación.
+
+Publicación y persistencia [#publicación-y-persistencia]
+
+Los servicios publican auditoría en el bus de eventos cuando su PublisherEventBus está habilitado. El código del backend no implementa un archivo de auditoría consultable y durable por sí solo.
+
+<Callout type="warn" title="El bus no sustituye a un archivo de cumplimiento">
+  Si necesitas retención, búsquedas, protección contra alteraciones o exportación regulatoria, conecta un consumidor que persista los eventos en el sistema aprobado por tu organización.
+</Callout>
+
+Diseña el consumidor para:
+
+* suscribirse a los tipos <code>audit.#</code> y también a los tipos de operación terminados en <code>.error</code>;
+* conservar el CloudEvent completo sin modificar;
+* registrar el momento de ingestión y detectar duplicados por ID;
+* cifrar en tránsito y en reposo;
+* limitar lectura y borrado a un rol separado del operador de PKI;
+* aplicar una política explícita de retención y legal hold;
+* alertar si deja de consumir o aumenta la cola pendiente.
+
+Datos sensibles [#datos-sensibles]
+
+Los campos input y output pueden contener sujetos, metadatos, material público, configuración o mensajes de error. Evalúa su clasificación antes de enviarlos a una plataforma externa.
+
+No registres claves privadas, secretos de proveedores ni tokens completos en automatizaciones que rodean a Lamassu. Restringe la exportación y aplica redacción en el destino sin destruir los campos necesarios para atribución.
+
+Una investigación reproducible [#una-investigación-reproducible]
+
+<Steps>
+  <Step>
+    Acota el intervalo [#acota-el-intervalo]
+
+    Parte de la hora reportada y normaliza todas las fuentes a UTC.
+  </Step>
+
+  <Step>
+    Identifica la operación [#identifica-la-operación]
+
+    Filtra por tipo de evento, fuente de servicio e identificador del recurso.
+  </Step>
+
+  <Step>
+    Atribuye el principal [#atribuye-el-principal]
+
+    Revisa principals y correlaciónalo con el proveedor OIDC o la identidad X.509 vigente en ese momento.
+  </Step>
+
+  <Step>
+    Compara intención y resultado [#compara-intención-y-resultado]
+
+    Contrasta input, has\_error y output. Un intento fallido no implica que el recurso haya cambiado.
+  </Step>
+
+  <Step>
+    Sigue el efecto [#sigue-el-efecto]
+
+    Busca los eventos de dominio y registros del servicio que compartan recurso y ventana temporal. En una revocación de CA, incluye las operaciones en cascada.
+  </Step>
+</Steps>
+
+Verificación periódica [#verificación-periódica]
+
+Genera una mutación controlada en un entorno de prueba y comprueba que:
+
+1. aparece un evento de auditoría correcto;
+2. el principal coincide con la identidad utilizada;
+3. el consumidor lo persiste una sola vez;
+4. puede recuperarse por recurso, actor y periodo;
+5. una interrupción del consumidor produce una alerta.
+
+Para métricas, trazas y logs técnicos del despliegue, consulta [Resolución de problemas](/docs/platform/pki/troubleshooting). La auditoría responde a “quién intentó cambiar qué”; la observabilidad explica cómo se comportó el sistema.

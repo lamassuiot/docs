@@ -1,0 +1,349 @@
+# Kubernetes self-managed (/docs/pr-preview/pr-26/deployment/self-hosted/overview)
+
+
+
+Despliegue self-managed con Kubernetes [#despliegue-self-managed-con-kubernetes]
+
+Lamassu IoT puede desplegarse en infraestructura propia mediante **Kubernetes**, tanto en clústeres gestionados internamente como en entornos self-managed.
+
+La referencia principal para este despliegue es el repositorio `lamassu-helm`, que incluye:
+
+* el chart principal de Lamassu
+* un chart auxiliar de SoftHSM
+* el script de despliegue automatizado `scripts/lamassu-fast-lane.sh`
+
+Quickstart [#quickstart]
+
+Si lo que necesitas es levantar un entorno funcional lo antes posible, la vía más rápida es usar Fastlane desde el repositorio `lamassu-helm`:
+
+```bash
+git clone https://github.com/lamassuiot/lamassu-helm.git
+cd lamassu-helm
+./scripts/lamassu-fast-lane.sh -n -ns lamassu-dev -d dev.lamassu.io -l ./charts/lamassu
+```
+
+Ese flujo:
+
+* crea o reutiliza el namespace indicado
+* instala PostgreSQL, Keycloak y RabbitMQ
+* despliega el chart de Lamassu
+* deja la UI expuesta en `https://<dominio>`
+
+Si buscas un despliegue productivo o más controlado, sigue con la instalación manual mediante Helm que se describe más abajo.
+
+Qué se despliega [#qué-se-despliega]
+
+El chart principal `charts/lamassu`, actualmente en la <del className="lm-diff-del">serie `3.7.x`</del><ins className="lm-diff-ins">versión `4.0.0`</ins>, despliega estos componentes:
+
+* `ui`
+* `ca`
+* `va`
+* `kms`
+* `device-manager`
+* `dms-manager`
+* `alerts`
+* `authz`, el servicio de autorización que decide qué peticiones del Gateway están permitidas
+* `wfx`, el servicio de flujos de trabajo Siemens WFX, expuesto bajo `/api/wfx/`
+* recursos de Gateway API y políticas de Envoy Gateway
+* job de migraciones de base de datos
+
+Requisitos previos [#requisitos-previos]
+
+* Clúster Kubernetes `1.19+`
+* Clúster Kubernetes `1.24+`. El chart declara `kubeVersion: ">=1.24.0-0"`, por lo que Helm rechaza la instalación en versiones anteriores. La integración con HSM mediante `services.kms.pkcs11Sidecar` requiere además Kubernetes `1.29+`, por su dependencia de los sidecars nativos de init container.
+* `kubectl` configurado con acceso al clúster
+* Helm `3.2.0+`
+* `cert-manager 1.14+` para la gestión de certificados cuando se usa `tls.type=certManager`
+* <del className="lm-diff-del">`Envoy Gateway 1.3.0+`</del><ins className="lm-diff-ins">`Envoy Gateway v1.8.0+`</ins>, ya que el chart publica servicios mediante Gateway API y no mediante Ingress<ins className="lm-diff-ins">. La autorización externa (`auth.externalAuthorization.path`) exige esta versión.</ins>
+* Acceso <del className="lm-diff-del">a un</del><ins className="lm-diff-ins">al</ins> registro de contenedores <del className="lm-diff-del">o imágenes previamente importadas si se trabaja en modo offline</del><ins className="lm-diff-ins">de Lamassu, o a un registro espejo propio, desde los nodos del clúster</ins>
+* Almacenamiento persistente disponible para PostgreSQL, RabbitMQ, VA y KMS
+
+Opciones de despliegue [#opciones-de-despliegue]
+
+Hay dos formas de desplegar Lamassu on-prem:
+
+1. Despliegue manual con Helm [#1-despliegue-manual-con-helm]
+
+Es la opción recomendada para entornos productivos o controlados, donde PostgreSQL, RabbitMQ, Keycloak, certificados y direccionamiento del Gateway ya están definidos por el equipo de plataforma.
+
+2. Despliegue automatizado con Fastlane [#2-despliegue-automatizado-con-fastlane]
+
+Es la opción más útil para pruebas, demos, CI o bootstrap rápido de un entorno. Fastlane levanta PostgreSQL, Keycloak, RabbitMQ y Lamassu en un único flujo. Su comportamiento está documentado en la página siguiente.
+
+Arquitectura [#arquitectura]
+
+Lamassu IoT se despliega como un conjunto de microservicios Kubernetes independientes. El chart principal crea `Deployment`, `StatefulSet`, `Service`, `ConfigMap`, `HTTPRoute`, `Gateway`, certificados y recursos auxiliares según los valores definidos.
+
+Dependencias externas requeridas por el chart principal:
+
+* PostgreSQL
+* RabbitMQ
+* proveedor OIDC, típicamente Keycloak
+
+El chart no instala estas dependencias por sí solo. Para un despliegue manual hay que provisionarlas antes. Si se busca un entorno funcional rápido para laboratorio o validación, el script Fastlane sí instala PostgreSQL, RabbitMQ y Keycloak además del chart de Lamassu.
+
+Instalación manual con Helm [#instalación-manual-con-helm]
+
+Agregar el repositorio Helm:
+
+```bash
+helm repo add lamassu https://lamassuiot.github.io/lamassu-helm
+helm repo update
+```
+
+O instalar desde una copia local del repositorio:
+
+```bash
+helm install lamassu ./charts/lamassu -n lamassu --create-namespace -f values.yaml
+```
+
+Valores mínimos que deben definirse [#valores-mínimos-que-deben-definirse]
+
+Los valores por defecto del chart son deliberadamente incompletos para dependencias externas. Como mínimo, un despliegue manual debe definir:
+
+* `postgres.hostname`, `postgres.username`, `postgres.password`
+* `amqp.hostname`, `amqp.username`, `amqp.password`
+* `auth.oidc.frontend.authority`
+* `auth.oidc.apiGateway.jwks`
+* `services.authz.jwkUrl` y un principal de bootstrap que coincida con un administrador real
+* `services.ca.domains`
+* `gateway.addresses` o una estrategia equivalente de publicación según el clúster
+* `tls.*` según se use `certManager` o certificado externo
+
+Ejemplo base:
+
+<div className="lm-diff-final">
+  ```yaml
+  postgres:
+    hostname: postgresql
+    port: 5432
+    username: lamassu
+    password: change-me
+
+  amqp:
+    hostname: rabbitmq
+    port: 5672
+    username: lamassu
+    password: change-me
+    tls: false
+
+  tls:
+    type: certManager
+    certManagerOptions:
+      issuer: ""
+      certSpec:
+        commonName: pki.example.internal
+        hostnames:
+          - pki.example.internal
+        addresses:
+          - 10.0.0.20
+
+  gateway:
+    addresses:
+      - 10.0.0.20
+    ports:
+      http: 80
+      https: 443
+    extraRouting:
+      - path: /auth
+        name: auth
+        target:
+          host: auth-keycloak
+          port: 8080
+
+  auth:
+    oidc:
+      frontend:
+        clientId: frontend
+        authority: https://pki.example.internal/auth/realms/lamassu
+      apiGateway:
+        jwks:
+          - name: oidc-authn
+            uri: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+    authorization:
+      rolesClaim: realm_access.roles
+      roles:
+        admin: pki-admin
+
+  services:
+    ca:
+      domains:
+        - pki.example.internal
+    authz:
+      jwkUrl: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+      bootstrap:
+        - principal_id: "oidc:pki-admin"
+          principal_name: "PKI Admin"
+          principal_type: "oidc"
+          policy_ids:
+            - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+          auth_config:
+            claims:
+              - claim: realm_access.roles
+                operator: contains
+                value: pki-admin
+  ```
+</div>
+
+<div className="lm-diff-merged">
+  ```yaml lmdiff="================-+==================================================="
+  postgres:
+    hostname: postgresql
+    port: 5432
+    username: lamassu
+    password: change-me
+
+  amqp:
+    hostname: rabbitmq
+    port: 5672
+    username: lamassu
+    password: change-me
+    tls: false
+
+  tls:
+    type: certManager
+    certManagerOptions:
+      issuer: downstream-ca-selfsigned-issuer
+      issuer: ""
+      certSpec:
+        commonName: pki.example.internal
+        hostnames:
+          - pki.example.internal
+        addresses:
+          - 10.0.0.20
+
+  gateway:
+    addresses:
+      - 10.0.0.20
+    ports:
+      http: 80
+      https: 443
+    extraRouting:
+      - path: /auth
+        name: auth
+        target:
+          host: auth-keycloak
+          port: 8080
+
+  auth:
+    oidc:
+      frontend:
+        clientId: frontend
+        authority: https://pki.example.internal/auth/realms/lamassu
+      apiGateway:
+        jwks:
+          - name: oidc-authn
+            uri: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+    authorization:
+      rolesClaim: realm_access.roles
+      roles:
+        admin: pki-admin
+
+  services:
+    ca:
+      domains:
+        - pki.example.internal
+    authz:
+      jwkUrl: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+      bootstrap:
+        - principal_id: "oidc:pki-admin"
+          principal_name: "PKI Admin"
+          principal_type: "oidc"
+          policy_ids:
+            - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+          auth_config:
+            claims:
+              - claim: realm_access.roles
+                operator: contains
+                value: pki-admin
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Con `tls.certManagerOptions.issuer` vacío, el chart `4.0.0` crea un `Issuer` self-signed con nombre dependiente del release (por ejemplo, `lamassu-downstream-ca-selfsigned-issuer` con `helm install lamassu`). El valor legado `downstream-ca-selfsigned-issuer` sigue resolviendo al mismo emisor, pero se recomienda dejarlo vacío o apuntar a tu propio `Issuer`/`ClusterIssuer` mediante `tls.certManagerOptions.clusterIssuer`.
+</div>
+
+Provisiona el primer administrador [#provisiona-el-primer-administrador]
+
+No hay un superusuario implícito. Antes de instalar, crea el rol `pki-admin` en el proveedor OIDC y asígnalo al grupo que administrará Lamassu. El principal del ejemplo concede la política `SUPER ADMIN` a cualquier token que contenga ese rol.
+
+El Job `pre-install` y `pre-upgrade` prepara las bases de datos, ejecuta las migraciones de authz, precarga las políticas y aplica `services.authz.bootstrap` antes de que arranquen los Deployments. El bootstrap es idempotente: conserva los principales existentes y añade únicamente los grants que falten.
+
+<Callout type="warn" title="Valida el acceso antes de exponer la plataforma">
+  Si ningún token coincide con un principal activo, nadie podrá administrar la PKI. Prueba una identidad autorizada y otra denegada, y conserva un procedimiento de recuperación.
+</Callout>
+
+Consulta [Control de acceso](/docs/platform/pki/access-control) para diseñar principales y políticas.
+
+Áreas de configuración más relevantes [#áreas-de-configuración-más-relevantes]
+
+* **TLS:** `tls.type`, `tls.certManagerOptions.*` y `tls.externalOptions.secretName` controlan el certificado *downstream* del Gateway.
+* **Gateway:** `gateway.addresses`, `gateway.ports.*`<del className="lm-diff-del"> </del><ins className="lm-diff-ins">, `gateway.className` </ins>y `gateway.extraRouting` publican la UI y las APIs mediante Envoy Gateway<ins className="lm-diff-ins">. `gateway.responseOverride` reescribe las respuestas `401`/`403` con cuerpos JSON propios (habilitado por defecto)</ins>.
+* **Persistencia:** `postgres.*` define la conexión a PostgreSQL.
+* **Mensajería:** `amqp.*` configura la conexión a RabbitMQ.
+* **Identidad y autorización:** `auth.oidc.*`, <ins className="lm-diff-ins">`auth.externalAuthorization.*`, </ins>`services.authz.jwkUrl` y `services.authz.bootstrap` configuran login, validación JWT<del className="lm-diff-del"> y</del><ins className="lm-diff-ins">, el control de acceso en el Gateway y los</ins> permisos iniciales.
+* **Autoridades:** `services.ca.domains` establece los dominios autorizados para CA y certificados.
+* **Claves:** `services.kms.cryptoEngines.*` configura los motores criptográficos y su almacenamiento.
+* **Alertas:** `services.alerts.smtp_server.*` prepara el envío de correo.
+* **Observabilidad:** `observability.*` habilita la instrumentación OpenTelemetry (trazas y logs) en todos los servicios.
+
+Verificación del despliegue [#verificación-del-despliegue]
+
+El chart incluye una prueba Helm en `charts/lamassu/templates/tests/test-connections.yml`. Tras instalarlo, puede validarse con:
+
+```bash
+helm test lamassu -n lamassu
+```
+
+<div className="lm-diff-del lm-diff-block">
+  La prueba comprueba al menos:
+</div>
+
+<div className="lm-diff-del lm-diff-block">
+  * salud de `ca`
+  * salud de `dms-manager`
+  * salud de `device-manager`
+  * salud de `va`
+  * respuesta HTML esperada del servicio `ui`
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La prueba lanza un pod efímero llamado `<release>-connectivity-test` (imagen configurable con `connectivityTest.image`) que comprueba el endpoint `/health` de `ca`, `dms-manager`, `device-manager` y `va`, y que la respuesta del servicio `ui` contiene el título `LamassuIoT Certificate Manager`.
+</div>
+
+Repositorio Helm [#repositorio-helm]
+
+El repositorio `lamassu-helm` está organizado en tres bloques principales:
+
+* `charts/lamassu`: chart principal de Lamassu
+* `charts/softhsm`: chart opcional para laboratorios o escenarios de integración con PKCS#11 emulado
+* `scripts/lamassu-fast-lane.sh`: automatización para levantar dependencias y desplegar Lamassu con intervención mínima
+
+SoftHSM como complemento opcional [#softhsm-como-complemento-opcional]
+
+El chart `charts/softhsm` no forma parte del despliegue estándar, pero resulta útil en entornos de laboratorio cuando se necesita simular un HSM compatible con PKCS#11. No sustituye <del className="lm-diff-del">al backend KMS principal</del><ins className="lm-diff-ins">a un HSM real en producción</ins>; sirve como soporte para pruebas o integraciones concretas.
+
+<div className="lm-diff-ins lm-diff-block">
+  En la versión `4.0.0` del chart, el servicio KMS puede consumir ese token PKCS#11 mediante el sidecar `services.kms.pkcs11Sidecar`, que expone el socket PKCS#11 en un volumen compartido del pod (requiere Kubernetes `1.29+`). El script Fastlane automatiza la integración completa con `--with-hsm` (ver [Fastlane](/docs/deployment/self-hosted/fastlane)).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Actualizar desde 3.8.x [#actualizar-desde-38x]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La versión `4.0.0` del chart introduce cambios que rompen la compatibilidad con los despliegues `3.8.x`. La guía completa está en [`charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`](https://github.com/lamassuiot/lamassu-helm/blob/main/charts/lamassu/CHANGELOG/3.8.0->4.0.0.md) del repositorio `lamassu-helm`. Los puntos que más afectan a un despliegue manual:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * **Nombres dependientes del release:** los recursos del chart pasan a llamarse `<release>-<componente>` (por ejemplo, `lamassu-kms`) en lugar de usar nombres fijos. Los PVC de KMS y VA cambian de nombre; si usas motores KMS con almacenamiento en sistema de ficheros o el `fileStore` local de VA, los datos requieren una migración manual descrita en la guía del CHANGELOG: tras `helm upgrade`, los StatefulSets nuevos arrancan con PVC vacíos y hay que copiar el contenido con un pod de ayuda (`alpine:3.20`) ajustando la propiedad a `65532:65532`. Si es una instalación nueva o no usas esos backends, no hay nada que migrar.
+  * **`services.authz` es obligatorio:** el nuevo servicio de autorización no existía en `3.8.0`. El Job de migraciones crea sus esquemas y precarga políticas, pero no crea la base de datos `pki`; provisiona esa base de datos y concede acceso al usuario de Lamassu antes de actualizar.
+  * **Validación estricta de valores:** el chart incorpora `values.schema.json` y rechaza claves de nivel superior desconocidas. Elimina bloques obsoletos (por ejemplo, `toolbox`) antes de ejecutar `helm upgrade`.
+  * **`services.connectors` ahora es un mapa:** cada entrada se indexa por el identificador del conector y debe definir `type` e `image`.
+  * **Por defecto más seguros:** los pods pasan a ejecutarse como usuario no root `65532:65532`, sin montaje del token del service account, con seccomp `RuntimeDefault` y capacidades eliminadas. Las sobrecargas por servicio de `runAsUser`/`runAsGroup` se han eliminado.
+  * **`toolbox` pasa a `connectivityTest`:** el contenedor auxiliar de verificación de conectividad se configura en `connectivityTest.image`.
+</div>
+
+Versionado y migraciones [#versionado-y-migraciones]
+
+La versión actual del chart en el repositorio es <del className="lm-diff-del">`3.8.0`</del><ins className="lm-diff-ins">`4.0.0`</ins>. Para upgrades entre versiones, consulta las guías de `charts/lamassu/CHANGELOG/` y revisa especialmente las migraciones de base de datos y el bootstrap de authz.

@@ -1,0 +1,71 @@
+# Alertas y suscripciones (/docs/pr-preview/pr-26/platform/pki/alerts)
+
+
+
+Las suscripciones convierten los eventos de Lamassu en notificaciones accionables. Puedes avisar a un equipo, alimentar un sistema de incidentes o activar una automatización cuando cambia una CA, un certificado o un dispositivo.
+
+Cómo funciona [#cómo-funciona]
+
+1. Un servicio publica un evento de dominio.
+2. Lamassu evalúa las suscripciones asociadas a ese tipo de evento.
+3. El filtro de cada suscripción decide si debe notificarse.
+4. Lamassu entrega el evento al canal configurado.
+
+El inventario de eventos muestra cuándo se observó cada tipo por última vez, cuántas veces ha ocurrido y cuántas suscripciones tiene. Puedes expandir un evento para inspeccionar un ejemplo de su payload JSON antes de crear el filtro.
+
+Canales disponibles [#canales-disponibles]
+
+* **Email** envía avisos a una persona o lista operativa. Solo requiere la dirección de destino.
+* **Microsoft Teams** publica la notificación en un canal mediante su URL de webhook.
+* **Webhook** entrega el evento a una automatización, SIEM o sistema de incidentes mediante `POST` o `PUT`.
+
+Crea una suscripción [#crea-una-suscripción]
+
+<Steps>
+  <Step>
+    Elige el evento [#elige-el-evento]
+
+    Abre **Alerts**, localiza el tipo de evento y selecciona **Subscribe**. Revisa el último ejemplo JSON para identificar los campos que necesitarás filtrar.
+  </Step>
+
+  <Step>
+    Configura el destino [#configura-el-destino]
+
+    Selecciona Email, Microsoft Teams o Webhook e introduce los datos del canal.
+  </Step>
+
+  <Step>
+    Limita las notificaciones [#limita-las-notificaciones]
+
+    Añade un filtro si no quieres recibir todas las instancias del evento.
+
+    * **None** notifica todas las instancias del evento.
+    * **JSON Path** evalúa uno o varios campos concretos.
+    * **JSON Schema** acepta únicamente payloads con una estructura determinada.
+    * **JavaScript** permite expresar lógica personalizada.
+
+    Por ejemplo, `function (event) { return event.data.status == "NO_IDENTITY"; }` limita una suscripción a dispositivos sin identidad.
+  </Step>
+
+  <Step>
+    Revisa y activa [#revisa-y-activa]
+
+    Comprueba el evento, el canal y el filtro en el resumen. Selecciona **Confirm Subscription** para comenzar la entrega.
+  </Step>
+</Steps>
+
+Gestiona una suscripción [#gestiona-una-suscripción]
+
+Abre una suscripción existente para consultar su destino y filtro, modificar la configuración o seleccionar **Unsubscribe**. Elimina las suscripciones que ya no tengan un propietario operativo para evitar entregas ignoradas o endpoints obsoletos.
+
+Familias de eventos [#familias-de-eventos]
+
+* **Autoridades:** `ca.create`, `ca.import`, `ca.reissue` y `ca.delete`.
+* **Certificados:** `ca.sign.certificate` y `certificate.delete`.
+* **Perfiles:** `profile.create`, `profile.update` y `profile.delete`.
+* **Enrolamiento:** `dms.create`, `dms.update`, `dms.enroll` y `dms.reenroll`.
+* **Dispositivos:** `device.create`, `device.identity.update` y `device.status.update`.
+* **Validación:** `va.role.crl.create`.
+* **Claves:** `kms.create`, `kms.import`, `kms.sign.message` y `kms.delete`.
+
+Utiliza el catálogo que muestra la consola como fuente para los tipos disponibles en la versión que tienes desplegada.

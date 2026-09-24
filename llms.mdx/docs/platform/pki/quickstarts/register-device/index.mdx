@@ -1,0 +1,47 @@
+# Registra tu primer dispositivo (/docs/platform/pki/quickstarts/register-device)
+
+
+
+En este quickstart registrarás manualmente un dispositivo y le asignarás su primer certificado. Es el recorrido más corto para entender cómo Lamassu relaciona una entidad física con su historial de identidades.
+
+Antes de empezar [#antes-de-empezar]
+
+* Un DMS configurado.
+* Una CA asociada al DMS.
+* Un identificador único para el dispositivo.
+
+<Steps>
+  <Step>
+    Registra el dispositivo [#registra-el-dispositivo]
+
+    Abre **Managed Devices**, selecciona la acción para registrar un dispositivo y completa:
+
+    * **Device ID**: identificador único del dispositivo.
+    * **Registration Authority**: DMS que aplicará las políticas de enrolamiento.
+    * **Icon** y **Tags**: clasificación opcional para localizarlo después.
+  </Step>
+
+  <Step>
+    Comprueba el estado inicial [#comprueba-el-estado-inicial]
+
+    Abre el dispositivo recién creado. Debe aparecer con estado **No Identity**: existe en el inventario, pero todavía no tiene un certificado asociado.
+  </Step>
+
+  <Step>
+    Asigna una identidad [#asigna-una-identidad]
+
+    Selecciona **Assign Identity**. Lamassu buscará certificados activos cuyo `Common Name` coincida con el `Device ID`.
+
+    Selecciona un certificado existente o usa **Issue New Instead** para emitir uno desde una CA vinculada al DMS.
+  </Step>
+
+  <Step>
+    Verifica el dispositivo [#verifica-el-dispositivo]
+
+    Tras confirmar, el estado debe cambiar a **Active**. Revisa **Certificate History** para comprobar la identidad asociada y **Device Event Timeline** para ver el evento de asignación.
+  </Step>
+</Steps>
+
+Automatiza el siguiente dispositivo [#automatiza-el-siguiente-dispositivo]
+
+El registro manual ayuda a entender el modelo, pero una flota debe usar enrolamiento automatizado. Continúa con [Device Management Service](/docs/platform/pki/device-enrollment) y la [integración EST](/docs/platform/pki/est-enrollment).

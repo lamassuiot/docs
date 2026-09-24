@@ -1,0 +1,59 @@
+# Emite tu primer certificado (/docs/platform/pki/quickstarts/issue-certificate)
+
+
+
+En este quickstart Lamassu generará la clave y el CSR en el navegador, y la CA emitirá el certificado. Al terminar descargarás el certificado y su clave privada.
+
+Antes de empezar [#antes-de-empezar]
+
+* Una CA activa con permiso para emitir certificados.
+* Un nombre para la identidad, por ejemplo `device-001.example.internal`.
+* Un lugar seguro en el que custodiar la clave privada descargada.
+
+<Callout type="warn" title="La clave privada se entrega una sola vez">
+  En este flujo la clave se genera en el navegador y Lamassu no la almacena. Descárgala y protégela antes de cerrar el resultado de la operación.
+</Callout>
+
+<Steps>
+  <Step>
+    Inicia la emisión [#inicia-la-emisión]
+
+    Abre la CA creada en el quickstart anterior, entra en **Issued Certificates** y selecciona **Issue New**.
+  </Step>
+
+  <Step>
+    Elige el método [#elige-el-método]
+
+    Selecciona **Generate Key & CSR in Browser**. Usa **Upload Existing CSR** cuando la clave privada deba generarse y permanecer en el sistema de destino.
+  </Step>
+
+  <Step>
+    Identifica el certificado [#identifica-el-certificado]
+
+    Introduce el `Common Name` y, si corresponde, la organización, unidad organizativa y ubicación. Añade SANs para cada nombre DNS, dirección IP, correo o URI con el que se vaya a validar la identidad.
+  </Step>
+
+  <Step>
+    Configura clave y usos [#configura-clave-y-usos]
+
+    Elige RSA o ECDSA, define la validez y selecciona los usos de clave. Para una identidad de dispositivo que usa mTLS, habilita **Digital Signature** y **Client Authentication**.
+
+    La validez no puede superar la fecha de expiración de la CA emisora.
+  </Step>
+
+  <Step>
+    Emite y descarga [#emite-y-descarga]
+
+    Confirma la emisión y descarga inmediatamente el certificado y la clave privada en formato PEM.
+  </Step>
+
+  <Step>
+    Verifica el resultado [#verifica-el-resultado]
+
+    El certificado debe aparecer en **Issued Certificates** con estado activo. Comprueba su sujeto, SANs, emisor, usos y periodo de validez.
+  </Step>
+</Steps>
+
+Siguiente paso [#siguiente-paso]
+
+[Registra tu primer dispositivo](/docs/platform/pki/quickstarts/register-device) para asociar la identidad a una entidad gestionada, o consulta la [gestión de certificados](/docs/platform/pki/certificates).

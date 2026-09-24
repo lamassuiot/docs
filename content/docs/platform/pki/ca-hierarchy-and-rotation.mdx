@@ -1,0 +1,98 @@
+---
+title: Jerarquía y rotación de CAs
+description: Diseña autoridades raíz e intermedias y sustituye certificados o claves sin romper la confianza.
+sidebar:
+  group: CA
+  label: Jerarquía y rotación
+---
+
+La jerarquía determina el alcance de cualquier error o compromiso. Una raíz firma CAs intermedias; las intermedias emiten las identidades que usan dispositivos y servicios. Esta separación permite aislar entornos y rotar una rama sin reemplazar toda la confianza.
+
+## Diseña la jerarquía
+
+Para una instalación de producción, utiliza una raíz muy restringida y una o más intermedias operativas. Separa intermedias cuando cambie alguno de estos límites:
+
+- entorno, como producción y preproducción;
+- propietario o equipo operador;
+- familia de dispositivos o proceso de fabricación;
+- región o requisito regulatorio;
+- motor criptográfico o política de clave;
+- ventana de mantenimiento y ritmo de renovación.
+
+Evita jerarquías profundas sin una necesidad concreta. Cada nivel añade distribución de cadena, validación y otro certificado que debes renovar.
+
+<Callout type="warn" title="La validez desciende por la jerarquía">
+  Una CA hija y los certificados finales deben expirar antes que su emisor. Reserva un margen que permita distribuir otra cadena y renovar los certificados dependientes.
+</Callout>
+
+## Reemisión y rotación no son lo mismo
+
+**Reemitir una CA** crea un certificado nuevo sobre la clave existente. Lamassu genera una CSR con esa clave, autofirma si es una raíz o pide a la CA padre que firme si es subordinada. El nuevo certificado queda activo y la CA apunta a su número de serie; los certificados anterior y nuevo quedan enlazados mediante metadatos.
+
+**Rotar una CA** crea una clave y una autoridad sucesoras. Es la opción adecuada ante compromiso, cambio criptográfico, migración de motor o política de claves no exportables.
+
+Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiración haya pasado. Anticípate a ambas condiciones.
+
+## Cuándo elegir cada operación
+
+- Reemite si la clave sigue siendo confiable y solo necesitas otro periodo de validez o un certificado actualizado.
+- Rota la clave si existe sospecha de compromiso, cambia el algoritmo o quieres mover la custodia a otro motor.
+- Crea una rama paralela si no puedes actualizar todos los consumidores al mismo tiempo.
+- Revoca inmediatamente solo cuando el riesgo de mantener la CA supera el impacto de interrumpir la flota.
+
+## Procedimiento de rotación de clave
+
+<Steps>
+  <Step>
+    ### Inventaría las dependencias
+
+    Localiza CAs hijas, certificados emitidos, DMS, conectores y almacenes de confianza externos. Incluye dispositivos que pueden permanecer desconectados durante semanas o meses.
+  </Step>
+
+  <Step>
+    ### Crea la CA sucesora
+
+    Genera una clave nueva en el motor previsto, crea la CA y asígnale un perfil explícito. No reutilices el identificador operativo para ocultar que es una generación distinta.
+  </Step>
+
+  <Step>
+    ### Distribuye la nueva confianza
+
+    Añade la nueva raíz o cadena a los consumidores antes de emitir con ella. En un DMS, utiliza las CAs gestionadas de `/cacerts` para mantener temporalmente las cadenas antigua y nueva.
+  </Step>
+
+  <Step>
+    ### Cambia la emisión
+
+    Actualiza la CA de enrolamiento y el perfil de los DMS. Mantén las CAs de validación adicionales si todavía deben aceptarse certificados antiguos durante el re-enrolamiento.
+  </Step>
+
+  <Step>
+    ### Renueva por lotes
+
+    Migra una cohorte pequeña, valida mTLS, OCSP y CRL desde el consumidor y amplía progresivamente. Supervisa qué dispositivos siguen presentando la cadena antigua.
+  </Step>
+
+  <Step>
+    ### Cierra el solapamiento
+
+    Cuando ningún consumidor legítimo dependa de la autoridad anterior, retírala de la emisión y de las CAs distribuidas. Revócala si la política lo exige.
+  </Step>
+</Steps>
+
+## Revocación en cascada
+
+Al revocar una CA, Lamassu actualiza también sus CAs hijas y certificados emitidos a `REVOKED` con razón `CessationOfOperation`. Las revocaciones de las hijas propagan el efecto a sus propias ramas.
+
+Esto protege la coherencia de la jerarquía, pero convierte la revocación en una acción de gran impacto. No la utilices como mecanismo ordinario para dejar de emitir: primero completa la migración y elimina la CA de los flujos operativos.
+
+## Comprobaciones después del cambio
+
+- La cadena nueva termina en un ancla instalada por el consumidor.
+- Los certificados nuevos contienen AKI, SKI, KU, EKU y SAN esperados.
+- El DMS entrega la cadena correcta mediante EST `/cacerts`.
+- El re-enrolamiento acepta la identidad antigua durante el periodo previsto.
+- OCSP y CRL responden para las autoridades que siguen activas.
+- No quedan DMS emitiendo accidentalmente desde la CA anterior.
+
+Consulta el [Modelo de confianza](/docs/platform/pki/concepts/trust-model) para entender los conjuntos de CAs del DMS y [Ciclo de vida de un certificado](/docs/platform/pki/concepts/certificate-lifecycle) para los estados y efectos de revocación.

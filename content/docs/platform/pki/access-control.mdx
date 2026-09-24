@@ -1,0 +1,105 @@
+---
+title: Control de acceso
+description: Conecta una identidad OIDC o X.509 con principales, políticas y permisos de Lamassu.
+---
+
+Lamassu separa autenticación y autorización. El proveedor OIDC o el certificado cliente demuestra quién realiza la petición; el servicio authz relaciona esa identidad con uno o varios principales y decide qué acciones están permitidas.
+
+## Cómo se toma una decisión
+
+1. El Gateway valida la autenticación configurada, normalmente un JWT mediante JWKS.
+2. Envoy envía la petición al endpoint de autorización externa /v1/ext_authz/check.
+3. authz compara las credenciales con principales activos.
+4. Reúne las políticas concedidas a los principales coincidentes.
+5. Evalúa la acción HTTP o el recurso solicitado y permite o deniega.
+
+Por defecto, <code>auth.externalAuthorization.failOpen</code> es <code>false</code>. Si authz no responde, el Gateway bloquea la petición protegida.
+
+## Principales
+
+Un principal representa una identidad autorizable, no necesariamente una persona individual. Tiene un identificador estable, nombre, tipo, configuración de coincidencia, estado activo y políticas concedidas.
+
+Lamassu admite dos tipos:
+
+- **oidc**: coincide con claims de un token, por ejemplo un rol, grupo o <code>preferred_username</code>.
+- **x509**: coincide con una identidad autenticada mediante certificado y su configuración de confianza.
+
+Diseña los principales alrededor de identidades estables del proveedor. Para administración humana suele ser preferible un grupo o rol gestionado centralmente; para automatización, usa una identidad técnica independiente.
+
+## Políticas
+
+Una política agrupa reglas reutilizables. Las reglas pueden:
+
+- permitir acciones sobre un tipo de entidad;
+- limitar el acceso a identificadores concretos;
+- seguir relaciones entre entidades;
+- aplicar filtros por atributos;
+- conceder acciones HTTP lógicas definidas por el esquema de una API.
+
+La acción <code>*</code> en una regla HTTP concede todas las acciones definidas por ese esquema. Resérvala para roles administrativos controlados.
+
+## Provisiona el primer administrador
+
+<Callout type="warn" title="No existe un superusuario implícito">
+  Una instalación sin un principal que coincida con tu identidad queda sin nadie capaz de administrar la PKI. Define el bootstrap y configura el IdP antes de exponer la plataforma.
+</Callout>
+
+El chart crea por defecto un principal que busca el rol OIDC <code>pki-admin</code> en <code>realm_access.roles</code> y le concede las políticas de administración incluidas. El Job Helm de preinstalación y preactualización ejecuta las migraciones de authz, precarga las políticas y crea los principales de bootstrap antes de iniciar los servicios.
+
+~~~yaml title="values.yaml"
+auth:
+  authorization:
+    rolesClaim: realm_access.roles
+    roles:
+      admin: pki-admin
+
+services:
+  authz:
+    jwkUrl: https://idp.example.com/realms/iot/protocol/openid-connect/certs
+    bootstrap:
+      - principal_id: "oidc:pki-admin"
+        principal_name: "PKI Admin"
+        principal_type: "oidc"
+        policy_ids:
+          - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+        auth_config:
+          claims:
+            - claim: "realm_access.roles"
+              operator: "contains"
+              value: "pki-admin"
+~~~
+
+Antes de instalar:
+
+1. Crea el rol <code>pki-admin</code> en tu proveedor OIDC.
+2. Asígnalo a un grupo administrativo pequeño y verificable.
+3. Configura la URL JWKS interna que alcanzará authz.
+4. Mantén al menos dos identidades humanas de recuperación.
+5. Prueba acceso permitido y denegado con usuarios distintos.
+
+El bootstrap es idempotente: si el principal ya existe, no lo reemplaza; solo añade las políticas configuradas que todavía falten. Por eso puedes mantenerlo en <code>values.yaml</code> durante las actualizaciones.
+
+## Bootstrap de Fastlane
+
+Fastlane instala un realm de Keycloak para laboratorio y crea el usuario <code>lamassu</code> con contraseña temporal <code>lamassu</code>, rol <code>pki-admin</code> y acción obligatoria de cambio de contraseña. Su principal de bootstrap coincide por <code>preferred_username=lamassu</code>.
+
+<Callout type="warn" title="Credenciales solo para bootstrap">
+  Cambia la contraseña en el primer acceso. No reutilices este usuario ni el IdP de ejemplo como diseño de producción.
+</Callout>
+
+## Operación segura
+
+- Concede políticas a grupos o identidades técnicas, no a claims ambiguos.
+- Desactiva un principal cuando deba perder acceso de inmediato.
+- Separa administración de PKI, operación de dispositivos y automatizaciones.
+- Revisa los grants tras cambios en el proveedor OIDC.
+- Mantén <code>failOpen: false</code> salvo una decisión de riesgo explícita.
+- Conserva un procedimiento probado para recuperar acceso sin desactivar autorización.
+
+## Diagnóstico rápido
+
+Un <code>401</code> suele indicar que el Gateway no pudo validar la autenticación. Revisa emisor, audiencia, expiración y JWKS.
+
+Un <code>403</code> indica normalmente que la identidad se autenticó, pero ningún principal activo y sus políticas autorizaron la acción. Comprueba claims reales del token, regla de coincidencia, grants y acción solicitada.
+
+Si todas las rutas protegidas fallan, verifica la salud y conectividad de authz, su acceso a PostgreSQL y la URL JWKS. Continúa con [Resolución de problemas](/docs/platform/pki/troubleshooting).

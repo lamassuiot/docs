@@ -8,7 +8,7 @@ sidebar:
 
 # EST: Enrollment over Secure Transport
 
-Lamassu IoT implementa el protocolo **EST (Enrollment over Secure Transport)** descrito en el RFC 7030 como su único mecanismo de inscripción de certificados para dispositivos. Cada DMS expone los endpoints EST, valida al dispositivo y aplica sus propias políticas de autenticación, registro y renovación — actuando como autoridad de registro (RA) frente al cliente.
+Lamassu IoT implementa el protocolo **EST (Enrollment over Secure Transport)** descrito en el RFC 7030 como su único mecanismo de inscripción de certificados para dispositivos. Cada DMS expone los endpoints EST, valida al dispositivo y aplica sus propias políticas de autenticación, registro y renovación. Así, actúa como autoridad de registro (RA) frente al cliente.
 
 La entidad que emite y firma criptográficamente el certificado es siempre la **CA asociada al DMS**, no el DMS. El DMS coordina el proceso: recibe el CSR, autentica al dispositivo y aplica la política de emisión. Esta distinción es relevante para el administrador PKI al seleccionar la `EnrollmentCA` y para el integrador al interpretar la cadena de confianza recibida de `/cacerts`.
 
@@ -182,7 +182,7 @@ JWT **no es un modo de autenticación válido en EST**. El extractor de identida
 
   El valor del campo `csr` es la **codificación base64 del PEM** del CSR (no el DER, y no el PEM en claro). El webhook debe responder con `2xx` y un cuerpo JSON `{"authorized": true}` para continuar; cualquier otra respuesta aborta el enrolamiento con `external webhook denied enrollment`. Un `204 No Content` **no es una respuesta válida** aunque sea un código `2xx`: Lamassu exige un cuerpo JSON con el campo `authorized`, así que un webhook que responda sin cuerpo deniega la operación igual que un error.
 
-- **`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`**: combina los dos modos anteriores durante `/simpleenroll` — el cliente debe presentar un certificado mTLS válido y el webhook debe devolver `authorized: true`. En `/simplereenroll` la combinación no se conserva: el chequeo conjunto mTLS + webhook no se mantiene, por lo que el integrador no debe asumir que las mismas garantías del enrollment inicial aplican en reenroll.
+- **`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`**: combina los dos modos anteriores durante `/simpleenroll`. El cliente debe presentar un certificado mTLS válido y el webhook debe devolver `authorized: true`. En `/simplereenroll` la combinación no se conserva: el chequeo conjunto mTLS + webhook no se mantiene, por lo que el integrador no debe asumir que las mismas garantías del enrollment inicial aplican en reenroll.
 
 - **`NO_AUTH`**: el DMS acepta cualquier CSR sin validar identidad del cliente. Lamassu emite un aviso en su log (`DMS is configured with NoAuth, allowing enrollment`) y procede al alta. Debe restringirse a entornos controlados (una red de aprovisionamiento aislada); cualquier red expuesta a internet con un DMS en `NO_AUTH` queda abierta a la emisión de certificados por terceros no autorizados.
 

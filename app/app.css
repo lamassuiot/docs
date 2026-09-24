@@ -6,48 +6,45 @@
 
 /* ── Lamassu custom theme ─────────────────────────────────────────────────
    Overrides neutral.css with Lamassu site colors.
-   Light: blue-tinted whites / navy primary
-   Dark:  deep navy (#0f0c29 → #1e1b4b) / cyan accent (#22d3ee)
+   Neutral zinc surfaces + blue primary in both modes (shadcn-style tokens).
    ──────────────────────────────────────────────────────────────────────── */
 @theme {
   /* Light mode */
-  --color-fd-background:           hsl(225, 60%, 97%);
-  --color-fd-foreground:           hsl(225, 65%, 8%);
-  --color-fd-muted:                hsl(225, 40%, 92%);
-  --color-fd-muted-foreground:     hsl(225, 25%, 42%);
-  --color-fd-popover:              hsl(225, 55%, 98%);
-  --color-fd-popover-foreground:   hsl(225, 65%, 8%);
-  --color-fd-card:                 hsl(225, 45%, 94%);
-  --color-fd-card-foreground:      hsl(225, 65%, 8%);
-  --color-fd-border:               hsla(225, 70%, 55%, 0.18);
-  --color-fd-primary:              hsl(221, 83%, 48%);
-  --color-fd-primary-foreground:   hsl(0, 0%, 98%);
-  --color-fd-secondary:            hsl(225, 40%, 88%);
-  --color-fd-secondary-foreground: hsl(225, 65%, 18%);
-  --color-fd-accent:               hsla(221, 80%, 58%, 0.2);
-  --color-fd-accent-foreground:    hsl(225, 65%, 18%);
-  --color-fd-ring:                 hsl(192, 100%, 42%);
+  --color-fd-background:           #ffffff;
+  --color-fd-foreground:           #09090b;
+  --color-fd-muted:                #f4f4f5;
+  --color-fd-muted-foreground:     #71717a;
+  --color-fd-popover:              #ffffff;
+  --color-fd-popover-foreground:   #09090b;
+  --color-fd-card:                 #ffffff;
+  --color-fd-card-foreground:      #09090b;
+  --color-fd-border:               #e4e4e7;
+  --color-fd-primary:              #1d4ed8;
+  --color-fd-primary-foreground:   #ffffff;
+  --color-fd-secondary:            #f4f4f5;
+  --color-fd-secondary-foreground: #18181b;
+  --color-fd-accent:               #f4f4f5;
+  --color-fd-accent-foreground:    #18181b;
+  --color-fd-ring:                 #1d4ed8;
 }
 
 .dark {
-  /* Deep navy matching the Lamassu gradient (#0f0c29 / #1e1b4b) */
-  --color-fd-background:           hsl(246, 60%, 6%);
-  --color-fd-foreground:           hsl(210, 40%, 94%);
-  --color-fd-muted:                hsl(237, 50%, 12%);
-  --color-fd-muted-foreground:     hsla(222, 55%, 80%, 0.65);
-  --color-fd-popover:              hsl(240, 55%, 8%);
-  --color-fd-popover-foreground:   hsl(210, 40%, 90%);
-  --color-fd-card:                 hsl(237, 52%, 10%);
-  --color-fd-card-foreground:      hsl(210, 40%, 94%);
-  --color-fd-border:               hsla(222, 80%, 65%, 0.14);
-  /* Cyan accent — #22d3ee / cyan-400 from the site CTA */
-  --color-fd-primary:              hsl(192, 91%, 50%);
-  --color-fd-primary-foreground:   hsl(246, 60%, 6%);
-  --color-fd-secondary:            hsl(237, 50%, 15%);
-  --color-fd-secondary-foreground: hsl(210, 40%, 88%);
-  --color-fd-accent:               hsla(222, 80%, 60%, 0.18);
-  --color-fd-accent-foreground:    hsl(210, 60%, 90%);
-  --color-fd-ring:                 hsl(192, 91%, 50%);
+  --color-fd-background:           #09090b;
+  --color-fd-foreground:           #fafafa;
+  --color-fd-muted:                #18181b;
+  --color-fd-muted-foreground:     #a1a1aa;
+  --color-fd-popover:              #0f0f11;
+  --color-fd-popover-foreground:   #fafafa;
+  --color-fd-card:                 #101012;
+  --color-fd-card-foreground:      #fafafa;
+  --color-fd-border:               #27272a;
+  --color-fd-primary:              #3b82f6;
+  --color-fd-primary-foreground:   #ffffff;
+  --color-fd-secondary:            #18181b;
+  --color-fd-secondary-foreground: #fafafa;
+  --color-fd-accent:               #18181b;
+  --color-fd-accent-foreground:    #fafafa;
+  --color-fd-ring:                 #3b82f6;
 }
 
 /* Sidebar shell — standard fumadocs background, no custom gradients */

@@ -5,13 +5,19 @@
 - [Utiliza Lamassu como SaaS](/docs/deployment/saas): Consume Lamassu como servicio gestionado sin operar infraestructura propia.
 - [Fastlane](/docs/deployment/self-hosted/fastlane): Referencia del script scripts/lamassu-fast-lane.sh para desplegar Lamassu PKI de forma automatizada en Kubernetes
 - [Kubernetes self-managed](/docs/deployment/self-hosted/overview): Despliega Lamassu en tu propio clúster Kubernetes con Helm o Fastlane.
+- [Control de acceso](/docs/platform/pki/access-control): Conecta una identidad OIDC o X.509 con principales, políticas y permisos de Lamassu.
 - [Alertas y suscripciones](/docs/platform/pki/alerts): Envía eventos de la PKI a personas y sistemas externos.
+- [Registros de auditoría](/docs/platform/pki/audit-logs): Entiende qué eventos de auditoría genera Lamassu y cómo convertirlos en una pista durable.
+- [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation): Diseña autoridades raíz e intermedias y sustituye certificados o claves sin romper la confianza.
 - [Autoridades de certificación](/docs/platform/pki/certificate-authorities): Crea, importa y opera las autoridades que establecen la confianza de tu PKI.
+- [Perfiles de certificado](/docs/platform/pki/certificate-profiles): Define políticas reutilizables para emitir certificados coherentes y limitar las claves aceptadas.
 - [Validación de certificados](/docs/platform/pki/certificate-validation): Publica el estado de las identidades mediante OCSP y CRL.
 - [Certificados](/docs/platform/pki/certificates): Consulta, descarga y revoca los certificados emitidos por Lamassu.
 - [Arquitectura de la plataforma](/docs/platform/pki/concepts/architecture): Componentes de Lamassu y relación entre control, claves, emisión y dispositivos.
-- [Ciclo de vida de una identidad](/docs/platform/pki/concepts/certificate-lifecycle): Estados, transiciones y decisiones operativas de un certificado de dispositivo.
+- [Ciclo de vida de un certificado](/docs/platform/pki/concepts/certificate-lifecycle): Emisión, uso, renovación, revocación y retirada de certificados en Lamassu.
+- [Glosario](/docs/platform/pki/concepts/glossary): Términos de PKI, certificados y gestión de identidades usados en Lamassu.
 - [Cómo funciona Lamassu](/docs/platform/pki/concepts/overview): El modelo mental de confianza, claves, certificados y dispositivos.
+- [Modelo de confianza](/docs/platform/pki/concepts/trust-model): Entiende dónde nace la confianza, cómo se distribuye y qué valida cada componente.
 - [Listas de revocación (CRL)](/docs/platform/pki/crl): Genera y distribuye listas firmadas para validar certificados sin conexión.
 - [Device Management Service](/docs/platform/pki/device-enrollment): Define cómo una flota recibe, renueva y utiliza sus identidades.
 - [Dispositivos e identidades](/docs/platform/pki/device-management): Registra dispositivos y controla sus identidades durante todo el ciclo de vida.
@@ -24,4 +30,5 @@
 - [Emite tu primer certificado](/docs/platform/pki/quickstarts/issue-certificate): Emite una identidad X.509 desde la consola y verifica el resultado.
 - [Primeros pasos](/docs/platform/pki/quickstarts/overview): Obtén un primer resultado con Lamassu y continúa desde una base funcional.
 - [Registra tu primer dispositivo](/docs/platform/pki/quickstarts/register-device): Añade un dispositivo a Lamassu y asígnale una identidad activa.
+- [Resolución de problemas](/docs/platform/pki/troubleshooting): Diagnostica acceso, salud, emisión, enrolamiento y dependencias en un despliegue de Lamassu.
 - [Test](/docs/test): A document to test Fumadocs

@@ -230,6 +230,10 @@ requiredActions: [UPDATE_PASSWORD]
 
 Por tanto, debe cambiar contraseña en el primer acceso.
 
+Fastlane también provisiona un principal de autorización `oidc:lamassu` que coincide con el claim `preferred_username=lamassu` y le concede la política `SUPER ADMIN`. Si activas los datos de ejemplo, crea además un principal independiente para la cuenta de servicio correspondiente.
+
+Este bootstrap está pensado para laboratorio, demos y CI. En producción, sustituye el principal por un rol o grupo administrado en tu proveedor OIDC y sigue [Control de acceso](/docs/platform/pki/access-control).
+
 Uso en CI [#uso-en-ci]
 
 El script está pensado también para validaciones rápidas y smoke tests locales. Tras la instalación puede ejecutarse:

@@ -338,6 +338,10 @@ requiredActions: [UPDATE_PASSWORD]
 
 Por tanto, debe cambiar contraseña en el primer acceso.
 
+Fastlane también provisiona un principal de autorización `oidc:lamassu` que coincide con el claim `preferred_username=lamassu` y le concede la política `SUPER ADMIN`. Si activas los datos de ejemplo, crea además un principal independiente para la cuenta de servicio correspondiente.
+
+Este bootstrap está pensado para laboratorio, demos y CI. En producción, sustituye el principal por un rol o grupo administrado en tu proveedor OIDC y sigue [Control de acceso](/docs/platform/pki/access-control).
+
 Uso en CI [#uso-en-ci]
 
 El script está pensado también para validaciones rápidas y smoke tests locales. Tras la instalación puede ejecutarse:
@@ -482,6 +486,7 @@ Los valores por defecto del chart son deliberadamente incompletos para dependenc
 * `amqp.hostname`, `amqp.username`, `amqp.password`
 * `auth.oidc.frontend.authority`
 * `auth.oidc.apiGateway.jwks`
+* `services.authz.jwkUrl` y un principal de bootstrap que coincida con un administrador real
 * `services.ca.domains`
 * `gateway.addresses` o una estrategia equivalente de publicación según el clúster
 * `tls.*` según se use `certManager` o certificado externo
@@ -535,12 +540,41 @@ auth:
       jwks:
         - name: oidc-authn
           uri: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+  authorization:
+    rolesClaim: realm_access.roles
+    roles:
+      admin: pki-admin
 
 services:
   ca:
     domains:
       - pki.example.internal
+  authz:
+    jwkUrl: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+    bootstrap:
+      - principal_id: "oidc:pki-admin"
+        principal_name: "PKI Admin"
+        principal_type: "oidc"
+        policy_ids:
+          - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+        auth_config:
+          claims:
+            - claim: realm_access.roles
+              operator: contains
+              value: pki-admin
 ```
+
+Provisiona el primer administrador [#provisiona-el-primer-administrador]
+
+No hay un superusuario implícito. Antes de instalar, crea el rol `pki-admin` en el proveedor OIDC y asígnalo al grupo que administrará Lamassu. El principal del ejemplo concede la política `SUPER ADMIN` a cualquier token que contenga ese rol.
+
+El Job `pre-install` y `pre-upgrade` prepara las bases de datos, ejecuta las migraciones de authz, precarga las políticas y aplica `services.authz.bootstrap` antes de que arranquen los Deployments. El bootstrap es idempotente: conserva los principales existentes y añade únicamente los grants que falten.
+
+<Callout type="warn" title="Valida el acceso antes de exponer la plataforma">
+  Si ningún token coincide con un principal activo, nadie podrá administrar la PKI. Prueba una identidad autorizada y otra denegada, y conserva un procedimiento de recuperación.
+</Callout>
+
+Consulta [Control de acceso](/docs/platform/pki/access-control) para diseñar principales y políticas.
 
 Áreas de configuración más relevantes [#áreas-de-configuración-más-relevantes]
 
@@ -548,7 +582,7 @@ services:
 * **Gateway:** `gateway.addresses`, `gateway.ports.*` y `gateway.extraRouting` publican la UI y las APIs mediante Envoy Gateway.
 * **Persistencia:** `postgres.*` define la conexión a PostgreSQL.
 * **Mensajería:** `amqp.*` configura la conexión a RabbitMQ.
-* **Identidad:** `auth.oidc.frontend.*` y `auth.oidc.apiGateway.jwks` configuran el login y la validación JWT.
+* **Identidad y autorización:** `auth.oidc.*`, `services.authz.jwkUrl` y `services.authz.bootstrap` configuran login, validación JWT y permisos iniciales.
 * **Autoridades:** `services.ca.domains` establece los dominios autorizados para CA y certificados.
 * **Claves:** `services.kms.cryptoEngines.*` configura los motores criptográficos y su almacenamiento.
 * **Alertas:** `services.alerts.smtp_server.*` prepara el envío de correo.
@@ -583,7 +617,113 @@ El chart `charts/softhsm` no forma parte del despliegue estándar, pero resulta 
 
 Versionado y migraciones [#versionado-y-migraciones]
 
-La serie actual del chart principal es `3.7.x`. Para upgrades entre versiones, el repositorio incluye guías específicas en `charts/lamassu/CHANGELOG/`, especialmente en cambios importantes como la adopción de Envoy Gateway o la introducción del servicio KMS.
+La versión actual del chart en el repositorio es `3.8.0`. Para upgrades entre versiones, consulta las guías de `charts/lamassu/CHANGELOG/` y revisa especialmente las migraciones de base de datos y el bootstrap de authz.
+
+
+# Control de acceso (/docs/platform/pki/access-control)
+
+
+
+Lamassu separa autenticación y autorización. El proveedor OIDC o el certificado cliente demuestra quién realiza la petición; el servicio authz relaciona esa identidad con uno o varios principales y decide qué acciones están permitidas.
+
+Cómo se toma una decisión [#cómo-se-toma-una-decisión]
+
+1. El Gateway valida la autenticación configurada, normalmente un JWT mediante JWKS.
+2. Envoy envía la petición al endpoint de autorización externa /v1/ext\_authz/check.
+3. authz compara las credenciales con principales activos.
+4. Reúne las políticas concedidas a los principales coincidentes.
+5. Evalúa la acción HTTP o el recurso solicitado y permite o deniega.
+
+Por defecto, <code>auth.externalAuthorization.failOpen</code> es <code>false</code>. Si authz no responde, el Gateway bloquea la petición protegida.
+
+Principales [#principales]
+
+Un principal representa una identidad autorizable, no necesariamente una persona individual. Tiene un identificador estable, nombre, tipo, configuración de coincidencia, estado activo y políticas concedidas.
+
+Lamassu admite dos tipos:
+
+* **oidc**: coincide con claims de un token, por ejemplo un rol, grupo o <code>preferred\_username</code>.
+* **x509**: coincide con una identidad autenticada mediante certificado y su configuración de confianza.
+
+Diseña los principales alrededor de identidades estables del proveedor. Para administración humana suele ser preferible un grupo o rol gestionado centralmente; para automatización, usa una identidad técnica independiente.
+
+Políticas [#políticas]
+
+Una política agrupa reglas reutilizables. Las reglas pueden:
+
+* permitir acciones sobre un tipo de entidad;
+* limitar el acceso a identificadores concretos;
+* seguir relaciones entre entidades;
+* aplicar filtros por atributos;
+* conceder acciones HTTP lógicas definidas por el esquema de una API.
+
+La acción <code>\*</code> en una regla HTTP concede todas las acciones definidas por ese esquema. Resérvala para roles administrativos controlados.
+
+Provisiona el primer administrador [#provisiona-el-primer-administrador]
+
+<Callout type="warn" title="No existe un superusuario implícito">
+  Una instalación sin un principal que coincida con tu identidad queda sin nadie capaz de administrar la PKI. Define el bootstrap y configura el IdP antes de exponer la plataforma.
+</Callout>
+
+El chart crea por defecto un principal que busca el rol OIDC <code>pki-admin</code> en <code>realm\_access.roles</code> y le concede las políticas de administración incluidas. El Job Helm de preinstalación y preactualización ejecuta las migraciones de authz, precarga las políticas y crea los principales de bootstrap antes de iniciar los servicios.
+
+```yaml title="values.yaml"
+auth:
+  authorization:
+    rolesClaim: realm_access.roles
+    roles:
+      admin: pki-admin
+
+services:
+  authz:
+    jwkUrl: https://idp.example.com/realms/iot/protocol/openid-connect/certs
+    bootstrap:
+      - principal_id: "oidc:pki-admin"
+        principal_name: "PKI Admin"
+        principal_type: "oidc"
+        policy_ids:
+          - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+        auth_config:
+          claims:
+            - claim: "realm_access.roles"
+              operator: "contains"
+              value: "pki-admin"
+```
+
+Antes de instalar:
+
+1. Crea el rol <code>pki-admin</code> en tu proveedor OIDC.
+2. Asígnalo a un grupo administrativo pequeño y verificable.
+3. Configura la URL JWKS interna que alcanzará authz.
+4. Mantén al menos dos identidades humanas de recuperación.
+5. Prueba acceso permitido y denegado con usuarios distintos.
+
+El bootstrap es idempotente: si el principal ya existe, no lo reemplaza; solo añade las políticas configuradas que todavía falten. Por eso puedes mantenerlo en <code>values.yaml</code> durante las actualizaciones.
+
+Bootstrap de Fastlane [#bootstrap-de-fastlane]
+
+Fastlane instala un realm de Keycloak para laboratorio y crea el usuario <code>lamassu</code> con contraseña temporal <code>lamassu</code>, rol <code>pki-admin</code> y acción obligatoria de cambio de contraseña. Su principal de bootstrap coincide por <code>preferred\_username=lamassu</code>.
+
+<Callout type="warn" title="Credenciales solo para bootstrap">
+  Cambia la contraseña en el primer acceso. No reutilices este usuario ni el IdP de ejemplo como diseño de producción.
+</Callout>
+
+Operación segura [#operación-segura]
+
+* Concede políticas a grupos o identidades técnicas, no a claims ambiguos.
+* Desactiva un principal cuando deba perder acceso de inmediato.
+* Separa administración de PKI, operación de dispositivos y automatizaciones.
+* Revisa los grants tras cambios en el proveedor OIDC.
+* Mantén <code>failOpen: false</code> salvo una decisión de riesgo explícita.
+* Conserva un procedimiento probado para recuperar acceso sin desactivar autorización.
+
+Diagnóstico rápido [#diagnóstico-rápido]
+
+Un <code>401</code> suele indicar que el Gateway no pudo validar la autenticación. Revisa emisor, audiencia, expiración y JWKS.
+
+Un <code>403</code> indica normalmente que la identidad se autenticó, pero ningún principal activo y sus políticas autorizaron la acción. Comprueba claims reales del token, regla de coincidencia, grants y acción solicitada.
+
+Si todas las rutas protegidas fallan, verifica la salud y conectividad de authz, su acceso a PostgreSQL y la URL JWKS. Continúa con [Resolución de problemas](/docs/platform/pki/troubleshooting).
 
 
 # Alertas y suscripciones (/docs/platform/pki/alerts)
@@ -659,11 +799,214 @@ Familias de eventos [#familias-de-eventos]
 Utiliza el catálogo que muestra la consola como fuente para los tipos disponibles en la versión que tienes desplegada.
 
 
+# Registros de auditoría (/docs/platform/pki/audit-logs)
+
+
+
+Lamassu instrumenta las operaciones mutables de sus servicios con eventos de auditoría. Cada evento describe la operación, los principales que coincidieron, la entrada, el resultado y si terminó con error.
+
+Qué contiene un evento [#qué-contiene-un-evento]
+
+El cuerpo de auditoría incluye:
+
+* <code>input</code>: datos recibidos por la operación;
+* <code>has\_error</code>: indica si el servicio devolvió un error;
+* <code>output</code>: resultado producido o mensaje de error;
+* <code>principals</code>: identificadores de los principales que coincidieron con la petición.
+
+Las operaciones correctas usan un tipo con prefijo <code>audit.</code>. Los fallos publican el tipo de operación con sufijo <code>.error</code>. El evento CloudEvents añade, además, fuente, identificador, fecha y tipo.
+
+<Callout type="info" title="Se auditan también los intentos fallidos">
+  Los middlewares publican el registro después de ejecutar la operación, tanto si tuvo éxito como si devolvió un error. Esto permite investigar intentos además de cambios confirmados.
+</Callout>
+
+Cobertura [#cobertura]
+
+El backend aplica auditoría a mutaciones de:
+
+* autoridades, certificados y perfiles de emisión;
+* claves y motores KMS;
+* dispositivos e identidades;
+* DMS y operaciones de enrolamiento;
+* funciones de validación y CRL;
+* principales, políticas y concesiones de autorización.
+
+No confundas estos eventos con los eventos de dominio. Un evento de dominio comunica que un recurso cambió para que otro componente reaccione; el evento de auditoría conserva contexto de entrada, salida y principal para investigación.
+
+Publicación y persistencia [#publicación-y-persistencia]
+
+Los servicios publican auditoría en el bus de eventos cuando su PublisherEventBus está habilitado. El código del backend no implementa un archivo de auditoría consultable y durable por sí solo.
+
+<Callout type="warn" title="El bus no sustituye a un archivo de cumplimiento">
+  Si necesitas retención, búsquedas, protección contra alteraciones o exportación regulatoria, conecta un consumidor que persista los eventos en el sistema aprobado por tu organización.
+</Callout>
+
+Diseña el consumidor para:
+
+* suscribirse a los tipos <code>audit.#</code> y también a los tipos de operación terminados en <code>.error</code>;
+* conservar el CloudEvent completo sin modificar;
+* registrar el momento de ingestión y detectar duplicados por ID;
+* cifrar en tránsito y en reposo;
+* limitar lectura y borrado a un rol separado del operador de PKI;
+* aplicar una política explícita de retención y legal hold;
+* alertar si deja de consumir o aumenta la cola pendiente.
+
+Datos sensibles [#datos-sensibles]
+
+Los campos input y output pueden contener sujetos, metadatos, material público, configuración o mensajes de error. Evalúa su clasificación antes de enviarlos a una plataforma externa.
+
+No registres claves privadas, secretos de proveedores ni tokens completos en automatizaciones que rodean a Lamassu. Restringe la exportación y aplica redacción en el destino sin destruir los campos necesarios para atribución.
+
+Una investigación reproducible [#una-investigación-reproducible]
+
+<Steps>
+  <Step>
+    Acota el intervalo [#acota-el-intervalo]
+
+    Parte de la hora reportada y normaliza todas las fuentes a UTC.
+  </Step>
+
+  <Step>
+    Identifica la operación [#identifica-la-operación]
+
+    Filtra por tipo de evento, fuente de servicio e identificador del recurso.
+  </Step>
+
+  <Step>
+    Atribuye el principal [#atribuye-el-principal]
+
+    Revisa principals y correlaciónalo con el proveedor OIDC o la identidad X.509 vigente en ese momento.
+  </Step>
+
+  <Step>
+    Compara intención y resultado [#compara-intención-y-resultado]
+
+    Contrasta input, has\_error y output. Un intento fallido no implica que el recurso haya cambiado.
+  </Step>
+
+  <Step>
+    Sigue el efecto [#sigue-el-efecto]
+
+    Busca los eventos de dominio y registros del servicio que compartan recurso y ventana temporal. En una revocación de CA, incluye las operaciones en cascada.
+  </Step>
+</Steps>
+
+Verificación periódica [#verificación-periódica]
+
+Genera una mutación controlada en un entorno de prueba y comprueba que:
+
+1. aparece un evento de auditoría correcto;
+2. el principal coincide con la identidad utilizada;
+3. el consumidor lo persiste una sola vez;
+4. puede recuperarse por recurso, actor y periodo;
+5. una interrupción del consumidor produce una alerta.
+
+Para métricas, trazas y logs técnicos del despliegue, consulta [Resolución de problemas](/docs/platform/pki/troubleshooting). La auditoría responde a “quién intentó cambiar qué”; la observabilidad explica cómo se comportó el sistema.
+
+
+# Jerarquía y rotación de CAs (/docs/platform/pki/ca-hierarchy-and-rotation)
+
+
+
+La jerarquía determina el alcance de cualquier error o compromiso. Una raíz firma CAs intermedias; las intermedias emiten las identidades que usan dispositivos y servicios. Esta separación permite aislar entornos y rotar una rama sin reemplazar toda la confianza.
+
+Diseña la jerarquía [#diseña-la-jerarquía]
+
+Para una instalación de producción, utiliza una raíz muy restringida y una o más intermedias operativas. Separa intermedias cuando cambie alguno de estos límites:
+
+* entorno, como producción y preproducción;
+* propietario o equipo operador;
+* familia de dispositivos o proceso de fabricación;
+* región o requisito regulatorio;
+* motor criptográfico o política de clave;
+* ventana de mantenimiento y ritmo de renovación.
+
+Evita jerarquías profundas sin una necesidad concreta. Cada nivel añade distribución de cadena, validación y otro certificado que debes renovar.
+
+<Callout type="warn" title="La validez desciende por la jerarquía">
+  Una CA hija y los certificados finales deben expirar antes que su emisor. Reserva un margen que permita distribuir otra cadena y renovar los certificados dependientes.
+</Callout>
+
+Reemisión y rotación no son lo mismo [#reemisión-y-rotación-no-son-lo-mismo]
+
+**Reemitir una CA** crea un certificado nuevo sobre la clave existente. Lamassu genera una CSR con esa clave, autofirma si es una raíz o pide a la CA padre que firme si es subordinada. El nuevo certificado queda activo y la CA apunta a su número de serie; los certificados anterior y nuevo quedan enlazados mediante metadatos.
+
+**Rotar una CA** crea una clave y una autoridad sucesoras. Es la opción adecuada ante compromiso, cambio criptográfico, migración de motor o política de claves no exportables.
+
+Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiración haya pasado. Anticípate a ambas condiciones.
+
+Cuándo elegir cada operación [#cuándo-elegir-cada-operación]
+
+* Reemite si la clave sigue siendo confiable y solo necesitas otro periodo de validez o un certificado actualizado.
+* Rota la clave si existe sospecha de compromiso, cambia el algoritmo o quieres mover la custodia a otro motor.
+* Crea una rama paralela si no puedes actualizar todos los consumidores al mismo tiempo.
+* Revoca inmediatamente solo cuando el riesgo de mantener la CA supera el impacto de interrumpir la flota.
+
+Procedimiento de rotación de clave [#procedimiento-de-rotación-de-clave]
+
+<Steps>
+  <Step>
+    Inventaría las dependencias [#inventaría-las-dependencias]
+
+    Localiza CAs hijas, certificados emitidos, DMS, conectores y almacenes de confianza externos. Incluye dispositivos que pueden permanecer desconectados durante semanas o meses.
+  </Step>
+
+  <Step>
+    Crea la CA sucesora [#crea-la-ca-sucesora]
+
+    Genera una clave nueva en el motor previsto, crea la CA y asígnale un perfil explícito. No reutilices el identificador operativo para ocultar que es una generación distinta.
+  </Step>
+
+  <Step>
+    Distribuye la nueva confianza [#distribuye-la-nueva-confianza]
+
+    Añade la nueva raíz o cadena a los consumidores antes de emitir con ella. En un DMS, utiliza las CAs gestionadas de `/cacerts` para mantener temporalmente las cadenas antigua y nueva.
+  </Step>
+
+  <Step>
+    Cambia la emisión [#cambia-la-emisión]
+
+    Actualiza la CA de enrolamiento y el perfil de los DMS. Mantén las CAs de validación adicionales si todavía deben aceptarse certificados antiguos durante el re-enrolamiento.
+  </Step>
+
+  <Step>
+    Renueva por lotes [#renueva-por-lotes]
+
+    Migra una cohorte pequeña, valida mTLS, OCSP y CRL desde el consumidor y amplía progresivamente. Supervisa qué dispositivos siguen presentando la cadena antigua.
+  </Step>
+
+  <Step>
+    Cierra el solapamiento [#cierra-el-solapamiento]
+
+    Cuando ningún consumidor legítimo dependa de la autoridad anterior, retírala de la emisión y de las CAs distribuidas. Revócala si la política lo exige.
+  </Step>
+</Steps>
+
+Revocación en cascada [#revocación-en-cascada]
+
+Al revocar una CA, Lamassu actualiza también sus CAs hijas y certificados emitidos a `REVOKED` con razón `CessationOfOperation`. Las revocaciones de las hijas propagan el efecto a sus propias ramas.
+
+Esto protege la coherencia de la jerarquía, pero convierte la revocación en una acción de gran impacto. No la utilices como mecanismo ordinario para dejar de emitir: primero completa la migración y elimina la CA de los flujos operativos.
+
+Comprobaciones después del cambio [#comprobaciones-después-del-cambio]
+
+* La cadena nueva termina en un ancla instalada por el consumidor.
+* Los certificados nuevos contienen AKI, SKI, KU, EKU y SAN esperados.
+* El DMS entrega la cadena correcta mediante EST `/cacerts`.
+* El re-enrolamiento acepta la identidad antigua durante el periodo previsto.
+* OCSP y CRL responden para las autoridades que siguen activas.
+* No quedan DMS emitiendo accidentalmente desde la CA anterior.
+
+Consulta el [Modelo de confianza](/docs/platform/pki/concepts/trust-model) para entender los conjuntos de CAs del DMS y [Ciclo de vida de un certificado](/docs/platform/pki/concepts/certificate-lifecycle) para los estados y efectos de revocación.
+
+
 # Autoridades de certificación (/docs/platform/pki/certificate-authorities)
 
 
 
 Una autoridad de certificación (CA) vincula identidades con claves públicas mediante certificados firmados. En Lamassu puedes crear una jerarquía nueva, utilizar una clave que ya está en el KMS o incorporar una CA externa.
+
+Para diseñar una cadena completa o sustituir una autoridad en producción, consulta [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation). Si necesitas estandarizar qué puede firmar cada autoridad, utiliza [Perfiles de certificado](/docs/platform/pki/certificate-profiles).
 
 Elige un flujo [#elige-un-flujo]
 
@@ -833,6 +1176,119 @@ Revoca una CA [#revoca-una-ca]
 La eliminación permanente solo está disponible después de revocar. Elimina el registro únicamente cuando la política de retención y auditoría lo permita.
 
 
+# Perfiles de certificado (/docs/platform/pki/certificate-profiles)
+
+
+
+Un perfil de emisión convierte una política de certificados en configuración reutilizable. En lugar de decidir validez, sujeto, extensiones y algoritmos en cada solicitud, defines una vez qué está permitido y asocias el perfil a una CA, un DMS o una emisión concreta.
+
+Qué controla un perfil [#qué-controla-un-perfil]
+
+Validez [#validez]
+
+Puedes expresar la vigencia como una duración desde el momento de emisión o como una fecha final fija. Una duración funciona bien para identidades recurrentes; una fecha común sirve para hacer que todo un lote termine antes de una migración o retirada.
+
+La fecha final nunca debe superar la de la CA emisora.
+
+Certificado de CA o certificado final [#certificado-de-ca-o-certificado-final]
+
+`Sign as CA` establece `IsCA` y las restricciones básicas necesarias para una autoridad. Actívalo solo en perfiles destinados a crear o reemitir CAs subordinadas.
+
+Key Usage y Extended Key Usage [#key-usage-y-extended-key-usage]
+
+El perfil puede imponer usos como `DigitalSignature`, `KeyEncipherment`, `CertSign`, `CRLSign`, `ClientAuth`, `ServerAuth` u `OCSPSigning`.
+
+Si activas **Honor Key Usage** o **Honor Extended Key Usages**, Lamassu conserva los valores solicitados por la CSR. Si los desactivas, los sustituye por los definidos en el perfil.
+
+<Callout type="warn" title="Honor significa delegar parte de la política">
+  No habilites las opciones `Honor…` para solicitudes no confiables salvo que otro componente valide esos campos. De lo contrario, el solicitante puede elegir capacidades más amplias de las previstas.
+</Callout>
+
+Sujeto [#sujeto]
+
+Con **Honor Subject**, el certificado conserva el sujeto de la CSR. Sin esa opción, Lamassu aplica `CN`, `O`, `OU`, `C`, `ST` y `L` del perfil. Si el perfil no define `Common Name`, se conserva el CN solicitado.
+
+Extensiones de la CSR [#extensiones-de-la-csr]
+
+Con **Honor Extensions**, Lamassu filtra las extensiones adicionales solicitadas y conserva únicamente SAN. Sin esa opción, descarta las extensiones adicionales de la CSR.
+
+Este comportamiento permite aceptar DNS, IP, correo o URI como identidades alternativas sin aceptar extensiones arbitrarias.
+
+Restricciones criptográficas [#restricciones-criptográficas]
+
+La aplicación criptográfica puede:
+
+* permitir o bloquear claves RSA;
+* limitar los tamaños RSA admitidos;
+* permitir o bloquear claves ECDSA;
+* limitar los tamaños o curvas ECDSA admitidos.
+
+Cuando está habilitada, Lamassu comprueba la clave pública antes de crear una CA o firmar una CSR. Una clave cuyo tipo o tamaño no figure en el perfil se rechaza.
+
+Precedencia del perfil [#precedencia-del-perfil]
+
+En operaciones que admiten varias fuentes, Lamassu resuelve el perfil en este orden:
+
+1. Perfil enviado dentro de la operación.
+2. Identificador de perfil enviado en la operación.
+3. Perfil predeterminado asociado a la CA.
+
+Un DMS también puede referenciar su propio perfil de emisión. De este modo, varias flotas pueden usar la misma CA con políticas distintas.
+
+Crea un perfil [#crea-un-perfil]
+
+<Steps>
+  <Step>
+    Define un único propósito [#define-un-único-propósito]
+
+    Separa, por ejemplo, dispositivos mTLS, servidores y CAs intermedias. Un perfil pequeño y específico es más fácil de revisar que uno que permita todos los usos.
+  </Step>
+
+  <Step>
+    Elige la validez [#elige-la-validez]
+
+    Alinea la duración con la capacidad real de renovación de la flota. Deja margen respecto a la expiración de la CA.
+  </Step>
+
+  <Step>
+    Fija usos y sujeto [#fija-usos-y-sujeto]
+
+    Para un dispositivo que se autentica como cliente, el punto de partida habitual es `DigitalSignature` y `ClientAuth`. Añade `ServerAuth` o `KeyEncipherment` solo si el protocolo lo necesita.
+  </Step>
+
+  <Step>
+    Restringe las claves [#restringe-las-claves]
+
+    Habilita la aplicación criptográfica y enumera únicamente algoritmos y tamaños compatibles con tu política y tus dispositivos.
+  </Step>
+
+  <Step>
+    Asócialo y prueba [#asócialo-y-prueba]
+
+    Asocia el perfil a una CA o DMS. Emite un certificado de prueba y comprueba sujeto, SAN, KU, EKU, restricciones básicas y fechas con una herramienta X.509 independiente.
+  </Step>
+</Steps>
+
+Ejemplos de diseño [#ejemplos-de-diseño]
+
+**Dispositivo mTLS**\
+Certificado final, validez corta, `DigitalSignature`, `ClientAuth`, sujeto controlado por el DMS y SAN permitido cuando identifica al dispositivo.
+
+**Servidor TLS**\
+Certificado final, `DigitalSignature`, `ServerAuth` y SAN obligatorio con los nombres que utilizarán los clientes.
+
+**CA intermedia**\
+`Sign as CA`, `CertSign` y `CRLSign`, validez superior a sus certificados finales y restricciones criptográficas más exigentes.
+
+Son patrones de partida, no una política universal. Verifica siempre los requisitos del protocolo, del consumidor y del marco regulatorio aplicable.
+
+Cambios y eliminación [#cambios-y-eliminación]
+
+Actualizar un perfil afecta a emisiones futuras; no modifica certificados ya firmados. Prueba los cambios antes de aplicarlos a una CA en producción y conserva la justificación operativa.
+
+Antes de eliminar un perfil, comprueba que ninguna CA o DMS dependa de él. Si deseas sustituirlo, crea la versión nueva, actualiza las referencias y realiza una emisión de prueba antes de retirar el anterior.
+
+
 # Validación de certificados (/docs/platform/pki/certificate-validation)
 
 
@@ -939,33 +1395,194 @@ Dependencias de la plataforma [#dependencias-de-la-plataforma]
 En un despliegue autogestionado, Lamassu utiliza PostgreSQL para persistencia, RabbitMQ para mensajería y un proveedor OIDC para autenticación. Consulta la [arquitectura de despliegue](/docs/deployment/self-hosted/overview#arquitectura) para ver cómo se publican los servicios en Kubernetes.
 
 
-# Ciclo de vida de una identidad (/docs/platform/pki/concepts/certificate-lifecycle)
+# Ciclo de vida de un certificado (/docs/platform/pki/concepts/certificate-lifecycle)
 
 
 
-Una identidad no termina cuando se emite el certificado. Lamassu mantiene su relación con el dispositivo y registra los cambios necesarios para renovarla, suspenderla o retirarla.
+Emitir un certificado es solo el comienzo. Durante su vida útil debes comprobar su vigencia, renovarlo antes de que caduque y retirarlo cuando deje de ser fiable. Lamassu conserva el certificado, su CA emisora, su estado y, cuando pertenece a un dispositivo, la identidad a la que está vinculado.
 
-Estados principales [#estados-principales]
+El recorrido completo [#el-recorrido-completo]
 
-* **`No Identity`**: el dispositivo está registrado pero no tiene certificado. Debes enrolarlo o asignarle una identidad.
-* **`Active`**: el certificado está vigente y puede utilizarse. Monitoriza su validez y prepara la renovación.
-* **`Renewal Pending`**: la identidad ha entrado en la ventana de renovación. El dispositivo ya puede iniciar el re-enrolamiento.
-* **`Expiring Soon`**: la fecha de expiración está próxima y la renovación requiere atención prioritaria.
-* **`Expired`**: el certificado ha superado su validez. Emite una identidad nueva.
-* **`Revoked`**: el certificado se ha invalidado antes de expirar. Investiga la causa y sustitúyelo si procede.
-* **`Decommissioned`**: el dispositivo se ha retirado definitivamente y no debe volver a enrolarse.
+<Steps>
+  <Step>
+    Solicitud [#solicitud]
+
+    El solicitante genera una clave y una CSR. En los flujos recomendados, la clave privada permanece en el dispositivo, navegador o motor criptográfico que la creó.
+  </Step>
+
+  <Step>
+    Emisión [#emisión]
+
+    La CA firma la CSR. El [perfil de emisión](/docs/platform/pki/certificate-profiles) determina la validez, los usos, el sujeto, las extensiones admitidas y las restricciones criptográficas.
+  </Step>
+
+  <Step>
+    Uso y supervisión [#uso-y-supervisión]
+
+    El certificado queda en estado `ACTIVE`. Lamassu monitoriza su fecha `Not After`; el trabajo de monitorización criptográfica marca como `EXPIRED` los certificados que han vencido.
+  </Step>
+
+  <Step>
+    Renovación o re-enrolamiento [#renovación-o-re-enrolamiento]
+
+    Se emite un certificado nuevo antes de que caduque el anterior. En un DMS puedes abrir ventanas preventiva y crítica para que el dispositivo se re-enrole mediante EST.
+  </Step>
+
+  <Step>
+    Revocación o retirada [#revocación-o-retirada]
+
+    Si la identidad deja de ser fiable, Lamassu registra la razón y la hora de revocación. OCSP y las CRLs permiten que los consumidores conozcan ese estado.
+  </Step>
+</Steps>
+
+Estados del certificado [#estados-del-certificado]
+
+Lamassu persiste cuatro estados X.509:
+
+* **`ACTIVE`**: el certificado está habilitado y dentro de su periodo de validez.
+* **`EXPIRED`**: ha superado su fecha de expiración. El monitor lo detecta de forma periódica; no es un estado que deba asignarse manualmente.
+* **`REVOKED`**: fue invalidado antes de expirar, con una razón y una marca temporal.
+* **`INACTIVE`**: está deshabilitado sin representar una revocación definitiva.
+
+La vista del dispositivo puede añadir estados operativos como ausencia de identidad, renovación pendiente, expiración próxima o baja. Son una interpretación del estado del dispositivo y de sus certificados, no nuevos estados X.509.
 
 Renovación y revocación no son equivalentes [#renovación-y-revocación-no-son-equivalentes]
 
-La **renovación** sustituye una identidad que sigue siendo fiable antes de que expire. La **revocación** comunica que un certificado ya no debe aceptarse. Revoca cuando exista compromiso, retirada o un cambio que invalide la identidad; renueva para mantener la continuidad operativa.
+La **renovación** crea un certificado sucesor para una identidad que continúa siendo válida. La **revocación** comunica que el certificado actual ya no debe aceptarse. Renueva para mantener continuidad; revoca ante compromiso, retirada o un cambio que invalide la identidad.
+
+Solo una revocación con razón `CertificateHold` puede revertirse. Una revocación con cualquier otra razón es definitiva en Lamassu.
+
+<Callout type="info" title="La reemisión de una CA reutiliza su clave">
+  La operación **Reissue CA** genera otro certificado para la misma clave y enlaza ambos números de serie mediante metadatos. No equivale a una rotación de clave. Para cambiar la clave, crea una CA sucesora y realiza una migración con periodo de solapamiento.
+</Callout>
+
+Efecto de revocar una CA [#efecto-de-revocar-una-ca]
+
+Revocar una CA es una operación en cascada. Lamassu revoca sus CAs hijas y los certificados que ha emitido con la razón `CessationOfOperation`. La propagación continúa por la jerarquía.
+
+Antes de confirmar:
+
+1. Identifica DMS, dispositivos y servicios que confían en esa cadena.
+2. Distribuye la nueva cadena de confianza.
+3. Reemite las identidades necesarias.
+4. Comprueba OCSP y CRL desde un consumidor real.
+5. Revoca la CA antigua cuando ya no exista tráfico legítimo.
 
 <Callout type="warn" title="Decommission es irreversible">
   Dar de baja un dispositivo revoca sus certificados y le impide obtener nuevas identidades. Utiliza esta acción únicamente cuando el dispositivo se retire de forma permanente.
 </Callout>
 
-Observabilidad [#observabilidad]
+Qué debes observar [#qué-debes-observar]
 
-El historial de certificados muestra todas las identidades asociadas a un dispositivo. La línea de tiempo registra enrolamientos, renovaciones y cambios de estado. Las suscripciones permiten enviar estos eventos a correo, Microsoft Teams o webhooks.
+* Certificados que entran en la ventana preventiva o crítica de renovación.
+* Errores repetidos de enrolamiento o re-enrolamiento.
+* Cambios de estado y razones de revocación.
+* Publicación y vigencia de OCSP y CRLs.
+* Dependencias que todavía presentan un certificado sustituido.
+
+El historial del dispositivo relaciona sus identidades anteriores y actuales. Para cambios administrativos y errores de mutación, consulta [Registros de auditoría](/docs/platform/pki/audit-logs).
+
+
+# Glosario (/docs/platform/pki/concepts/glossary)
+
+
+
+A–C [#ac]
+
+**AKI (Authority Key Identifier)**\
+Identificador de la clave pública de la autoridad que firmó un certificado. Ayuda a construir la cadena hacia el emisor correcto.
+
+**Ancla de confianza**\
+Certificado, normalmente de una CA raíz, que un consumidor acepta de forma explícita como punto final de una cadena.
+
+**CA (Certification Authority)**\
+Autoridad que firma certificados y vincula una identidad con una clave pública.
+
+**CA intermedia**\
+CA firmada por otra autoridad. Se utiliza para emitir sin exponer la raíz a la operación diaria.
+
+**CA raíz**\
+CA autofirmada que inicia una jerarquía de confianza.
+
+**Certificado X.509**\
+Documento firmado que contiene una clave pública, un sujeto, un emisor, un periodo de validez y extensiones que delimitan su uso.
+
+**CRL (Certificate Revocation List)**\
+Lista firmada de certificados revocados publicada por una CA.
+
+**CSR (Certificate Signing Request)**\
+Solicitud PKCS#10 que contiene una clave pública y atributos solicitados. La firma de la CSR demuestra posesión de la clave privada correspondiente.
+
+D–K [#dk]
+
+**DMS (Device Management Service)**\
+Configuración que agrupa reglas de registro, enrolamiento, re-enrolamiento, emisión y distribución de CAs para una flota.
+
+**Distinguished Name (DN)**\
+Conjunto de atributos del sujeto o emisor, como `CN`, `O`, `OU`, `C`, `ST` y `L`.
+
+**EST (Enrollment over Secure Transport)**\
+Protocolo definido en RFC 7030 para obtener CAs, enrolar y re-enrolar certificados sobre HTTPS.
+
+**Extended Key Usage (EKU)**\
+Extensión que acota finalidades como autenticación de cliente, autenticación de servidor, firma de código u OCSP.
+
+**Identidad de dispositivo**\
+Relación entre un dispositivo y uno de sus certificados. Un dispositivo puede conservar un historial de identidades.
+
+**Identity slot**\
+Posición lógica en un dispositivo donde Lamassu vincula una identidad activa o histórica.
+
+**JITP (Just-in-Time Provisioning)**\
+Registro automático de un dispositivo cuando completa correctamente su primer enrolamiento.
+
+**KMS (Key Management Service)**\
+Servicio de Lamassu que normaliza generación, importación y uso de claves sobre distintos motores criptográficos.
+
+**Key Usage**\
+Extensión X.509 que permite operaciones básicas como firma digital, cifrado de clave o firma de certificados.
+
+M–R [#mr]
+
+**mTLS (Mutual TLS)**\
+TLS donde cliente y servidor presentan certificados. Un DMS puede usar el certificado cliente como método de autenticación.
+
+**OCSP (Online Certificate Status Protocol)**\
+Protocolo para consultar en línea si un certificado está vigente, revocado o es desconocido.
+
+**Perfil de emisión**\
+Política reutilizable que define cómo Lamassu construye un certificado y qué claves acepta.
+
+**Principal**\
+Identidad de operador o cliente de API reconocida por el servicio de autorización. Lamassu admite principales OIDC y X.509.
+
+**Política**\
+Conjunto de permisos asignable a uno o varios principales.
+
+**RA (Registration Authority)**\
+Componente que verifica al solicitante antes de pedir a una CA que emita. El DMS cumple este papel en los flujos de enrolamiento de dispositivos.
+
+**Relying party**\
+Sistema consumidor que decide si acepta un certificado presentado.
+
+**Revocación**\
+Invalidación de un certificado antes de su fecha de expiración.
+
+S–Z [#sz]
+
+**SAN (Subject Alternative Name)**\
+Extensión que añade identidades como nombres DNS, direcciones IP, correos o URIs.
+
+**SKI (Subject Key Identifier)**\
+Identificador derivado de la clave pública del propio certificado.
+
+**VA (Validation Authority)**\
+Servicio de Lamassu responsable de las respuestas OCSP y la generación o publicación de CRLs.
+
+**Ventana de renovación**\
+Periodo anterior a la expiración durante el que un dispositivo puede o debe solicitar otra identidad.
+
+¿Falta un término operativo? Consulta primero [Cómo funciona Lamassu](/docs/platform/pki/concepts/overview) y el [Modelo de confianza](/docs/platform/pki/concepts/trust-model), donde estos conceptos aparecen conectados.
 
 
 # Cómo funciona Lamassu (/docs/platform/pki/concepts/overview)
@@ -999,6 +1616,79 @@ Del alta a la operación [#del-alta-a-la-operación]
 
   <Card title="Ciclo de vida de una identidad" description="Sigue un certificado desde el enrolamiento hasta la renovación o revocación." href="/docs/platform/pki/concepts/certificate-lifecycle" />
 </Cards>
+
+
+# Modelo de confianza (/docs/platform/pki/concepts/trust-model)
+
+
+
+En Lamassu, confianza no significa simplemente que un certificado exista en el inventario. Un consumidor confía en una identidad cuando puede construir una cadena hasta una raíz que reconoce, comprobar que el certificado sirve para el uso esperado y verificar que sigue vigente.
+
+Las cuatro decisiones de confianza [#las-cuatro-decisiones-de-confianza]
+
+Quién puede emitir [#quién-puede-emitir]
+
+La jerarquía de CAs define qué autoridades pueden firmar. Una CA raíz establece el ancla de confianza; las CAs intermedias separan ámbitos operativos y evitan utilizar la raíz para cada emisión.
+
+Qué puede emitirse [#qué-puede-emitirse]
+
+Los [perfiles de certificado](/docs/platform/pki/certificate-profiles) limitan validez, sujeto, usos, extensiones y parámetros criptográficos. La posesión de una CA no sustituye a una política de emisión.
+
+Quién puede solicitarlo [#quién-puede-solicitarlo]
+
+El DMS actúa como punto de enrolamiento. Puede autenticar una solicitud EST con certificado cliente, webhook externo o una combinación de ambos. Las CAs configuradas para validar al solicitante no tienen por qué ser la CA que emitirá la identidad nueva.
+
+Quién acepta el resultado [#quién-acepta-el-resultado]
+
+El servicio o dispositivo consumidor mantiene su propio almacén de confianza. Lamassu puede distribuir la CA del sistema, la CA de enrolamiento y otras CAs gestionadas mediante `/cacerts`, pero el consumidor decide cuáles instala y cómo aplica la validación.
+
+Flujo de una identidad [#flujo-de-una-identidad]
+
+1. El dispositivo demuestra que puede enrolarse según la política del DMS.
+2. El DMS valida la solicitud y remite la CSR a la CA de enrolamiento.
+3. La CA aplica el perfil y firma sin recibir la clave privada del dispositivo.
+4. El dispositivo instala el certificado y la cadena que necesita.
+5. El sistema que confía en el dispositivo valida cadena, fechas, usos y estado de revocación.
+
+<Callout type="info" title="Autenticación y autorización son límites distintos">
+  OIDC o X.509 identifica al operador que llama a Lamassu. El servicio de autorización decide qué acciones puede realizar. La jerarquía X.509, en cambio, determina si un certificado presentado por un dispositivo es confiable.
+</Callout>
+
+CAs de enrolamiento, validación y distribución [#cas-de-enrolamiento-validación-y-distribución]
+
+Un DMS relaciona tres conjuntos que conviene diseñar por separado:
+
+* **CA de enrolamiento:** firma las nuevas identidades.
+* **CAs de validación:** autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, Lamassu prueba primero la CA de enrolamiento y después las CAs de validación adicionales.
+* **CAs distribuidas:** forman el contenido que el dispositivo obtiene mediante EST `/cacerts`. Puedes incluir la CA del sistema, la CA de enrolamiento y una lista de CAs gestionadas.
+
+Esta separación permite migrar una flota: aceptas temporalmente certificados de la jerarquía anterior, emites con la nueva y distribuyes ambas cadenas durante el solapamiento.
+
+Validación y revocación [#validación-y-revocación]
+
+Una cadena válida no garantiza por sí sola que el certificado deba aceptarse. El consumidor también debe comprobar:
+
+* que la fecha actual está entre `Not Before` y `Not After`;
+* que `Key Usage` y `Extended Key Usage` permiten la operación;
+* que nombres, SANs y sujeto coinciden con la identidad esperada;
+* que el certificado no aparece revocado mediante [OCSP](/docs/platform/pki/ocsp) o una [CRL](/docs/platform/pki/crl).
+
+Durante la autenticación mTLS de un DMS, Lamassu intenta comprobar la revocación. Si el certificado no contiene información suficiente para efectuar esa comprobación, el backend registra una advertencia y continúa tratándolo como no revocado. Diseña los perfiles y puntos de distribución para evitar esa situación en producción.
+
+Límites de custodia [#límites-de-custodia]
+
+El KMS conserva la referencia de la clave y delega la operación al motor configurado. Con un HSM o un KMS cloud, la clave privada puede permanecer no exportable. Eso protege la custodia, pero no impide por sí solo el uso indebido: todavía debes restringir quién puede ordenar una firma y auditar esas operaciones.
+
+Patrón recomendado [#patrón-recomendado]
+
+* Mantén la raíz fuera de las operaciones diarias o con acceso muy restringido.
+* Emite desde CAs intermedias separadas por entorno o dominio de riesgo.
+* Asigna perfiles explícitos a cada caso de uso.
+* Distribuye la nueva confianza antes de comenzar una rotación.
+* Mantén solapamiento suficiente para renovar una flota desconectada.
+* Valida desde el sistema consumidor, no solo desde la consola de Lamassu.
+
+Continúa con [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation) para convertir este modelo en un procedimiento operativo.
 
 
 # Listas de revocación (CRL) (/docs/platform/pki/crl)
@@ -2369,6 +3059,18 @@ Elige tu recorrido [#elige-tu-recorrido]
   <Card title="Integro otro sistema" description="Conecta Lamassu con AWS IoT Core y otros destinos." href="/docs/platform/pki/integrations/aws-iot-core" />
 </Cards>
 
+Referencia operativa [#referencia-operativa]
+
+<Cards>
+  <Card title="Perfiles de certificado" description="Convierte la política de emisión en restricciones reutilizables." href="/docs/platform/pki/certificate-profiles" />
+
+  <Card title="Jerarquía y rotación" description="Sustituye certificados o claves de CA sin romper la confianza." href="/docs/platform/pki/ca-hierarchy-and-rotation" />
+
+  <Card title="Control de acceso" description="Configura principales, políticas y el primer administrador." href="/docs/platform/pki/access-control" />
+
+  <Card title="Resolución de problemas" description="Diagnostica Gateway, servicios, emisión y enrolamiento." href="/docs/platform/pki/troubleshooting" />
+</Cards>
+
 
 # Crea tu primera CA (/docs/platform/pki/quickstarts/create-certificate-authority)
 
@@ -2565,6 +3267,177 @@ Antes de empezar [#antes-de-empezar]
 Automatiza el siguiente dispositivo [#automatiza-el-siguiente-dispositivo]
 
 El registro manual ayuda a entender el modelo, pero una flota debe usar enrolamiento automatizado. Continúa con [Device Management Service](/docs/platform/pki/device-enrollment) y la [integración EST](/docs/platform/pki/est-enrollment).
+
+
+# Resolución de problemas (/docs/platform/pki/troubleshooting)
+
+
+
+Empieza por localizar la capa que falla. Una respuesta del Gateway, un pod no preparado y una emisión rechazada pueden parecer el mismo problema desde la consola, pero requieren evidencias distintas.
+
+Secuencia de diagnóstico [#secuencia-de-diagnóstico]
+
+<Steps>
+  <Step>
+    Reproduce una sola operación [#reproduce-una-sola-operación]
+
+    Anota hora en UTC, usuario o principal, recurso, endpoint y resultado. Evita repetir una acción destructiva como revocación o eliminación.
+  </Step>
+
+  <Step>
+    Separa cliente, Gateway y servicio [#separa-cliente-gateway-y-servicio]
+
+    Comprueba el código HTTP. Un 401 apunta a autenticación; un 403, a autorización; un 404, a ruta o recurso; un 5xx, al servicio o una dependencia.
+  </Step>
+
+  <Step>
+    Revisa el estado de Kubernetes [#revisa-el-estado-de-kubernetes]
+
+    Localiza pods no preparados, reinicios, eventos recientes y el estado del release.
+  </Step>
+
+  <Step>
+    Consulta el servicio afectado [#consulta-el-servicio-afectado]
+
+    Revisa su endpoint /health y sus logs en la misma ventana temporal. Después sigue la dependencia indicada: PostgreSQL, RabbitMQ, proveedor OIDC o motor criptográfico.
+  </Step>
+
+  <Step>
+    Valida el resultado desde fuera [#valida-el-resultado-desde-fuera]
+
+    Para PKI, comprueba el certificado, la cadena, OCSP o CRL con el mismo tipo de cliente que utiliza producción.
+  </Step>
+</Steps>
+
+Recogida mínima de evidencias [#recogida-mínima-de-evidencias]
+
+Sustituye los marcadores por tu release, namespace y deployment reales.
+
+```bash
+helm status <release> -n <namespace>
+kubectl get pods -n <namespace> -o wide
+kubectl get deployments,statefulsets,jobs -n <namespace>
+kubectl get events -n <namespace> --sort-by=.lastTimestamp
+kubectl describe pod <pod> -n <namespace>
+kubectl logs <pod> -n <namespace> --all-containers --since=30m
+```
+
+Ejecuta también la prueba de conectividad del chart:
+
+```bash
+helm test <release> -n <namespace>
+```
+
+El test consulta la salud de CA, DMS Manager, Device Manager y VA, y comprueba que la UI devuelve HTML. Un test correcto confirma conectividad básica, no un flujo completo de emisión.
+
+<Callout type="info" title="Las sondas usan /health">
+  Los servicios del chart exponen sondas de inicio, disponibilidad y vida sobre <code>/health</code>. Un pod puede estar ejecutándose pero no recibir tráfico si la readiness probe falla.
+</Callout>
+
+No puedo iniciar sesión [#no-puedo-iniciar-sesión]
+
+Si recibes un 401:
+
+* comprueba que la autoridad OIDC de la UI sea accesible desde el navegador;
+* verifica emisor, audiencia y expiración del token;
+* confirma que el Gateway puede obtener las claves de la URI JWKS;
+* revisa que la ruta pública e interna del proveedor apunten al mismo realm.
+
+Si el login termina pero las APIs devuelven 403:
+
+* inspecciona los claims reales del token;
+* confirma que coinciden con un principal activo;
+* revisa las políticas concedidas al principal;
+* verifica que authz alcanza PostgreSQL y su JWKS.
+
+En una instalación nueva, confirma que el Job de migración terminó. Ese Job crea esquemas, migra authz, precarga políticas y provisiona los principales definidos en <code>services.authz.bootstrap</code>.
+
+Todo devuelve 403 o 5xx [#todo-devuelve-403-o-5xx]
+
+La autorización externa falla cerrada por defecto. Si authz no está disponible, las rutas protegidas se bloquean.
+
+1. Localiza el pod y Service de authz.
+2. Comprueba /health, logs y conexión a su base de datos.
+3. Verifica el DNS y puerto configurados en externalAuthorization.
+4. Comprueba que la ruta del check es /v1/ext\_authz/check.
+5. No cambies a <code>failOpen: true</code> como solución permanente: permitiría tráfico sin autorización durante la caída.
+
+Un pod no está Ready [#un-pod-no-está-ready]
+
+Revisa primero <code>kubectl describe pod</code>. Las causas habituales son:
+
+* credenciales o DNS incorrectos para PostgreSQL o RabbitMQ;
+* volumen persistente sin enlazar;
+* imagen inaccesible o política de pull incorrecta;
+* configuración inválida del motor criptográfico;
+* límites de CPU o memoria demasiado bajos;
+* migración previa incompleta.
+
+Los valores genéricos solicitan 100 mCPU y 128 MiB y limitan a 500 mCPU y 512 MiB. Ajusta por servicio cuando haya OOMKills, throttling o arranques lentos.
+
+Los motores KMS basados en filesystem y el almacenamiento local de VA utilizan volúmenes de acceso exclusivo. Mantén una réplica o migra a backends compartidos antes de habilitar autoscaling.
+
+La emisión falla [#la-emisión-falla]
+
+Acota el error siguiendo este orden:
+
+1. La CA existe, está activa y no ha expirado.
+2. La CA tiene una clave privada utilizable y el motor está disponible.
+3. La CSR tiene una firma válida.
+4. El perfil permite el tipo y tamaño de clave.
+5. La validez solicitada cabe dentro de la vigencia de la CA.
+6. KU, EKU, sujeto y extensiones cumplen el perfil.
+
+Si la reemisión de una CA falla, recuerda que no se admite para una CA revocada o ya expirada. Para cambiar su clave, sigue [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation).
+
+El enrolamiento EST falla [#el-enrolamiento-est-falla]
+
+Comprueba:
+
+* el identificador del DMS en el path EST;
+* el método de autenticación configurado;
+* la cadena presentada por el cliente;
+* las CAs de validación y el límite de niveles;
+* el estado de revocación del certificado cliente;
+* la firma de la CSR;
+* la CA y el perfil usados para emitir;
+* la ventana de re-enrolamiento.
+
+En re-enrolamiento, Lamassu intenta validar primero con la CA de enrolamiento y después con las CAs adicionales. Durante una migración, conserva la CA anterior en ese segundo conjunto hasta terminar el solapamiento.
+
+OCSP o CRL no reflejan un cambio [#ocsp-o-crl-no-reflejan-un-cambio]
+
+* Confirma que la revocación quedó persistida y tiene razón y timestamp.
+* Revisa la configuración y logs de VA.
+* Comprueba la periodicidad y próxima actualización de la CRL.
+* Descarta cachés intermedias en proxy y cliente.
+* Verifica que el certificado apunta al endpoint que estás consultando.
+* Consulta por número de serie y emisor correctos.
+
+Los eventos no llegan [#los-eventos-no-llegan]
+
+Los eventos de dominio y auditoría dependen del publisher del bus:
+
+* verifica que esté habilitado en el servicio emisor;
+* comprueba conectividad y credenciales AMQP;
+* revisa exchange, routing key, colas y consumidores;
+* inspecciona dead-letter queues;
+* alerta sobre colas durables huérfanas y crecimiento de backlog.
+
+Una caída del consumidor no siempre impide que la operación principal termine. Por eso debes monitorizar RabbitMQ y verificar de forma independiente la persistencia de [auditoría](/docs/platform/pki/audit-logs).
+
+Observabilidad [#observabilidad]
+
+El chart puede habilitar instrumentación OpenTelemetry. Las trazas se exportan por OTLP HTTP y los logs pueden dirigirse a un endpoint compatible, como VictoriaLogs. Usa un identificador de correlación y la misma ventana temporal para unir Gateway, authz, servicio y dependencia.
+
+Antes de cerrar una incidencia, guarda:
+
+* causa confirmada;
+* alcance temporal y recursos afectados;
+* comandos o consultas utilizados;
+* cambio aplicado y forma de revertirlo;
+* validación desde un consumidor;
+* acción preventiva y propietario.
 
 
 # Test (/docs/test)

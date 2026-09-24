@@ -102,6 +102,7 @@ Los valores por defecto del chart son deliberadamente incompletos para dependenc
 * `amqp.hostname`, `amqp.username`, `amqp.password`
 * `auth.oidc.frontend.authority`
 * `auth.oidc.apiGateway.jwks`
+* `services.authz.jwkUrl` y un principal de bootstrap que coincida con un administrador real
 * `services.ca.domains`
 * `gateway.addresses` o una estrategia equivalente de publicación según el clúster
 * `tls.*` según se use `certManager` o certificado externo
@@ -155,12 +156,41 @@ auth:
       jwks:
         - name: oidc-authn
           uri: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+  authorization:
+    rolesClaim: realm_access.roles
+    roles:
+      admin: pki-admin
 
 services:
   ca:
     domains:
       - pki.example.internal
+  authz:
+    jwkUrl: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+    bootstrap:
+      - principal_id: "oidc:pki-admin"
+        principal_name: "PKI Admin"
+        principal_type: "oidc"
+        policy_ids:
+          - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+        auth_config:
+          claims:
+            - claim: realm_access.roles
+              operator: contains
+              value: pki-admin
 ```
+
+Provisiona el primer administrador [#provisiona-el-primer-administrador]
+
+No hay un superusuario implícito. Antes de instalar, crea el rol `pki-admin` en el proveedor OIDC y asígnalo al grupo que administrará Lamassu. El principal del ejemplo concede la política `SUPER ADMIN` a cualquier token que contenga ese rol.
+
+El Job `pre-install` y `pre-upgrade` prepara las bases de datos, ejecuta las migraciones de authz, precarga las políticas y aplica `services.authz.bootstrap` antes de que arranquen los Deployments. El bootstrap es idempotente: conserva los principales existentes y añade únicamente los grants que falten.
+
+<Callout type="warn" title="Valida el acceso antes de exponer la plataforma">
+  Si ningún token coincide con un principal activo, nadie podrá administrar la PKI. Prueba una identidad autorizada y otra denegada, y conserva un procedimiento de recuperación.
+</Callout>
+
+Consulta [Control de acceso](/docs/platform/pki/access-control) para diseñar principales y políticas.
 
 Áreas de configuración más relevantes [#áreas-de-configuración-más-relevantes]
 
@@ -168,7 +198,7 @@ services:
 * **Gateway:** `gateway.addresses`, `gateway.ports.*` y `gateway.extraRouting` publican la UI y las APIs mediante Envoy Gateway.
 * **Persistencia:** `postgres.*` define la conexión a PostgreSQL.
 * **Mensajería:** `amqp.*` configura la conexión a RabbitMQ.
-* **Identidad:** `auth.oidc.frontend.*` y `auth.oidc.apiGateway.jwks` configuran el login y la validación JWT.
+* **Identidad y autorización:** `auth.oidc.*`, `services.authz.jwkUrl` y `services.authz.bootstrap` configuran login, validación JWT y permisos iniciales.
 * **Autoridades:** `services.ca.domains` establece los dominios autorizados para CA y certificados.
 * **Claves:** `services.kms.cryptoEngines.*` configura los motores criptográficos y su almacenamiento.
 * **Alertas:** `services.alerts.smtp_server.*` prepara el envío de correo.
@@ -203,4 +233,4 @@ El chart `charts/softhsm` no forma parte del despliegue estándar, pero resulta 
 
 Versionado y migraciones [#versionado-y-migraciones]
 
-La serie actual del chart principal es `3.7.x`. Para upgrades entre versiones, el repositorio incluye guías específicas en `charts/lamassu/CHANGELOG/`, especialmente en cambios importantes como la adopción de Envoy Gateway o la introducción del servicio KMS.
+La versión actual del chart en el repositorio es `3.8.0`. Para upgrades entre versiones, consulta las guías de `charts/lamassu/CHANGELOG/` y revisa especialmente las migraciones de base de datos y el bootstrap de authz.

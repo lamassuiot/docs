@@ -111,6 +111,43 @@ article td,
   --lm-callout-background: hsl(48, 52%, 22%);
 }
 
+/* Code blocks: flat containers instead of Fumadocs' bordered/rounded card. */
+.shiki {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* MDX tables: flat enterprise data tables instead of Fumadocs' rounded card
+   table — no outer border/radius, only a shaded header and horizontal row
+   dividers. */
+.prose table {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  border-collapse: collapse;
+  overflow: visible;
+}
+
+.prose th,
+.prose td {
+  border: 0;
+  background: transparent;
+}
+
+.prose thead {
+  background: var(--color-fd-muted);
+  border-bottom: 1px solid var(--color-fd-border);
+}
+
+.prose tbody tr {
+  border-bottom: 1px solid var(--color-fd-border);
+}
+
+.prose tbody tr:last-child {
+  border-bottom: 0;
+}
+
 /* ── PR preview diff ───────────────────────────────────────────────────────
    Markup comes from lib/docs-diff (preview builds only). Off by default: the
    page reads as the PR's final version and removed content is hidden. The

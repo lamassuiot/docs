@@ -49,6 +49,19 @@ const diffBase = process.env.VITE_DOCS_DIFF_BASE;
 export default defineConfig({
   mdxOptions: {
     remarkImageOptions: false,
+    rehypeCodeOptions: {
+      ...rehypeCodeDefaultOptions,
+      // Muted, low-chroma palette instead of Fumadocs' default GitHub theme.
+      themes: { light: "min-light", dark: "min-dark" },
+      ...(diffBase
+        ? {
+            transformers: [
+              ...(rehypeCodeDefaultOptions.transformers ?? []),
+              transformerDocsDiff(),
+            ],
+          }
+        : {}),
+    },
     ...(diffBase
       ? {
           // Appended after Fumadocs' own plugins — see remarkDocsDiff.
@@ -56,13 +69,6 @@ export default defineConfig({
             ...plugins,
             [remarkDocsDiff, { base: diffBase }],
           ],
-          rehypeCodeOptions: {
-            ...rehypeCodeDefaultOptions,
-            transformers: [
-              ...(rehypeCodeDefaultOptions.transformers ?? []),
-              transformerDocsDiff(),
-            ],
-          },
         }
       : {}),
   },

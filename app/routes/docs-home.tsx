@@ -70,11 +70,7 @@ export default function DocsHome() {
       <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-fd-border bg-fd-muted px-3 py-1">
-              <span className="size-1.5 rounded-full bg-fd-primary" />
-              <span className="text-xs font-medium text-fd-muted-foreground">Documentación oficial · Lamassu IoT</span>
-            </div>
-            <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-fd-foreground sm:text-5xl">
+            <h1 className="text-4xl font-extrabold tracking-tight text-fd-foreground sm:text-5xl">
               Documentación de la plataforma Lamassu IoT
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-fd-muted-foreground">
@@ -105,7 +101,12 @@ export default function DocsHome() {
               <span className="ml-2 font-mono text-xs text-white/45">lamassu-fast-lane.sh</span>
             </div>
             <div className="space-y-1 p-5 font-mono text-[13px] leading-relaxed text-zinc-200">
-              <div className="text-white/40"># Despliega Lamassu en tu clúster local</div>
+              <div className="text-white/40"># 1. Encuentra la IP de tu interfaz principal</div>
+              <div>
+                <span className="text-blue-300">ip a</span>
+              </div>
+              <div className="pl-4 text-white/60">2: eth0: ... inet 192.168.1.101/24 ...</div>
+              <div className="pt-2 text-white/40"># 2. Despliega Lamassu con esa IP</div>
               <div>
                 <span className="text-blue-300">./scripts/lamassu-fast-lane.sh</span> \
               </div>
@@ -122,7 +123,7 @@ export default function DocsHome() {
                 <span className="text-emerald-300">--sample-data</span> \
               </div>
               <div className="pl-4">
-                <span className="text-emerald-300">-ip</span> 172.23.30.203
+                <span className="text-emerald-300">-ip</span> 192.168.1.101
               </div>
               <div className="pt-2 text-white/40"># → clúster listo</div>
               <div className="text-cyan-300">✓ Lamassu disponible en https://lab.lamassu.io</div>

@@ -1,0 +1,29 @@
+# Despliega Lamassu (/docs/es/deployment/overview)
+
+
+
+Puedes ejecutar Lamassu en tu propio clúster Kubernetes, desplegar una imagen preparada desde AWS Marketplace o consumir la plataforma como servicio gestionado.
+
+Elige un modelo [#elige-un-modelo]
+
+| Modelo                  | Recomendado para                                            | Quién opera la infraestructura | Punto de partida             |
+| ----------------------- | ----------------------------------------------------------- | ------------------------------ | ---------------------------- |
+| Kubernetes self-managed | Producción, entornos regulados y despliegues personalizados | Tu equipo                      | Helm o Fastlane              |
+| AWS Marketplace         | Evaluación o despliegue dedicado dentro de una cuenta AWS   | Tu equipo                      | Imagen preconfigurada en EC2 |
+| SaaS                    | Equipos que quieren utilizar la plataforma sin operarla     | Lamassu                        | Suscripción gestionada       |
+
+<Cards>
+  <Card title="Kubernetes self-managed" description="Controla red, almacenamiento, claves, dependencias y ciclo de actualización." href="/docs/deployment/self-hosted/overview" />
+
+  <Card title="AWS Marketplace" description="Lanza una instancia preconfigurada de Lamassu en AWS EC2." href="/docs/deployment/aws-marketplace" />
+
+  <Card title="Lamassu SaaS" description="Utiliza una instancia operada y actualizada como servicio gestionado." href="/docs/deployment/saas" />
+</Cards>
+
+¿Solo quieres evaluar la plataforma? [#solo-quieres-evaluar-la-plataforma]
+
+Usa [Fastlane](/docs/deployment/self-hosted/fastlane) para levantar PostgreSQL, Keycloak, RabbitMQ y Lamassu en un clúster Kubernetes mediante un único flujo. Está pensado para laboratorios, demos y bootstrap; para producción, configura las dependencias y los valores Helm de forma explícita.
+
+Después del despliegue [#después-del-despliegue]
+
+Cuando la consola esté disponible, continúa con [Crea tu primera CA](/docs/platform/pki/quickstarts/create-certificate-authority). Ese quickstart verifica que el motor criptográfico y la emisión funcionan correctamente.

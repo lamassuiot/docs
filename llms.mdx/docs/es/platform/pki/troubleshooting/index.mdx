@@ -1,0 +1,169 @@
+# Resolución de problemas (/docs/es/platform/pki/troubleshooting)
+
+
+
+Empieza por localizar la capa que falla. Una respuesta del Gateway, un pod no preparado y una emisión rechazada pueden parecer el mismo problema desde la consola, pero requieren evidencias distintas.
+
+Secuencia de diagnóstico [#secuencia-de-diagnóstico]
+
+<Steps>
+  <Step>
+    Reproduce una sola operación [#reproduce-una-sola-operación]
+
+    Anota hora en UTC, usuario o principal, recurso, endpoint y resultado. Evita repetir una acción destructiva como revocación o eliminación.
+  </Step>
+
+  <Step>
+    Separa cliente, Gateway y servicio [#separa-cliente-gateway-y-servicio]
+
+    Comprueba el código HTTP. Un 401 apunta a autenticación; un 403, a autorización; un 404, a ruta o recurso; un 5xx, al servicio o una dependencia.
+  </Step>
+
+  <Step>
+    Revisa el estado de Kubernetes [#revisa-el-estado-de-kubernetes]
+
+    Localiza pods no preparados, reinicios, eventos recientes y el estado del release.
+  </Step>
+
+  <Step>
+    Consulta el servicio afectado [#consulta-el-servicio-afectado]
+
+    Revisa su endpoint /health y sus logs en la misma ventana temporal. Después sigue la dependencia indicada: PostgreSQL, RabbitMQ, proveedor OIDC o motor criptográfico.
+  </Step>
+
+  <Step>
+    Valida el resultado desde fuera [#valida-el-resultado-desde-fuera]
+
+    Para PKI, comprueba el certificado, la cadena, OCSP o CRL con el mismo tipo de cliente que utiliza producción.
+  </Step>
+</Steps>
+
+Recogida mínima de evidencias [#recogida-mínima-de-evidencias]
+
+Sustituye los marcadores por tu release, namespace y deployment reales.
+
+```bash
+helm status <release> -n <namespace>
+kubectl get pods -n <namespace> -o wide
+kubectl get deployments,statefulsets,jobs -n <namespace>
+kubectl get events -n <namespace> --sort-by=.lastTimestamp
+kubectl describe pod <pod> -n <namespace>
+kubectl logs <pod> -n <namespace> --all-containers --since=30m
+```
+
+Ejecuta también la prueba de conectividad del chart:
+
+```bash
+helm test <release> -n <namespace>
+```
+
+El test consulta la salud de CA, DMS Manager, Device Manager y VA, y comprueba que la UI devuelve HTML. Un test correcto confirma conectividad básica, no un flujo completo de emisión.
+
+<Callout type="info" title="Las sondas usan /health">
+  Los servicios del chart exponen sondas de inicio, disponibilidad y vida sobre <code>/health</code>. Un pod puede estar ejecutándose pero no recibir tráfico si la readiness probe falla.
+</Callout>
+
+No puedo iniciar sesión [#no-puedo-iniciar-sesión]
+
+Si recibes un 401:
+
+* comprueba que la autoridad OIDC de la UI sea accesible desde el navegador;
+* verifica emisor, audiencia y expiración del token;
+* confirma que el Gateway puede obtener las claves de la URI JWKS;
+* revisa que la ruta pública e interna del proveedor apunten al mismo realm.
+
+Si el login termina pero las APIs devuelven 403:
+
+* inspecciona los claims reales del token;
+* confirma que coinciden con un principal activo;
+* revisa las políticas concedidas al principal;
+* verifica que authz alcanza PostgreSQL y su JWKS.
+
+En una instalación nueva, confirma que el Job de migración terminó. Ese Job crea esquemas, migra authz, precarga políticas y provisiona los principales definidos en <code>services.authz.bootstrap</code>.
+
+Todo devuelve 403 o 5xx [#todo-devuelve-403-o-5xx]
+
+La autorización externa falla cerrada por defecto. Si authz no está disponible, las rutas protegidas se bloquean.
+
+1. Localiza el pod y Service de authz.
+2. Comprueba /health, logs y conexión a su base de datos.
+3. Verifica el DNS y puerto configurados en externalAuthorization.
+4. Comprueba que la ruta del check es /v1/ext\_authz/check.
+5. No cambies a <code>failOpen: true</code> como solución permanente: permitiría tráfico sin autorización durante la caída.
+
+Un pod no está Ready [#un-pod-no-está-ready]
+
+Revisa primero <code>kubectl describe pod</code>. Las causas habituales son:
+
+* credenciales o DNS incorrectos para PostgreSQL o RabbitMQ;
+* volumen persistente sin enlazar;
+* imagen inaccesible o política de pull incorrecta;
+* configuración inválida del motor criptográfico;
+* límites de CPU o memoria demasiado bajos;
+* migración previa incompleta.
+
+Los valores genéricos solicitan 100 mCPU y 128 MiB y limitan a 500 mCPU y 512 MiB. Ajusta por servicio cuando haya OOMKills, throttling o arranques lentos.
+
+Los motores KMS basados en filesystem y el almacenamiento local de VA utilizan volúmenes de acceso exclusivo. Mantén una réplica o migra a backends compartidos antes de habilitar autoscaling.
+
+La emisión falla [#la-emisión-falla]
+
+Acota el error siguiendo este orden:
+
+1. La CA existe, está activa y no ha expirado.
+2. La CA tiene una clave privada utilizable y el motor está disponible.
+3. La CSR tiene una firma válida.
+4. El perfil permite el tipo y tamaño de clave.
+5. La validez solicitada cabe dentro de la vigencia de la CA.
+6. KU, EKU, sujeto y extensiones cumplen el perfil.
+
+Si la reemisión de una CA falla, recuerda que no se admite para una CA revocada o ya expirada. Para cambiar su clave, sigue [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation).
+
+El enrolamiento EST falla [#el-enrolamiento-est-falla]
+
+Comprueba:
+
+* el identificador del DMS en el path EST;
+* el método de autenticación configurado;
+* la cadena presentada por el cliente;
+* las CAs de validación y el límite de niveles;
+* el estado de revocación del certificado cliente;
+* la firma de la CSR;
+* la CA y el perfil usados para emitir;
+* la ventana de re-enrolamiento.
+
+En re-enrolamiento, Lamassu intenta validar primero con la CA de enrolamiento y después con las CAs adicionales. Durante una migración, conserva la CA anterior en ese segundo conjunto hasta terminar el solapamiento.
+
+OCSP o CRL no reflejan un cambio [#ocsp-o-crl-no-reflejan-un-cambio]
+
+* Confirma que la revocación quedó persistida y tiene razón y timestamp.
+* Revisa la configuración y logs de VA.
+* Comprueba la periodicidad y próxima actualización de la CRL.
+* Descarta cachés intermedias en proxy y cliente.
+* Verifica que el certificado apunta al endpoint que estás consultando.
+* Consulta por número de serie y emisor correctos.
+
+Los eventos no llegan [#los-eventos-no-llegan]
+
+Los eventos de dominio y auditoría dependen del publisher del bus:
+
+* verifica que esté habilitado en el servicio emisor;
+* comprueba conectividad y credenciales AMQP;
+* revisa exchange, routing key, colas y consumidores;
+* inspecciona dead-letter queues;
+* alerta sobre colas durables huérfanas y crecimiento de backlog.
+
+Una caída del consumidor no siempre impide que la operación principal termine. Por eso debes monitorizar RabbitMQ y verificar de forma independiente la persistencia de [auditoría](/docs/platform/pki/audit-logs).
+
+Observabilidad [#observabilidad]
+
+El chart puede habilitar instrumentación OpenTelemetry. Las trazas se exportan por OTLP HTTP y los logs pueden dirigirse a un endpoint compatible, como VictoriaLogs. Usa un identificador de correlación y la misma ventana temporal para unir Gateway, authz, servicio y dependencia.
+
+Antes de cerrar una incidencia, guarda:
+
+* causa confirmada;
+* alcance temporal y recursos afectados;
+* comandos o consultas utilizados;
+* cambio aplicado y forma de revertirlo;
+* validación desde un consumidor;
+* acción preventiva y propietario.

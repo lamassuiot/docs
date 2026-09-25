@@ -1,0 +1,70 @@
+# Device Management Service (/docs/es/platform/pki/device-enrollment)
+
+
+
+Un **Device Management Service (DMS)** actúa como autoridad de registro frente a una flota. Recibe solicitudes, aplica la política de autenticación y encarga la emisión a la CA configurada.
+
+Cada DMS es un límite operativo independiente: puede representar una línea de producto, un entorno o un tipo de dispositivo con su propia CA, reglas de autenticación, confianza distribuida y ventana de renovación.
+
+Antes de empezar [#antes-de-empezar]
+
+* Crea o importa al menos una CA activa.
+* Decide cómo se autenticarán los dispositivos durante el primer enrolamiento.
+* Define qué autoridades debe recibir el dispositivo como anclas de confianza.
+* Asegúrate de tener permisos para administrar DMS.
+
+Configura un DMS [#configura-un-dms]
+
+<Steps>
+  <Step>
+    Identifica la flota [#identifica-la-flota]
+
+    Asigna al DMS un nombre que describa su alcance, por ejemplo una familia de dispositivos o un entorno.
+  </Step>
+
+  <Step>
+    Selecciona la CA de enrolamiento [#selecciona-la-ca-de-enrolamiento]
+
+    Elige la autoridad que emitirá las identidades. Su política y periodo de validez condicionan los certificados que podrá obtener la flota.
+  </Step>
+
+  <Step>
+    Configura EST [#configura-est]
+
+    Define la autenticación de `enroll`, la política de `reenroll`, la ventana de renovación y, si se necesita, `serverkeygen`.
+  </Step>
+
+  <Step>
+    Distribuye la confianza [#distribuye-la-confianza]
+
+    Configura **CA Distribution** para controlar la respuesta del endpoint `cacerts`.
+  </Step>
+
+  <Step>
+    Verifica los endpoints [#verifica-los-endpoints]
+
+    Desde el menú del DMS, abre **EST (RFC-7030)** y comprueba la URL base y los ejemplos de invocación antes de integrar el firmware.
+  </Step>
+</Steps>
+
+Distribución de confianza [#distribución-de-confianza]
+
+* **Include Lamassu System CA** distribuye el certificado TLS del servidor Lamassu, útil para *pinning*. No representa una CA de emisión.
+* **Include Enrollment CA** añade la autoridad configurada para emitir las identidades del DMS.
+* **Managed CAs** permite incluir autoridades adicionales que el dispositivo debe considerar de confianza.
+
+Opera el inventario de DMS [#opera-el-inventario-de-dms]
+
+* **Edit** modifica la política del DMS.
+* **Go to DMS owned devices** abre únicamente los dispositivos de esa flota.
+* **Show/Edit Metadata** permite gestionar configuración avanzada y datos de integraciones.
+* **EST (RFC-7030)** muestra los endpoints y ejemplos específicos del DMS.
+* **Delete** elimina el DMS y su configuración. La acción es irreversible.
+
+Integra los dispositivos [#integra-los-dispositivos]
+
+<Cards>
+  <Card title="Enrolamiento EST" description="Configura autenticación, endpoints y flujos para firmware." href="/docs/platform/pki/est-enrollment" />
+
+  <Card title="Dispositivos e identidades" description="Consulta estados, historial y acciones operativas." href="/docs/platform/pki/device-management" />
+</Cards>

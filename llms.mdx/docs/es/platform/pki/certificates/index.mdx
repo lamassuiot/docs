@@ -1,0 +1,56 @@
+# Certificados (/docs/es/platform/pki/certificates)
+
+
+
+El inventario de certificados ofrece una vista global de las identidades emitidas por todas las autoridades. También puedes abrir **Issued Certificates** dentro de una CA para limitar la vista a ese emisor.
+
+Busca un certificado [#busca-un-certificado]
+
+Abre **Certificates** y filtra por:
+
+* `Common Name` del sujeto.
+* Número de serie.
+* Estado.
+* Autoridad emisora.
+
+Utiliza **Quick Inspect** para una comprobación rápida o **View Details** para ver el sujeto, SANs, usos, cadena, periodo de validez y metadatos completos.
+
+Descarga el certificado [#descarga-el-certificado]
+
+La acción de descarga entrega el certificado en formato PEM. Si el certificado se emitió mediante un CSR externo, la clave privada permanece en el sistema que generó ese CSR. Si se generó en el navegador, la clave solo estuvo disponible al finalizar la emisión.
+
+Revoca un certificado [#revoca-un-certificado]
+
+Revoca una identidad cuando la clave se haya comprometido, el sujeto ya no esté autorizado o el certificado deba dejar de aceptarse antes de expirar.
+
+<Steps>
+  <Step>
+    Abre la acción [#abre-la-acción]
+
+    En el inventario o la vista de detalle, selecciona **Revoke Certificate**.
+  </Step>
+
+  <Step>
+    Elige una razón [#elige-una-razón]
+
+    Selecciona la razón que represente el incidente. Esta información se publica en OCSP y en la CRL.
+  </Step>
+
+  <Step>
+    Confirma y verifica [#confirma-y-verifica]
+
+    Confirma la operación y comprueba que el estado sea **Revoked**. Si la CA regenera la CRL al revocar, verifica también que exista una versión nueva.
+  </Step>
+</Steps>
+
+<Callout type="warn" title="Solo CertificateHold es reversible">
+  Una revocación con la razón `CertificateHold` puede reactivarse. Las demás razones producen una revocación definitiva.
+</Callout>
+
+Continúa [#continúa]
+
+<Cards>
+  <Card title="Validar con OCSP" description="Consulta el estado de un certificado en tiempo real." href="/docs/platform/pki/ocsp" />
+
+  <Card title="Distribuir una CRL" description="Publica el estado para validación offline." href="/docs/platform/pki/crl" />
+</Cards>

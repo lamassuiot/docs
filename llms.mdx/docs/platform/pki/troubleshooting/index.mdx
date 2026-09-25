@@ -1,46 +1,46 @@
-# Resolución de problemas (/docs/platform/pki/troubleshooting)
+# Troubleshooting (/docs/platform/pki/troubleshooting)
 
 
 
-Empieza por localizar la capa que falla. Una respuesta del Gateway, un pod no preparado y una emisión rechazada pueden parecer el mismo problema desde la consola, pero requieren evidencias distintas.
+Start by locating the failing layer. A Gateway response, an unready pod and a rejected issuance can look like the same problem from the console, but they require different evidence.
 
-Secuencia de diagnóstico [#secuencia-de-diagnóstico]
+Diagnostic sequence [#diagnostic-sequence]
 
 <Steps>
   <Step>
-    Reproduce una sola operación [#reproduce-una-sola-operación]
+    Reproduce a single operation [#reproduce-a-single-operation]
 
-    Anota hora en UTC, usuario o principal, recurso, endpoint y resultado. Evita repetir una acción destructiva como revocación o eliminación.
+    Note the time in UTC, user or principal, resource, endpoint and result. Avoid repeating a destructive action such as revocation or deletion.
   </Step>
 
   <Step>
-    Separa cliente, Gateway y servicio [#separa-cliente-gateway-y-servicio]
+    Separate client, Gateway and service [#separate-client-gateway-and-service]
 
-    Comprueba el código HTTP. Un 401 apunta a autenticación; un 403, a autorización; un 404, a ruta o recurso; un 5xx, al servicio o una dependencia.
+    Check the HTTP status. A 401 points to authentication; a 403, to authorization; a 404, to route or resource; a 5xx, to the service or a dependency.
   </Step>
 
   <Step>
-    Revisa el estado de Kubernetes [#revisa-el-estado-de-kubernetes]
+    Review Kubernetes status [#review-kubernetes-status]
 
-    Localiza pods no preparados, reinicios, eventos recientes y el estado del release.
+    Locate unready pods, restarts, recent events and the state of the release.
   </Step>
 
   <Step>
-    Consulta el servicio afectado [#consulta-el-servicio-afectado]
+    Query the affected service [#query-the-affected-service]
 
-    Revisa su endpoint /health y sus logs en la misma ventana temporal. Después sigue la dependencia indicada: PostgreSQL, RabbitMQ, proveedor OIDC o motor criptográfico.
+    Review its /health endpoint and its logs in the same time window. Then follow the indicated dependency: PostgreSQL, RabbitMQ, the OIDC provider or the cryptographic engine.
   </Step>
 
   <Step>
-    Valida el resultado desde fuera [#valida-el-resultado-desde-fuera]
+    Validate the result from outside [#validate-the-result-from-outside]
 
-    Para PKI, comprueba el certificado, la cadena, OCSP o CRL con el mismo tipo de cliente que utiliza producción.
+    For PKI, check the certificate, the chain, OCSP or CRL with the same type of client production uses.
   </Step>
 </Steps>
 
-Recogida mínima de evidencias [#recogida-mínima-de-evidencias]
+Minimal evidence collection [#minimal-evidence-collection]
 
-Sustituye los marcadores por tu release, namespace y deployment reales.
+Replace the placeholders with your real release, namespace and deployment.
 
 ```bash
 helm status <release> -n <namespace>
@@ -51,119 +51,119 @@ kubectl describe pod <pod> -n <namespace>
 kubectl logs <pod> -n <namespace> --all-containers --since=30m
 ```
 
-Ejecuta también la prueba de conectividad del chart:
+Also run the chart's connectivity test:
 
 ```bash
 helm test <release> -n <namespace>
 ```
 
-El test consulta la salud de CA, DMS Manager, Device Manager y VA, y comprueba que la UI devuelve HTML. Un test correcto confirma conectividad básica, no un flujo completo de emisión.
+The test checks the health of CA, DMS Manager, Device Manager and VA, and verifies that the UI returns HTML. A passing test confirms basic connectivity, not a full issuance flow.
 
-<Callout type="info" title="Las sondas usan /health">
-  Los servicios del chart exponen sondas de inicio, disponibilidad y vida sobre <code>/health</code>. Un pod puede estar ejecutándose pero no recibir tráfico si la readiness probe falla.
+<Callout type="info" title="Probes use /health">
+  The chart's services expose startup, readiness and liveness probes over <code>/health</code>. A pod can be running but receive no traffic if the readiness probe fails.
 </Callout>
 
-No puedo iniciar sesión [#no-puedo-iniciar-sesión]
+I cannot sign in [#i-cannot-sign-in]
 
-Si recibes un 401:
+If you receive a 401:
 
-* comprueba que la autoridad OIDC de la UI sea accesible desde el navegador;
-* verifica emisor, audiencia y expiración del token;
-* confirma que el Gateway puede obtener las claves de la URI JWKS;
-* revisa que la ruta pública e interna del proveedor apunten al mismo realm.
+* check that the UI's OIDC authority is reachable from the browser;
+* verify issuer, audience and expiration of the token;
+* confirm the Gateway can fetch the keys from the JWKS URI;
+* check that the provider's public and internal routes point to the same realm.
 
-Si el login termina pero las APIs devuelven 403:
+If login succeeds but the APIs return 403:
 
-* inspecciona los claims reales del token;
-* confirma que coinciden con un principal activo;
-* revisa las políticas concedidas al principal;
-* verifica que authz alcanza PostgreSQL y su JWKS.
+* inspect the token's real claims;
+* confirm they match an active principal;
+* review the policies granted to that principal;
+* verify that authz reaches PostgreSQL and its JWKS.
 
-En una instalación nueva, confirma que el Job de migración terminó. Ese Job crea esquemas, migra authz, precarga políticas y provisiona los principales definidos en <code>services.authz.bootstrap</code>.
+On a fresh installation, confirm the migration Job finished. That Job creates schemas, migrates authz, preloads policies and provisions the principals defined in <code>services.authz.bootstrap</code>.
 
-Todo devuelve 403 o 5xx [#todo-devuelve-403-o-5xx]
+Everything returns 403 or 5xx [#everything-returns-403-or-5xx]
 
-La autorización externa falla cerrada por defecto. Si authz no está disponible, las rutas protegidas se bloquean.
+External authorization fails closed by default. If authz is unavailable, protected routes are blocked.
 
-1. Localiza el pod y Service de authz.
-2. Comprueba /health, logs y conexión a su base de datos.
-3. Verifica el DNS y puerto configurados en externalAuthorization.
-4. Comprueba que la ruta del check es /v1/ext\_authz/check.
-5. No cambies a <code>failOpen: true</code> como solución permanente: permitiría tráfico sin autorización durante la caída.
+1. Locate the authz pod and Service.
+2. Check /health, logs and its database connection.
+3. Verify the DNS and port configured in externalAuthorization.
+4. Check the check route is /v1/ext\_authz/check.
+5. Do not switch to <code>failOpen: true</code> as a permanent workaround: it would allow traffic without authorization during the outage.
 
-Un pod no está Ready [#un-pod-no-está-ready]
+A pod is not Ready [#a-pod-is-not-ready]
 
-Revisa primero <code>kubectl describe pod</code>. Las causas habituales son:
+Review <code>kubectl describe pod</code> first. Common causes are:
 
-* credenciales o DNS incorrectos para PostgreSQL o RabbitMQ;
-* volumen persistente sin enlazar;
-* imagen inaccesible o política de pull incorrecta;
-* configuración inválida del motor criptográfico;
-* límites de CPU o memoria demasiado bajos;
-* migración previa incompleta.
+* wrong credentials or DNS for PostgreSQL or RabbitMQ;
+* unbound persistent volume;
+* inaccessible image or incorrect pull policy;
+* invalid cryptographic engine configuration;
+* CPU or memory limits set too low;
+* an incomplete prior migration.
 
-Los valores genéricos solicitan 100 mCPU y 128 MiB y limitan a 500 mCPU y 512 MiB. Ajusta por servicio cuando haya OOMKills, throttling o arranques lentos.
+Generic values request 100 mCPU and 128 MiB and limit to 500 mCPU and 512 MiB. Tune per service when you see OOMKills, throttling or slow startups.
 
-Los motores KMS basados en filesystem y el almacenamiento local de VA utilizan volúmenes de acceso exclusivo. Mantén una réplica o migra a backends compartidos antes de habilitar autoscaling.
+Filesystem-based KMS engines and VA local storage use exclusive-access volumes. Keep a single replica or migrate to shared backends before enabling autoscaling.
 
-La emisión falla [#la-emisión-falla]
+Issuance fails [#issuance-fails]
 
-Acota el error siguiendo este orden:
+Narrow the error following this order:
 
-1. La CA existe, está activa y no ha expirado.
-2. La CA tiene una clave privada utilizable y el motor está disponible.
-3. La CSR tiene una firma válida.
-4. El perfil permite el tipo y tamaño de clave.
-5. La validez solicitada cabe dentro de la vigencia de la CA.
-6. KU, EKU, sujeto y extensiones cumplen el perfil.
+1. The CA exists, is active and has not expired.
+2. The CA has a usable private key and the engine is available.
+3. The CSR has a valid signature.
+4. The profile allows the key type and size.
+5. The requested validity fits within the CA's lifetime.
+6. KU, EKU, subject and extensions comply with the profile.
 
-Si la reemisión de una CA falla, recuerda que no se admite para una CA revocada o ya expirada. Para cambiar su clave, sigue [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation).
+If the reissuance of a CA fails, remember it is not supported for a revoked or already-expired CA. To change its key, follow [CA hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation).
 
-El enrolamiento EST falla [#el-enrolamiento-est-falla]
+EST enrollment fails [#est-enrollment-fails]
 
-Comprueba:
+Check:
 
-* el identificador del DMS en el path EST;
-* el método de autenticación configurado;
-* la cadena presentada por el cliente;
-* las CAs de validación y el límite de niveles;
-* el estado de revocación del certificado cliente;
-* la firma de la CSR;
-* la CA y el perfil usados para emitir;
-* la ventana de re-enrolamiento.
+* the DMS identifier in the EST path;
+* the configured authentication method;
+* the chain presented by the client;
+* the validation CAs and the level limit;
+* the revocation status of the client certificate;
+* the CSR signature;
+* the CA and profile used for issuance;
+* the re-enrollment window.
 
-En re-enrolamiento, Lamassu intenta validar primero con la CA de enrolamiento y después con las CAs adicionales. Durante una migración, conserva la CA anterior en ese segundo conjunto hasta terminar el solapamiento.
+During re-enrollment, Lamassu first tries to validate with the enrollment CA and then with the additional CAs. During a migration, keep the old CA in that second set until the overlap ends.
 
-OCSP o CRL no reflejan un cambio [#ocsp-o-crl-no-reflejan-un-cambio]
+OCSP or CRL do not reflect a change [#ocsp-or-crl-do-not-reflect-a-change]
 
-* Confirma que la revocación quedó persistida y tiene razón y timestamp.
-* Revisa la configuración y logs de VA.
-* Comprueba la periodicidad y próxima actualización de la CRL.
-* Descarta cachés intermedias en proxy y cliente.
-* Verifica que el certificado apunta al endpoint que estás consultando.
-* Consulta por número de serie y emisor correctos.
+* Confirm the revocation was persisted and has reason and timestamp.
+* Review VA configuration and logs.
+* Check the CRL's periodicity and next update.
+* Rule out intermediate caches in proxy and client.
+* Verify the certificate points to the endpoint you are querying.
+* Query by the correct serial number and issuer.
 
-Los eventos no llegan [#los-eventos-no-llegan]
+Events are not arriving [#events-are-not-arriving]
 
-Los eventos de dominio y auditoría dependen del publisher del bus:
+Domain and audit events depend on the bus publisher:
 
-* verifica que esté habilitado en el servicio emisor;
-* comprueba conectividad y credenciales AMQP;
-* revisa exchange, routing key, colas y consumidores;
-* inspecciona dead-letter queues;
-* alerta sobre colas durables huérfanas y crecimiento de backlog.
+* verify it is enabled in the emitting service;
+* check AMQP connectivity and credentials;
+* review exchange, routing key, queues and consumers;
+* inspect dead-letter queues;
+* alert on orphan durable queues and backlog growth.
 
-Una caída del consumidor no siempre impide que la operación principal termine. Por eso debes monitorizar RabbitMQ y verificar de forma independiente la persistencia de [auditoría](/docs/platform/pki/audit-logs).
+A consumer outage does not always prevent the main operation from completing. That is why you must monitor RabbitMQ and independently verify the persistence of [audit logs](/docs/platform/pki/audit-logs).
 
-Observabilidad [#observabilidad]
+Observability [#observability]
 
-El chart puede habilitar instrumentación OpenTelemetry. Las trazas se exportan por OTLP HTTP y los logs pueden dirigirse a un endpoint compatible, como VictoriaLogs. Usa un identificador de correlación y la misma ventana temporal para unir Gateway, authz, servicio y dependencia.
+The chart can enable OpenTelemetry instrumentation. Traces are exported over OTLP HTTP and logs can be directed to a compatible endpoint, such as VictoriaLogs. Use a correlation identifier and the same time window to join Gateway, authz, service and dependency.
 
-Antes de cerrar una incidencia, guarda:
+Before closing an incident, record:
 
-* causa confirmada;
-* alcance temporal y recursos afectados;
-* comandos o consultas utilizados;
-* cambio aplicado y forma de revertirlo;
-* validación desde un consumidor;
-* acción preventiva y propietario.
+* the confirmed cause;
+* the time scope and affected resources;
+* the commands or queries used;
+* the applied change and how to revert it;
+* validation from a consumer;
+* the preventive action and its owner.

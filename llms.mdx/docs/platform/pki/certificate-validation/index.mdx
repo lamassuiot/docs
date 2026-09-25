@@ -1,19 +1,19 @@
-# Validación de certificados (/docs/platform/pki/certificate-validation)
+# Certificate validation (/docs/platform/pki/certificate-validation)
 
 
 
-La emisión demuestra quién firmó un certificado; la validación permite saber si todavía debe aceptarse. Lamassu publica el estado mediante dos mecanismos complementarios.
+Issuance proves who signed a certificate; validation tells you whether it should still be accepted. Lamassu publishes status through two complementary mechanisms.
 
-Elige un mecanismo [#elige-un-mecanismo]
+Choose a mechanism [#choose-a-mechanism]
 
-Usa **OCSP** cuando el consumidor esté conectado y necesite consultar el estado más reciente de un certificado concreto.
+Use **OCSP** when the consumer is online and needs to check the latest status of a specific certificate.
 
-Usa una **CRL** cuando la validación deba realizarse localmente, sin conexión o sobre un volumen elevado de certificados. El consumidor descarga periódicamente una lista firmada y la conserva hasta la siguiente actualización.
+Use a **CRL** when validation must happen locally, offline or over a high volume of certificates. The consumer periodically downloads a signed list and keeps it until the next update.
 
-Muchos entornos utilizan ambos: OCSP como comprobación primaria y CRL como mecanismo local o de respaldo.
+Many environments use both: OCSP as the primary check and a CRL as the local or fallback mechanism.
 
 <Cards>
-  <Card title="Validación online con OCSP" description="Consulta estados Good, Revoked y Unknown en tiempo real." href="/docs/platform/pki/ocsp" />
+  <Card title="Online validation with OCSP" description="Query Good, Revoked and Unknown statuses in real time." href="/docs/platform/pki/ocsp" />
 
-  <Card title="Listas de revocación" description="Genera, publica y distribuye CRLs por autoridad." href="/docs/platform/pki/crl" />
+  <Card title="Revocation lists" description="Generate, publish and distribute CRLs per authority." href="/docs/platform/pki/crl" />
 </Cards>

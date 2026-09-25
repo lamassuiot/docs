@@ -1,100 +1,100 @@
-# Glosario (/docs/platform/pki/concepts/glossary)
+# Glossary (/docs/platform/pki/concepts/glossary)
 
 
 
 A–C [#ac]
 
 **AKI (Authority Key Identifier)**\
-Identificador de la clave pública de la autoridad que firmó un certificado. Ayuda a construir la cadena hacia el emisor correcto.
+Identifier of the public key of the authority that signed a certificate. It helps build the chain toward the correct issuer.
 
-**Ancla de confianza**\
-Certificado, normalmente de una CA raíz, que un consumidor acepta de forma explícita como punto final de una cadena.
+**Anchor of trust**\
+A certificate, usually from a root CA, that a consumer explicitly accepts as the endpoint of a chain.
 
 **CA (Certification Authority)**\
-Autoridad que firma certificados y vincula una identidad con una clave pública.
+Authority that signs certificates and binds an identity to a public key.
 
-**CA intermedia**\
-CA firmada por otra autoridad. Se utiliza para emitir sin exponer la raíz a la operación diaria.
+**Intermediate CA**\
+A CA signed by another authority. Used to issue without exposing the root to daily operation.
 
-**CA raíz**\
-CA autofirmada que inicia una jerarquía de confianza.
+**Root CA**\
+A self-signed CA that starts a hierarchy of trust.
 
-**Certificado X.509**\
-Documento firmado que contiene una clave pública, un sujeto, un emisor, un periodo de validez y extensiones que delimitan su uso.
+**X.509 certificate**\
+A signed document containing a public key, a subject, an issuer, a validity period and extensions that constrain its use.
 
 **CRL (Certificate Revocation List)**\
-Lista firmada de certificados revocados publicada por una CA.
+Signed list of revoked certificates published by a CA.
 
 **CSR (Certificate Signing Request)**\
-Solicitud PKCS#10 que contiene una clave pública y atributos solicitados. La firma de la CSR demuestra posesión de la clave privada correspondiente.
+PKCS#10 request containing a public key and requested attributes. Signing the CSR proves possession of the corresponding private key.
 
 D–K [#dk]
 
 **DMS (Device Management Service)**\
-Configuración que agrupa reglas de registro, enrolamiento, re-enrolamiento, emisión y distribución de CAs para una flota.
+Configuration that groups registration, enrollment, re-enrollment, issuance and CA distribution rules for a fleet.
 
 **Distinguished Name (DN)**\
-Conjunto de atributos del sujeto o emisor, como `CN`, `O`, `OU`, `C`, `ST` y `L`.
+Set of subject or issuer attributes, such as `CN`, `O`, `OU`, `C`, `ST` and `L`.
 
 **EST (Enrollment over Secure Transport)**\
-Protocolo definido en RFC 7030 para obtener CAs, enrolar y re-enrolar certificados sobre HTTPS.
+Protocol defined in RFC 7030 to obtain CAs, enroll and re-enroll certificates over HTTPS.
 
 **Extended Key Usage (EKU)**\
-Extensión que acota finalidades como autenticación de cliente, autenticación de servidor, firma de código u OCSP.
+Extension that constrains purposes such as client authentication, server authentication, code signing or OCSP.
 
-**Identidad de dispositivo**\
-Relación entre un dispositivo y uno de sus certificados. Un dispositivo puede conservar un historial de identidades.
+**Device identity**\
+Relationship between a device and one of its certificates. A device can keep a history of identities.
 
 **Identity slot**\
-Posición lógica en un dispositivo donde Lamassu vincula una identidad activa o histórica.
+Logical position on a device where Lamassu binds an active or historical identity.
 
 **JITP (Just-in-Time Provisioning)**\
-Registro automático de un dispositivo cuando completa correctamente su primer enrolamiento.
+Automatic registration of a device when it successfully completes its first enrollment.
 
 **KMS (Key Management Service)**\
-Servicio de Lamassu que normaliza generación, importación y uso de claves sobre distintos motores criptográficos.
+Lamassu service that normalizes key generation, import and use across different cryptographic engines.
 
 **Key Usage**\
-Extensión X.509 que permite operaciones básicas como firma digital, cifrado de clave o firma de certificados.
+X.509 extension that allows basic operations such as digital signature, key encryption or certificate signing.
 
 M–R [#mr]
 
 **mTLS (Mutual TLS)**\
-TLS donde cliente y servidor presentan certificados. Un DMS puede usar el certificado cliente como método de autenticación.
+TLS where both client and server present certificates. A DMS can use the client certificate as an authentication method.
 
 **OCSP (Online Certificate Status Protocol)**\
-Protocolo para consultar en línea si un certificado está vigente, revocado o es desconocido.
+Protocol for querying online whether a certificate is valid, revoked or unknown.
 
-**Perfil de emisión**\
-Política reutilizable que define cómo Lamassu construye un certificado y qué claves acepta.
+**Issuance profile**\
+Reusable policy that defines how Lamassu builds a certificate and which keys it accepts.
 
 **Principal**\
-Identidad de operador o cliente de API reconocida por el servicio de autorización. Lamassu admite principales OIDC y X.509.
+Operator or API client identity recognized by the authorization service. Lamassu supports OIDC and X.509 principals.
 
-**Política**\
-Conjunto de permisos asignable a uno o varios principales.
+**Policy**\
+Set of permissions assignable to one or more principals.
 
 **RA (Registration Authority)**\
-Componente que verifica al solicitante antes de pedir a una CA que emita. El DMS cumple este papel en los flujos de enrolamiento de dispositivos.
+Component that verifies the requester before asking a CA to issue. The DMS plays this role in device enrollment flows.
 
 **Relying party**\
-Sistema consumidor que decide si acepta un certificado presentado.
+Consuming system that decides whether to accept a presented certificate.
 
-**Revocación**\
-Invalidación de un certificado antes de su fecha de expiración.
+**Revocation**\
+Invalidation of a certificate before its expiration date.
 
 S–Z [#sz]
 
 **SAN (Subject Alternative Name)**\
-Extensión que añade identidades como nombres DNS, direcciones IP, correos o URIs.
+Extension that adds identities such as DNS names, IP addresses, emails or URIs.
 
 **SKI (Subject Key Identifier)**\
-Identificador derivado de la clave pública del propio certificado.
+Identifier derived from the public key of the certificate itself.
 
 **VA (Validation Authority)**\
-Servicio de Lamassu responsable de las respuestas OCSP y la generación o publicación de CRLs.
+Lamassu service responsible for OCSP responses and the generation or publication of CRLs.
 
-**Ventana de renovación**\
-Periodo anterior a la expiración durante el que un dispositivo puede o debe solicitar otra identidad.
+**Renewal window**\
+Period before expiration during which a device may or must request another identity.
 
-¿Falta un término operativo? Consulta primero [Cómo funciona Lamassu](/docs/platform/pki/concepts/overview) y el [Modelo de confianza](/docs/platform/pki/concepts/trust-model), donde estos conceptos aparecen conectados.
+Missing an operational term? Check [How Lamassu works](/docs/platform/pki/concepts/overview) and the [Trust model](/docs/platform/pki/concepts/trust-model) first, where these concepts appear connected.

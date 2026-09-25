@@ -1,190 +1,190 @@
-# Claves y motores criptográficos (/docs/platform/pki/key-management)
+# Keys and cryptographic engines (/docs/platform/pki/key-management)
 
 
 
-Gestión de claves criptográficas [#gestión-de-claves-criptográficas]
+Cryptographic key management [#cryptographic-key-management]
 
-El servicio de Gestión de Claves Criptográficas (KMS) de Lamassu IoT centraliza la generación, importación, custodia y uso de las claves de la plataforma. Desde aquí se gestionan las claves que soportan a las CAs y al resto de operaciones de firma que dependen de la PKI.
+The Cryptographic Key Management Service (KMS) of Lamassu IoT centralizes the generation, import, custody and use of the platform's keys. This is where you manage the keys that support the CAs and the rest of the signing operations that depend on the PKI.
 
-En la configuración actual, Lamassu IoT trabaja exclusivamente con claves asimétricas, como RSA y curvas elípticas. Estas claves se usan para emitir certificados X.509, firmar solicitudes y realizar operaciones de autenticación y validación dentro del sistema.
+In the current configuration, Lamassu IoT works exclusively with asymmetric keys, such as RSA and elliptic curves. These keys are used to issue X.509 certificates, sign requests and perform authentication and validation operations within the system.
 
-Qué resuelve el KMS [#qué-resuelve-el-kms]
+What the KMS solves [#what-the-kms-solves]
 
-El KMS unifica la gestión del ciclo de vida de las claves y evita que cada servicio tenga que integrarse directamente con un proveedor criptográfico concreto.
+The KMS unifies key lifecycle management and prevents every service from having to integrate directly with a specific cryptographic provider.
 
-En la práctica, permite:
+In practice, it lets you:
 
-* Generar nuevos pares de claves desde Lamassu IoT.
-* Importar claves creadas externamente.
-* Delegar la custodia y las operaciones criptográficas en motores externos.
-* Reutilizar claves ya existentes para CAs, CSR y tareas de firma o verificación.
+* Generate new key pairs from Lamassu IoT.
+* Import keys created externally.
+* Delegate custody and cryptographic operations to external engines.
+* Reuse existing keys for CAs, CSRs and signing or verification tasks.
 
-Motores criptográficos [#motores-criptográficos]
+Cryptographic engines [#cryptographic-engines]
 
-Lamassu puede trabajar con distintos motores criptográficos según los requisitos del despliegue. En algunos entornos bastará con un motor software; en otros será necesario delegar la custodia en un HSM, en un servicio cloud o en una plataforma especializada.
+Lamassu can work with different cryptographic engines depending on deployment requirements. In some environments a software engine is enough; in others custody must be delegated to an HSM, a cloud service or a specialized platform.
 
-Una misma instancia puede tener varios motores configurados al mismo tiempo, incluso varias instancias del mismo tipo. Esto permite adaptar la operación a distintos niveles de seguridad, coste y requisitos regulatorios.
+A single instance can have several engines configured at the same time, including multiple instances of the same type. This lets you adapt operations to different security, cost and regulatory requirements.
 
-Actualmente, Lamassu soporta cinco tipos de motor. Elige según el nivel de aislamiento que necesites y quién debe poder acceder al material privado.
+Currently, Lamassu supports five engine types. Choose according to the isolation level you need and who should be able to access private material.
 
 File System [#file-system]
 
-Genera las claves con las librerías criptográficas de Go y delega su protección en el sistema de archivos. Funciona tanto on-premise como en cloud, pero no evita la extracción de la clave y no está recomendado para producción.
+Generates keys with Go's cryptographic libraries and delegates their protection to the file system. It works both on-premise and in the cloud, but it does not prevent key extraction and is not recommended for production.
 
 HashiCorp Vault [#hashicorp-vault]
 
-Protege las claves en reposo y puede ejecutarse on-premise o en cloud. Un administrador con permisos suficientes todavía puede visualizar el material privado, por lo que conviene limitar el acceso administrativo y custodiar las claves de *unseal*.
+Protects keys at rest and can run on-premise or in the cloud. An administrator with sufficient permissions can still view private material, so it is wise to limit administrative access and safeguard the *unseal* keys.
 
 AWS Secrets Manager [#aws-secrets-manager]
 
-Ofrece persistencia cifrada en AWS con coste asociado. Protege la clave en reposo, pero un administrador autorizado puede recuperarla; no proporciona la misma resistencia a la extracción que un KMS o HSM.
+Offers encrypted persistence in AWS at a cost. It protects the key at rest, but an authorized administrator can recover it; it does not provide the same extraction resistance as a KMS or HSM.
 
 AWS KMS [#aws-kms]
 
-Genera las claves con entropía hardware y no expone la clave privada. Las operaciones se ejecutan dentro del servicio. Aun así, una identidad con permisos suficientes podría utilizar la clave para firmar, por lo que la política IAM sigue siendo crítica.
+Generates keys with hardware entropy and never exposes the private key. Operations run inside the service. Even so, an identity with sufficient permissions could use the key to sign, so IAM policy remains critical.
 
 PKCS#11 [#pkcs11]
 
-Permite integrar HSMs locales, entornos aislados y servicios *Key as a Service*. La generación, persistencia y resistencia a la extracción dependen del dispositivo o proveedor concreto. Es la opción más flexible cuando la política exige custodia hardware.
+Allows integrating local HSMs, isolated environments and *Key as a Service* offerings. Generation, persistence and extraction resistance depend on the specific device or provider. It is the most flexible option when policy requires hardware custody.
 
-Lamassu muestra en la consola el listado completo de motores habilitados.
+Lamassu shows the full list of enabled engines in the console.
 
-Cada motor define qué algoritmos soporta, como RSA o ECC/ECDSA, y qué tamaños de clave puede generar.
+Each engine defines which algorithms it supports, such as RSA or ECC/ECDSA, and which key sizes it can generate.
 
-Durante el despliegue es obligatorio definir un motor por defecto. Ese motor se utilizará cuando un proceso necesite crear o persistir una clave y el usuario no haya seleccionado uno específico, por ejemplo al crear o importar una CA.
+During deployment it is mandatory to define a default engine. That engine will be used when a process needs to create or persist a key and the user has not selected a specific one, for example when creating or importing a CA.
 
-Inventario de claves [#inventario-de-claves]
+Key inventory [#key-inventory]
 
-La pantalla principal de KMS muestra el inventario completo de claves registradas en el sistema. Es la vista de referencia para revisar qué claves existen, dónde están custodiadas y con qué entidades están relacionadas.
+The main KMS screen shows the complete inventory of keys registered in the system. It is the reference view for reviewing which keys exist, where they are kept and which entities they relate to.
 
-La tabla incluye los siguientes campos:
+The table includes the following fields:
 
-* **Name**: nombre descriptivo de la clave.
-* **Type**: algoritmo y tamaño de clave, por ejemplo RSA 2048 o EC P-256.
-* **Strength**: indicador visual de fortaleza criptográfica.
-* **Public/Private**: indica si Lamassu gestiona el par completo o solo la clave pública.
-* **Crypto Engine**: motor criptográfico que custodia la clave.
-* **Aliases**: nombres alternativos asociados a la clave.
-* **Tags**: etiquetas para clasificación y búsqueda.
-* **Related Entities**: certificados u otras entidades vinculadas a esa clave.
+* **Name**: descriptive name of the key.
+* **Type**: algorithm and key size, for example RSA 2048 or EC P-256.
+* **Strength**: visual indicator of cryptographic strength.
+* **Public/Private**: whether Lamassu manages the full pair or only the public key.
+* **Crypto Engine**: cryptographic engine keeping the key.
+* **Aliases**: alternative names associated with the key.
+* **Tags**: labels for classification and search.
+* **Related Entities**: certificates or other entities linked to that key.
 
-Desde esta vista también se accede a las acciones más habituales:
+From this view you also reach the most common actions:
 
-* **View Details** para consultar metadatos, identificadores y relaciones.
-* **Generate CSR** para crear una solicitud PKCS#10 con la clave seleccionada.
-* **Sign / Verify** para probar operaciones criptográficas sobre la clave.
-* **Delete Key** para eliminar la clave del sistema.
+* **View Details** to inspect metadata, identifiers and relationships.
+* **Generate CSR** to create a PKCS#10 request with the selected key.
+* **Sign / Verify** to test cryptographic operations on the key.
+* **Delete Key** to remove the key from the system.
 
-Crear o importar claves [#crear-o-importar-claves]
+Create or import keys [#create-or-import-keys]
 
-El alta de claves se realiza desde el asistente que se abre con **Create New Key**.
+Keys are registered from the wizard opened with **Create New Key**.
 
-Generar un nuevo par de claves [#generar-un-nuevo-par-de-claves]
+Generate a new key pair [#generate-a-new-key-pair]
 
-Si la clave va a nacer dentro de Lamassu, el flujo recomendado es generar un nuevo par gestionado directamente por uno de los motores configurados.
+If the key will be born inside Lamassu, the recommended flow is to generate a new pair managed directly by one of the configured engines.
 
-En la primera pantalla del asistente, elija **Generate New Key Pair** y después defina los parámetros principales:
+On the wizard's first screen, choose **Generate New Key Pair** and then define the main parameters:
 
-* **Key Name**: nombre único y descriptivo.
-* **Crypto Engine**: motor que custodiará la clave.
-* **Key Type** y **Key Size**: algoritmo y tamaño o curva.
-* **Tags**: metadatos para clasificar la clave.
-* **Metadata**: información adicional para usos avanzados.
+* **Key Name**: unique and descriptive name.
+* **Crypto Engine**: engine that will keep the key.
+* **Key Type** and **Key Size**: algorithm and size or curve.
+* **Tags**: metadata to classify the key.
+* **Metadata**: additional information for advanced uses.
 
-Importar un par existente [#importar-un-par-existente]
+Import an existing pair [#import-an-existing-pair]
 
-La importación permite registrar en Lamassu una clave generada fuera de la plataforma. Es el flujo habitual en escenarios BYOK, migraciones o integración con material criptográfico que ya está en producción.
+Importing lets you register in Lamassu a key generated outside the platform. It is the usual flow in BYOK scenarios, migrations or integration with cryptographic material already in production.
 
-* Cuando la clave se ha generado en un entorno aislado o en un HSM externo.
-* Cuando se necesita migrar una PKI existente sin reemitir certificados.
-* Cuando Lamassu debe operar con una raíz de confianza creada por un tercero.
+* When the key was generated in an isolated environment or an external HSM.
+* When an existing PKI needs to be migrated without reissuing certificates.
+* When Lamassu must operate with a root of trust created by a third party.
 
-En el asistente, elija **Import Existing Key Pair** y complete los campos solicitados:
+In the wizard, choose **Import Existing Key Pair** and complete the requested fields:
 
-* **Key Name**: nombre descriptivo dentro de Lamassu IoT.
-* **Crypto Engine**: motor que custodiará la clave importada.
-* **Tags**: etiquetas para organización y búsqueda.
-* **Metadata**: información adicional opcional.
-* **Private Key (PEM)**: clave privada en formato PEM.
+* **Key Name**: descriptive name within Lamassu IoT.
+* **Crypto Engine**: engine that will keep the imported key.
+* **Tags**: labels for organization and search.
+* **Metadata**: additional optional information.
+* **Private Key (PEM)**: private key in PEM format.
 
-Una vez completado el asistente, la clave queda almacenada en el motor seleccionado y puede utilizarse para firma, generación de CSR y el resto de operaciones soportadas por KMS.
+Once the wizard is complete, the key is stored in the selected engine and can be used for signing, CSR generation and the rest of the operations supported by the KMS.
 
-Operaciones sobre una clave [#operaciones-sobre-una-clave]
+Operations on a key [#operations-on-a-key]
 
-Cada clave registrada dispone de una vista de detalle y de varias acciones operativas.
+Each registered key has a detail view and several operational actions.
 
-Ver detalles [#ver-detalles]
+View details [#view-details]
 
-La pantalla **View Details** concentra la información técnica y administrativa de la clave.
+The **View Details** screen concentrates the technical and administrative information of the key.
 
-En la pestaña **Overview** se muestran, entre otros, estos campos:
+The **Overview** tab shows, among others, these fields:
 
-* **Key Name**: nombre descriptivo.
-* **Key Identifier**: identificador único del sistema. Lamassu utiliza formatos de ID basados en PKCS11.
-* **Tags**: etiquetas asociadas.
-* **Aliases**: nombres alternativos.
-* **Crypto Engine**: motor en el que reside la clave.
-* **Algorithm, Key Size & Strength**: algoritmo, parámetros y nivel de fortaleza.
+* **Key Name**: descriptive name.
+* **Key Identifier**: unique system identifier. Lamassu uses PKCS11-based ID formats.
+* **Tags**: associated labels.
+* **Aliases**: alternative names.
+* **Crypto Engine**: engine where the key resides.
+* **Algorithm, Key Size & Strength**: algorithm, parameters and strength level.
 
-La sección **Related Entities** muestra qué objetos de Lamassu dependen de esa clave.
+The **Related Entities** section shows which Lamassu objects depend on that key.
 
-La pestaña **Public Key** presenta la clave pública en formato PEM, lista para consulta o copia.
+The **Public Key** tab presents the public key in PEM format, ready to consult or copy.
 
-Firmar y verificar [#firmar-y-verificar]
+Sign and verify [#sign-and-verify]
 
-La acción **Sign / Verify** sirve para validar que la clave y el motor criptográfico funcionan correctamente.
+The **Sign / Verify** action validates that the key and the cryptographic engine work correctly.
 
-Al abrirla aparecen dos áreas: **Sign** y **Verify**.
+When you open it, two areas appear: **Sign** and **Verify**.
 
 Sign [#sign]
 
-Esta pestaña usa la clave privada para generar una firma digital sobre un mensaje o sobre un *digest* ya calculado.
+This tab uses the private key to generate a digital signature over a message or an already computed *digest*.
 
-Campos principales:
+Main fields:
 
-* **Algorithm**: algoritmo de firma disponible para el tipo de clave.
-* **Message Type**: `Raw` para datos en claro o `Digest` para un hash precalculado.
-* **Payload Encoding**: codificación de entrada, como UTF-8, Hex o Base64.
-* **Message**: contenido que se va a firmar.
-* **Signature**: resultado de la operación, mostrado en hexadecimal.
+* **Algorithm**: signing algorithm available for the key type.
+* **Message Type**: `Raw` for clear data or `Digest` for a precomputed hash.
+* **Payload Encoding**: input encoding, such as UTF-8, Hex or Base64.
+* **Message**: content to sign.
+* **Signature**: result of the operation, shown in hexadecimal.
 
 Verify [#verify]
 
-Esta pestaña comprueba si una firma corresponde a la clave pública asociada.
+This tab checks whether a signature corresponds to the associated public key.
 
-Campos principales:
+Main fields:
 
-* **Algorithm**: debe coincidir con el algoritmo usado para la firma.
-* **Message Type**: `Raw` o `Digest`.
-* **Payload Encoding**: codificación del mensaje.
-* **Message**: mensaje original o hash.
-* **Signature**: firma que se desea comprobar.
-* **Result**: indicador del resultado de la validación.
+* **Algorithm**: must match the algorithm used for the signature.
+* **Message Type**: `Raw` or `Digest`.
+* **Payload Encoding**: encoding of the message.
+* **Message**: original message or hash.
+* **Signature**: signature to check.
+* **Result**: indicator of the validation result.
 
-Generar un CSR [#generar-un-csr]
+Generate a CSR [#generate-a-csr]
 
-La acción **Generate CSR** crea una solicitud PKCS#10 firmada con la clave privada custodiada en Lamassu, sin exponerla fuera del motor criptográfico.
+The **Generate CSR** action creates a PKCS#10 request signed with the private key kept in Lamassu, without exposing it outside the cryptographic engine.
 
-Este flujo es útil para:
+This flow is useful for:
 
-* Solicitar certificados a una CA externa.
-* Renovar una identidad manteniendo la misma clave.
+* Requesting certificates from an external CA.
+* Renewing an identity while keeping the same key.
 
-Al abrir el formulario se solicitan los datos del sujeto y los atributos principales del certificado:
+When you open the form, it asks for the subject data and the main certificate attributes:
 
-* **Common Name (CN)**: nombre principal de la identidad.
-* **Organization (O)**: organización o empresa.
-* **Organizational Unit (OU)**: departamento o unidad.
-* **Country (C)**: código de país de dos letras.
-* **State / Province (ST)**: estado o provincia.
-* **Locality (L)**: ciudad o localidad.
-* **Email Address**: correo de contacto.
-* **Subject Alternative Names (SANs)**: nombres o identificadores alternativos, como DNS o IP.
+* **Common Name (CN)**: main name of the identity.
+* **Organization (O)**: organization or company.
+* **Organizational Unit (OU)**: department or unit.
+* **Country (C)**: two-letter country code.
+* **State / Province (ST)**: state or province.
+* **Locality (L)**: city or locality.
+* **Email Address**: contact email.
+* **Subject Alternative Names (SANs)**: alternative names or identifiers, such as DNS or IP.
 
-Una vez completado el formulario, Lamassu genera la CSR y la presenta para su descarga o copia.
+Once the form is complete, Lamassu generates the CSR and presents it for download or copy.
 
-Firma local con PKCS#11 [#firma-local-con-pkcs11]
+Sign locally with PKCS#11 [#sign-locally-with-pkcs11]
 
-Lamassu también ofrece una ayuda específica para integraciones locales mediante **Sign locally with OpenSSL & PKCS11 tools**.
+Lamassu also offers specific help for local integrations through **Sign locally with OpenSSL & PKCS11 tools**.
 
-Esta opción muestra los pasos necesarios para configurar el entorno local, cargar el módulo PKCS#11 y ejecutar firmas con herramientas como OpenSSL sin extraer la clave privada del entorno custodiado.
+This option shows the steps needed to configure the local environment, load the PKCS#11 module and perform signatures with tools like OpenSSL without extracting the private key from the secured environment.

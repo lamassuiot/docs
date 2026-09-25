@@ -1,0 +1,152 @@
+# Expón el Gateway (/docs/es/deployment/self-hosted/networking)
+
+
+
+Expón el Gateway de Lamassu [#expón-el-gateway-de-lamassu]
+
+El chart de Lamassu crea un Gateway compartido con listeners HTTP y HTTPS. Envoy Gateway crea normalmente un deployment de proxy dedicado y un Service `LoadBalancer`.
+
+```text
+Cliente
+  |
+  v
+dirección accesible:443
+  |
+  v
+Service LoadBalancer -> proxy Envoy -> rutas del Gateway -> servicios
+```
+
+La accesibilidad externa depende de toda la ruta. Un recurso `Gateway` no configura por sí mismo el router, firewall, DNS, balanceador cloud ni NAT upstream.
+
+¿Necesitas gateway.addresses? [#necesitas-gatewayaddresses]
+
+Normalmente no. Si lo omites, el controlador del Gateway y la implementación del balanceador pueden asignar una dirección y publicarla en `Gateway.status.addresses` y en el estado del Service generado.
+
+Defínelo únicamente cuando:
+
+* tu balanceador cloud o bare metal permite solicitar una dirección concreta
+* esa dirección está asignada a este Gateway
+* la red ya enruta el tráfico de esa dirección hasta el clúster
+
+```yaml
+gateway:
+  addresses:
+    - 192.168.1.50
+```
+
+Esto solicita `192.168.1.50`; no reclama la IP en tu LAN ni la vuelve accesible.
+
+No confundas estos valores:
+
+* `gateway.addresses` solicita una dirección para el Gateway.
+* `tls.certManagerOptions.certSpec.addresses` añade direcciones IP a los SAN del certificado TLS.
+
+Si los usuarios se conectan por DNS, añade el nombre a `tls.certManagerOptions.certSpec.hostnames`. No copies la IP pública de un proxy upstream en `gateway.addresses`.
+
+Diseño recomendado para un solo nodo [#diseño-recomendado-para-un-solo-nodo]
+
+Para una VM pequeña con K3s o MicroK8s, usa un único Gateway externo de Lamassu y enruta todos los endpoints a través de él:
+
+```text
+Internet o LAN
+      |
+      | DNS: pki.example.com
+      v
+Dirección de la VM o balanceador :443
+      |
+      v
+un Service LoadBalancer de Envoy
+      |
+      v
+un Gateway de Lamassu
+      |
+      +-- /              -> UI
+      +-- /api/...       -> APIs de Lamassu
+      +-- /auth/...      -> Keycloak, si se configura
+```
+
+Este diseño utiliza una IP, un punto de entrada TLS y un único par de puertos. El chart ya crea las rutas necesarias.
+
+K3s [#k3s]
+
+K3s ServiceLB implementa cada Service `LoadBalancer` mediante pods que reservan los puertos del Service en el nodo. En un único nodo, solo un Service puede ocupar el puerto 80 y otro el 443. El Service Traefik que K3s instala por defecto puede estar ocupando ambos.
+
+Para el diseño recomendado:
+
+1. Usa un único Gateway de Lamassu expuesto externamente.
+2. Comprueba que los puertos 80 y 443 están libres. Deshabilita o reconfigura Traefik si no forma parte de la ruta de tráfico.
+3. Permite esos puertos en el firewall de la VM y en cualquier security group upstream.
+4. Apunta DNS a la dirección accesible de la VM.
+
+Consulta la [documentación de K3s ServiceLB](https://docs.k3s.io/networking/networking-services) para conocer el uso de host ports y cómo sustituirlo por otro balanceador.
+
+Bare metal con MetalLB o kube-vip [#bare-metal-con-metallb-o-kube-vip]
+
+Asigna una VIP de un pool accesible desde la LAN. Puedes solicitarla con `gateway.addresses` si la implementación lo permite. Confirma la dirección asignada en el estado en lugar de asumir que la solicitud tuvo éxito.
+
+Proxy externo, NAT o VPN [#proxy-externo-nat-o-vpn]
+
+Una dirección pública externa puede reenviar TCP 80 y 443 a la VM o a una VIP de Kubernetes:
+
+```text
+IP pública:443 -> proxy o DNAT -> VPN/LAN -> endpoint del clúster:443
+```
+
+La IP pública pertenece al dispositivo externo. Deja `gateway.addresses` sin definir o usa la dirección real del lado de Kubernetes, nunca una IP que el clúster no pueda asociar.
+
+¿Qué ocurre si necesitas tres Gateways? [#qué-ocurre-si-necesitas-tres-gateways]
+
+Primero decide si necesitas tres data planes independientes o solo tres nombres de host.
+
+| Requisito                                        | Diseño recomendado                                      | Consecuencia                                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Varias URL o servicios de Lamassu                | Un Gateway con varias rutas                             | Una IP y un proxy fleet; es el comportamiento predeterminado del chart                         |
+| Gateways independientes e IP externas distintas  | Una VIP por Gateway                                     | Todos pueden usar 80/443; requiere un balanceador con un pool de direcciones                   |
+| Gateways independientes, un nodo y una IP        | Puertos externos diferentes                             | Los clientes deben indicar puertos no estándar                                                 |
+| Terminación TLS/mTLS separada detrás de una IP   | Front door con enrutamiento SNI hacia Gateways internos | Diseño avanzado; el front door usa TLS passthrough y cada Gateway termina su propio TLS        |
+| Recursos Gateway separados pero proxy compartido | Modo merged Gateway de Envoy                            | Solo separación lógica; cada listener necesita una tupla única de puerto, protocolo y hostname |
+
+<Callout type="warn" title="Tres Gateways en un nodo K3s">
+  Tres Services `LoadBalancer` independientes no pueden reservar a la vez los mismos puertos 80 y 443 mediante K3s ServiceLB. Usa un Gateway compartido, asigna VIP distintas con otro balanceador o utiliza puertos diferentes.
+</Callout>
+
+Envoy Gateway provisiona normalmente un proxy fleet por `Gateway`. Su [modo merged Gateway](https://gateway.envoyproxy.io/docs/tasks/operations/deployment-mode/) puede compartir un fleet y una dirección, pero no es un cambio directo para varias releases de Lamassu: los listeners generados usan los mismos puertos y protocolos sin hostnames distintos, por lo que entran en conflicto salvo que personalices el diseño.
+
+Usa un front door con SNI solo cuando los Gateways internos deban mantener políticas TLS o mTLS independientes:
+
+```text
+                     +-> Gateway interno A (termina api.example.com)
+una IP pública:443
+front door passthrough+-> Gateway interno B (termina pki.example.com)
+                     +-> Gateway interno C (termina auth.example.com)
+```
+
+Esto requiere hostnames SNI distintos y configuración de red externa al chart de Lamassu.
+
+Guía de decisión [#guía-de-decisión]
+
+1. Si un Gateway puede gestionar TLS y el enrutamiento, usa el valor predeterminado del chart.
+2. Si los Gateways necesitan políticas independientes y puedes asignar IP, usa una VIP por Gateway.
+3. Si solo necesitas separar los recursos Kubernetes, evalúa merged Gateway y usa tuplas de listener únicas.
+4. Si los data planes y la terminación TLS deben ser independientes detrás de una IP, añade un front door con TLS passthrough y SNI.
+5. Si nada de lo anterior es posible, usa puertos externos distintos o cambia el diseño de red.
+
+Verifica la ruta de tráfico [#verifica-la-ruta-de-tráfico]
+
+```bash
+kubectl get gateway -A
+kubectl describe gateway -n <namespace> <gateway-name>
+kubectl get service -A
+kubectl get httproute -n <namespace>
+```
+
+Comprueba, en orden:
+
+1. El `Gateway` muestra `Accepted=True` y `Programmed=True`.
+2. Su estado contiene la dirección esperada.
+3. El Service `LoadBalancer` generado tiene una dirección externa utilizable.
+4. El puerto 443 de esa dirección es accesible desde la red del cliente.
+5. DNS resuelve al endpoint accesible externamente.
+6. El certificado contiene el nombre DNS o la IP usada por el cliente.
+
+Gateway API trata las direcciones como estado deseado que el controlador puede asignar o rechazar; consulta la [introducción a Gateway API](https://gateway-api.sigs.k8s.io/docs/concepts/api-overview/) para conocer el modelo.

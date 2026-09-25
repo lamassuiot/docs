@@ -1,31 +1,31 @@
-# Cómo funciona Lamassu (/docs/platform/pki/concepts/overview)
+# How Lamassu works (/docs/platform/pki/concepts/overview)
 
 
 
-Lamassu conecta tres elementos: una **raíz de confianza**, una **política de emisión** y una **entidad que necesita demostrar su identidad**. La plataforma coordina esos elementos durante todo el ciclo de vida del certificado.
+Lamassu connects three elements: a **root of trust**, an **issuance policy** and an **entity that needs to prove its identity**. The platform coordinates these elements throughout the certificate lifecycle.
 
-El modelo en cinco piezas [#el-modelo-en-cinco-piezas]
+The model in five pieces [#the-model-in-five-pieces]
 
-**Motor criptográfico.** Genera o custodia claves y ejecuta las operaciones privadas sin exponer el material criptográfico al resto de servicios.
+**Cryptographic engine.** Generates or safeguards keys and executes private-key operations without exposing key material to the rest of the services.
 
-**Autoridad de certificación (CA).** Firma certificados y establece la cadena de confianza.
+**Certification Authority (CA).** Signs certificates and establishes the chain of trust.
 
-**Device Management Service (DMS).** Define cómo se registran, autentican y renuevan los dispositivos de una flota.
+**Device Management Service (DMS).** Defines how the devices of a fleet are registered, authenticated and renewed.
 
-**Dispositivo.** Conserva su clave privada y presenta el certificado para demostrar su identidad.
+**Device.** Keeps its private key and presents the certificate to prove its identity.
 
-**Validation Authority (VA).** Publica el estado de los certificados mediante OCSP y CRL.
+**Validation Authority (VA).** Publishes the status of certificates through OCSP and CRL.
 
-Del alta a la operación [#del-alta-a-la-operación]
+From onboarding to operation [#from-onboarding-to-operation]
 
-1. Un administrador configura un motor criptográfico y crea o importa una CA.
-2. Un DMS relaciona esa CA con una política de enrolamiento.
-3. El dispositivo genera una clave y solicita un certificado mediante EST, o un operador le asigna una identidad.
-4. Lamassu conserva el inventario, el historial y el estado de la identidad.
-5. Los consumidores comprueban la cadena y consultan OCSP o una CRL cuando necesitan conocer su vigencia.
+1. An administrator configures a cryptographic engine and creates or imports a CA.
+2. A DMS relates that CA to an enrollment policy.
+3. The device generates a key and requests a certificate through EST, or an operator assigns it an identity.
+4. Lamassu keeps the inventory, history and status of the identity.
+5. Consumers check the chain and query OCSP or a CRL when they need to know whether it is still valid.
 
 <Cards>
-  <Card title="Arquitectura" description="Conoce los componentes y dónde termina la responsabilidad de cada uno." href="/docs/platform/pki/concepts/architecture" />
+  <Card title="Architecture" description="Get to know the components and where each one's responsibility ends." href="/docs/platform/pki/concepts/architecture" />
 
-  <Card title="Ciclo de vida de una identidad" description="Sigue un certificado desde el enrolamiento hasta la renovación o revocación." href="/docs/platform/pki/concepts/certificate-lifecycle" />
+  <Card title="Identity lifecycle" description="Follow a certificate from enrollment to renewal or revocation." href="/docs/platform/pki/concepts/certificate-lifecycle" />
 </Cards>

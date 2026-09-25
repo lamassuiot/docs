@@ -1,171 +1,171 @@
-# Enrolamiento de dispositivos con EST (/docs/platform/pki/est-enrollment)
+# Device enrollment with EST (/docs/platform/pki/est-enrollment)
 
 
 
 EST: Enrollment over Secure Transport [#est-enrollment-over-secure-transport]
 
-Lamassu IoT implementa el protocolo **EST (Enrollment over Secure Transport)** descrito en el RFC 7030 como su único mecanismo de inscripción de certificados para dispositivos. Cada DMS expone los endpoints EST, valida al dispositivo y aplica sus propias políticas de autenticación, registro y renovación. Así, actúa como autoridad de registro (RA) frente al cliente.
+Lamassu IoT implements the **EST (Enrollment over Secure Transport)** protocol described in RFC 7030 as its only certificate enrollment mechanism for devices. Each DMS exposes the EST endpoints, validates the device and applies its own authentication, registration and renewal policies. In doing so, it acts as the Registration Authority (RA) facing the client.
 
-La entidad que emite y firma criptográficamente el certificado es siempre la **CA asociada al DMS**, no el DMS. El DMS coordina el proceso: recibe el CSR, autentica al dispositivo y aplica la política de emisión. Esta distinción es relevante para el administrador PKI al seleccionar la `EnrollmentCA` y para el integrador al interpretar la cadena de confianza recibida de `/cacerts`.
+The entity that issues and cryptographically signs the certificate is always the **CA associated with the DMS**, not the DMS. The DMS coordinates the process: it receives the CSR, authenticates the device and applies the issuance policy. This distinction matters for the PKI administrator when selecting the `EnrollmentCA` and for the integrator when interpreting the chain of trust received from `/cacerts`.
 
-Esta guía está dividida en dos partes:
+This guide is split in two parts:
 
-* [Configuración del DMS](#configuración-del-dms), para el administrador PKI.
-* [Integración de dispositivos](#integración-de-dispositivos), para quien consume los endpoints EST desde firmware, scripts o servicios de aprovisionamiento.
+* [DMS configuration](#dms-configuration), for the PKI administrator.
+* [Device integration](#device-integration), for anyone consuming the EST endpoints from firmware, scripts or provisioning services.
 
-Si solo necesita una orientación rápida, este es el recorrido recomendado:
+If you only need a quick orientation, this is the recommended route:
 
-* **Administrador PKI:** empiece por [Configuración del DMS](#configuración-del-dms) y termine con [Diagnóstico y compatibilidad](#diagnóstico-y-compatibilidad).
-* **Integrador de dispositivos:** empiece por [Antes de empezar](#antes-de-empezar) y continúe con `/cacerts`, `/simpleenroll`, `/simplereenroll` o `/serverkeygen`, según el flujo que vaya a implementar.
+* **PKI administrator:** start with [DMS configuration](#dms-configuration) and finish with [Diagnostics and compatibility](#diagnostics-and-compatibility).
+* **Device integrator:** start with [Before you begin](#before-you-begin) and continue with `/cacerts`, `/simpleenroll`, `/simplereenroll` or `/serverkeygen`, depending on the flow you will implement.
 
 ***
 
-Configuración del DMS [#configuración-del-dms]
+DMS configuration [#dms-configuration]
 
-Requisitos previos [#requisitos-previos]
+Prerequisites [#prerequisites]
 
-Antes de configurar un DMS para EST, deben existir los siguientes recursos en la plataforma:
+Before configuring a DMS for EST, the following resources must exist on the platform:
 
-* **Una CA disponible**: la CA que actuará como `EnrollmentCA` debe estar creada y en estado activo en Lamassu. Si el modo de autenticación es `CLIENT_CERTIFICATE`, también deben estar creadas las CAs de validación del certificado bootstrap.
-* **Un DMS creado**: el DMS al que se aplicará esta configuración debe existir previamente. La configuración EST se aplica sobre un DMS existente, no lo crea.
+* **An available CA**: the CA acting as `EnrollmentCA` must be created and active in Lamassu. If the authentication mode is `CLIENT_CERTIFICATE`, the validation CAs for the bootstrap certificate must also have been created.
+* **A created DMS**: the DMS this configuration applies to must already exist. The EST configuration is applied over an existing DMS, it does not create one.
 
-Conviene separar cuatro bloques de configuración:
+It is worth separating four configuration blocks:
 
-* Cómo se realizará el enrollment inicial, incluyendo el modo de alta y la autenticación del cliente.
-* Cómo se gestionará el re-enrollment de certificados ya emitidos.
-* Cómo se configurará el endpoint cacerts para la distribución de las CAs de confianza utilizadas por los dispositivos.
-* Si se habilitará la generación de claves en servidor mediante `ServerKeyGen`.
+* How the initial enrollment will be performed, including the registration mode and client authentication.
+* How the re-enrollment of already-issued certificates will be handled.
+* How the cacerts endpoint will be configured to distribute the CAs devices use as trust anchors.
+* Whether server-side key generation through `ServerKeyGen` will be enabled.
 
-Configuración de enrollment [#configuración-de-enrollment]
+Enrollment configuration [#enrollment-configuration]
 
 Enrollment Device Registration [#enrollment-device-registration]
 
-En esta sección se define cómo se registran los dispositivos nuevos y con qué credenciales se autentican.
+This section defines how new devices are registered and with which credentials they authenticate.
 
-* **Registration Mode**: determina el comportamiento al recibir una inscripción inicial. En modo `JITP` (*Just-In-Time Provisioning*), el dispositivo se crea automáticamente la primera vez que se presenta, aplicando los tags, metadatos e icono definidos en el perfil de aprovisionamiento. En modo `PRE_REGISTRATION`, el dispositivo debe existir previamente en la plataforma; si no existe, la solicitud se rechaza con `device not preregistered`. El modo JITP es adecuado para flotas grandes donde el inventario se construye durante el despliegue; el modo `PRE_REGISTRATION` encaja en entornos de alta seguridad donde cada dispositivo se aprueba de forma explícita antes de recibir un certificado.
-* **Tags**: se aplican a cada dispositivo creado automáticamente por este DMS. Son opcionales y solo tienen efecto en modo JITP. Los tags permiten mejorar la búsqueda de dispositivos.
-* **Icon**: se aplica a cada dispositivo creado automáticamente por este DMS. Es opcional y solo tiene efecto en modo JITP. Únicamente visual.
+* **Registration Mode**: determines the behavior when receiving an initial enrollment. In `JITP` (*Just-In-Time Provisioning*) mode, the device is created automatically the first time it presents itself, applying the tags, metadata and icon defined in the provisioning profile. In `PRE_REGISTRATION` mode, the device must already exist on the platform; if it does not, the request is rejected with `device not preregistered`. JITP mode suits large fleets where the inventory is built during deployment; `PRE_REGISTRATION` fits high-security environments where each device is explicitly approved before receiving a certificate.
+* **Tags**: applied to each device automatically created by this DMS. They are optional and only take effect in JITP mode. Tags improve device search.
+* **Icon**: applied to each device automatically created by this DMS. It is optional and only takes effect in JITP mode. Purely visual.
 
 Enrollment Settings [#enrollment-settings]
 
-* **Enrollment CA**: identifica la CA que firmará los certificados de identidad emitidos a través de este DMS. Su elección determina la cadena de confianza que el dispositivo recibirá y la raíz contra la que los sistemas de backend validarán los certificados de flota.
-* **Allow Override Enrollment** (`enable_replaceable_enrollment`): permite que un dispositivo ya enrolado vuelva a inscribirse mediante `/simpleenroll`. Cuando está activa, el certificado anterior se revoca con la razón `superseded` y el slot de identidad se actualiza. Cuando está inactiva, un segundo intento de `simpleenroll` se rechaza con `forbiddenNewEnrollment`. Esta opción debe habilitarse con precaución en entornos de producción, ya que permite sustituir la identidad de un dispositivo sin pasar por el flujo de re-enrollment.
-* **Verify CSR Signature** (`verify_csr_signature`): controla si el servidor valida la firma del CSR contra la clave pública declarada en él (prueba de posesión PKCS#10). Cuando está inactiva, un solicitante podría enviar un CSR con una clave pública que no controla y obtener un certificado vinculado a ella. Para flotas IoT en redes abiertas debe estar activa.
-* **Authentication Mode**: define cómo el DMS valida la identidad del dispositivo durante el enrollment. Puede exigir un certificado mTLS (`CLIENT_CERTIFICATE`), delegar la autorización en un webhook (`EXTERNAL_WEBHOOK`), combinar ambos controles (`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`) o aceptar solicitudes sin autenticación (`NO_AUTH`). Este último modo debe limitarse a laboratorios o redes de aprovisionamiento aisladas.
+* **Enrollment CA**: identifies the CA that will sign the identity certificates issued through this DMS. Its choice determines the chain of trust the device will receive and the root against which backend systems will validate fleet certificates.
+* **Allow Override Enrollment** (`enable_replaceable_enrollment`): allows an already-enrolled device to enroll again through `/simpleenroll`. When active, the previous certificate is revoked with the reason `superseded` and the identity slot is updated. When inactive, a second `simpleenroll` attempt is rejected with `forbiddenNewEnrollment`. This option must be enabled with care in production environments, since it lets you replace a device's identity without going through the re-enrollment flow.
+* **Verify CSR Signature** (`verify_csr_signature`): controls whether the server validates the CSR signature against the public key declared in it (PKCS#10 proof of possession). When inactive, a requester could submit a CSR with a public key it does not control and obtain a certificate bound to it. For IoT fleets on open networks it must be enabled.
+* **Authentication Mode**: defines how the DMS validates the device identity during enrollment. It can require an mTLS certificate (`CLIENT_CERTIFICATE`), delegate authorization to a webhook (`EXTERNAL_WEBHOOK`), combine both controls (`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`) or accept unauthenticated requests (`NO_AUTH`). The latter must be limited to isolated labs or provisioning networks.
 
-Cuando el modo es `CLIENT_CERTIFICATE` o `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`, se configuran además estos parámetros:
+When the mode is `CLIENT_CERTIFICATE` or `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`, these parameters are also configured:
 
-* **Validation CAs**: lista de CAs de confianza para validar el certificado bootstrap presentado por el dispositivo.
-* **Chain Validation Level**: profundidad máxima de la cadena de validación. El valor `-1` valida la cadena completa hasta la CA raíz.
-* **Allow Authenticating Expired Certificates**: si está activo, acepta certificados cliente caducados. Es útil en escenarios de recuperación donde el dispositivo no pudo renovar su certificado a tiempo.
+* **Validation CAs**: list of trusted CAs to validate the bootstrap certificate presented by the device.
+* **Chain Validation Level**: maximum depth of the validation chain. The value `-1` validates the full chain up to the root CA.
+* **Allow Authenticating Expired Certificates**: if active, accepts expired client certificates. Useful in recovery scenarios where the device could not renew its certificate in time.
 
-Cuando el modo incluye `EXTERNAL_WEBHOOK`, se configuran además estos parámetros:
+When the mode includes `EXTERNAL_WEBHOOK`, these parameters are also configured:
 
-* **Webhook URL**: dirección del servicio externo que decidirá la autorización.
-* **HTTP Method**: método HTTP utilizado para invocar el webhook. Admite `POST` (por defecto) o `PUT`; ambos son equivalentes para el webhook, solo cambia el verbo con el que Lamassu realiza la llamada.
-* **Timeout**: tiempo máximo de espera de la llamada al webhook. Si no se especifica, el valor por defecto es de **10 segundos**; superado ese plazo sin respuesta, Lamassu deniega la operación.
-* **Webhook Authentication Mode**: modo de autenticación del webhook hacia el servicio externo, por ejemplo `ApiKey`, `OIDC` o `mTLS`.
+* **Webhook URL**: address of the external service that will decide authorization.
+* **HTTP Method**: HTTP method used to invoke the webhook. Supports `POST` (default) or `PUT`; both are equivalent for the webhook, only the verb Lamassu uses changes.
+* **Timeout**: maximum wait time for the webhook call. If not specified, the default is **10 seconds**; after that without a response, Lamassu denies the operation.
+* **Webhook Authentication Mode**: authentication mode of the webhook toward the external service, for example `ApiKey`, `OIDC` or `mTLS`.
 
-El contrato exacto que debe implementar el servicio webhook (esquema de petición y respuesta, ejemplos) está publicado como especificación OpenAPI: [referencia del webhook de autorización](/api-reference/enroll-reenroll-webhook).
+The exact contract the webhook service must implement (request and response schema, examples) is published as an OpenAPI specification: [authorization webhook reference](/api-reference/enroll-reenroll-webhook).
 
-Perfil de emisión [#perfil-de-emisión]
+Issuance profile [#issuance-profile]
 
-El comportamiento del certificado emitido no lo determina únicamente el CSR del dispositivo, sino el **perfil de emisión** (`IssuanceProfile`) asociado al DMS. El integrador no configura este perfil, pero sus reglas afectan al contenido del certificado final:
+The behavior of the issued certificate is not determined solely by the device's CSR, but by the **issuance profile** (`IssuanceProfile`) associated with the DMS. The integrator does not configure this profile, but its rules affect the content of the final certificate:
 
-* **`HonorSubject`** controla si el subject del CSR se traslada literalmente al certificado. Si está desactivado, la CA aplica la plantilla del perfil e ignora el subject recibido.
-* **`HonorKeyUsage`** decide si se respeta el `KeyUsage` del CSR o se sustituye por el definido en la plantilla.
-* **`HonorExtendedKeyUsages`** aplica la misma regla a `ExtKeyUsage`.
-* **`HonorExtensions`** controla si el resto de extensiones del CSR, como SAN o CDP, se incluyen en el certificado.
+* **`HonorSubject`** controls whether the CSR's subject is copied verbatim into the certificate. If disabled, the CA applies the profile's template and ignores the received subject.
+* **`HonorKeyUsage`** decides whether the CSR's `KeyUsage` is respected or replaced by the one defined in the template.
+* **`HonorExtendedKeyUsages`** applies the same rule to `ExtKeyUsage`.
+* **`HonorExtensions`** controls whether the rest of the CSR's extensions, such as SAN or CDP, are included in the certificate.
 
-Esto es relevante para el integrador: el `KeyUsage`, `ExtKeyUsage` y los SAN que declara el CSR pueden no aparecer tal cual en el certificado final si el perfil así lo decide. Consulte con el administrador PKI si el certificado emitido no contiene las extensiones esperadas.
+This matters for the integrator: the `KeyUsage`, `ExtKeyUsage` and SANs declared in the CSR may not appear as-is in the final certificate if the profile decides otherwise. Check with the PKI administrator if the issued certificate does not contain the expected extensions.
 
-Configuración de re-enrollment [#configuración-de-re-enrollment]
+Re-enrollment configuration [#re-enrollment-configuration]
 
-La sección **Re-Enrollment Settings** controla el proceso de renovación de certificados. El re-enrollment puede realizarse únicamente cuando el certificado está dentro de la ventana configurada, y opcionalmente también cuando el certificado ya ha caducado.
+The **Re-Enrollment Settings** section controls the certificate renewal process. Re-enrollment can only be performed while the certificate is within the configured window, and optionally also when the certificate has already expired.
 
-* **Revoke On Re-Enroll**: si está activo, el certificado anterior se revoca automáticamente con la razón `superseded` una vez emitido el nuevo.
-* **Allow Expired Renewal**: permite renovar un certificado ya caducado. Es útil cuando un dispositivo ha estado desconectado y no pudo renovar dentro de la ventana.
-* **Allowed Renewal Delta**: ventana de tiempo previa a la caducidad durante la cual se permite el re-enrollment. Antes de que se abra esta ventana, la solicitud se rechaza con `invalid reenroll window`.
-* **Preventive Renewal Delta**: tiempo previo a la caducidad a partir del cual se emiten alertas de renovación preventiva.
-* **Critical Renewal Delta**: umbral más cercano al vencimiento que activa alertas de estado crítico.
-* **Additional Validation CAs**: CAs adicionales aceptadas como emisoras del certificado en vigor durante el re-enrollment. Permite migrar a una nueva CA de enrolamiento sin interrumpir la renovación de dispositivos ya enrolados con la CA anterior.
+* **Revoke On Re-Enroll**: if active, the previous certificate is automatically revoked with the reason `superseded` once the new one is issued.
+* **Allow Expired Renewal**: allows renewing an already-expired certificate. Useful when a device has been offline and could not renew within the window.
+* **Allowed Renewal Delta**: time window before expiration during which re-enrollment is allowed. Before this window opens, the request is rejected with `invalid reenroll window`.
+* **Preventive Renewal Delta**: time before expiration from which preventive renewal alerts are raised.
+* **Critical Renewal Delta**: threshold closest to expiration that triggers critical status alerts.
+* **Additional Validation CAs**: additional CAs accepted as issuers of the active certificate during re-enrollment. It allows migrating to a new enrollment CA without interrupting the renewal of devices already enrolled with the previous CA.
 
-Configuración de ServerKeyGen [#configuración-de-serverkeygen]
+ServerKeyGen configuration [#serverkeygen-configuration]
 
-La sección **Server Key Generation** permite que Lamassu genere el par de claves del dispositivo en el servidor y lo devuelva junto con el certificado emitido. Es útil para dispositivos con capacidad criptográfica limitada.
+The **Server Key Generation** section lets Lamassu generate the device's key pair on the server and return it together with the issued certificate. It is useful for devices with limited cryptographic capability.
 
-La opción **Enable Server-Side Key Generation** activa el endpoint `/serverkeygen`. Cuando está inactiva, cualquier llamada a ese endpoint se rechaza con `server key generation not enabled`.
+The **Enable Server-Side Key Generation** option activates the `/serverkeygen` endpoint. When inactive, any call to that endpoint is rejected with `server key generation not enabled`.
 
-**Key Type** selecciona el algoritmo: `RSA` o `ECDSA`. El campo **Key Size (bits)** determina el tamaño de la clave. Para ECDSA, el tamaño en bits determina también la curva: 256 corresponde a P-256, 384 a P-384 y 521 a P-521.
+**Key Type** selects the algorithm: `RSA` or `ECDSA`. The **Key Size (bits)** field determines the key size. For ECDSA, the size in bits also determines the curve: 256 corresponds to P-256, 384 to P-384 and 521 to P-521.
 
-La clave se genera en el motor software del servidor, no en un Crypto Engine de hardware como AWS KMS o PKCS#11. La única protección de la clave en tránsito es el canal TLS; no se aplica cifrado adicional (CMS EnvelopedData) sobre la clave antes de enviarla al dispositivo. Consulte el [apartado `/serverkeygen`](#serverkeygen) de la referencia para integrador para conocer el formato exacto de la respuesta y las consideraciones de seguridad.
+The key is generated in the server's software engine, not in a hardware Crypto Engine such as AWS KMS or PKCS#11. The only protection of the key in transit is the TLS channel; no additional encryption (CMS EnvelopedData) is applied to the key before sending it to the device. See the [`/serverkeygen` section](#serverkeygen) of the integrator reference for the exact response format and security considerations.
 
-Verificar la configuración [#verificar-la-configuración]
+Verify the configuration [#verify-the-configuration]
 
-Una vez aplicados los ajustes de enrollment, re-enrollment y ServerKeyGen, puede confirmar que el DMS está operativo de las siguientes formas:
+Once the enrollment, re-enrollment and ServerKeyGen settings are applied, you can confirm the DMS is operational as follows:
 
-* **Desde la consola**: accede al detalle del DMS y comprueba que la sección EST muestra la CA de enrolamiento asignada y el modo de autenticación configurado.
-* **Con una solicitud de prueba**: invoca el endpoint `/cacerts` del DMS desde un cliente `curl` con la confianza del servidor. Una respuesta `200 OK` con contenido base64 confirma que el DMS está activo y que la CA de enrolamiento es accesible.
+* **From the console**: open the DMS detail and check that the EST section shows the assigned enrollment CA and the configured authentication mode.
+* **With a test request**: invoke the DMS's `/cacerts` endpoint from a `curl` client with server trust. A `200 OK` response with base64 content confirms the DMS is active and the enrollment CA is reachable.
 
 ```bash
 curl -s --cacert lamassu-trust.pem \
   "https://<EST_HOST>/.well-known/est/<DMS_ID>/cacerts" | head -c 100
 ```
 
-Si el DMS no existe o la CA no está disponible, el servidor responde con `DMS not found` u otro mensaje de error. Consulte la sección [Diagnóstico y compatibilidad](#diagnóstico-y-compatibilidad) para interpretar los mensajes de error.
+If the DMS does not exist or the CA is not available, the server responds with `DMS not found` or another error message. See the [Diagnostics and compatibility](#diagnostics-and-compatibility) section to interpret error messages.
 
 ***
 
-Integración de dispositivos [#integración-de-dispositivos]
+Device integration [#device-integration]
 
-*Esta sección está dirigida al integrador de dispositivos.*
+*This section is aimed at device integrators.*
 
-Los endpoints EST de Lamassu se publican bajo el prefijo `/.well-known/est` y exigen siempre la presencia del segmento de ruta `{aps}`, que se interpreta como el identificador del DMS al que se dirige la operación. La asociación es directa: el valor de `{aps}` recibido en la URL se utiliza como ID de DMS al consultar el almacén interno. Las variantes registradas sin `{aps}` (por ejemplo `/.well-known/est/cacerts`) están enrutadas en el código, pero su gestor exige el campo `APS` y devuelve `400 Bad Request` con el mensaje `Field validation for 'APS' failed` cuando el segmento no se proporciona.
+Lamassu's EST endpoints are published under the `/.well-known/est` prefix and always require the presence of the `{aps}` path segment, interpreted as the identifier of the DMS the operation targets. The association is direct: the `{aps}` value received in the URL is used as the DMS ID when querying the internal store. Variants registered without `{aps}` (for example `/.well-known/est/cacerts`) are routed in the code, but their handler requires the `APS` field and returns `400 Bad Request` with the message `Field validation for 'APS' failed` when the segment is not provided.
 
-Esta parte sigue el orden habitual de trabajo del integrador: primero los requisitos previos y el modelo de autenticación, después la referencia de cada endpoint y, al final, ejemplos completos y material de diagnóstico.
+This part follows the integrator's usual working order: first the prerequisites and the authentication model, then the reference for each endpoint and, finally, complete examples and diagnostic material.
 
-Antes de empezar [#antes-de-empezar]
+Before you begin [#before-you-begin]
 
-El administrador PKI debe haber configurado un DMS con el protocolo `EST_RFC7030`, una CA de enrolamiento asignada y al menos un modo de autenticación. Sin esa configuración previa, Lamassu rechaza cualquier solicitud de enrolamiento. Los detalles de esa configuración se encuentran en la [sección de configuración del DMS](#configuración-del-dms) de esta misma página.
+The PKI administrator must have configured a DMS with the `EST_RFC7030` protocol, an assigned enrollment CA and at least one authentication mode. Without that prior configuration, Lamassu rejects any enrollment request. The details of that configuration are in the [DMS configuration section](#dms-configuration) of this same page.
 
-Antes de realizar la primera llamada, asegúrese de tener:
+Before making the first call, make sure you have:
 
-* **La URL del host EST**, por ejemplo `https://est.lamassu.example`, proporcionada por el administrador PKI.
-* **El ancla de confianza del servidor** (`lamassu-trust.pem`), raíz o intermedia, con la que el cliente validará el TLS de Lamassu.
-* **El certificado bootstrap y su clave privada** si el DMS usa `CLIENT_CERTIFICATE` o `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`. Esta identidad debe proceder de una de las `ValidationCAs` configuradas, normalmente una CA de aprovisionamiento distinta de la CA de enrolamiento.
-* **El ID del DMS** (`{aps}`), que debe aparecer en todas las rutas EST.
+* **The EST host URL**, for example `https://est.lamassu.example`, provided by the PKI administrator.
+* **The server trust anchor** (`lamassu-trust.pem`), root or intermediate, with which the client will validate Lamassu's TLS.
+* **The bootstrap certificate and its private key** if the DMS uses `CLIENT_CERTIFICATE` or `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`. This identity must come from one of the configured `ValidationCAs`, usually a provisioning CA different from the enrollment CA.
+* **The DMS ID** (`{aps}`), which must appear in every EST route.
 
-Resumen del flujo [#resumen-del-flujo]
+Flow overview [#flow-overview]
 
-* **Descargue la confianza con `/cacerts`:** el cliente valida el TLS del servidor y recibe los certificados en PKCS#7 o PEM.
-* **Realice el alta inicial con `/simpleenroll`:** presente el certificado bootstrap o la credencial definida por `AuthMode` para obtener el certificado del dispositivo.
-* **Renueve con `/simplereenroll`:** autentíquese con el certificado actual del dispositivo para obtener uno nuevo.
-* **Use `/serverkeygen` solo si necesita generación de claves en servidor:** aplica la misma autenticación que `/simpleenroll` y devuelve la clave privada PKCS#8 junto con el certificado.
+* **Download trust with `/cacerts`:** the client validates the server's TLS and receives the certificates in PKCS#7 or PEM.
+* **Perform initial enrollment with `/simpleenroll`:** present the bootstrap certificate or the credential defined by `AuthMode` to obtain the device certificate.
+* **Renew with `/simplereenroll`:** authenticate with the device's current certificate to obtain a new one.
+* **Use `/serverkeygen` only if you need server-side key generation:** it applies the same authentication as `/simpleenroll` and returns the PKCS#8 private key together with the certificate.
 
-Modelo de autenticación del cliente [#modelo-de-autenticación-del-cliente]
+Client authentication model [#client-authentication-model]
 
-La implementación de Lamassu reconoce cuatro configuraciones de autenticación para `/simpleenroll`, expresadas mediante el campo `EnrollmentOptionsESTRFC7030.AuthMode` del DMS. Tres son modos simples (`CLIENT_CERTIFICATE`, `EXTERNAL_WEBHOOK`, `NO_AUTH`) y una combina dos controles (`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`). El cliente debe presentarse en el modo que el DMS espera; cualquier otra combinación genera un fallo en la inscripción.
+Lamassu's implementation recognizes four authentication configurations for `/simpleenroll`, expressed through the DMS's `EnrollmentOptionsESTRFC7030.AuthMode` field. Three are simple modes (`CLIENT_CERTIFICATE`, `EXTERNAL_WEBHOOK`, `NO_AUTH`) and one combines two controls (`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`). The client must present itself in the mode the DMS expects; any other combination fails the enrollment.
 
-| Modo (`AuthMode`)                         | Descripción                     | Credencial esperada                                             | Aplica en enroll     | Aplica en reenroll                                           |
-| ----------------------------------------- | ------------------------------- | --------------------------------------------------------------- | -------------------- | ------------------------------------------------------------ |
-| `CLIENT_CERTIFICATE`                      | mTLS con certificado X.509      | Certificado y clave privada cliente                             | Sí                   | Sí (con el certificado en vigor)                             |
-| `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | mTLS más validación por webhook | Certificado y clave privada cliente, más aprobación del webhook | Sí                   | No como combinación; en reenroll no mantiene ambos controles |
-| `EXTERNAL_WEBHOOK`                        | Webhook externo de autorización | Ninguna en el canal TLS                                         | Sí                   | No, degrada a `NO_AUTH`                                      |
-| `NO_AUTH`                                 | Sin autenticación               | Ninguna                                                         | Sí (uso restringido) | Sí (uso restringido)                                         |
+| Mode (`AuthMode`)                         | Description                    | Expected credential                                       | Applies in enroll    | Applies in reenroll                                          |
+| ----------------------------------------- | ------------------------------ | --------------------------------------------------------- | -------------------- | ------------------------------------------------------------ |
+| `CLIENT_CERTIFICATE`                      | mTLS with X.509 certificate    | Client certificate and private key                        | Yes                  | Yes (with the active certificate)                            |
+| `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | mTLS plus webhook validation   | Client certificate and private key, plus webhook approval | Yes                  | Not as a combination; in reenroll both controls are not kept |
+| `EXTERNAL_WEBHOOK`                        | External authorization webhook | None on the TLS channel                                   | Yes                  | No, degrades to `NO_AUTH`                                    |
+| `NO_AUTH`                                 | No authentication              | None                                                      | Yes (restricted use) | Yes (restricted use)                                         |
 
-JWT **no es un modo de autenticación válido en EST**. El extractor de identidad JWT existe en el código pero solo se evalúa en la API de administración de Lamassu. Cualquier *Bearer token* enviado a `/.well-known/est/...` se ignora silenciosamente. Cuando el DMS está configurado con `AuthMode: CLIENT_CERTIFICATE`, una petición que solo aporte JWT se rechaza por falta de certificado cliente. Cuando el DMS está en `AuthMode: NO_AUTH`, la petición se procesa como tal y el JWT no añade ni resta autorización.
+JWT **is not a valid authentication mode in EST**. The JWT identity extractor exists in the code but is only evaluated in Lamassu's administration API. Any *Bearer token* sent to `/.well-known/est/...` is silently ignored. When the DMS is configured with `AuthMode: CLIENT_CERTIFICATE`, a request carrying only a JWT is rejected for lack of a client certificate. When the DMS is in `AuthMode: NO_AUTH`, the request is processed as such and the JWT neither adds nor removes authorization.
 
-* **`CLIENT_CERTIFICATE`**: el cliente presenta un certificado X.509 emitido por una de las CAs declaradas en `AuthOptionsMTLS.ValidationCAs`. El proceso valida la cadena del certificado contra esas CAs mediante los parámetros `ValidationCAs`, `AllowExpired` y `ChainLevelValidation`. Además, el servicio comprueba el estado de revocación en tres pasos: primero busca el cert en la base de datos local de Lamassu; si no lo encuentra, consulta los responders OCSP listados en la extensión AIA; si OCSP falla, intenta los CRL Distribution Points (CDP). Un certificado revocado interrumpe la inscripción con `certificate is revoked`.
+* **`CLIENT_CERTIFICATE`**: the client presents an X.509 certificate issued by one of the CAs declared in `AuthOptionsMTLS.ValidationCAs`. The process validates the certificate chain against those CAs through the `ValidationCAs`, `AllowExpired` and `ChainLevelValidation` parameters. In addition, the service checks the revocation status in three steps: first it looks up the cert in Lamassu's local database; if not found, it queries the OCSP responders listed in the AIA extension; if OCSP fails, it tries the CRL Distribution Points (CDP). A revoked certificate interrupts the enrollment with `certificate is revoked`.
 
-  Sus parámetros principales son `ValidationCAs`, la lista de CAs que pueden validar el certificado bootstrap o el certificado en vigor; `AllowExpired`, que permite aceptar certificados cliente caducados; y `ChainLevelValidation`, que limita la profundidad de la cadena cuando su valor es mayor que cero.
+  Its main parameters are `ValidationCAs`, the list of CAs that can validate the bootstrap certificate or the active certificate; `AllowExpired`, which allows accepting expired client certificates; and `ChainLevelValidation`, which limits the chain depth when its value is greater than zero.
 
-* **`EXTERNAL_WEBHOOK`**: Lamassu delega la decisión de autorización en un servicio HTTP externo. El servidor EST construye una petición `POST` al webhook configurado con un cuerpo JSON que reproduce el contexto de la inscripción.
+* **`EXTERNAL_WEBHOOK`**: Lamassu delegates the authorization decision to an external HTTP service. The EST server builds a `POST` request to the configured webhook with a JSON body reproducing the enrollment context.
 
   ```json
   {
-    "csr": "<base64 del PEM del CSR, p. ej. 'LS0tLS1CRUdJTi...'>",
+    "csr": "<base64 of the CSR PEM, e.g. 'LS0tLS1CRUdJTi...'>",
     "aps": "<DMS_ID>",
-    "device_cn": "<CommonName del CSR>",
+    "device_cn": "<CommonName of the CSR>",
     "http_request": {
       "headers": { "Header-Name": "value" },
       "url": "/.well-known/est/<DMS_ID>/simpleenroll"
@@ -173,34 +173,34 @@ JWT **no es un modo de autenticación válido en EST**. El extractor de identida
   }
   ```
 
-  El valor del campo `csr` es la **codificación base64 del PEM** del CSR (no el DER, y no el PEM en claro). El webhook debe responder con `2xx` y un cuerpo JSON `{"authorized": true}` para continuar; cualquier otra respuesta aborta el enrolamiento con `external webhook denied enrollment`. Un `204 No Content` **no es una respuesta válida** aunque sea un código `2xx`: Lamassu exige un cuerpo JSON con el campo `authorized`, así que un webhook que responda sin cuerpo deniega la operación igual que un error.
+  The value of the `csr` field is the **base64 encoding of the CSR's PEM** (not the DER, and not the plain PEM). The webhook must respond with `2xx` and a JSON body `{"authorized": true}` to continue; any other response aborts the enrollment with `external webhook denied enrollment`. A `204 No Content` **is not a valid response** even though it is a `2xx` code: Lamassu requires a JSON body with the `authorized` field, so a webhook responding without a body denies the operation just like an error.
 
-* **`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`**: combina los dos modos anteriores durante `/simpleenroll`. El cliente debe presentar un certificado mTLS válido y el webhook debe devolver `authorized: true`. En `/simplereenroll` la combinación no se conserva: el chequeo conjunto mTLS + webhook no se mantiene, por lo que el integrador no debe asumir que las mismas garantías del enrollment inicial aplican en reenroll.
+* **`CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`**: combines the two previous modes during `/simpleenroll`. The client must present a valid mTLS certificate and the webhook must return `authorized: true`. In `/simplereenroll` the combination is not preserved: the joint mTLS + webhook check is not maintained, so the integrator must not assume the same guarantees of the initial enrollment apply in reenroll.
 
-* **`NO_AUTH`**: el DMS acepta cualquier CSR sin validar identidad del cliente. Lamassu emite un aviso en su log (`DMS is configured with NoAuth, allowing enrollment`) y procede al alta. Debe restringirse a entornos controlados (una red de aprovisionamiento aislada); cualquier red expuesta a internet con un DMS en `NO_AUTH` queda abierta a la emisión de certificados por terceros no autorizados.
+* **`NO_AUTH`**: the DMS accepts any CSR without validating the client's identity. Lamassu logs a warning (`DMS is configured with NoAuth, allowing enrollment`) and proceeds with the registration. It must be restricted to controlled environments (an isolated provisioning network); any network exposed to the internet with a DMS in `NO_AUTH` is open to certificate issuance by unauthorized third parties.
 
-Referencia de endpoints [#referencia-de-endpoints]
+Endpoint reference [#endpoint-reference]
 
-Las siguientes secciones describen los endpoints en el orden más habitual de uso dentro del ciclo de vida del dispositivo:
+The following sections describe the endpoints in the usual order of use within the device lifecycle:
 
-* `/cacerts`: descarga de la cadena de confianza.
-* `/simpleenroll`: inscripción inicial del certificado.
-* `/simplereenroll`: renovación de un certificado ya emitido.
-* `/serverkeygen`: inscripción con generación de clave en servidor.
+* `/cacerts`: download of the trust chain.
+* `/simpleenroll`: initial certificate enrollment.
+* `/simplereenroll`: renewal of an already-issued certificate.
+* `/serverkeygen`: enrollment with server-side key generation.
 
 /cacerts [#cacerts]
 
-El endpoint `GET /.well-known/est/{aps}/cacerts` distribuye los certificados que el dispositivo necesita para validar al servidor EST y al resto de las CAs gestionadas por el DMS. Lamassu inserta los certificados en este orden: primero el certificado **downstream** del servidor Lamassu, que es la hoja TLS del servidor y no una CA, útil para pinning si `IncludeLamassuSystemCA` está activado; después la lista `ManagedCAs` declarada en el DMS; y por último la CA de enrolamiento, si `IncludeEnrollmentCA` está activado.
+The endpoint `GET /.well-known/est/{aps}/cacerts` distributes the certificates the device needs to validate the EST server and the rest of the CAs managed by the DMS. Lamassu inserts the certificates in this order: first the **downstream** certificate of the Lamassu server, which is the server's TLS leaf and not a CA, useful for pinning if `IncludeLamassuSystemCA` is enabled; then the `ManagedCAs` list declared in the DMS; and last the enrollment CA, if `IncludeEnrollmentCA` is enabled.
 
-`CADistributionSettings` permite decidir qué se publica:
+`CADistributionSettings` lets you decide what is published:
 
-* **`IncludeLamassuSystemCA`** añade el certificado *downstream* del servidor Lamassu. Es la hoja TLS que el cliente puede usar para anclar la conexión, no una CA.
-* **`IncludeEnrollmentCA`** añade la CA emisora del DMS, responsable de firmar los certificados de dispositivo.
-* **`ManagedCAs`** publica CAs adicionales como anclas de confianza.
+* **`IncludeLamassuSystemCA`** adds the *downstream* certificate of the Lamassu server. It is the TLS leaf the client can use to pin the connection, not a CA.
+* **`IncludeEnrollmentCA`** adds the DMS's issuing CA, responsible for signing device certificates.
+* **`ManagedCAs`** publishes additional CAs as trust anchors.
 
-El formato por defecto es PKCS#7 *degenerate* (sólo certificados) codificado en base64. La respuesta declara `Content-Type: application/pkcs7-mime; smime-type=certs-only` y `Content-Transfer-Encoding: base64`. El base64 viene troceado en líneas de **76 caracteres** terminadas en CRLF, una anchura conforme con S/MIME (RFC 5751), no los 64 que sugieren ciertas guías de RFC 7030. Este troceo aplica únicamente a `/cacerts` y `/simpleenroll`; las partes internas de `/serverkeygen` no llevan wrap, como se explica más abajo.
+The default format is *degenerate* PKCS#7 (certificates only) base64-encoded. The response declares `Content-Type: application/pkcs7-mime; smime-type=certs-only` and `Content-Transfer-Encoding: base64`. The base64 is wrapped in lines of **76 characters** terminated with CRLF, a width compliant with S/MIME (RFC 5751), not the 64 that some RFC 7030 guides suggest. This wrapping applies only to `/cacerts` and `/simpleenroll`; the internal parts of `/serverkeygen` carry no wrap, as explained below.
 
-El PKCS#7 *degenerate* es un **conjunto** de certificados sin orden semántico definido. Aunque Lamassu los inserta en el orden indicado, el integrador no debe asumir ese orden al validar cadenas: la cadena debe construirse por correspondencia `Subject`/`Issuer` (o por AKI/SKI), no por la posición en la respuesta.
+*Degenerate* PKCS#7 is a **set** of certificates with no defined semantic order. Although Lamassu inserts them in the order stated, the integrator must not assume that order when validating chains: the chain must be built by `Subject`/`Issuer` matching (or by AKI/SKI), not by position in the response.
 
 ```bash
 curl -s --cacert lamassu-trust.pem \
@@ -211,9 +211,9 @@ base64 -d -i cacerts.b64 > cacerts.p7b
 openssl pkcs7 -inform DER -in cacerts.p7b -print_certs -out cacerts.pem
 ```
 
-El flag `-i` (ignore garbage) ayuda a tolerar el CRLF que Lamassu añade y es necesario en algunos `base64` (BusyBox, BSD); en GNU coreutils se ignora.
+The `-i` flag (ignore garbage) helps tolerate the CRLF Lamassu adds and is necessary on some `base64` implementations (BusyBox, BSD); on GNU coreutils it is ignored.
 
-Lamassu añade además una extensión sobre el RFC: si el cliente envía la cabecera `Accept: application/x-pem-file`, el servidor responde con la concatenación PEM de los mismos certificados, sin el envoltorio PKCS#7. Esto facilita el consumo desde scripts. La extensión también funciona en `/simpleenroll` y `/simplereenroll`.
+Lamassu additionally adds an extension over the RFC: if the client sends the `Accept: application/x-pem-file` header, the server responds with the PEM concatenation of the same certificates, without the PKCS#7 wrapper. This makes consumption from scripts easier. The extension also works on `/simpleenroll` and `/simplereenroll`.
 
 ```bash
 curl -s --cacert lamassu-trust.pem \
@@ -224,7 +224,7 @@ curl -s --cacert lamassu-trust.pem \
 
 /simpleenroll [#simpleenroll]
 
-El endpoint `POST /.well-known/est/{aps}/simpleenroll` recibe un CSR y devuelve el certificado emitido. El cuerpo de la petición debe ser el **PKCS#10 (CSR) en DER, codificado en base64** sin saltos de línea. La base64 envuelve directamente al DER, no al PEM. La cabecera `Content-Type` debe valer `application/pkcs10`. Si el `Content-Type` es diferente, el servidor responde `400` con `content-type must be application/pkcs10`; si el cuerpo no es base64 válido, responde `400` con `body payload must be base64 encoded`.
+The endpoint `POST /.well-known/est/{aps}/simpleenroll` receives a CSR and returns the issued certificate. The request body must be the **PKCS#10 (CSR) in DER, base64-encoded** without line breaks. The base64 wraps the DER directly, not a PEM. The `Content-Type` header must be `application/pkcs10`. If the `Content-Type` is different, the server responds `400` with `content-type must be application/pkcs10`; if the body is not valid base64, it responds `400` with `body payload must be base64 encoded`.
 
 ```bash
 openssl req -in device.csr -outform DER | base64 -w 0 > device.csr.b64
@@ -237,7 +237,7 @@ curl -s --cacert lamassu-trust.pem \
   -o enroll.b64
 ```
 
-La respuesta sigue el mismo envoltorio que `/cacerts`: PKCS#7 *degenerate* en base64, con `Content-Type: application/pkcs7-mime; smime-type=certs-only`. El PKCS#7 contiene **únicamente el certificado de hoja** recién emitido; no incluye la CA emisora ni intermediarios. Esto cumple RFC 7030 §4.2.3 (donde la cadena es opcional) pero implica que el integrador debe combinar este certificado con la cadena obtenida de `/cacerts` antes de presentarlo a cualquier relying party que valide cadena completa (por ejemplo, un broker MQTT con mTLS estricta).
+The response follows the same wrapper as `/cacerts`: *degenerate* PKCS#7 in base64, with `Content-Type: application/pkcs7-mime; smime-type=certs-only`. The PKCS#7 contains **only the newly issued leaf certificate**; it does not include the issuing CA or intermediates. This complies with RFC 7030 §4.2.3 (where the chain is optional) but implies the integrator must combine this certificate with the chain obtained from `/cacerts` before presenting it to any relying party that validates the full chain (for example, an MQTT broker with strict mTLS).
 
 ```bash
 base64 -d -i enroll.b64 > enroll.p7b
@@ -245,20 +245,20 @@ openssl pkcs7 -inform DER -in enroll.p7b -print_certs -out device.crt
 openssl verify -CAfile cacerts.pem device.crt
 ```
 
-Varios campos del DMS gobiernan el comportamiento de `/simpleenroll`. El integrador no los configura, pero conviene conocerlos para interpretar los rechazos:
+Several DMS fields govern the behavior of `/simpleenroll`. The integrator does not configure them, but it helps to know them to interpret rejections:
 
-* **`EnrollmentSettings.RegistrationMode`** decide si el dispositivo se crea durante la primera inscripción (`JITP`) o debe existir previamente (`PRE_REGISTRATION`).
-* **`EnrollmentSettings.EnableReplaceableEnrollment`** permite repetir `/simpleenroll` para un dispositivo ya enrolado. Al hacerlo, revoca el certificado anterior como `superseded`; si está desactivado, el servidor responde con `forbiddenNewEnrollment`.
-* **`EnrollmentSettings.VerifyCSRSignature`** valida que quien envía el CSR controla la clave privada declarada. Para flotas IoT en redes abiertas debe estar activo.
+* **`EnrollmentSettings.RegistrationMode`** decides whether the device is created during the first enrollment (`JITP`) or must exist beforehand (`PRE_REGISTRATION`).
+* **`EnrollmentSettings.EnableReplaceableEnrollment`** allows repeating `/simpleenroll` for an already-enrolled device. When doing so, it revokes the previous certificate as `superseded`; if disabled, the server responds with `forbiddenNewEnrollment`.
+* **`EnrollmentSettings.VerifyCSRSignature`** validates that whoever submits the CSR controls the declared private key. For IoT fleets on open networks it must be enabled.
 
-En modo `JITP`, el primer `simpleenroll` con un `CommonName` que aún no existe en Lamassu crea el dispositivo automáticamente. En modo `PRE_REGISTRATION`, el dispositivo debe existir previamente; un `CommonName` desconocido se rechaza con `device not preregistered`. Consulte [Configuración de enrollment](#configuración-de-enrollment) para más detalles sobre ambos modos y el comportamiento del perfil de emisión.
+In `JITP` mode, the first `simpleenroll` with a `CommonName` that does not yet exist in Lamassu creates the device automatically. In `PRE_REGISTRATION` mode, the device must exist beforehand; an unknown `CommonName` is rejected with `device not preregistered`. See [Enrollment configuration](#enrollment-configuration) for more details on both modes and the behavior of the issuance profile.
 
 /simplereenroll [#simplereenroll]
 
-El endpoint `POST /.well-known/est/{aps}/simplereenroll` renueva el certificado de un dispositivo ya enrolado. El formato del cuerpo es idéntico al de `/simpleenroll` (DER base64 sin saltos, `Content-Type: application/pkcs10`). La diferencia está en la autenticación: el cliente debe presentar **el certificado en vigor** del dispositivo (no el bootstrap) como credencial mTLS.
+The endpoint `POST /.well-known/est/{aps}/simplereenroll` renews the certificate of an already-enrolled device. The body format is identical to `/simpleenroll` (DER base64 without line breaks, `Content-Type: application/pkcs10`). The difference lies in authentication: the client must present **the device's active certificate** (not the bootstrap) as the mTLS credential.
 
-<Callout type="warn" title="Modo EXTERNAL_WEBHOOK: degradación a NO_AUTH en reenroll">
-  Si el DMS está configurado con `AuthMode: EXTERNAL_WEBHOOK`, el webhook **no se invoca** durante `/simplereenroll`. El flujo de renovación degrada silenciosamente a `NO_AUTH`: cualquier cliente que conozca un `CommonName` válido puede solicitar reenroll para ese dispositivo sin autenticación (`allowing reenroll: using NO AUTH mode` en el log). Un DMS con `EXTERNAL_WEBHOOK` no debe usarse en producción para flujos de reenroll a menos que se controle la red de acceso al endpoint.
+<Callout type="warn" title="EXTERNAL_WEBHOOK mode: degradation to NO_AUTH in reenroll">
+  If the DMS is configured with `AuthMode: EXTERNAL_WEBHOOK`, the webhook is **not invoked** during `/simplereenroll`. The renewal flow silently degrades to `NO_AUTH`: any client that knows a valid `CommonName` can request reenroll for that device without authentication (`allowing reenroll: using NO AUTH mode` in the log). A DMS with `EXTERNAL_WEBHOOK` must not be used in production for reenroll flows unless access to the endpoint is network-controlled.
 </Callout>
 
 ```bash
@@ -272,42 +272,42 @@ curl -s --cacert lamassu-trust.pem \
   -o reenroll.b64
 ```
 
-El comportamiento del reenroll está condicionado por varios campos de `ReEnrollmentSettings`:
+The behavior of reenroll is governed by several `ReEnrollmentSettings` fields:
 
-* **`ReEnrollmentDelta`** abre la ventana de renovación en `NotAfter - ReEnrollmentDelta`. Antes de ese instante, el servidor responde con `invalid reenroll window`.
+* **`ReEnrollmentDelta`** opens the renewal window at `NotAfter - ReEnrollmentDelta`. Before that instant, the server responds with `invalid reenroll window`.
 
-* **`EnableExpiredRenewal`** permite usar un certificado ya caducado como prueba de identidad; si está desactivado, el servidor responde con `expired certificate`.
+* **`EnableExpiredRenewal`** allows using an already-expired certificate as proof of identity; if disabled, the server responds with `expired certificate`.
 
-* **`RevokeOnReEnrollment`** revoca el certificado anterior como `superseded` después de emitir el nuevo.
+* **`RevokeOnReEnrollment`** revokes the previous certificate as `superseded` after issuing the new one.
 
-* **`AdditionalValidationCAs`** añade emisores válidos para el certificado actual, además de la CA de enrolamiento del DMS.
+* **`AdditionalValidationCAs`** adds valid issuers for the current certificate, in addition to the DMS's enrollment CA.
 
-* **Inmutabilidad del subject**: el CSR de renovación debe tener exactamente el mismo subject que el certificado en vigor. Lamassu compara, byte a byte, el `RawSubject` del CSR con el del certificado (`slices.Compare`). Si los bytes difieren, el servidor cae a una comparación semántica de respaldo sobre los atributos `CommonName`, `OrganizationalUnit`, `Organization`, `Locality`, `Province` y `Country`. Si todos esos atributos coinciden, el reenroll continúa pese a la diferencia de bytes (rescata casos donde solo cambia la codificación, `PrintableString` frente a `UTF8String`). Si algún atributo difiere, el reenroll se aborta con `invalid RawSubject bytes`. El integrador debe regenerar el CSR con exactamente el mismo subject que en la inscripción inicial para no depender del comportamiento de fallback.
+* **Subject immutability**: the renewal CSR must have exactly the same subject as the active certificate. Lamassu compares, byte by byte, the `RawSubject` of the CSR with the certificate's (`slices.Compare`). If the bytes differ, the server falls back to a semantic comparison over the `CommonName`, `OrganizationalUnit`, `Organization`, `Locality`, `Province` and `Country` attributes. If all those attributes match, the reenroll continues despite the byte difference (rescuing cases where only the encoding changes, `PrintableString` versus `UTF8String`). If any attribute differs, the reenroll aborts with `invalid RawSubject bytes`. The integrator must regenerate the CSR with exactly the same subject as in the initial enrollment to avoid depending on fallback behavior.
 
-* **Validación de la cadena del certificado presentado**: la validación se intenta primero contra la CA de enrolamiento del DMS; si falla, recorre las `AdditionalValidationCAs`. La validación es "shallow": cada CA se prueba como ancla, no se compone una cadena multinivel. El cliente debe presentar la cadena completa en el handshake mTLS. Un certificado revocado aborta el reenroll con `certificate is revoked`.
+* **Validation of the presented certificate's chain**: validation is first attempted against the DMS's enrollment CA; if it fails, it walks the `AdditionalValidationCAs`. Validation is "shallow": each CA is tested as an anchor, no multi-level chain is composed. The client must present the complete chain in the mTLS handshake. A revoked certificate aborts the reenroll with `certificate is revoked`.
 
 /serverkeygen [#serverkeygen]
 
-El endpoint `POST /.well-known/est/{aps}/serverkeygen` permite que Lamassu genere el par de claves del dispositivo en el servidor y devuelva, en la misma respuesta, la clave privada y el certificado emitido. Es útil para dispositivos con capacidad criptográfica limitada o flujos donde la clave se aprovisiona durante la fabricación.
+The endpoint `POST /.well-known/est/{aps}/serverkeygen` lets Lamassu generate the device's key pair on the server and return, in the same response, the private key and the issued certificate. It is useful for devices with limited cryptographic capability or flows where the key is provisioned during manufacturing.
 
-Este endpoint requiere que `ServerKeyGen.Enabled` valga `true` en el DMS. Si no está activado, el servidor responde con `server key generation not enabled`. La autenticación se aplica igual que en `/simpleenroll`: el integrador presenta la credencial que corresponda al `AuthMode` del DMS.
+This endpoint requires `ServerKeyGen.Enabled` to be `true` in the DMS. If it is not enabled, the server responds with `server key generation not enabled`. Authentication applies the same way as in `/simpleenroll`: the integrator presents the credential matching the DMS's `AuthMode`.
 
-El algoritmo y el tamaño de la clave generada se deciden por el DMS, no por el cliente.
+The algorithm and size of the generated key are decided by the DMS, not by the client.
 
-* **RSA** admite cualquier tamaño aceptado por `crypto/rsa`; los valores habituales son 2048, 3072 y 4096 bits. Un valor no válido hace fallar la generación con un error `500`.
-* **ECDSA** admite 224, 256, 384 y 521 bits, equivalentes a P-224, P-256 (`prime256v1`), P-384 y P-521. Cualquier otro valor degrada **silenciosamente** a P-256 y solo deja un aviso en el log: el cliente no recibe un error y puede obtener una curva distinta de la esperada.
+* **RSA** supports any size accepted by `crypto/rsa`; common values are 2048, 3072 and 4096 bits. An invalid value fails generation with a `500` error.
+* **ECDSA** supports 224, 256, 384 and 521 bits, equivalent to P-224, P-256 (`prime256v1`), P-384 and P-521. Any other value **silently** degrades to P-256 and only leaves a warning in the log: the client receives no error and may obtain a curve different from the expected one.
 
-El CSR enviado por el cliente sirve únicamente para transportar el subject y las extensiones; la prueba de posesión PKCS#10 no aplica aquí porque el cliente no es quien generó la clave. Lamassu descarta la clave pública del CSR original, genera un par de claves nuevo con su entropía interna, en motor software y no en un Crypto Engine de hardware como AWS KMS o PKCS#11, construye un CSR nuevo con esa clave y procede a una inscripción interna equivalente a `/simpleenroll`.
+The CSR sent by the client serves only to carry the subject and extensions; the PKCS#10 proof of possession does not apply here because the client is not the one who generated the key. Lamassu discards the original CSR's public key, generates a new key pair with its internal entropy, in a software engine and not in a hardware Crypto Engine such as AWS KMS or PKCS#11, builds a new CSR with that key and proceeds with an internal enrollment equivalent to `/simpleenroll`.
 
-La respuesta es un `multipart/mixed` con el boundary literal `estServerLamassuBoundary`. Contiene dos partes:
+The response is a `multipart/mixed` with the literal boundary `estServerLamassuBoundary`. It contains two parts:
 
-1. La clave privada en formato **PKCS#8 sin cifrar**, codificada en base64 dentro de una parte con `Content-Type: application/pkcs8`.
-2. El certificado emitido en PKCS#7 *degenerate* base64, dentro de una parte con `Content-Type: application/pkcs7-mime; smime-type=certs-only`.
+1. The private key in **unencrypted PKCS#8** format, base64-encoded inside a part with `Content-Type: application/pkcs8`.
+2. The issued certificate in *degenerate* PKCS#7 base64, inside a part with `Content-Type: application/pkcs7-mime; smime-type=certs-only`.
 
-A diferencia de `/cacerts` y `/simpleenroll`, donde el base64 va troceado en líneas de 76 caracteres, cada parte de `/serverkeygen` viaja como **una única línea base64 sin saltos**. Cualquier proxy inverso que reescriba el cuerpo (por ejemplo, normalizando line endings) puede romper el parseo.
+Unlike `/cacerts` and `/simpleenroll`, where the base64 is wrapped in 76-character lines, each part of `/serverkeygen` travels as **a single base64 line without breaks**. Any reverse proxy that rewrites the body (for example, normalizing line endings) can break the parsing.
 
-<Callout type="warn" title="Aviso crítico de seguridad: clave privada en tránsito">
-  Este endpoint invierte el principio PKI por el que el subscriber controla su clave privada. La clave se serializa en PKCS#8 sin cifrar (`PrivateKeyInfo`, sin `EncryptedPrivateKeyInfo`). No se aplica el envoltorio CMS `EnvelopedData` contemplado en RFC 7030 §4.4.2; no se aplica AES key wrap ni cifrado simétrico por contraseña. La única protección es el TLS del canal. El integrador debe garantizar que: (a) ningún proxy inverso termine TLS y registre el cuerpo de la respuesta; (b) la clave se cifre en reposo inmediatamente tras recibirla; (c) la cuenta de auditoría en el servidor Lamassu queda como punto único de origen de la clave.
+<Callout type="warn" title="Critical security warning: private key in transit">
+  This endpoint reverses the PKI principle whereby the subscriber controls its own private key. The key is serialized as unencrypted PKCS#8 (`PrivateKeyInfo`, without `EncryptedPrivateKeyInfo`). The CMS `EnvelopedData` wrapper contemplated in RFC 7030 §4.4.2 is not applied; no AES key wrap or password-based symmetric encryption is used. The only protection is the channel's TLS. The integrator must guarantee that: (a) no reverse proxy terminates TLS and logs the response body; (b) the key is encrypted at rest immediately after receipt; (c) the audit account on the Lamassu server remains the single point of origin of the key.
 </Callout>
 
 ```bash
@@ -319,31 +319,31 @@ curl -s --cacert lamassu-trust.pem \
   -o response.mime
 ```
 
-Para separar las dos partes, el siguiente fragmento usa `awk` con el boundary literal. Funciona con la estructura exacta de Lamassu (cada parte = headers + línea en blanco + una sola línea base64); cualquier proxy intermedio que reescriba el cuerpo lo romperá.
+To separate the two parts, the following snippet uses `awk` with the literal boundary. It works with Lamassu's exact structure (each part = headers + blank line + a single base64 line); any intermediate proxy rewriting the body will break it.
 
 ```bash
-# Extraer la primera parte (clave PKCS#8) - base64 plano en una línea
+# Extract the first part (PKCS#8 key) - plain base64 in one line
 awk '/--estServerLamassuBoundary/{i++; next} i==1 && NF{print}' response.mime \
   | sed -n '/^$/,$p' | tail -n +2 | base64 -d -i > device.key.der
 
-# Extraer la segunda parte (certificado PKCS#7) - base64 plano en una línea
+# Extract the second part (PKCS#7 certificate) - plain base64 in one line
 awk '/--estServerLamassuBoundary/{i++; next} i==2 && NF{print}' response.mime \
   | sed -n '/^$/,$p' | tail -n +2 | base64 -d -i > device.p7b
 
-# Convertir la clave a PEM (PKCS#8 sin cifrar)
+# Convert the key to PEM (unencrypted PKCS#8)
 openssl pkcs8 -inform DER -in device.key.der -nocrypt -out device.key
 
-# Convertir el certificado a PEM
+# Convert the certificate to PEM
 openssl pkcs7 -inform DER -in device.p7b -print_certs -out device.crt
 ```
 
-Flujos completos [#flujos-completos]
+Full flows [#full-flows]
 
-Una vez revisados los endpoints por separado, estos ejemplos muestran cómo encadenarlos en dos escenarios habituales: el alta inicial de un dispositivo y la renovación de un certificado ya emitido.
+Once the endpoints have been reviewed individually, these examples show how to chain them in two common scenarios: the initial enrollment of a device and the renewal of an already-issued certificate.
 
-Ejemplo end-to-end: enroll [#ejemplo-end-to-end-enroll]
+End-to-end example: enroll [#end-to-end-example-enroll]
 
-El siguiente script ilustra el proceso completo de inscripción de un dispositivo con clave EC P-256 generada localmente y autenticación mTLS contra un certificado bootstrap.
+The following script illustrates the complete process of enrolling a device with a locally generated EC P-256 key and mTLS authentication against a bootstrap certificate.
 
 ```bash
 #!/usr/bin/env bash
@@ -361,23 +361,23 @@ DEVICE_CSR="device.csr"
 DEVICE_CRT="device.crt"
 CACERTS_PEM="cacerts.pem"
 
-# 1. Generar la clave privada del dispositivo (EC P-256)
+# 1. Generate the device's private key (EC P-256)
 openssl ecparam -name prime256v1 -genkey -noout -out "$DEVICE_KEY"
 
-# 2. Construir el CSR con el subject definitivo (firmado con SHA-256)
+# 2. Build the CSR with the final subject (signed with SHA-256)
 openssl req -new -key "$DEVICE_KEY" -sha256 -out "$DEVICE_CSR" \
   -subj "/CN=$DEVICE_CN/O=Acme/OU=Fleet"
 
-# 3. Descargar la cadena de confianza del DMS
+# 3. Download the DMS trust chain
 curl -s --cacert "$TRUST" \
   -H "Accept: application/x-pem-file" \
   "$EST_HOST/.well-known/est/$DMS_ID/cacerts" \
   -o "$CACERTS_PEM"
 
-# 4. Convertir el CSR a base64 DER sin saltos de línea
+# 4. Convert the CSR to base64 DER without line breaks
 openssl req -in "$DEVICE_CSR" -outform DER | base64 -w 0 > device.csr.b64
 
-# 5. Solicitar el certificado al endpoint /simpleenroll usando mTLS
+# 5. Request the certificate from /simpleenroll using mTLS
 curl -s --cacert "$TRUST" \
   --cert "$BOOTSTRAP_CRT" --key "$BOOTSTRAP_KEY" \
   -H "Content-Type: application/pkcs10" \
@@ -385,17 +385,17 @@ curl -s --cacert "$TRUST" \
   "$EST_HOST/.well-known/est/$DMS_ID/simpleenroll" \
   -o enroll.b64
 
-# 6. Desempaquetar el PKCS#7 base64 y persistir el certificado
+# 6. Unwrap the base64 PKCS#7 and persist the certificate
 base64 -d -i enroll.b64 \
   | openssl pkcs7 -inform DER -print_certs -out "$DEVICE_CRT"
 
-# 7. Validar el certificado contra la cadena descargada
+# 7. Validate the certificate against the downloaded chain
 openssl verify -CAfile "$CACERTS_PEM" "$DEVICE_CRT"
 ```
 
-Ejemplo end-to-end: reenroll [#ejemplo-end-to-end-reenroll]
+End-to-end example: reenroll [#end-to-end-example-reenroll]
 
-El siguiente script reproduce un proceso de renovación: detecta la expiración del certificado actual, regenera el CSR con el **mismo subject** y se autentica con el certificado en vigor.
+The following script reproduces a renewal process: it detects the expiration of the current certificate, regenerates the CSR with the **same subject** and authenticates with the active certificate.
 
 ```bash
 #!/usr/bin/env bash
@@ -409,22 +409,22 @@ DEVICE_KEY="device.key"
 DEVICE_CRT="device.crt"
 DEVICE_CRT_NEW="device.new.crt"
 
-# 1. Inspeccionar el subject actual y la fecha de expiración
+# 1. Inspect the current subject and expiration date
 CURRENT_SUBJECT=$(openssl x509 -in "$DEVICE_CRT" -noout -subject -nameopt RFC2253 \
   | sed 's/^subject=//')
 NOT_AFTER=$(openssl x509 -in "$DEVICE_CRT" -noout -enddate | cut -d= -f2)
-echo "Subject actual: $CURRENT_SUBJECT"
-echo "Caduca: $NOT_AFTER"
+echo "Current subject: $CURRENT_SUBJECT"
+echo "Expires: $NOT_AFTER"
 
-# 2. Construir el nuevo CSR con el MISMO subject que el certificado en vigor.
-#    Cualquier diferencia en atributos provoca "invalid RawSubject bytes".
+# 2. Build the new CSR with the SAME subject as the active certificate.
+#    Any difference in attributes causes "invalid RawSubject bytes".
 openssl req -new -key "$DEVICE_KEY" -sha256 -out device-renewal.csr \
   -subj "/CN=device-00001/O=Acme/OU=Fleet"
 
-# 3. Convertir a base64 DER sin saltos
+# 3. Convert to base64 DER without line breaks
 openssl req -in device-renewal.csr -outform DER | base64 -w 0 > device-renewal.csr.b64
 
-# 4. Invocar /simplereenroll con el certificado en vigor como credencial mTLS
+# 4. Invoke /simplereenroll with the active certificate as the mTLS credential
 curl -s --cacert "$TRUST" \
   --cert "$DEVICE_CRT" --key "$DEVICE_KEY" \
   -H "Content-Type: application/pkcs10" \
@@ -432,65 +432,65 @@ curl -s --cacert "$TRUST" \
   "$EST_HOST/.well-known/est/$DMS_ID/simplereenroll" \
   -o reenroll.b64
 
-# 5. Desempaquetar el nuevo certificado y persistirlo
+# 5. Unwrap the new certificate and persist it
 base64 -d -i reenroll.b64 \
   | openssl pkcs7 -inform DER -print_certs -out "$DEVICE_CRT_NEW"
 
-echo "Nuevo certificado guardado en $DEVICE_CRT_NEW"
+echo "New certificate saved to $DEVICE_CRT_NEW"
 ```
 
-Próximos pasos tras el enrolamiento [#próximos-pasos-tras-el-enrolamiento]
+Next steps after enrollment [#next-steps-after-enrollment]
 
-Una vez que el dispositivo ha obtenido su certificado de identidad, los pasos habituales son:
+Once the device has obtained its identity certificate, the usual steps are:
 
-* **Instalar la cadena de confianza** (`cacerts.pem`) en el almacén de confianza del dispositivo. El broker MQTT, el servidor HTTPS o cualquier relying party que valide mTLS necesitará esta cadena.
-* **Combinar el certificado de hoja con la cadena** antes de presentarlo en conexiones mTLS. La respuesta de `/simpleenroll` contiene solo el certificado de hoja; el relying party puede rechazar la conexión si no recibe la cadena completa.
-* **Planificar la renovación**: configurar en el dispositivo un temporizador que invoque `/simplereenroll` dentro de la ventana `ReEnrollmentDelta` antes de la caducidad del certificado. No espere a que caduque salvo que `EnableExpiredRenewal` esté activo.
+* **Install the trust chain** (`cacerts.pem`) into the device's trust store. The MQTT broker, the HTTPS server or any relying party validating mTLS will need this chain.
+* **Combine the leaf certificate with the chain** before presenting it in mTLS connections. The `/simpleenroll` response contains only the leaf certificate; the relying party may reject the connection if it does not receive the full chain.
+* **Plan renewal**: configure a timer on the device that invokes `/simplereenroll` within the `ReEnrollmentDelta` window before the certificate expires. Do not wait for expiry unless `EnableExpiredRenewal` is enabled.
 
 ***
 
-Diagnóstico y compatibilidad [#diagnóstico-y-compatibilidad]
+Diagnostics and compatibility [#diagnostics-and-compatibility]
 
-Códigos de error y diagnóstico [#códigos-de-error-y-diagnóstico]
+Error codes and diagnostics [#error-codes-and-diagnostics]
 
-<Callout type="warn" title="HTTP 500 para errores de negocio">
-  Lamassu mapea casi todos los errores de negocio a `500 Internal Server Error`, no a `4xx`. El código de estado HTTP no es suficiente para distinguir entre un error de red y un error de política. El integrador debe inspeccionar el campo `err` del cuerpo JSON (`{"err": "<mensaje>"}`) para determinar la causa exacta del fallo.
+<Callout type="warn" title="HTTP 500 for business errors">
+  Lamassu maps almost every business error to `500 Internal Server Error`, not to `4xx`. The HTTP status code is not enough to distinguish a network error from a policy error. The integrator must inspect the `err` field of the JSON body (`{"err": "<message>"}`) to determine the exact cause of the failure.
 </Callout>
 
-| HTTP | Mensaje                                   | Causa                                                                                                | Acción del integrador                                                                                                   |
-| ---- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| 400  | `Field validation for 'APS' failed`       | El segmento `{aps}` falta en la URL.                                                                 | Incluir el ID del DMS en la ruta.                                                                                       |
-| 400  | `content-type must be application/pkcs10` | Cabecera `Content-Type` ausente o incorrecta.                                                        | Fijar `Content-Type: application/pkcs10`.                                                                               |
-| 400  | `body payload must be base64 encoded`     | El cuerpo no es base64 válido.                                                                       | Usar `base64 -w 0` para evitar saltos de línea.                                                                         |
-| 500  | `DMS not found`                           | El valor `{aps}` no se corresponde con ningún DMS.                                                   | Verificar el identificador con el administrador PKI.                                                                    |
-| 500  | `invalid certificate`                     | El certificado cliente no es válido contra `ValidationCAs`.                                          | Comprobar la cadena del certificado bootstrap.                                                                          |
-| 500  | `certificate is revoked`                  | El certificado **presentado como credencial mTLS** está revocado en Lamassu o vía OCSP/CRL externos. | Solicitar un nuevo certificado bootstrap o investigar la revocación.                                                    |
-| 500  | `revoked certificate`                     | En reenroll, el certificado **activo del dispositivo en la base de datos** figura como revocado.     | Revisar el estado del slot de identidad; si la revocación fue intencional, emitir un nuevo enroll en lugar de reenroll. |
-| 500  | `expired certificate`                     | El certificado presentado ha caducado y el DMS no permite `AllowExpired`/`EnableExpiredRenewal`.     | Renovar antes de la caducidad o solicitar habilitar `EnableExpiredRenewal`.                                             |
-| 500  | `forbiddenNewEnrollment`                  | El dispositivo ya está enrolado y `EnableReplaceableEnrollment` es `false`.                          | Usar `/simplereenroll` o pedir al administrador que habilite el flag.                                                   |
-| 500  | `device not preregistered`                | El DMS está en `PRE_REGISTRATION` y el dispositivo no existe.                                        | Registrar el dispositivo antes de inscribirlo.                                                                          |
-| 500  | `invalid reenroll window`                 | Se intenta renovar antes de `NotAfter - ReEnrollmentDelta`.                                          | Esperar a la apertura de la ventana o pedir un `ReEnrollmentDelta` mayor.                                               |
-| 500  | `invalid RawSubject bytes`                | El subject del CSR de renovación no coincide con el del certificado en vigor.                        | Regenerar el CSR con el subject exacto del cert anterior.                                                               |
-| 500  | `external webhook denied enrollment`      | El webhook devolvió un código no `2xx` o `authorized != true`.                                       | Revisar los logs del servicio webhook.                                                                                  |
-| 500  | `server key generation not enabled`       | `/serverkeygen` está deshabilitado en el DMS.                                                        | Pedir al administrador activar `ServerKeyGen.Enabled`.                                                                  |
+| HTTP | Message                                   | Cause                                                                                                   | Integrator action                                                                                           |
+| ---- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 400  | `Field validation for 'APS' failed`       | The `{aps}` segment is missing from the URL.                                                            | Include the DMS ID in the path.                                                                             |
+| 400  | `content-type must be application/pkcs10` | `Content-Type` header missing or incorrect.                                                             | Set `Content-Type: application/pkcs10`.                                                                     |
+| 400  | `body payload must be base64 encoded`     | The body is not valid base64.                                                                           | Use `base64 -w 0` to avoid line breaks.                                                                     |
+| 500  | `DMS not found`                           | The `{aps}` value does not match any DMS.                                                               | Verify the identifier with the PKI administrator.                                                           |
+| 500  | `invalid certificate`                     | The client certificate is not valid against `ValidationCAs`.                                            | Check the bootstrap certificate chain.                                                                      |
+| 500  | `certificate is revoked`                  | The certificate **presented as the mTLS credential** is revoked in Lamassu or via external OCSP/CRL.    | Request a new bootstrap certificate or investigate the revocation.                                          |
+| 500  | `revoked certificate`                     | In reenroll, the device's **active certificate in the database** is listed as revoked.                  | Review the identity slot status; if the revocation was intentional, issue a new enroll instead of reenroll. |
+| 500  | `expired certificate`                     | The presented certificate has expired and the DMS does not allow `AllowExpired`/`EnableExpiredRenewal`. | Renew before expiration or request `EnableExpiredRenewal` to be enabled.                                    |
+| 500  | `forbiddenNewEnrollment`                  | The device is already enrolled and `EnableReplaceableEnrollment` is `false`.                            | Use `/simplereenroll` or ask the administrator to enable the flag.                                          |
+| 500  | `device not preregistered`                | The DMS is in `PRE_REGISTRATION` and the device does not exist.                                         | Register the device before enrolling it.                                                                    |
+| 500  | `invalid reenroll window`                 | Renewal attempted before `NotAfter - ReEnrollmentDelta`.                                                | Wait for the window to open or request a larger `ReEnrollmentDelta`.                                        |
+| 500  | `invalid RawSubject bytes`                | The renewal CSR's subject does not match the active certificate's.                                      | Regenerate the CSR with the exact subject of the previous cert.                                             |
+| 500  | `external webhook denied enrollment`      | The webhook returned a non-`2xx` code or `authorized != true`.                                          | Review the webhook service logs.                                                                            |
+| 500  | `server key generation not enabled`       | `/serverkeygen` is disabled on the DMS.                                                                 | Ask the administrator to enable `ServerKeyGen.Enabled`.                                                     |
 
-Para los mensajes que no figuren en esta tabla, los logs del servidor Lamassu (con los campos `func`, `dms`, `device-cn`, `step`, `auth-method`, `auth-status`) son el primer lugar donde buscar la causa.
+For messages not listed in this table, the Lamassu server logs (with the fields `func`, `dms`, `device-cn`, `step`, `auth-method`, `auth-status`) are the first place to look for the cause.
 
-Notas de compatibilidad [#notas-de-compatibilidad]
+Compatibility notes [#compatibility-notes]
 
-La implementación de Lamassu se ajusta al RFC 7030 en lo esencial pero introduce varias particularidades que pueden afectar a clientes EST estrictos o a librerías de terceros:
+Lamassu's implementation follows RFC 7030 in its essentials but introduces several quirks that can affect strict EST clients or third-party libraries:
 
-* Los endpoints `/csrattrs` y `/fullcmc` del RFC 7030 **no están implementados** en Lamassu. Un cliente que invoque `/.well-known/est/<DMS_ID>/csrattrs` recibirá `404 Not Found` en lugar del `204 No Content` que el RFC sugiere para "sin atributos". Las librerías EST estrictas deben configurarse para no intentar `csrattrs`.
-* El base64 de la respuesta de `/cacerts` y `/simpleenroll` se trocea en líneas de **76 caracteres** terminadas con CRLF (conforme con S/MIME, RFC 5751). Las partes de `/serverkeygen` no aplican wrap.
-* El boundary del `multipart/mixed` en `/serverkeygen` está fijado y no se puede negociar.
-* El segmento `{aps}` es **obligatorio** en todas las rutas EST. Las rutas registradas sin `{aps}` están en el código pero responden `400`.
-* El cuerpo de `/cacerts`, `/simpleenroll` y `/simplereenroll` puede devolverse como PEM concatenado si el cliente envía `Accept: application/x-pem-file`. Esta es una extensión específica de Lamassu y no aparece en el RFC.
-* El servidor no rechaza explícitamente CSRs firmados con SHA-1 o MD5; el integrador debe generar el CSR con SHA-256 o superior.
+* The `/csrattrs` and `/fullcmc` endpoints of RFC 7030 are **not implemented** in Lamassu. A client invoking `/.well-known/est/<DMS_ID>/csrattrs` receives `404 Not Found` instead of the `204 No Content` the RFC suggests for "no attributes". Strict EST libraries must be configured not to attempt `csrattrs`.
+* The base64 of the `/cacerts` and `/simpleenroll` responses is wrapped in lines of **76 characters** terminated with CRLF (S/MIME compliant, RFC 5751). The parts of `/serverkeygen` apply no wrap.
+* The `multipart/mixed` boundary in `/serverkeygen` is fixed and cannot be negotiated.
+* The `{aps}` segment is **mandatory** in all EST routes. Routes registered without `{aps}` are in the code but respond `400`.
+* The body of `/cacerts`, `/simpleenroll` and `/simplereenroll` can be returned as concatenated PEM if the client sends `Accept: application/x-pem-file`. This is a Lamassu-specific extension and does not appear in the RFC.
+* The server does not explicitly reject CSRs signed with SHA-1 or MD5; the integrator must generate the CSR with SHA-256 or higher.
 
 <Cards>
-  <Card title="Visión general del DMS" href="/docs/platform/pki/device-enrollment" />
+  <Card title="DMS overview" href="/docs/platform/pki/device-enrollment" />
 
-  <Card title="Validación OCSP" href="/docs/platform/pki/ocsp" />
+  <Card title="OCSP validation" href="/docs/platform/pki/ocsp" />
 
-  <Card title="Gestionar dispositivos" href="/docs/platform/pki/device-management" />
+  <Card title="Manage devices" href="/docs/platform/pki/device-management" />
 </Cards>

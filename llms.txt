@@ -1,34 +1,36 @@
 # Documentation
 
-- [Despliega desde AWS Marketplace](/docs/deployment/aws-marketplace): Ejecuta una instancia preconfigurada de Lamassu IoT en Amazon EC2.
-- [Despliega Lamassu](/docs/deployment/overview): Elige el modelo operativo que encaja con tu infraestructura y requisitos de control.
-- [Utiliza Lamassu como SaaS](/docs/deployment/saas): Consume Lamassu como servicio gestionado sin operar infraestructura propia.
-- [Fastlane](/docs/deployment/self-hosted/fastlane): Referencia del script scripts/lamassu-fast-lane.sh para desplegar Lamassu PKI de forma automatizada en Kubernetes
-- [Kubernetes self-managed](/docs/deployment/self-hosted/overview): Despliega Lamassu en tu propio clúster Kubernetes con Helm o Fastlane.
-- [Control de acceso](/docs/platform/pki/access-control): Diseña quién puede acceder a Lamassu mediante principales, políticas, permisos sobre recursos y autorización de rutas HTTP.
-- [Alertas y suscripciones](/docs/platform/pki/alerts): Envía eventos de la PKI a personas y sistemas externos.
-- [Registros de auditoría](/docs/platform/pki/audit-logs): Entiende qué eventos de auditoría genera Lamassu y cómo convertirlos en una pista durable.
-- [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation): Diseña autoridades raíz e intermedias y sustituye certificados o claves sin romper la confianza.
-- [Autoridades de certificación](/docs/platform/pki/certificate-authorities): Crea, importa y opera las autoridades que establecen la confianza de tu PKI.
-- [Perfiles de certificado](/docs/platform/pki/certificate-profiles): Define políticas reutilizables para emitir certificados coherentes y limitar las claves aceptadas.
-- [Validación de certificados](/docs/platform/pki/certificate-validation): Publica el estado de las identidades mediante OCSP y CRL.
-- [Certificados](/docs/platform/pki/certificates): Consulta, descarga y revoca los certificados emitidos por Lamassu.
-- [Arquitectura de la plataforma](/docs/platform/pki/concepts/architecture): Componentes de Lamassu y relación entre control, claves, emisión y dispositivos.
-- [Ciclo de vida de un certificado](/docs/platform/pki/concepts/certificate-lifecycle): Emisión, uso, renovación, revocación y retirada de certificados en Lamassu.
-- [Glosario](/docs/platform/pki/concepts/glossary): Términos de PKI, certificados y gestión de identidades usados en Lamassu.
-- [Cómo funciona Lamassu](/docs/platform/pki/concepts/overview): El modelo mental de confianza, claves, certificados y dispositivos.
-- [Modelo de confianza](/docs/platform/pki/concepts/trust-model): Entiende dónde nace la confianza, cómo se distribuye y qué valida cada componente.
-- [Listas de revocación (CRL)](/docs/platform/pki/crl): Genera y distribuye listas firmadas para validar certificados sin conexión.
-- [Device Management Service](/docs/platform/pki/device-enrollment): Define cómo una flota recibe, renueva y utiliza sus identidades.
-- [Dispositivos e identidades](/docs/platform/pki/device-management): Registra dispositivos y controla sus identidades durante todo el ciclo de vida.
-- [Enrolamiento de dispositivos con EST](/docs/platform/pki/est-enrollment): Guía del protocolo EST en Lamassu IoT, con la configuración del DMS para el administrador PKI y la referencia de endpoints para el integrador de dispositivos.
-- [AWS IoT Core](/docs/platform/pki/integrations/aws-iot-core): El conector de Lamassu para AWS IoT Core sincroniza las identidades de los dispositivos con la plataforma AWS, gestionando el registro de CAs, el aprovisionamiento de Things y el ciclo de vida de los certificados de forma automática y orientada a eventos.
-- [Claves y motores criptográficos](/docs/platform/pki/key-management): Genera, importa y opera claves sin acoplar la PKI a un proveedor concreto.
-- [Validación online con OCSP](/docs/platform/pki/ocsp): Consulta en tiempo real si un certificado sigue vigente o se ha revocado.
-- [Plataforma Lamassu IoT](/docs/platform/pki/overview): Gestiona la PKI y las identidades digitales de tus dispositivos desde una única plataforma.
-- [Crea tu primera CA](/docs/platform/pki/quickstarts/create-certificate-authority): Crea una autoridad raíz y comprueba que está preparada para emitir certificados.
-- [Emite tu primer certificado](/docs/platform/pki/quickstarts/issue-certificate): Emite una identidad X.509 desde la consola y verifica el resultado.
-- [Primeros pasos](/docs/platform/pki/quickstarts/overview): Obtén un primer resultado con Lamassu y continúa desde una base funcional.
-- [Registra tu primer dispositivo](/docs/platform/pki/quickstarts/register-device): Añade un dispositivo a Lamassu y asígnale una identidad activa.
-- [Resolución de problemas](/docs/platform/pki/troubleshooting): Diagnostica acceso, salud, emisión, enrolamiento y dependencias en un despliegue de Lamassu.
+- [Deploy from AWS Marketplace](/docs/deployment/aws-marketplace): Run a preconfigured Lamassu IoT instance on Amazon EC2.
+- [Deploy Lamassu](/docs/deployment/overview): Choose the operating model that fits your infrastructure and control requirements.
+- [Use Lamassu as SaaS](/docs/deployment/saas): Consume Lamassu as a managed service without operating your own infrastructure.
+- [Fastlane](/docs/deployment/self-hosted/fastlane): Bootstrap a complete Lamassu evaluation or lab environment on an existing Kubernetes cluster.
+- [Install with Helm](/docs/deployment/self-hosted/helm): Prepare dependencies, configure the Lamassu chart and verify a controlled Kubernetes deployment.
+- [Expose the Gateway](/docs/deployment/self-hosted/networking): Choose how clients reach Lamassu, when to set gateway.addresses and how to design multiple Gateways.
+- [Kubernetes self-managed](/docs/deployment/self-hosted/overview): Choose an installation workflow and network architecture for Lamassu on your Kubernetes cluster.
+- [Access control](/docs/platform/pki/access-control): Design who can access Lamassu through principals, policies, resource permissions and HTTP route authorization.
+- [Alerts and subscriptions](/docs/platform/pki/alerts): Send PKI events to people and external systems.
+- [Audit logs](/docs/platform/pki/audit-logs): Understand which audit events Lamassu generates and how to turn them into a durable trail.
+- [CA hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation): Design root and intermediate authorities and replace certificates or keys without breaking trust.
+- [Certification authorities](/docs/platform/pki/certificate-authorities): Create, import and operate the authorities that establish your PKI's trust.
+- [Certificate profiles](/docs/platform/pki/certificate-profiles): Define reusable policies to issue consistent certificates and constrain accepted keys.
+- [Certificate validation](/docs/platform/pki/certificate-validation): Publish the status of identities through OCSP and CRL.
+- [Certificates](/docs/platform/pki/certificates): Inspect, download and revoke the certificates issued by Lamassu.
+- [Platform architecture](/docs/platform/pki/concepts/architecture): Lamassu components and how control, keys, issuance and devices relate.
+- [Certificate lifecycle](/docs/platform/pki/concepts/certificate-lifecycle): Issuance, use, renewal, revocation and retirement of certificates in Lamassu.
+- [Glossary](/docs/platform/pki/concepts/glossary): PKI, certificate and identity management terms used in Lamassu.
+- [How Lamassu works](/docs/platform/pki/concepts/overview): The mental model of trust, keys, certificates and devices.
+- [Trust model](/docs/platform/pki/concepts/trust-model): Understand where trust originates, how it is distributed and what each component validates.
+- [Revocation lists (CRL)](/docs/platform/pki/crl): Generate and distribute signed lists to validate certificates offline.
+- [Device Management Service](/docs/platform/pki/device-enrollment): Define how a fleet receives, renews and uses its identities.
+- [Devices and identities](/docs/platform/pki/device-management): Register devices and control their identities throughout the lifecycle.
+- [Device enrollment with EST](/docs/platform/pki/est-enrollment): EST protocol guide for Lamassu IoT, with DMS configuration for the PKI administrator and the endpoint reference for device integrators.
+- [AWS IoT Core](/docs/platform/pki/integrations/aws-iot-core): Lamassu's connector for AWS IoT Core syncs device identities with the AWS platform, handling CA registration, Thing provisioning and certificate lifecycle automatically and event-driven.
+- [Keys and cryptographic engines](/docs/platform/pki/key-management): Generate, import and operate keys without coupling the PKI to a specific provider.
+- [Online validation with OCSP](/docs/platform/pki/ocsp): Check in real time whether a certificate is still valid or has been revoked.
+- [Lamassu IoT Platform](/docs/platform/pki/overview): Manage PKI and digital identities for your devices from a single platform.
+- [Create your first CA](/docs/platform/pki/quickstarts/create-certificate-authority): Create a root authority and check that it is ready to issue certificates.
+- [Issue your first certificate](/docs/platform/pki/quickstarts/issue-certificate): Issue an X.509 identity from the console and verify the result.
+- [Get started](/docs/platform/pki/quickstarts/overview): Get a first result with Lamassu and continue from a working base.
+- [Register your first device](/docs/platform/pki/quickstarts/register-device): Add a device to Lamassu and assign it an active identity.
+- [Troubleshooting](/docs/platform/pki/troubleshooting): Diagnose access, health, issuance, enrollment and dependencies in a Lamassu deployment.
 - [Test](/docs/test): A document to test Fumadocs

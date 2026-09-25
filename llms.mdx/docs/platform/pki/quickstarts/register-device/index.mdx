@@ -1,47 +1,47 @@
-# Registra tu primer dispositivo (/docs/platform/pki/quickstarts/register-device)
+# Register your first device (/docs/platform/pki/quickstarts/register-device)
 
 
 
-En este quickstart registrarás manualmente un dispositivo y le asignarás su primer certificado. Es el recorrido más corto para entender cómo Lamassu relaciona una entidad física con su historial de identidades.
+In this quickstart you will manually register a device and assign it its first certificate. It is the shortest path to understanding how Lamassu relates a physical entity to its identity history.
 
-Antes de empezar [#antes-de-empezar]
+Before you begin [#before-you-begin]
 
-* Un DMS configurado.
-* Una CA asociada al DMS.
-* Un identificador único para el dispositivo.
+* A configured DMS.
+* A CA associated with the DMS.
+* A unique identifier for the device.
 
 <Steps>
   <Step>
-    Registra el dispositivo [#registra-el-dispositivo]
+    Register the device [#register-the-device]
 
-    Abre **Managed Devices**, selecciona la acción para registrar un dispositivo y completa:
+    Open **Managed Devices**, select the action to register a device and complete:
 
-    * **Device ID**: identificador único del dispositivo.
-    * **Registration Authority**: DMS que aplicará las políticas de enrolamiento.
-    * **Icon** y **Tags**: clasificación opcional para localizarlo después.
+    * **Device ID**: unique identifier of the device.
+    * **Registration Authority**: the DMS that will apply the enrollment policies.
+    * **Icon** and **Tags**: optional classification to locate it later.
   </Step>
 
   <Step>
-    Comprueba el estado inicial [#comprueba-el-estado-inicial]
+    Check the initial status [#check-the-initial-status]
 
-    Abre el dispositivo recién creado. Debe aparecer con estado **No Identity**: existe en el inventario, pero todavía no tiene un certificado asociado.
+    Open the newly created device. It should appear with status **No Identity**: it exists in the inventory but does not yet have an associated certificate.
   </Step>
 
   <Step>
-    Asigna una identidad [#asigna-una-identidad]
+    Assign an identity [#assign-an-identity]
 
-    Selecciona **Assign Identity**. Lamassu buscará certificados activos cuyo `Common Name` coincida con el `Device ID`.
+    Select **Assign Identity**. Lamassu will search for active certificates whose `Common Name` matches the `Device ID`.
 
-    Selecciona un certificado existente o usa **Issue New Instead** para emitir uno desde una CA vinculada al DMS.
+    Select an existing certificate or use **Issue New Instead** to issue one from a CA linked to the DMS.
   </Step>
 
   <Step>
-    Verifica el dispositivo [#verifica-el-dispositivo]
+    Verify the device [#verify-the-device]
 
-    Tras confirmar, el estado debe cambiar a **Active**. Revisa **Certificate History** para comprobar la identidad asociada y **Device Event Timeline** para ver el evento de asignación.
+    After confirming, the status should change to **Active**. Review **Certificate History** to check the associated identity and **Device Event Timeline** to see the assignment event.
   </Step>
 </Steps>
 
-Automatiza el siguiente dispositivo [#automatiza-el-siguiente-dispositivo]
+Automate the next device [#automate-the-next-device]
 
-El registro manual ayuda a entender el modelo, pero una flota debe usar enrolamiento automatizado. Continúa con [Device Management Service](/docs/platform/pki/device-enrollment) y la [integración EST](/docs/platform/pki/est-enrollment).
+Manual registration helps you understand the model, but a fleet should use automated enrollment. Continue with [Device Management Service](/docs/platform/pki/device-enrollment) and the [EST integration](/docs/platform/pki/est-enrollment).

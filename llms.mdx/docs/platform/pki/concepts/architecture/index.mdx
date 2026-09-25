@@ -1,25 +1,25 @@
-# Arquitectura de la plataforma (/docs/platform/pki/concepts/architecture)
+# Platform architecture (/docs/platform/pki/concepts/architecture)
 
 
 
-Lamassu se despliega como un conjunto de servicios independientes. La separación evita que todos los componentes necesiten acceso directo a las claves privadas y permite escalar cada capacidad según la carga.
+Lamassu deploys as a set of independent services. This separation keeps every component from needing direct access to private keys and lets each capability scale according to load.
 
-Plano de control [#plano-de-control]
+Control plane [#control-plane]
 
-La consola y las APIs administran autoridades, certificados, DMS, dispositivos, alertas y configuración. Los eventos de dominio permiten que conectores y automatizaciones reaccionen a los cambios sin sondear continuamente la plataforma.
+The console and the APIs manage authorities, certificates, DMSs, devices, alerts and configuration. Domain events allow connectors and automations to react to changes without continuously polling the platform.
 
-Custodia y operaciones criptográficas [#custodia-y-operaciones-criptográficas]
+Key custody and cryptographic operations [#key-custody-and-cryptographic-operations]
 
-El KMS ofrece una interfaz común sobre motores software, PKCS#11 y proveedores cloud. El motor seleccionado conserva la clave o delega la operación criptográfica sin que los demás servicios conozcan su implementación.
+The KMS offers a common interface over software engines, PKCS#11 and cloud providers. The selected engine keeps the key or delegates the cryptographic operation without the other services knowing its implementation.
 
-Emisión y enrolamiento [#emisión-y-enrolamiento]
+Issuance and enrollment [#issuance-and-enrollment]
 
-El servicio de CA emite certificados y mantiene la relación con su autoridad. El DMS aplica las reglas de enrolamiento y expone los flujos EST para que un dispositivo solicite o renueve una identidad.
+The CA service issues certificates and maintains the relationship with its authority. The DMS applies the enrollment rules and exposes the EST flows so a device can request or renew an identity.
 
-Estado y validación [#estado-y-validación]
+Status and validation [#status-and-validation]
 
-Device Manager conserva la vista operativa del dispositivo y su historial. Validation Authority publica OCSP y CRLs para que otros sistemas decidan si deben confiar en un certificado presentado.
+Device Manager keeps the operational view of the device and its history. The Validation Authority publishes OCSP and CRLs so other systems can decide whether to trust a presented certificate.
 
-Dependencias de la plataforma [#dependencias-de-la-plataforma]
+Platform dependencies [#platform-dependencies]
 
-En un despliegue autogestionado, Lamassu utiliza PostgreSQL para persistencia, RabbitMQ para mensajería y un proveedor OIDC para autenticación. Consulta la [arquitectura de despliegue](/docs/deployment/self-hosted/overview#arquitectura) para ver cómo se publican los servicios en Kubernetes.
+In a self-managed deployment, Lamassu uses PostgreSQL for persistence, RabbitMQ for messaging and an OIDC provider for authentication. See the [deployment architecture](/docs/deployment/self-hosted/overview#architecture) for how the services are published on Kubernetes.

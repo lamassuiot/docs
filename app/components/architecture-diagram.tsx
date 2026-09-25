@@ -40,6 +40,7 @@ export function ArchitectureDiagram({
       src={`${asset("architecture-diagram.html")}#${hash}`}
       title={title}
       loading="lazy"
+      allow="fullscreen"
       allowFullScreen
       className={cn(
         "my-6 aspect-[16/9] w-full rounded-lg border",

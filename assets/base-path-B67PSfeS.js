@@ -1,0 +1,1 @@
+function r(s){return`/docs/${s.replace(/^\//,"")}`}const n=e("/docs");function e(s){const t=s.replace(/\/+$/,"");return t.startsWith("/")?t:`/${t}`}function c(s=""){const t=s.replace(/^\//,"");return t?`${n}/${t}`:n}const o=`/${n.split("/")[1]}/versions.json`;function i(s){return s.startsWith(n)?s.slice(n.length).replace(/^\//,""):""}export{n as D,o as V,r as a,c as d,i as p};

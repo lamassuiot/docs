@@ -1491,24 +1491,35 @@ window.addEventListener('keydown', ev => {
   else if (k === 'f') toggleFullscreen();
 });
 
-// ---- fullscreen
+// ---- fullscreen (cross-browser: iOS Safari 16.4+ and older Android WebViews
+// only expose the webkit-prefixed Fullscreen API, not the unprefixed one)
 const fsBtn = document.getElementById('fs-btn');
 const FS_EXPAND = fsBtn.innerHTML;
 const FS_COMPRESS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M9 21v-3a2 2 0 0 0-2-2H4M15 21v-3a2 2 0 0 1 2-2h3"/></svg>';
+const fsEnabled = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled || document.msFullscreenEnabled);
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
 function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else document.documentElement.requestFullscreen().catch(() => {});
+  if (fsElement()) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+    if (exit) { const r = exit.call(document); if (r && r.catch) r.catch(() => {}); }
+  } else {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+    if (req) { const r = req.call(el); if (r && r.catch) r.catch(() => {}); }
+  }
 }
 function updateFsBtn() {
-  const active = !!document.fullscreenElement;
+  const active = !!fsElement();
   fsBtn.innerHTML = active ? FS_COMPRESS : FS_EXPAND;
   const label = active ? 'Exit fullscreen' : 'Enter fullscreen';
   fsBtn.setAttribute('aria-label', label);
   fsBtn.title = label + ' (F)';
 }
 fsBtn.addEventListener('click', toggleFullscreen);
-document.addEventListener('fullscreenchange', () => { updateFsBtn(); resize(); });
-if (!document.fullscreenEnabled) fsBtn.style.display = 'none';
+['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
+  document.addEventListener(evt, () => { updateFsBtn(); resize(); });
+});
+if (!fsEnabled) fsBtn.style.display = 'none';
 
 // ---- frame loop
 const start = performance.now();

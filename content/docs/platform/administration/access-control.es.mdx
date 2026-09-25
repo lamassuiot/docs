@@ -57,7 +57,7 @@ La decisión se toma **antes de reenviar la petición al servicio**:
 7. Si la ruta declara restricciones, compara datos de la petición con los atributos normalizados del mismo principal que aporta la política.
 8. Un resultado satisfactorio permite a Envoy reenviar la petición; cualquier otra respuesta la bloquea en el Gateway.
 
-Cuando permite el acceso, `authz` devuelve el principal seleccionado en `x-current-user`. El Gateway puede propagar esa cabecera al servicio para conservar el contexto de identidad.
+Cuando permite el acceso, `authz` devuelve el principal seleccionado en la cabecera de respuesta `X-Principal-ID`. El Gateway puede propagar esa cabecera al servicio para conservar el contexto de identidad.
 
 Las reglas HTTP responden principalmente a **“¿puede esta identidad llamar a esta operación de la API?”**. Por sí solas no generan filtros sobre la base de datos del servicio externo. Para limitar una ruta a un dispositivo, tenant o cliente concreto, el esquema debe declarar una restricción que relacione un valor de la petición con un atributo normalizado del principal.
 

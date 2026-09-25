@@ -1,16 +1,14 @@
 import { HomeLayout } from "fumadocs-ui/layouts/home";
 import { ArrowRight } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { asset } from "@/lib/asset";
 import { docsPath } from "@/lib/base-path";
 import { baseOptions, gitConfig } from "@/lib/layout.shared";
-import { type Locale, localeFromPath, siteUrl } from "@/lib/locales";
+import { type Locale, localeFromPath } from "@/lib/locales";
 import type { Route } from "./+types/docs-home";
 
-export function meta({}: Route.MetaArgs) {
-  const locale = localeFromPath(
-    typeof window === "undefined" ? "/" : window.location.pathname,
-  );
+export function meta({ location }: Route.MetaArgs) {
+  const locale = localeFromPath(location.pathname);
   const t = locale === "es" ? ES_COPY : EN_COPY;
   return [
     { title: t.metaTitle },
@@ -166,7 +164,6 @@ const sections = [
   { icon: asset("images/kubernetes-white.svg") },
 ];
 
-
 const sectionHrefs: Record<Locale, string[]> = {
   en: [docsPath("platform/pki/overview"), docsPath("deployment/overview")],
   es: [
@@ -181,11 +178,6 @@ const navHrefs: Record<Locale, string[]> = {
     docsPath("es/platform/pki/overview"),
     docsPath("es/deployment/overview"),
   ],
-};
-
-const docsHomeHref: Record<Locale, string> = {
-  en: siteUrl("en"),
-  es: siteUrl("es"),
 };
 
 function navLinksFor(locale: Locale) {
@@ -213,8 +205,10 @@ const ScalarIcon = () => (
     viewBox="0 0 39 39"
     width="18"
     height="18"
+    aria-hidden
     className="size-[18px] shrink-0"
   >
+    <title>Scalar</title>
     <path
       d="M22.65.05c.4 0 .8.3.8.8v8.8l6-6.2c.3-.4.9-.4 1.1 0l4.6 4.6c.3.3.4.8 0 1v.1l-6 6.2h8.5c.5 0 .8.3.8.8v6.6c0 .5-.3.8-.8.8h-8.6l6.1 6.2c.3.3.4.8 0 1.1l-4.6 4.7c-.2.3-.8.4-1 0l-6-6.2v8.8c0 .5-.4.8-.9.8h-6.4c-.5 0-.8-.3-.8-.8v-4.6c0-1.4.6-2.8 1.5-3.9l8.4-8.5c.9-1 .9-2.5 0-3.4l-8.3-8.5c-1-1-1.6-2.4-1.6-3.8V.85c0-.5.3-.8.8-.8h6.4zm-13.4 3.4h.2l14 14.4c1 1 1 2.5 0 3.4l-14 14.4c-.2.4-.8.4-1 0l-4.8-4.6c-.3-.3-.4-.7 0-1l6-6.4h-8.3c-.5 0-.8-.3-.8-.8v-6.6c0-.5.3-.8.8-.8h8.6l-6.2-6.2a1 1 0 010-1.1l4.5-4.7c.3-.3.8-.3 1 0z"
       fill="currentColor"
@@ -223,9 +217,8 @@ const ScalarIcon = () => (
 );
 
 export default function DocsHome() {
-  const locale: Locale = localeFromPath(
-    typeof window === "undefined" ? "/" : window.location.pathname,
-  );
+  const { pathname } = useLocation();
+  const locale: Locale = localeFromPath(pathname);
   const t = locale === "es" ? ES_COPY : EN_COPY;
 
   return (

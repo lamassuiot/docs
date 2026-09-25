@@ -25,13 +25,6 @@ export const LOCALE_ITEMS: { name: string; locale: Locale }[] = [
 ];
 
 /**
- * Persists the reader's choice across visits. The cookie never decides which
- * content renders for a URL — it only feeds the pre-hydration redirect in
- * root.tsx, which lands the reader on the locale's canonical URL.
- */
-export const LOCALE_COOKIE = "lamassu-docs-locale";
-
-/**
  * The i18n contract shared by the loader (app/lib/source.ts), the prerender
  * config (react-router.config.ts) and everything that maps a URL to a page.
  * Loaded in Node config files too, so this module must not touch
@@ -49,11 +42,23 @@ function isLocale(value: string): value is Locale {
   return (LOCALES as string[]).includes(value);
 }
 
+function pathSegments(path: string): string[] {
+  return path
+    .replace(/^\/+|\/+$/g, "")
+    .split("/")
+    .filter(Boolean);
+}
+
+function contentSegments(path: string): string[] {
+  const segments = pathSegments(path);
+  const mount = pathSegments(DOCS_BASE_PATH);
+  const isMounted = mount.every((part, index) => segments[index] === part);
+  return isMounted ? segments.slice(mount.length) : segments;
+}
+
 /** Locale used for a full site path, e.g. '/docs/en/platform/...' -> 'en'. The mount prefix is ignored first. */
 export function localeFromPath(path: string): Locale {
-  const mount = DOCS_BASE_PATH.replace(/^\/+|\/+$/g, "");
-  const segments = path.replace(/^\/+/, "").split("/").filter(Boolean);
-  const content = segments[0] === mount ? segments.slice(1) : segments;
+  const content = contentSegments(path);
   return content.length > 0 && isLocale(content[0])
     ? content[0]
     : DEFAULT_LOCALE;
@@ -98,13 +103,14 @@ export function rewriteDocsUrlToLocale(url: string, locale: Locale): string {
   const [path, hash] = url.split("#", 2);
   if (!path.startsWith("/")) return url;
 
-  const mount = DOCS_BASE_PATH.replace(/^\/+|\/+$/g, "");
-  const segments = path.replace(/^\/+/, "").split("/").filter(Boolean);
-  if (segments[0] !== mount) return url;
+  const mount = pathSegments(DOCS_BASE_PATH);
+  const segments = pathSegments(path);
+  if (!mount.every((part, index) => segments[index] === part)) return url;
 
-  const hasLocalePrefix = segments.length > 1 && isLocale(segments[1]);
-  const content = hasLocalePrefix ? segments.slice(2) : segments.slice(1);
-  const target = `${DOCS_BASE_PATH}/${localePath(locale, content.join("/"))}`;
+  const mountedContent = segments.slice(mount.length);
+  const hasLocalePrefix = isLocale(mountedContent[0] ?? "");
+  const content = hasLocalePrefix ? mountedContent.slice(1) : mountedContent;
+  const target = docsUrl(DOCS_BASE_PATH, locale, content);
   return hash !== undefined ? `${target}#${hash}` : target;
 }
 /**
@@ -134,9 +140,7 @@ export function siteUrl(locale: Locale): string {
 
 /** Site path segments with the mount prefix removed, e.g. '/docs/x' -> ['x']. */
 export function mountFrom(path: string): string[] {
-  const mount = DOCS_BASE_PATH.replace(/^\/+|\/+$/g, "");
-  const segments = path.replace(/^\/+/, "").split("/").filter(Boolean);
-  return segments[0] === mount ? segments.slice(1) : segments;
+  return contentSegments(path);
 }
 /**
  * Split a content file path into its locale-free path and locale, mirroring

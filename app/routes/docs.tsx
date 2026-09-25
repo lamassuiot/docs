@@ -32,7 +32,7 @@ import {
   DiffToggle,
   type PageDiff,
 } from "@/components/diff-toggle";
-import { MdxLink } from "@/components/mdx-link";
+import { MdxCard, MdxLink } from "@/components/mdx-link";
 import { VersionSelector } from "@/components/version-selector";
 import { docsPath } from "@/lib/base-path";
 import { baseOptions, gitConfig } from "@/lib/layout.shared";
@@ -488,7 +488,13 @@ const clientLoader = browserCollections.docs.createClientLoader({
         </div>
         <DocsBody className="[&>h1:first-child]:hidden">
           <Mdx
-            components={{ ...defaultMdxComponents, a: MdxLink, Step, Steps }}
+            components={{
+              ...defaultMdxComponents,
+              a: MdxLink,
+              Card: MdxCard,
+              Step,
+              Steps,
+            }}
           />
         </DocsBody>
       </DocsPage>

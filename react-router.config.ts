@@ -21,11 +21,11 @@ export default {
     v8_middleware: true,
   },
   async prerender({ getStaticPaths }) {
-    const paths: string[] = [];
+    const paths = new Set<string>();
     const excluded: string[] = [];
 
     for (const path of getStaticPaths()) {
-      if (!excluded.includes(path)) paths.push(path);
+      if (!excluded.includes(path)) paths.add(path);
     }
 
     for await (const entry of glob("**/*.{mdx,md}", { cwd: "content/docs" })) {
@@ -36,13 +36,13 @@ export default {
       for (const target of LOCALES) {
         // Every locale gets a page URL: untranslated pages fall back to the
         // default language's content at the locale's URL.
-        paths.push(docsUrl(basePath, target, slugs));
-        paths.push(
+        paths.add(docsUrl(basePath, target, slugs));
+        paths.add(
           `/llms.mdx/docs/${[...(target === i18nConfig.defaultLanguage ? [] : [target]), ...slugs, "index.mdx"].join("/")}`,
         );
       }
     }
 
-    return paths;
+    return [...paths];
   },
 } satisfies Config;

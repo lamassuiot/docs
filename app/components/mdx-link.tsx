@@ -1,3 +1,4 @@
+import { Card, type CardProps } from "fumadocs-ui/components/card";
 import { useI18n } from "fumadocs-ui/contexts/i18n";
 import type { ComponentProps } from "react";
 import { DOCS_BASE_PATH, docsPath } from "@/lib/base-path";
@@ -17,6 +18,17 @@ export function MdxLink({ href, ...props }: ComponentProps<"a">) {
   const { locale } = useI18n();
   return (
     <a
+      href={href ? rewrite(href, (locale ?? DEFAULT_LOCALE) as Locale) : href}
+      {...props}
+    />
+  );
+}
+
+/** Locale-aware variant of Fumadocs' MDX card link. */
+export function MdxCard({ href, ...props }: CardProps) {
+  const { locale } = useI18n();
+  return (
+    <Card
       href={href ? rewrite(href, (locale ?? DEFAULT_LOCALE) as Locale) : href}
       {...props}
     />

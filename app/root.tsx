@@ -13,68 +13,15 @@ import "./app.css";
 import { DIFF_ENABLED, diffInitScript } from "@/components/diff-toggle";
 import SearchDialog from "@/components/search";
 import { asset } from "@/lib/asset";
-import { DOCS_BASE_PATH } from "@/lib/base-path";
 import {
-  DEFAULT_LOCALE,
-  LOCALE_COOKIE,
   LOCALE_ITEMS,
-  LOCALES,
+  type Locale,
   localeFromPath,
-  mountFrom,
+  rewriteDocsUrlToLocale,
+  siteUrl,
   uiTranslations,
 } from "@/lib/locales";
 import NotFound from "./routes/not-found";
-
-/**
- * Runs before hydration: ?lang= overrides the cookie, the cookie overrides
- * the URL. Once applied, the URL is canonical — the query param is dropped,
- * which also keeps cache keys and prerendered pages consistent.
- */
-const localeRedirectScript = `
-try {
-  var locales = ${JSON.stringify(LOCALES)};
-  var params = new URLSearchParams(window.location.search);
-  var param = params.get('lang');
-  var cookie = (document.cookie.match(/(?:^|; )${LOCALE_COOKIE}=([^;]+)/) || [])[1];
-  var target = locales.includes(param) ? param : (locales.includes(cookie) ? cookie : null);
-  var path = window.location.pathname;
-  var mount = ${JSON.stringify(DOCS_BASE_PATH)};
-  var i = path.indexOf(mount + '/');
-  var content = i !== -1 ? path.slice(i + mount.length + 1) : path.replace(/^\\/+/, '');
-  var segments = content.split('/').filter(Boolean);
-  var hasPrefix = segments.length > 0 && locales.includes(segments[0]);
-  var current = hasPrefix ? segments[0] : ${JSON.stringify(DEFAULT_LOCALE)};
-  // Prerendered HTML cannot know the URL, so correct lang before hydration.
-  document.documentElement.lang = current;
-  if (target) {
-    var setCookie = function (value) {
-      var entry = '${LOCALE_COOKIE}=' + value + '; path=/; max-age=31536000; samesite=lax';
-      if (window.cookieStore && typeof window.cookieStore.set === 'function') {
-        window.cookieStore.set({ name: '${LOCALE_COOKIE}', value: value, path: '/', expires: Date.now() + 31536000000 });
-      } else {
-        document.cookie = entry;
-      }
-    };
-    if (current !== target) {
-      var suffix = hasPrefix ? segments.slice(1) : segments;
-      var next = (mount + '/' + (target === ${JSON.stringify(DEFAULT_LOCALE)} ? '' : target + '/') + suffix.join('/')).replace(/\\/+$/, '');
-      var nextUrl = next + window.location.hash;
-      params.delete('lang');
-      var qs = params.toString();
-      setCookie(target);
-      window.location.replace(qs ? nextUrl + '?' + qs : nextUrl);
-    } else {
-      setCookie(target);
-      if (param) {
-        params.delete('lang');
-        var qs2 = params.toString();
-        var clean = window.location.pathname + window.location.hash;
-        window.history.replaceState(window.history.state, '', qs2 ? clean + '?' + qs2 : clean);
-      }
-    }
-  }
-} catch (e) {}
-`.trim();
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -90,10 +37,10 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  // Prerendered HTML cannot know its URL, so this is only the default; the
-  // pre-hydration script below corrects `lang` before content renders.
+  const locale = localeFromPath(useLocation().pathname);
+
   return (
-    <html lang={DEFAULT_LOCALE} suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -104,10 +51,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           // biome-ignore lint/security/noDangerouslySetInnerHtml: constant script, no user input
           <script dangerouslySetInnerHTML={{ __html: diffInitScript }} />
         )}
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: constant script, no user input */}
-        <script dangerouslySetInnerHTML={{ __html: localeRedirectScript }} />
       </head>
-      <body className="flex flex-col min-h-screen">{children}</body>
+      <body className="flex flex-col min-h-screen">
+        {children}
+        <ScrollRestoration />
+        <Scripts />
+      </body>
     </html>
   );
 }
@@ -124,33 +73,15 @@ function LocaleAwareApp() {
         locale,
         locales: LOCALE_ITEMS,
         translations: uiTranslations(locale),
-        // The default locale has no URL prefix, so switching to it removes
-        // the locale segment; switching to a prefixed locale replaces or
-        // unshifts it. The choice is stored in a cookie so the next visit
-        // redirects before content renders.
         onLocaleChange: (next) => {
-          const entry = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
-          if ("cookieStore" in window) {
-            window.cookieStore.set({
-              name: LOCALE_COOKIE,
-              value: next,
-              path: "/",
-              expires: Date.now() + 365 * 24 * 3600 * 1000,
-            });
-          } else {
-            // biome-ignore lint/suspicious/noDocumentCookie: cookieStore is unavailable in older browsers
-            document.cookie = entry;
-          }
-          const segments = mountFrom(pathname);
-          const first = segments[0];
-          if ((LOCALES as string[]).includes(first)) {
-            if (next === DEFAULT_LOCALE) segments.splice(0, 1);
-            else segments[0] = next;
-          } else if (next !== DEFAULT_LOCALE) {
-            segments.unshift(next);
-          }
-          const nextUrl = `/${[...segments].join("/")}`;
-          window.location.assign(nextUrl === "/" ? DOCS_BASE_PATH : nextUrl);
+          const target = next as Locale;
+          const nextPath =
+            pathname === "/"
+              ? siteUrl(target)
+              : rewriteDocsUrlToLocale(pathname, target);
+          window.location.assign(
+            `${nextPath}${window.location.search}${window.location.hash}`,
+          );
         },
       }}
     >
@@ -160,13 +91,7 @@ function LocaleAwareApp() {
 }
 
 export default function App() {
-  return (
-    <>
-      <LocaleAwareApp />
-      <ScrollRestoration />
-      <Scripts />
-    </>
-  );
+  return <LocaleAwareApp />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

@@ -1,0 +1,418 @@
+import{j as e}from"./chunk-LFPYN7LY-rz7-nU66.js";let t=`
+
+Despliegue self-managed con Kubernetes [#despliegue-self-managed-con-kubernetes]
+
+Lamassu IoT puede desplegarse en infraestructura propia mediante **Kubernetes**, tanto en clústeres gestionados internamente como en entornos self-managed.
+
+La referencia principal para este despliegue es el repositorio \`lamassu-helm\`, que incluye:
+
+* el chart principal de Lamassu
+* un chart auxiliar de SoftHSM
+* el script de despliegue automatizado \`scripts/lamassu-fast-lane.sh\`
+
+Quickstart [#quickstart]
+
+Si lo que necesitas es levantar un entorno funcional lo antes posible, la vía más rápida es usar Fastlane desde el repositorio \`lamassu-helm\`:
+
+\`\`\`bash
+git clone https://github.com/lamassuiot/lamassu-helm.git
+cd lamassu-helm
+./scripts/lamassu-fast-lane.sh -n -ns lamassu-dev -d dev.lamassu.io -l ./charts/lamassu
+\`\`\`
+
+Ese flujo:
+
+* crea o reutiliza el namespace indicado
+* instala PostgreSQL, Keycloak y RabbitMQ
+* despliega el chart de Lamassu
+* deja la UI expuesta en \`https://<dominio>\`
+
+Si buscas un despliegue productivo o más controlado, sigue con la instalación manual mediante Helm que se describe más abajo.
+
+Qué se despliega [#qué-se-despliega]
+
+El chart principal \`charts/lamassu\`, actualmente en la serie \`3.7.x\`, despliega estos componentes:
+
+* \`ui\`
+* \`ca\`
+* \`va\`
+* \`kms\`
+* \`device-manager\`
+* \`dms-manager\`
+* \`alerts\`
+* recursos de Gateway API y políticas de Envoy Gateway
+* job de migraciones de base de datos
+
+Requisitos previos [#requisitos-previos]
+
+* Clúster Kubernetes \`1.19+\`
+* \`kubectl\` configurado con acceso al clúster
+* Helm \`3.2.0+\`
+* \`cert-manager 1.14+\` para la gestión de certificados cuando se usa \`tls.type=certManager\`
+* \`Envoy Gateway 1.3.0+\`, ya que el chart publica servicios mediante Gateway API y no mediante Ingress
+* Acceso a un registro de contenedores o imágenes previamente importadas si se trabaja en modo offline
+* Almacenamiento persistente disponible para PostgreSQL, RabbitMQ, VA y KMS
+
+Opciones de despliegue [#opciones-de-despliegue]
+
+Hay dos formas de desplegar Lamassu on-prem:
+
+1. Despliegue manual con Helm [#1-despliegue-manual-con-helm]
+
+Es la opción recomendada para entornos productivos o controlados, donde PostgreSQL, RabbitMQ, Keycloak, certificados y direccionamiento del Gateway ya están definidos por el equipo de plataforma.
+
+2. Despliegue automatizado con Fastlane [#2-despliegue-automatizado-con-fastlane]
+
+Es la opción más útil para pruebas, demos, CI o bootstrap rápido de un entorno. Fastlane levanta PostgreSQL, Keycloak, RabbitMQ y Lamassu en un único flujo. Su comportamiento está documentado en la página siguiente.
+
+Arquitectura [#arquitectura]
+
+Lamassu IoT se despliega como un conjunto de microservicios Kubernetes independientes. El chart principal crea \`Deployment\`, \`StatefulSet\`, \`Service\`, \`ConfigMap\`, \`HTTPRoute\`, \`Gateway\`, certificados y recursos auxiliares según los valores definidos.
+
+Dependencias externas requeridas por el chart principal:
+
+* PostgreSQL
+* RabbitMQ
+* proveedor OIDC, típicamente Keycloak
+
+El chart no instala estas dependencias por sí solo. Para un despliegue manual hay que provisionarlas antes. Si se busca un entorno funcional rápido para laboratorio o validación, el script Fastlane sí instala PostgreSQL, RabbitMQ y Keycloak además del chart de Lamassu.
+
+Instalación manual con Helm [#instalación-manual-con-helm]
+
+Agregar el repositorio Helm:
+
+\`\`\`bash
+helm repo add lamassu https://lamassuiot.github.io/lamassu-helm
+helm repo update
+\`\`\`
+
+O instalar desde una copia local del repositorio:
+
+\`\`\`bash
+helm install lamassu ./charts/lamassu -n lamassu --create-namespace -f values.yaml
+\`\`\`
+
+Valores mínimos que deben definirse [#valores-mínimos-que-deben-definirse]
+
+Los valores por defecto del chart son deliberadamente incompletos para dependencias externas. Como mínimo, un despliegue manual debe definir:
+
+* \`postgres.hostname\`, \`postgres.username\`, \`postgres.password\`
+* \`amqp.hostname\`, \`amqp.username\`, \`amqp.password\`
+* \`auth.oidc.frontend.authority\`
+* \`auth.oidc.apiGateway.jwks\`
+* \`services.authz.jwkUrl\` y un principal de bootstrap que coincida con un administrador real
+* \`services.ca.domains\`
+* \`gateway.addresses\` o una estrategia equivalente de publicación según el clúster
+* \`tls.*\` según se use \`certManager\` o certificado externo
+
+Ejemplo base:
+
+\`\`\`yaml
+postgres:
+  hostname: postgresql
+  port: 5432
+  username: lamassu
+  password: change-me
+
+amqp:
+  hostname: rabbitmq
+  port: 5672
+  username: lamassu
+  password: change-me
+  tls: false
+
+tls:
+  type: certManager
+  certManagerOptions:
+    issuer: downstream-ca-selfsigned-issuer
+    certSpec:
+      commonName: pki.example.internal
+      hostnames:
+        - pki.example.internal
+      addresses:
+        - 10.0.0.20
+
+gateway:
+  addresses:
+    - 10.0.0.20
+  ports:
+    http: 80
+    https: 443
+  extraRouting:
+    - path: /auth
+      name: auth
+      target:
+        host: auth-keycloak
+        port: 8080
+
+auth:
+  oidc:
+    frontend:
+      clientId: frontend
+      authority: https://pki.example.internal/auth/realms/lamassu
+    apiGateway:
+      jwks:
+        - name: oidc-authn
+          uri: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+  authorization:
+    rolesClaim: realm_access.roles
+    roles:
+      admin: pki-admin
+
+services:
+  ca:
+    domains:
+      - pki.example.internal
+  authz:
+    jwkUrl: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
+    bootstrap:
+      - principal_id: "oidc:pki-admin"
+        principal_name: "PKI Admin"
+        principal_type: "oidc"
+        policy_ids:
+          - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+        auth_config:
+          claims:
+            - claim: realm_access.roles
+              operator: contains
+              value: pki-admin
+\`\`\`
+
+Provisiona el primer administrador [#provisiona-el-primer-administrador]
+
+No hay un superusuario implícito. Antes de instalar, crea el rol \`pki-admin\` en el proveedor OIDC y asígnalo al grupo que administrará Lamassu. El principal del ejemplo concede la política \`SUPER ADMIN\` a cualquier token que contenga ese rol.
+
+El Job \`pre-install\` y \`pre-upgrade\` prepara las bases de datos, ejecuta las migraciones de authz, precarga las políticas y aplica \`services.authz.bootstrap\` antes de que arranquen los Deployments. El bootstrap es idempotente: conserva los principales existentes y añade únicamente los grants que falten.
+
+<Callout type="warn" title="Valida el acceso antes de exponer la plataforma">
+  Si ningún token coincide con un principal activo, nadie podrá administrar la PKI. Prueba una identidad autorizada y otra denegada, y conserva un procedimiento de recuperación.
+</Callout>
+
+Consulta [Control de acceso](/docs/platform/pki/access-control) para diseñar principales y políticas.
+
+Áreas de configuración más relevantes [#áreas-de-configuración-más-relevantes]
+
+* **TLS:** \`tls.type\`, \`tls.certManagerOptions.*\` y \`tls.externalOptions.secretName\` controlan el certificado *downstream* del Gateway.
+* **Gateway:** \`gateway.addresses\`, \`gateway.ports.*\` y \`gateway.extraRouting\` publican la UI y las APIs mediante Envoy Gateway.
+* **Persistencia:** \`postgres.*\` define la conexión a PostgreSQL.
+* **Mensajería:** \`amqp.*\` configura la conexión a RabbitMQ.
+* **Identidad y autorización:** \`auth.oidc.*\`, \`services.authz.jwkUrl\` y \`services.authz.bootstrap\` configuran login, validación JWT y permisos iniciales.
+* **Autoridades:** \`services.ca.domains\` establece los dominios autorizados para CA y certificados.
+* **Claves:** \`services.kms.cryptoEngines.*\` configura los motores criptográficos y su almacenamiento.
+* **Alertas:** \`services.alerts.smtp_server.*\` prepara el envío de correo.
+
+Verificación del despliegue [#verificación-del-despliegue]
+
+El chart incluye una prueba Helm en \`charts/lamassu/templates/tests/test-connections.yml\`. Tras instalarlo, puede validarse con:
+
+\`\`\`bash
+helm test lamassu -n lamassu
+\`\`\`
+
+La prueba comprueba al menos:
+
+* salud de \`ca\`
+* salud de \`dms-manager\`
+* salud de \`device-manager\`
+* salud de \`va\`
+* respuesta HTML esperada del servicio \`ui\`
+
+Repositorio Helm [#repositorio-helm]
+
+El repositorio \`lamassu-helm\` está organizado en tres bloques principales:
+
+* \`charts/lamassu\`: chart principal de Lamassu
+* \`charts/softhsm\`: chart opcional para laboratorios o escenarios de integración con PKCS#11 emulado
+* \`scripts/lamassu-fast-lane.sh\`: automatización para levantar dependencias y desplegar Lamassu con intervención mínima
+
+SoftHSM como complemento opcional [#softhsm-como-complemento-opcional]
+
+El chart \`charts/softhsm\` no forma parte del despliegue estándar, pero resulta útil en entornos de laboratorio cuando se necesita simular un HSM compatible con PKCS#11. No sustituye al backend KMS principal; sirve como soporte para pruebas o integraciones concretas.
+
+Versionado y migraciones [#versionado-y-migraciones]
+
+La versión actual del chart en el repositorio es \`3.8.0\`. Para upgrades entre versiones, consulta las guías de \`charts/lamassu/CHANGELOG/\` y revisa especialmente las migraciones de base de datos y el bootstrap de authz.
+`,d={title:"Kubernetes self-managed",description:"Despliega Lamassu en tu propio clúster Kubernetes con Helm o Fastlane."},c={contents:[{heading:"despliegue-self-managed-con-kubernetes",content:"Lamassu IoT puede desplegarse en infraestructura propia mediante **Kubernetes**, tanto en clústeres gestionados internamente como en entornos self-managed."},{heading:"despliegue-self-managed-con-kubernetes",content:"La referencia principal para este despliegue es el repositorio `lamassu-helm`, que incluye:"},{heading:"despliegue-self-managed-con-kubernetes",content:"el chart principal de Lamassu"},{heading:"despliegue-self-managed-con-kubernetes",content:"un chart auxiliar de SoftHSM"},{heading:"despliegue-self-managed-con-kubernetes",content:"el script de despliegue automatizado `scripts/lamassu-fast-lane.sh`"},{heading:"quickstart",content:"Si lo que necesitas es levantar un entorno funcional lo antes posible, la vía más rápida es usar Fastlane desde el repositorio `lamassu-helm`:"},{heading:"quickstart",content:"Ese flujo:"},{heading:"quickstart",content:"crea o reutiliza el namespace indicado"},{heading:"quickstart",content:"instala PostgreSQL, Keycloak y RabbitMQ"},{heading:"quickstart",content:"despliega el chart de Lamassu"},{heading:"quickstart",content:"deja la UI expuesta en `https://<dominio>`"},{heading:"quickstart",content:"Si buscas un despliegue productivo o más controlado, sigue con la instalación manual mediante Helm que se describe más abajo."},{heading:"qué-se-despliega",content:"El chart principal `charts/lamassu`, actualmente en la serie `3.7.x`, despliega estos componentes:"},{heading:"qué-se-despliega",content:"`ui`"},{heading:"qué-se-despliega",content:"`ca`"},{heading:"qué-se-despliega",content:"`va`"},{heading:"qué-se-despliega",content:"`kms`"},{heading:"qué-se-despliega",content:"`device-manager`"},{heading:"qué-se-despliega",content:"`dms-manager`"},{heading:"qué-se-despliega",content:"`alerts`"},{heading:"qué-se-despliega",content:"recursos de Gateway API y políticas de Envoy Gateway"},{heading:"qué-se-despliega",content:"job de migraciones de base de datos"},{heading:"requisitos-previos",content:"Clúster Kubernetes `1.19+`"},{heading:"requisitos-previos",content:"`kubectl` configurado con acceso al clúster"},{heading:"requisitos-previos",content:"Helm `3.2.0+`"},{heading:"requisitos-previos",content:"`cert-manager 1.14+` para la gestión de certificados cuando se usa `tls.type=certManager`"},{heading:"requisitos-previos",content:"`Envoy Gateway 1.3.0+`, ya que el chart publica servicios mediante Gateway API y no mediante Ingress"},{heading:"requisitos-previos",content:"Acceso a un registro de contenedores o imágenes previamente importadas si se trabaja en modo offline"},{heading:"requisitos-previos",content:"Almacenamiento persistente disponible para PostgreSQL, RabbitMQ, VA y KMS"},{heading:"opciones-de-despliegue",content:"Hay dos formas de desplegar Lamassu on-prem:"},{heading:"1-despliegue-manual-con-helm",content:"Es la opción recomendada para entornos productivos o controlados, donde PostgreSQL, RabbitMQ, Keycloak, certificados y direccionamiento del Gateway ya están definidos por el equipo de plataforma."},{heading:"2-despliegue-automatizado-con-fastlane",content:"Es la opción más útil para pruebas, demos, CI o bootstrap rápido de un entorno. Fastlane levanta PostgreSQL, Keycloak, RabbitMQ y Lamassu en un único flujo. Su comportamiento está documentado en la página siguiente."},{heading:"arquitectura",content:"Lamassu IoT se despliega como un conjunto de microservicios Kubernetes independientes. El chart principal crea `Deployment`, `StatefulSet`, `Service`, `ConfigMap`, `HTTPRoute`, `Gateway`, certificados y recursos auxiliares según los valores definidos."},{heading:"arquitectura",content:"Dependencias externas requeridas por el chart principal:"},{heading:"arquitectura",content:"PostgreSQL"},{heading:"arquitectura",content:"RabbitMQ"},{heading:"arquitectura",content:"proveedor OIDC, típicamente Keycloak"},{heading:"arquitectura",content:"El chart no instala estas dependencias por sí solo. Para un despliegue manual hay que provisionarlas antes. Si se busca un entorno funcional rápido para laboratorio o validación, el script Fastlane sí instala PostgreSQL, RabbitMQ y Keycloak además del chart de Lamassu."},{heading:"instalación-manual-con-helm",content:"Agregar el repositorio Helm:"},{heading:"instalación-manual-con-helm",content:"O instalar desde una copia local del repositorio:"},{heading:"valores-mínimos-que-deben-definirse",content:"Los valores por defecto del chart son deliberadamente incompletos para dependencias externas. Como mínimo, un despliegue manual debe definir:"},{heading:"valores-mínimos-que-deben-definirse",content:"`postgres.hostname`, `postgres.username`, `postgres.password`"},{heading:"valores-mínimos-que-deben-definirse",content:"`amqp.hostname`, `amqp.username`, `amqp.password`"},{heading:"valores-mínimos-que-deben-definirse",content:"`auth.oidc.frontend.authority`"},{heading:"valores-mínimos-que-deben-definirse",content:"`auth.oidc.apiGateway.jwks`"},{heading:"valores-mínimos-que-deben-definirse",content:"`services.authz.jwkUrl` y un principal de bootstrap que coincida con un administrador real"},{heading:"valores-mínimos-que-deben-definirse",content:"`services.ca.domains`"},{heading:"valores-mínimos-que-deben-definirse",content:"`gateway.addresses` o una estrategia equivalente de publicación según el clúster"},{heading:"valores-mínimos-que-deben-definirse",content:"`tls.*` según se use `certManager` o certificado externo"},{heading:"valores-mínimos-que-deben-definirse",content:"Ejemplo base:"},{heading:"provisiona-el-primer-administrador",content:"No hay un superusuario implícito. Antes de instalar, crea el rol `pki-admin` en el proveedor OIDC y asígnalo al grupo que administrará Lamassu. El principal del ejemplo concede la política `SUPER ADMIN` a cualquier token que contenga ese rol."},{heading:"provisiona-el-primer-administrador",content:"El Job `pre-install` y `pre-upgrade` prepara las bases de datos, ejecuta las migraciones de authz, precarga las políticas y aplica `services.authz.bootstrap` antes de que arranquen los Deployments. El bootstrap es idempotente: conserva los principales existentes y añade únicamente los grants que falten."},{heading:"provisiona-el-primer-administrador",content:"Si ningún token coincide con un principal activo, nadie podrá administrar la PKI. Prueba una identidad autorizada y otra denegada, y conserva un procedimiento de recuperación."},{heading:"provisiona-el-primer-administrador",content:"Consulta Control de acceso para diseñar principales y políticas."},{heading:"áreas-de-configuración-más-relevantes",content:"**TLS:** `tls.type`, `tls.certManagerOptions.*` y `tls.externalOptions.secretName` controlan el certificado *downstream* del Gateway."},{heading:"áreas-de-configuración-más-relevantes",content:"**Gateway:** `gateway.addresses`, `gateway.ports.*` y `gateway.extraRouting` publican la UI y las APIs mediante Envoy Gateway."},{heading:"áreas-de-configuración-más-relevantes",content:"**Persistencia:** `postgres.*` define la conexión a PostgreSQL."},{heading:"áreas-de-configuración-más-relevantes",content:"**Mensajería:** `amqp.*` configura la conexión a RabbitMQ."},{heading:"áreas-de-configuración-más-relevantes",content:"**Identidad y autorización:** `auth.oidc.*`, `services.authz.jwkUrl` y `services.authz.bootstrap` configuran login, validación JWT y permisos iniciales."},{heading:"áreas-de-configuración-más-relevantes",content:"**Autoridades:** `services.ca.domains` establece los dominios autorizados para CA y certificados."},{heading:"áreas-de-configuración-más-relevantes",content:"**Claves:** `services.kms.cryptoEngines.*` configura los motores criptográficos y su almacenamiento."},{heading:"áreas-de-configuración-más-relevantes",content:"**Alertas:** `services.alerts.smtp_server.*` prepara el envío de correo."},{heading:"verificación-del-despliegue",content:"El chart incluye una prueba Helm en `charts/lamassu/templates/tests/test-connections.yml`. Tras instalarlo, puede validarse con:"},{heading:"verificación-del-despliegue",content:"La prueba comprueba al menos:"},{heading:"verificación-del-despliegue",content:"salud de `ca`"},{heading:"verificación-del-despliegue",content:"salud de `dms-manager`"},{heading:"verificación-del-despliegue",content:"salud de `device-manager`"},{heading:"verificación-del-despliegue",content:"salud de `va`"},{heading:"verificación-del-despliegue",content:"respuesta HTML esperada del servicio `ui`"},{heading:"repositorio-helm",content:"El repositorio `lamassu-helm` está organizado en tres bloques principales:"},{heading:"repositorio-helm",content:"`charts/lamassu`: chart principal de Lamassu"},{heading:"repositorio-helm",content:"`charts/softhsm`: chart opcional para laboratorios o escenarios de integración con PKCS#11 emulado"},{heading:"repositorio-helm",content:"`scripts/lamassu-fast-lane.sh`: automatización para levantar dependencias y desplegar Lamassu con intervención mínima"},{heading:"softhsm-como-complemento-opcional",content:"El chart `charts/softhsm` no forma parte del despliegue estándar, pero resulta útil en entornos de laboratorio cuando se necesita simular un HSM compatible con PKCS#11. No sustituye al backend KMS principal; sirve como soporte para pruebas o integraciones concretas."},{heading:"versionado-y-migraciones",content:"La versión actual del chart en el repositorio es `3.8.0`. Para upgrades entre versiones, consulta las guías de `charts/lamassu/CHANGELOG/` y revisa especialmente las migraciones de base de datos y el bootstrap de authz."}],headings:[{id:"despliegue-self-managed-con-kubernetes",content:"Despliegue self-managed con Kubernetes"},{id:"quickstart",content:"Quickstart"},{id:"qué-se-despliega",content:"Qué se despliega"},{id:"requisitos-previos",content:"Requisitos previos"},{id:"opciones-de-despliegue",content:"Opciones de despliegue"},{id:"1-despliegue-manual-con-helm",content:"1\\. Despliegue manual con Helm"},{id:"2-despliegue-automatizado-con-fastlane",content:"2\\. Despliegue automatizado con Fastlane"},{id:"arquitectura",content:"Arquitectura"},{id:"instalación-manual-con-helm",content:"Instalación manual con Helm"},{id:"valores-mínimos-que-deben-definirse",content:"Valores mínimos que deben definirse"},{id:"provisiona-el-primer-administrador",content:"Provisiona el primer administrador"},{id:"áreas-de-configuración-más-relevantes",content:"Áreas de configuración más relevantes"},{id:"verificación-del-despliegue",content:"Verificación del despliegue"},{id:"repositorio-helm",content:"Repositorio Helm"},{id:"softhsm-como-complemento-opcional",content:"SoftHSM como complemento opcional"},{id:"versionado-y-migraciones",content:"Versionado y migraciones"}]};const o=[{depth:1,url:"#despliegue-self-managed-con-kubernetes",title:e.jsx(e.Fragment,{children:"Despliegue self-managed con Kubernetes"})},{depth:2,url:"#quickstart",title:e.jsx(e.Fragment,{children:"Quickstart"})},{depth:2,url:"#qué-se-despliega",title:e.jsx(e.Fragment,{children:"Qué se despliega"})},{depth:2,url:"#requisitos-previos",title:e.jsx(e.Fragment,{children:"Requisitos previos"})},{depth:2,url:"#opciones-de-despliegue",title:e.jsx(e.Fragment,{children:"Opciones de despliegue"})},{depth:3,url:"#1-despliegue-manual-con-helm",title:e.jsx(e.Fragment,{children:"1. Despliegue manual con Helm"})},{depth:3,url:"#2-despliegue-automatizado-con-fastlane",title:e.jsx(e.Fragment,{children:"2. Despliegue automatizado con Fastlane"})},{depth:2,url:"#arquitectura",title:e.jsx(e.Fragment,{children:"Arquitectura"})},{depth:2,url:"#instalación-manual-con-helm",title:e.jsx(e.Fragment,{children:"Instalación manual con Helm"})},{depth:2,url:"#valores-mínimos-que-deben-definirse",title:e.jsx(e.Fragment,{children:"Valores mínimos que deben definirse"})},{depth:2,url:"#provisiona-el-primer-administrador",title:e.jsx(e.Fragment,{children:"Provisiona el primer administrador"})},{depth:2,url:"#áreas-de-configuración-más-relevantes",title:e.jsx(e.Fragment,{children:"Áreas de configuración más relevantes"})},{depth:2,url:"#verificación-del-despliegue",title:e.jsx(e.Fragment,{children:"Verificación del despliegue"})},{depth:2,url:"#repositorio-helm",title:e.jsx(e.Fragment,{children:"Repositorio Helm"})},{depth:2,url:"#softhsm-como-complemento-opcional",title:e.jsx(e.Fragment,{children:"SoftHSM como complemento opcional"})},{depth:2,url:"#versionado-y-migraciones",title:e.jsx(e.Fragment,{children:"Versionado y migraciones"})}];function n(i){const s={a:"a",code:"code",em:"em",h1:"h1",h2:"h2",h3:"h3",li:"li",p:"p",pre:"pre",span:"span",strong:"strong",ul:"ul",...i.components},{Callout:a}=s;return a||l("Callout"),e.jsxs(e.Fragment,{children:[e.jsx(s.h1,{id:"despliegue-self-managed-con-kubernetes",children:"Despliegue self-managed con Kubernetes"}),`
+`,e.jsxs(s.p,{children:["Lamassu IoT puede desplegarse en infraestructura propia mediante ",e.jsx(s.strong,{children:"Kubernetes"}),", tanto en clústeres gestionados internamente como en entornos self-managed."]}),`
+`,e.jsxs(s.p,{children:["La referencia principal para este despliegue es el repositorio ",e.jsx(s.code,{children:"lamassu-helm"}),", que incluye:"]}),`
+`,e.jsxs(s.ul,{children:[`
+`,e.jsx(s.li,{children:"el chart principal de Lamassu"}),`
+`,e.jsx(s.li,{children:"un chart auxiliar de SoftHSM"}),`
+`,e.jsxs(s.li,{children:["el script de despliegue automatizado ",e.jsx(s.code,{children:"scripts/lamassu-fast-lane.sh"})]}),`
+`]}),`
+`,e.jsx(s.h2,{id:"quickstart",children:"Quickstart"}),`
+`,e.jsxs(s.p,{children:["Si lo que necesitas es levantar un entorno funcional lo antes posible, la vía más rápida es usar Fastlane desde el repositorio ",e.jsx(s.code,{children:"lamassu-helm"}),":"]}),`
+`,e.jsx(e.Fragment,{children:e.jsx(s.pre,{className:"shiki shiki-themes min-light min-dark",style:{"--shiki-light":"#24292eff","--shiki-dark":"#b392f0","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#1f1f1f"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:e.jsxs(s.code,{children:[e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#6F42C1","--shiki-dark":"#B392F0"},children:"git"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" clone"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" https://github.com/lamassuiot/lamassu-helm.git"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#6F42C1","--shiki-dark":"#B392F0"},children:"cd"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" lamassu-helm"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#6F42C1","--shiki-dark":"#B392F0"},children:"./scripts/lamassu-fast-lane.sh"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" -n"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" -ns"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" lamassu-dev"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" -d"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" dev.lamassu.io"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" -l"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" ./charts/lamassu"})]})]})})}),`
+`,e.jsx(s.p,{children:"Ese flujo:"}),`
+`,e.jsxs(s.ul,{children:[`
+`,e.jsx(s.li,{children:"crea o reutiliza el namespace indicado"}),`
+`,e.jsx(s.li,{children:"instala PostgreSQL, Keycloak y RabbitMQ"}),`
+`,e.jsx(s.li,{children:"despliega el chart de Lamassu"}),`
+`,e.jsxs(s.li,{children:["deja la UI expuesta en ",e.jsx(s.code,{children:"https://<dominio>"})]}),`
+`]}),`
+`,e.jsx(s.p,{children:"Si buscas un despliegue productivo o más controlado, sigue con la instalación manual mediante Helm que se describe más abajo."}),`
+`,e.jsx(s.h2,{id:"qué-se-despliega",children:"Qué se despliega"}),`
+`,e.jsxs(s.p,{children:["El chart principal ",e.jsx(s.code,{children:"charts/lamassu"}),", actualmente en la serie ",e.jsx(s.code,{children:"3.7.x"}),", despliega estos componentes:"]}),`
+`,e.jsxs(s.ul,{children:[`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"ui"})}),`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"ca"})}),`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"va"})}),`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"kms"})}),`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"device-manager"})}),`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"dms-manager"})}),`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"alerts"})}),`
+`,e.jsx(s.li,{children:"recursos de Gateway API y políticas de Envoy Gateway"}),`
+`,e.jsx(s.li,{children:"job de migraciones de base de datos"}),`
+`]}),`
+`,e.jsx(s.h2,{id:"requisitos-previos",children:"Requisitos previos"}),`
+`,e.jsxs(s.ul,{children:[`
+`,e.jsxs(s.li,{children:["Clúster Kubernetes ",e.jsx(s.code,{children:"1.19+"})]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"kubectl"})," configurado con acceso al clúster"]}),`
+`,e.jsxs(s.li,{children:["Helm ",e.jsx(s.code,{children:"3.2.0+"})]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"cert-manager 1.14+"})," para la gestión de certificados cuando se usa ",e.jsx(s.code,{children:"tls.type=certManager"})]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"Envoy Gateway 1.3.0+"}),", ya que el chart publica servicios mediante Gateway API y no mediante Ingress"]}),`
+`,e.jsx(s.li,{children:"Acceso a un registro de contenedores o imágenes previamente importadas si se trabaja en modo offline"}),`
+`,e.jsx(s.li,{children:"Almacenamiento persistente disponible para PostgreSQL, RabbitMQ, VA y KMS"}),`
+`]}),`
+`,e.jsx(s.h2,{id:"opciones-de-despliegue",children:"Opciones de despliegue"}),`
+`,e.jsx(s.p,{children:"Hay dos formas de desplegar Lamassu on-prem:"}),`
+`,e.jsx(s.h3,{id:"1-despliegue-manual-con-helm",children:"1. Despliegue manual con Helm"}),`
+`,e.jsx(s.p,{children:"Es la opción recomendada para entornos productivos o controlados, donde PostgreSQL, RabbitMQ, Keycloak, certificados y direccionamiento del Gateway ya están definidos por el equipo de plataforma."}),`
+`,e.jsx(s.h3,{id:"2-despliegue-automatizado-con-fastlane",children:"2. Despliegue automatizado con Fastlane"}),`
+`,e.jsx(s.p,{children:"Es la opción más útil para pruebas, demos, CI o bootstrap rápido de un entorno. Fastlane levanta PostgreSQL, Keycloak, RabbitMQ y Lamassu en un único flujo. Su comportamiento está documentado en la página siguiente."}),`
+`,e.jsx(s.h2,{id:"arquitectura",children:"Arquitectura"}),`
+`,e.jsxs(s.p,{children:["Lamassu IoT se despliega como un conjunto de microservicios Kubernetes independientes. El chart principal crea ",e.jsx(s.code,{children:"Deployment"}),", ",e.jsx(s.code,{children:"StatefulSet"}),", ",e.jsx(s.code,{children:"Service"}),", ",e.jsx(s.code,{children:"ConfigMap"}),", ",e.jsx(s.code,{children:"HTTPRoute"}),", ",e.jsx(s.code,{children:"Gateway"}),", certificados y recursos auxiliares según los valores definidos."]}),`
+`,e.jsx(s.p,{children:"Dependencias externas requeridas por el chart principal:"}),`
+`,e.jsxs(s.ul,{children:[`
+`,e.jsx(s.li,{children:"PostgreSQL"}),`
+`,e.jsx(s.li,{children:"RabbitMQ"}),`
+`,e.jsx(s.li,{children:"proveedor OIDC, típicamente Keycloak"}),`
+`]}),`
+`,e.jsx(s.p,{children:"El chart no instala estas dependencias por sí solo. Para un despliegue manual hay que provisionarlas antes. Si se busca un entorno funcional rápido para laboratorio o validación, el script Fastlane sí instala PostgreSQL, RabbitMQ y Keycloak además del chart de Lamassu."}),`
+`,e.jsx(s.h2,{id:"instalación-manual-con-helm",children:"Instalación manual con Helm"}),`
+`,e.jsx(s.p,{children:"Agregar el repositorio Helm:"}),`
+`,e.jsx(e.Fragment,{children:e.jsx(s.pre,{className:"shiki shiki-themes min-light min-dark",style:{"--shiki-light":"#24292eff","--shiki-dark":"#b392f0","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#1f1f1f"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:e.jsxs(s.code,{children:[e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#6F42C1","--shiki-dark":"#B392F0"},children:"helm"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" repo"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" add"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" lamassu"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" https://lamassuiot.github.io/lamassu-helm"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#6F42C1","--shiki-dark":"#B392F0"},children:"helm"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" repo"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" update"})]})]})})}),`
+`,e.jsx(s.p,{children:"O instalar desde una copia local del repositorio:"}),`
+`,e.jsx(e.Fragment,{children:e.jsx(s.pre,{className:"shiki shiki-themes min-light min-dark",style:{"--shiki-light":"#24292eff","--shiki-dark":"#b392f0","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#1f1f1f"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:e.jsx(s.code,{children:e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#6F42C1","--shiki-dark":"#B392F0"},children:"helm"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" install"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" lamassu"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" ./charts/lamassu"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" -n"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" lamassu"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" --create-namespace"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" -f"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" values.yaml"})]})})})}),`
+`,e.jsx(s.h2,{id:"valores-mínimos-que-deben-definirse",children:"Valores mínimos que deben definirse"}),`
+`,e.jsx(s.p,{children:"Los valores por defecto del chart son deliberadamente incompletos para dependencias externas. Como mínimo, un despliegue manual debe definir:"}),`
+`,e.jsxs(s.ul,{children:[`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"postgres.hostname"}),", ",e.jsx(s.code,{children:"postgres.username"}),", ",e.jsx(s.code,{children:"postgres.password"})]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"amqp.hostname"}),", ",e.jsx(s.code,{children:"amqp.username"}),", ",e.jsx(s.code,{children:"amqp.password"})]}),`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"auth.oidc.frontend.authority"})}),`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"auth.oidc.apiGateway.jwks"})}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"services.authz.jwkUrl"})," y un principal de bootstrap que coincida con un administrador real"]}),`
+`,e.jsx(s.li,{children:e.jsx(s.code,{children:"services.ca.domains"})}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"gateway.addresses"})," o una estrategia equivalente de publicación según el clúster"]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"tls.*"})," según se use ",e.jsx(s.code,{children:"certManager"})," o certificado externo"]}),`
+`]}),`
+`,e.jsx(s.p,{children:"Ejemplo base:"}),`
+`,e.jsx(e.Fragment,{children:e.jsx(s.pre,{className:"shiki shiki-themes min-light min-dark",style:{"--shiki-light":"#24292eff","--shiki-dark":"#b392f0","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#1f1f1f"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z" fill="currentColor" /></svg>',children:e.jsxs(s.code,{children:[e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"postgres"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  hostname"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" postgresql"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  port"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#1976D2","--shiki-dark":"#F8F8F8"},children:" 5432"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  username"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" lamassu"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  password"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" change-me"})]}),`
+`,e.jsx(s.span,{className:"line"}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"amqp"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  hostname"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" rabbitmq"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  port"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#1976D2","--shiki-dark":"#F8F8F8"},children:" 5672"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  username"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" lamassu"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  password"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" change-me"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  tls"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#1976D2","--shiki-dark":"#79B8FF"},children:" false"})]}),`
+`,e.jsx(s.span,{className:"line"}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"tls"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  type"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" certManager"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  certManagerOptions"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    issuer"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" downstream-ca-selfsigned-issuer"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    certSpec"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"      commonName"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" pki.example.internal"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"      hostnames"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#24292EFF","--shiki-dark":"#B392F0"},children:"        - "}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:"pki.example.internal"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"      addresses"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#24292EFF","--shiki-dark":"#B392F0"},children:"        - "}),e.jsx(s.span,{style:{"--shiki-light":"#1976D2","--shiki-dark":"#F8F8F8"},children:"10.0.0.20"})]}),`
+`,e.jsx(s.span,{className:"line"}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"gateway"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  addresses"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#24292EFF","--shiki-dark":"#B392F0"},children:"    - "}),e.jsx(s.span,{style:{"--shiki-light":"#1976D2","--shiki-dark":"#F8F8F8"},children:"10.0.0.20"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  ports"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    http"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#1976D2","--shiki-dark":"#F8F8F8"},children:" 80"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    https"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#1976D2","--shiki-dark":"#F8F8F8"},children:" 443"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  extraRouting"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#24292EFF","--shiki-dark":"#B392F0"},children:"    - "}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"path"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" /auth"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"      name"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" auth"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"      target"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"        host"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" auth-keycloak"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"        port"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#1976D2","--shiki-dark":"#F8F8F8"},children:" 8080"})]}),`
+`,e.jsx(s.span,{className:"line"}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"auth"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  oidc"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    frontend"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"      clientId"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" frontend"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"      authority"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" https://pki.example.internal/auth/realms/lamassu"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    apiGateway"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"      jwks"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#24292EFF","--shiki-dark":"#B392F0"},children:"        - "}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"name"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" oidc-authn"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"          uri"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  authorization"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    rolesClaim"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" realm_access.roles"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    roles"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"      admin"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" pki-admin"})]}),`
+`,e.jsx(s.span,{className:"line"}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"services"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  ca"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    domains"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#24292EFF","--shiki-dark":"#B392F0"},children:"      - "}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:"pki.example.internal"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"  authz"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    jwkUrl"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"    bootstrap"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#24292EFF","--shiki-dark":"#B392F0"},children:"      - "}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"principal_id"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:' "oidc:pki-admin"'})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"        principal_name"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:' "PKI Admin"'})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"        principal_type"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:' "oidc"'})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"        policy_ids"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#24292EFF","--shiki-dark":"#B392F0"},children:"          - "}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:'"lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"'})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"        auth_config"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"          claims"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#24292EFF","--shiki-dark":"#B392F0"},children:"            - "}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"claim"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" realm_access.roles"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"              operator"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" contains"})]}),`
+`,e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F8F8F8"},children:"              value"}),e.jsx(s.span,{style:{"--shiki-light":"#D32F2F","--shiki-dark":"#F97583"},children:":"}),e.jsx(s.span,{style:{"--shiki-light":"#22863A","--shiki-dark":"#FFAB70"},children:" pki-admin"})]})]})})}),`
+`,e.jsx(s.h2,{id:"provisiona-el-primer-administrador",children:"Provisiona el primer administrador"}),`
+`,e.jsxs(s.p,{children:["No hay un superusuario implícito. Antes de instalar, crea el rol ",e.jsx(s.code,{children:"pki-admin"})," en el proveedor OIDC y asígnalo al grupo que administrará Lamassu. El principal del ejemplo concede la política ",e.jsx(s.code,{children:"SUPER ADMIN"})," a cualquier token que contenga ese rol."]}),`
+`,e.jsxs(s.p,{children:["El Job ",e.jsx(s.code,{children:"pre-install"})," y ",e.jsx(s.code,{children:"pre-upgrade"})," prepara las bases de datos, ejecuta las migraciones de authz, precarga las políticas y aplica ",e.jsx(s.code,{children:"services.authz.bootstrap"})," antes de que arranquen los Deployments. El bootstrap es idempotente: conserva los principales existentes y añade únicamente los grants que falten."]}),`
+`,e.jsx(a,{type:"warn",title:"Valida el acceso antes de exponer la plataforma",children:e.jsx(s.p,{children:"Si ningún token coincide con un principal activo, nadie podrá administrar la PKI. Prueba una identidad autorizada y otra denegada, y conserva un procedimiento de recuperación."})}),`
+`,e.jsxs(s.p,{children:["Consulta ",e.jsx(s.a,{href:"/docs/platform/pki/access-control",children:"Control de acceso"})," para diseñar principales y políticas."]}),`
+`,e.jsx(s.h2,{id:"áreas-de-configuración-más-relevantes",children:"Áreas de configuración más relevantes"}),`
+`,e.jsxs(s.ul,{children:[`
+`,e.jsxs(s.li,{children:[e.jsx(s.strong,{children:"TLS:"})," ",e.jsx(s.code,{children:"tls.type"}),", ",e.jsx(s.code,{children:"tls.certManagerOptions.*"})," y ",e.jsx(s.code,{children:"tls.externalOptions.secretName"})," controlan el certificado ",e.jsx(s.em,{children:"downstream"})," del Gateway."]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.strong,{children:"Gateway:"})," ",e.jsx(s.code,{children:"gateway.addresses"}),", ",e.jsx(s.code,{children:"gateway.ports.*"})," y ",e.jsx(s.code,{children:"gateway.extraRouting"})," publican la UI y las APIs mediante Envoy Gateway."]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.strong,{children:"Persistencia:"})," ",e.jsx(s.code,{children:"postgres.*"})," define la conexión a PostgreSQL."]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.strong,{children:"Mensajería:"})," ",e.jsx(s.code,{children:"amqp.*"})," configura la conexión a RabbitMQ."]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.strong,{children:"Identidad y autorización:"})," ",e.jsx(s.code,{children:"auth.oidc.*"}),", ",e.jsx(s.code,{children:"services.authz.jwkUrl"})," y ",e.jsx(s.code,{children:"services.authz.bootstrap"})," configuran login, validación JWT y permisos iniciales."]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.strong,{children:"Autoridades:"})," ",e.jsx(s.code,{children:"services.ca.domains"})," establece los dominios autorizados para CA y certificados."]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.strong,{children:"Claves:"})," ",e.jsx(s.code,{children:"services.kms.cryptoEngines.*"})," configura los motores criptográficos y su almacenamiento."]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.strong,{children:"Alertas:"})," ",e.jsx(s.code,{children:"services.alerts.smtp_server.*"})," prepara el envío de correo."]}),`
+`]}),`
+`,e.jsx(s.h2,{id:"verificación-del-despliegue",children:"Verificación del despliegue"}),`
+`,e.jsxs(s.p,{children:["El chart incluye una prueba Helm en ",e.jsx(s.code,{children:"charts/lamassu/templates/tests/test-connections.yml"}),". Tras instalarlo, puede validarse con:"]}),`
+`,e.jsx(e.Fragment,{children:e.jsx(s.pre,{className:"shiki shiki-themes min-light min-dark",style:{"--shiki-light":"#24292eff","--shiki-dark":"#b392f0","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#1f1f1f"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:e.jsx(s.code,{children:e.jsxs(s.span,{className:"line",children:[e.jsx(s.span,{style:{"--shiki-light":"#6F42C1","--shiki-dark":"#B392F0"},children:"helm"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" test"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" lamassu"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" -n"}),e.jsx(s.span,{style:{"--shiki-light":"#2B5581","--shiki-dark":"#9DB1C5"},children:" lamassu"})]})})})}),`
+`,e.jsx(s.p,{children:"La prueba comprueba al menos:"}),`
+`,e.jsxs(s.ul,{children:[`
+`,e.jsxs(s.li,{children:["salud de ",e.jsx(s.code,{children:"ca"})]}),`
+`,e.jsxs(s.li,{children:["salud de ",e.jsx(s.code,{children:"dms-manager"})]}),`
+`,e.jsxs(s.li,{children:["salud de ",e.jsx(s.code,{children:"device-manager"})]}),`
+`,e.jsxs(s.li,{children:["salud de ",e.jsx(s.code,{children:"va"})]}),`
+`,e.jsxs(s.li,{children:["respuesta HTML esperada del servicio ",e.jsx(s.code,{children:"ui"})]}),`
+`]}),`
+`,e.jsx(s.h2,{id:"repositorio-helm",children:"Repositorio Helm"}),`
+`,e.jsxs(s.p,{children:["El repositorio ",e.jsx(s.code,{children:"lamassu-helm"})," está organizado en tres bloques principales:"]}),`
+`,e.jsxs(s.ul,{children:[`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"charts/lamassu"}),": chart principal de Lamassu"]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"charts/softhsm"}),": chart opcional para laboratorios o escenarios de integración con PKCS#11 emulado"]}),`
+`,e.jsxs(s.li,{children:[e.jsx(s.code,{children:"scripts/lamassu-fast-lane.sh"}),": automatización para levantar dependencias y desplegar Lamassu con intervención mínima"]}),`
+`]}),`
+`,e.jsx(s.h2,{id:"softhsm-como-complemento-opcional",children:"SoftHSM como complemento opcional"}),`
+`,e.jsxs(s.p,{children:["El chart ",e.jsx(s.code,{children:"charts/softhsm"})," no forma parte del despliegue estándar, pero resulta útil en entornos de laboratorio cuando se necesita simular un HSM compatible con PKCS#11. No sustituye al backend KMS principal; sirve como soporte para pruebas o integraciones concretas."]}),`
+`,e.jsx(s.h2,{id:"versionado-y-migraciones",children:"Versionado y migraciones"}),`
+`,e.jsxs(s.p,{children:["La versión actual del chart en el repositorio es ",e.jsx(s.code,{children:"3.8.0"}),". Para upgrades entre versiones, consulta las guías de ",e.jsx(s.code,{children:"charts/lamassu/CHANGELOG/"})," y revisa especialmente las migraciones de base de datos y el bootstrap de authz."]})]})}function h(i={}){const{wrapper:s}=i.components||{};return s?e.jsx(s,{...i,children:e.jsx(n,{...i})}):n(i)}function l(i,s){throw new Error("Expected component `"+i+"` to be defined: you likely forgot to import, pass, or provide it.")}export{t as _markdown,h as default,d as frontmatter,c as structuredData,o as toc};

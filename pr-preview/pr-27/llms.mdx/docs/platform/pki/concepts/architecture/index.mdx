@@ -1,0 +1,25 @@
+# Arquitectura de la plataforma (/docs/pr-preview/pr-27/platform/pki/concepts/architecture)
+
+
+
+Lamassu se despliega como un conjunto de servicios independientes. La separación evita que todos los componentes necesiten acceso directo a las claves privadas y permite escalar cada capacidad según la carga.
+
+Plano de control [#plano-de-control]
+
+La consola y las APIs administran autoridades, certificados, DMS, dispositivos, alertas y configuración. Los eventos de dominio permiten que conectores y automatizaciones reaccionen a los cambios sin sondear continuamente la plataforma.
+
+Custodia y operaciones criptográficas [#custodia-y-operaciones-criptográficas]
+
+El KMS ofrece una interfaz común sobre motores software, PKCS#11 y proveedores cloud. El motor seleccionado conserva la clave o delega la operación criptográfica sin que los demás servicios conozcan su implementación.
+
+Emisión y enrolamiento [#emisión-y-enrolamiento]
+
+El servicio de CA emite certificados y mantiene la relación con su autoridad. El DMS aplica las reglas de enrolamiento y expone los flujos EST para que un dispositivo solicite o renueve una identidad.
+
+Estado y validación [#estado-y-validación]
+
+Device Manager conserva la vista operativa del dispositivo y su historial. Validation Authority publica OCSP y CRLs para que otros sistemas decidan si deben confiar en un certificado presentado.
+
+Dependencias de la plataforma [#dependencias-de-la-plataforma]
+
+En un despliegue autogestionado, Lamassu utiliza PostgreSQL para persistencia, RabbitMQ para mensajería y un proveedor OIDC para autenticación. Consulta la [arquitectura de despliegue](/docs/deployment/self-hosted/overview#arquitectura) para ver cómo se publican los servicios en Kubernetes.

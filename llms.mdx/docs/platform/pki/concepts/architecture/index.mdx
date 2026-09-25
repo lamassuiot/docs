@@ -4,6 +4,10 @@
 
 Lamassu deploys as a set of independent services. This separation keeps every component from needing direct access to private keys and lets each capability scale according to load.
 
+<ArchitectureDiagram level="low" view="3d" />
+
+Switch to the low level to see the internals of the Lamassu platform box (CA, KMS, DMS, Device Manager, VA, Alerts, AWS IoT connector, Job Manager and the console/API), and to medium to see it as a single platform alongside its external dependencies.
+
 Control plane [#control-plane]
 
 The console and the APIs manage authorities, certificates, DMSs, devices, alerts and configuration. Domain events allow connectors and automations to react to changes without continuously polling the platform.

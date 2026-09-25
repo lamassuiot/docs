@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lamassu PKI Architecture</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f7ff; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #fs-btn {
+    position: fixed; top: 12px; right: 12px; z-index: 10;
+    width: 34px; height: 34px; padding: 0; display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; border: 1px solid rgba(30,58,138,0.25); background: rgba(255,255,255,0.9); color: #1d4ed8;
+    cursor: pointer;
+  }
+  #fs-btn:hover { background: #ffffff; }
+  #fs-btn svg { width: 16px; height: 16px; display: block; }
+  html[data-lamassu-theme="dark"] #fs-btn { border-color: rgba(148,163,184,0.35); background: rgba(20,27,44,0.9); color: #93c5fd; }
+  html[data-lamassu-theme="dark"] #fs-btn:hover { background: #141b2c; }
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Animated architecture diagram of the Lamassu PKI platform on Kubernetes, switchable between 2D and 3D and between low and medium level"></canvas>
+<button id="fs-btn" type="button" aria-label="Enter fullscreen" title="Fullscreen (F)">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+</button>
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   THEME (dark/light passed via #dark / #light, else OS preference)
+   ===================================================================== */
+const DARK = (() => {
+  const h = location.hash.toLowerCase();
+  if (/(^|[#&])dark\b/.test(h)) return true;
+  if (/(^|[#&])light\b/.test(h)) return false;
+  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+})();
+document.documentElement.setAttribute('data-lamassu-theme', DARK ? 'dark' : 'light');
+document.body.style.background = DARK ? '#0a0f1c' : '#f4f7ff';
+// picks the light or dark literal for one-off colors that aren't in the C palette
+const LD = (light, dark) => DARK ? dark : light;
+
+/* =====================================================================
+   SHARED CONSTANTS
+   ===================================================================== */
+const LW = 1600, LH = 900, LOOP = 24;
+const C = DARK ? {
+  navy: '#08152e', n2: '#0f1f3d', n3: '#172554', b9: '#1e3a8a',
+  P: '#3b82f6', b6: '#3b82f6', b5: '#60a5fa', b4: '#93c5fd', b3: '#bfdbfe',
+  b2: '#1e3a5f', b1: '#16233d', b0: '#111d33', bg: '#0a0f1c', w: '#141b2c',
+  g6: '#9aa7bd', g5: '#8b96ab', g4: '#64748b', g3: '#334155', g2: '#1e293b',
+  v6: '#a78bfa', v5: '#c4b5fd', c6: '#22d3ee', c4: '#67e8f9', a5: '#fbbf24', a4: '#fde68a', ok: '#34d399',
+  text: '#e7ecf6', halo: 'rgba(10,15,28,', border: 'rgba(148,163,184,', shadow: 'rgba(0,0,0,'
+} : {
+  navy: '#08152e', n2: '#0f1f3d', n3: '#172554', b9: '#1e3a8a',
+  P: '#1d4ed8', b6: '#2563eb', b5: '#3b82f6', b4: '#60a5fa', b3: '#93c5fd',
+  b2: '#bfdbfe', b1: '#dbeafe', b0: '#eff6ff', bg: '#f4f7ff', w: '#ffffff',
+  g6: '#475569', g5: '#64748b', g4: '#94a3b8', g3: '#cbd5e1', g2: '#e2e8f0',
+  v6: '#7c3aed', v5: '#8b5cf6', c6: '#0891b2', c4: '#22d3ee', a5: '#f59e0b', a4: '#fbbf24', ok: '#10b981',
+  text: '#08152e', halo: 'rgba(237,242,255,', border: 'rgba(30,58,138,', shadow: 'rgba(15,31,61,'
+};
+const SANS = 'Inter, "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif';
+const MONO = 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace';
+const CAT = { native: C.P, auth: C.v6, infra: C.g5, crypto: C.a5, ext: C.g4, event: C.c6, client: C.b5 };
+const NATIVE = new Set(['ui', 'dms', 'ca', 'kms', 'swe', 'job', 'devmgr', 'va', 'awsiot', 'alerts']);
+
+/* =====================================================================
+   SHARED UTILS / PRIMITIVES  (all draw into the current context g)
+   ===================================================================== */
+let g = null;
+const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const rgba = (h, a) => { const [r, gg, b] = hexRGB(h); return `rgba(${r},${gg},${b},${a})`; };
+const mixCache = new Map();
+function mix(a, b, t) {
+  if (t <= 0.001) return a;
+  const q = Math.round(Math.min(1, t) * 50) / 50, key = a + b + q;
+  let v = mixCache.get(key); if (v) return v;
+  const A = hexRGB(a), B = hexRGB(b);
+  v = '#' + A.map((c, i) => Math.round(c + (B[i] - c) * q).toString(16).padStart(2, '0')).join('');
+  mixCache.set(key, v); return v;
+}
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const smooth = t => { t = clamp(t); return t * t * (3 - 2 * t); };
+const easeIO = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const lerp = (a, b, t) => a + (b - a) * t;
+const lerp2 = (p, q, t) => [lerp(p[0], q[0], t), lerp(p[1], q[1], t)];
+function path(pts) { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); }
+function poly(pts, fill, stroke, lw) { path(pts); g.closePath(); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.stroke(); } }
+function seg(a, b, col, lw) { g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.strokeStyle = col; g.lineWidth = lw || 1; g.stroke(); }
+function line(x0, y0, x1, y1, col, lw) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = col; g.lineWidth = lw || 1; g.stroke(); }
+function dot(p, r, col) { g.beginPath(); g.arc(p[0], p[1], r, 0, Math.PI * 2); g.fillStyle = col; g.fill(); }
+function circ(x, y, r, fill, stroke, lw) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.stroke(); } }
+function rr(x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.arcTo(x + w, y, x + w, y + r, r);
+  g.lineTo(x + w, y + h - r); g.arcTo(x + w, y + h, x + w - r, y + h, r); g.lineTo(x + r, y + h);
+  g.arcTo(x, y + h, x, y + h - r, r); g.lineTo(x, y + r); g.arcTo(x, y, x + r, y, r); g.closePath();
+}
+function font(sz, w = 500, fam = SANS) { g.font = `${w} ${sz}px ${fam}`; }
+function ls(px) { if ('letterSpacing' in g) g.letterSpacing = px + 'px'; }
+function text(t, x, y, o = {}) {
+  font(o.size || 9.5, o.w || 500, o.fam || SANS); ls(o.ls || 0);
+  g.fillStyle = o.col || C.b9; g.textAlign = o.align || 'left'; g.textBaseline = o.base || 'middle';
+  if (o.rot) { g.save(); g.translate(x, y); g.rotate(o.rot); g.fillText(t, 0, 0); g.restore(); } else g.fillText(t, x, y);
+  ls(0);
+}
+const LOGO = { w: 495, h: 476, paths: [["M36.9845 82.4277C23.6637 77.8266 12.0899 67.5286 5.32059 54.8209 1.8264 48.0285 0.734805 40.5791-0.138832 22.1746-1.01211 0.264271-0.793791-1.70749 2.48172-0.392981 4.66527 0.483475 9.68806 1.14073 13.8368 1.14073L21.2615 1.14073 21.2615 21.5174C21.2615 44.523 24.7557 52.6296 36.9845 60.2985 51.3968 69.0623 71.0502 63.804 80.2218 48.9049 83.716 42.9893 84.5892 37.7309 84.5892 21.5174L84.5892 1.14073 92.0139 1.14073C96.1631 1.14073 101.185 0.483475 103.151-0.392981 106.645-1.48828 106.863 0.483475 105.99 22.1746 105.335 41.0175 104.243 48.0285 100.531 55.0398 93.7608 67.7478 80.2218 79.1411 66.9014 83.0849 52.7071 87.4669 51.1785 87.4669 36.9845 82.4277Z", 338.0, 87.0], ["M7.8986 29.406C-3.26435 23.3532-2.38869 5.19525 8.99272 0.487654 21.2502-4.21994 33.7261 6.76444 30.443 19.5423 28.0352 29.6299 17.0914 34.3375 7.8986 29.406Z", 1.0, 113.0], ["M0.5722 168.742 1.44708 159.952 69.7036 159.952 137.741 159.952 217.593 79.7419 297.444-0.468278 310.571-0.468278 323.697-0.468278 235.095 88.5318 146.492 177.532 73.2042 177.532-0.303036 177.532 0.5722 168.742Z", 43.0, 265.0], ["M3.79503 149.174C-0.359802 145.018-0.578421 141.955-0.578421 98.2051L-0.578421 51.8299 25.4433 25.7987 51.6837-0.451384 79.0174 25.7987 106.352 51.8299 106.352 99.299C106.57 145.893 106.57 146.768 101.76 150.049 97.6047 152.893 89.0764 153.549 52.5585 153.549 11.0109 153.549 7.9495 153.33 3.79503 149.174ZM67.2095 128.393C75.3002 124.236 80.3295 114.83 80.3295 103.893 80.3295 94.2676 73.7695 82.4549 67.4281 80.2675 63.4919 79.174 62.8361 77.205 62.8361 65.83L62.8361 52.9239 54.0892 52.9239 45.3423 52.9239 45.3423 64.7361C45.3423 75.4553 44.6864 77.205 36.5954 85.2989 28.9419 92.9552 27.8488 95.1426 27.8488 103.893 27.8488 124.674 49.0599 137.799 67.2095 128.393Z", 338.0, 261.0], ["M7.85642 28.5539C-3.30652 22.6902-2.43087 5.09971 8.95055 0.539238 21.208-4.02124 33.6839 6.61987 30.4008 18.9984 27.993 28.7708 17.0492 33.3313 7.85642 28.5539Z", 30.0, 150.0], ["M-0.284177 131.767-0.284177 122.968 48.4475 122.968 97.3987 122.968 159.082 61.1569 220.545-0.434353 231.74 0.225501 242.716 0.885356 175.545 70.6156 108.374 140.126 54.1549 140.346-0.284177 140.566-0.284177 131.767Z", 70.0, 265.0], ["M7.81433 28.621C-3.34874 22.7573-2.47307 5.1666 8.90847 0.606069 21.166-3.95446 33.6421 6.68677 30.359 19.0655 27.9511 28.838 17.0072 33.3985 7.81433 28.621Z", 58.0, 187.0], ["M0.606527 93.8345 1.47895 85.0688 27.2219 85.0688 52.9644 85.0688 95.0688 42.3346 137.391-0.399557 148.953-0.399557 160.734-0.399557 110.994 51.1007 61.4723 102.601 30.7123 102.601-0.266254 102.601 0.606527 93.8345Z", 100.0, 265.0], ["M70.7343 246.841C67.665 242.902 57.3608 225.173 47.4954 207.663L29.7372 175.928 31.7102 136.531 33.9027 97.3537 16.1445 79.4063C3.86731 67.1497-1.175 60.5834-0.298263 58.1762 0.578833 56.2062 1.8943 54.6741 2.77103 54.6741 3.86731 54.6741 13.9523 63.8666 25.1332 75.2477L45.7416 96.0402 44.4261 135.218 43.1106 174.614 58.8955 186.652C78.1884 201.535 77.5308 203.067 77.75 153.603 77.9692 114.863 77.9692 114.863 64.3765 97.7913L56.0454 87.0667 56.0454 46.1381C56.0454 17.2476 56.9225 4.33441 58.6763 2.58336 60.4301 0.832308 71.6114-0.043218 94.8503-0.043218 122.474-0.043218 128.832 0.613336 129.709 3.23991 130.805 6.0851 118.528 29.0663 111.293 37.8212 109.101 40.2288 104.716 41.5419 98.358 41.5419L88.9309 41.5419 88.9309 55.3306 88.9309 68.9007 116.116 87.9422C130.805 98.4478 144.398 107.64 146.152 108.297 148.563 109.172 154.702 99.7613 168.733 72.8404 186.71 38.9157 188.245 34.976 189.341 20.7493 189.78 12.4324 191.314 4.11544 192.41 2.58336 195.26-0.918744 252.481-1.13735 254.454 2.36439 257.962 7.61718 234.504 34.976 226.392 34.976 222.007 34.976 218.938 38.0402 210.826 50.7344L200.741 66.4931 200.741 91.2254 200.741 115.958 264.539 115.958C324.171 115.958 328.118 115.739 327.021 112.237 326.364 110.048 320.444 90.3498 313.648 68.4628 303.563 35.8515 301.371 26.6591 302.029 15.9341L302.686 3.23991 334.037 2.58336C370.211 1.9268 370.869 2.36439 356.838 20.7493 349.822 29.9418 347.191 31.6929 340.395 32.3494 336.01 32.7874 332.283 33.6625 332.283 34.3195 332.283 36.5081 363.415 110.486 365.168 112.237 366.045 113.331 371.965 98.0103 378.542 78.3118 386.654 52.923 390.381 38.2588 390.819 27.3156 392.354-0.261829 389.284 2.14542 423.266 2.14542 457.686 2.14542 457.906 2.36439 443.874 20.7493 436.64 30.3798 433.57 32.7874 428.747 32.7874 414.716 32.7874 415.593 25.3456 415.593 138.939 415.593 221.234 414.935 242.902 412.743 244.652 410.55 246.622 403.316 240.494 381.611 218.826L353.111 190.373 270.02 190.373 186.71 190.373 155.579 222.109 124.667 253.845 100.331 253.845 75.9962 253.845 70.7343 246.841Z", 40.0, 475.0]] };
+const LOGO_P = LOGO.paths.map(([d, tx, ty]) => ({ p: new Path2D(d), tx, ty }));
+// Lamassu logo, drawn from inline vector paths, centred at (cx, cy) with height h
+function drawLogo(cx, cy, h, col) {
+  const s = h / LOGO.h;
+  g.save(); g.translate(cx - LOGO.w * s / 2, cy - h / 2); g.scale(s, s); g.fillStyle = col;
+  for (const q of LOGO_P) { g.save(); g.transform(1, 0, 0, -1, q.tx, q.ty); g.fill(q.p, 'evenodd'); g.restore(); }
+  g.restore();
+}
+function pip(pt, polyPts) {
+  let inside = false;
+  for (let i = 0, j = polyPts.length - 1; i < polyPts.length; j = i++) {
+    const [xi, yi] = polyPts[i], [xj, yj] = polyPts[j];
+    if (((yi > pt[1]) !== (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+/* =====================================================================
+   SHARED MODEL: node descriptions, edge metadata, level mapping
+   ===================================================================== */
+const DESC = {
+  device: ['IoT / OT device.', 'Enrolls and renews certificates over EST', 'through the Envoy Gateway.'],
+  admin: ['Operator console in the browser.', 'REST access to Lamassu APIs via Envoy.'],
+  api: ['Third-party systems integrating over', 'REST, EST and OCSP.'],
+  lb: ['Platform L4 load balancer.', 'Exposes the Envoy Gateway Service.', 'No HTTP routing decisions.'],
+  envoy: ['Single external HTTP entry point.', 'TLS termination, HTTPRoute, JWT validation;', 'ext_authz check before protected routes.'],
+  authz: ['Authorization service for Envoy ext_authz.', 'Evaluates grants and policies stored', 'in its own PostgreSQL schema.'],
+  certmgr: ['Issues and rotates the Gateway TLS', 'certificate. Not on the application path.'],
+  ui: ['Backend API serving the Lamassu console.', 'Reached through Envoy HTTPRoute.'],
+  dms: ['Device Manufacturing System manager.', 'EST enrollment / re-enrollment;', 'requests certificate issuance from CA.'],
+  ca: ['Certificate lifecycle and issuance.', 'Delegates all private-key operations to KMS.', 'Source of truth for certificate state.'],
+  kms: ['Unified cryptographic key abstraction.', 'Software, PKCS#11 and cloud-backed engines.', 'Private keys are never exposed to CA.'],
+  swe: ['In-process software crypto engine', 'hosted inside KMS.'],
+  job: ['Lamassu-native job service.', 'Integrates only through the HTTP perimeter', '(Envoy + ext_authz). Not on the event bus.'],
+  devmgr: ['Device inventory, identity and metadata.', 'Publishes and consumes device events.'],
+  va: ['OCSP and CRL publication.', 'Certificate state is retrieved from CA', '(GetCertificateBySerialNumber).'],
+  awsiot: ['Event-driven connector. Synchronizes CAs,', 'Things and certificates with AWS IoT Core;', 'calls DMS Manager and Device Manager.'],
+  alerts: ['Pure event consumer. Matches subscriptions', 'and sends notifications. Never polls.'],
+  keycloak: ['OIDC identity provider.', 'Publishes JWKS used by Envoy and authz', 'to validate JWTs.'],
+  storage: ['Persistent volumes (PVC) backing', 'PostgreSQL and RabbitMQ.'],
+  rabbit: ['Domain-event backbone using AMQP', 'and CloudEvents. Publish / subscribe;', 'consumers are pushed, never polled.'],
+  hsm: ['External hardware security module', 'reached through the KMS PKCS#11 engine.'],
+  awskms: ['Cloud key provider (AWS KMS).', 'Accessed only by KMS.'],
+  azkv: ['Cloud key provider (Azure Key Vault).', 'Accessed only by KMS.'],
+  gcpkms: ['Cloud key provider (GCP Cloud KMS).', 'Accessed only by KMS.'],
+  iotcore: ['External AWS IoT Core.', 'Receives CA, Thing and certificate state', 'from the AWS IoT Connector.'],
+  smtp: ['E-mail notification channel.'], teams: ['Chat notification channel.'], webhook: ['Generic HTTP webhook channel.'],
+  lamassu: ['Lamassu native services as one platform:', 'CA, KMS, DMS Manager, Device Manager, VA,', 'Alerts, AWS IoT Connector, Job Manager, UI.', 'Switch to Low level to see the internals.'],
+  db_authz: ['PostgreSQL database owned by authz.', 'Stores grants / policies.'],
+  db_dms: ['PostgreSQL database owned by DMS Manager.', 'Schema per service, no shared tables.'],
+  db_devmgr: ['PostgreSQL database owned by Device Manager.', 'Schema per service, no shared tables.'],
+  db_ca: ['PostgreSQL database owned by CA.', 'Schema per service, no shared tables.'],
+  db_va: ['PostgreSQL database owned by the VA.', 'VA configuration only, never certificates.'],
+  db_kms: ['PostgreSQL database owned by KMS.', 'Schema per service, no shared tables.'],
+  db_alerts: ['PostgreSQL database owned by Alerts.', 'Schema per service, no shared tables.']
+};
+const CATS = {
+  device: 'client', admin: 'client', api: 'client', lb: 'infra', envoy: 'native', authz: 'auth', certmgr: 'infra',
+  ui: 'native', dms: 'native', ca: 'native', kms: 'crypto', swe: 'crypto', job: 'native', devmgr: 'native', va: 'native', awsiot: 'native', alerts: 'native',
+  keycloak: 'infra', storage: 'infra', rabbit: 'event', hsm: 'crypto', awskms: 'crypto', azkv: 'crypto', gcpkms: 'crypto',
+  iotcore: 'ext', smtp: 'ext', teams: 'ext', webhook: 'ext', lamassu: 'native'
+};
+const OWNER = { db_authz: 'authz', db_dms: 'dms', db_devmgr: 'devmgr', db_ca: 'ca', db_va: 'va', db_kms: 'kms', db_alerts: 'alerts' };
+for (const k in OWNER) CATS[k] = 'infra';
+const SHORT = { ui: 'UI / Console', dms: 'DMS Manager', ca: 'CA', kms: 'KMS', swe: 'SW engine', job: 'Job Manager', devmgr: 'Device Manager', va: 'VA', awsiot: 'AWS IoT', alerts: 'Alerts' };
+const SHORT3 = { ui: 'UI', dms: 'DMS', ca: 'CA', kms: 'KMS', swe: 'SW engine', job: 'Jobs', devmgr: 'Devices', va: 'VA', awsiot: 'AWS IoT', alerts: 'Alerts' };
+
+// [id, from, to, type, opts]
+const META_LIST = [
+  ['in_admin', 'admin', 'envoy', 'http'], ['in_device', 'device', 'envoy', 'http'], ['in_api', 'api', 'envoy', 'http'],
+  ['ext_authz', 'envoy', 'authz', 'auth'], ['cm_tls', 'certmgr', 'envoy', 'infra'],
+  ['jwks_gw', 'keycloak', 'envoy', 'auth'], ['jwks_authz', 'keycloak', 'authz', 'auth'],
+  ['gw_ui', 'envoy', 'ui', 'http'], ['gw_job', 'envoy', 'job', 'http'], ['gw_dms', 'envoy', 'dms', 'http'], ['gw_va', 'envoy', 'va', 'http'],
+  ['dms_ca', 'dms', 'ca', 'http'], ['ca_kms', 'ca', 'kms', 'http'], ['va_ca', 'va', 'ca', 'http'],
+  ['aws_dms', 'awsiot', 'dms', 'http'], ['aws_dev', 'awsiot', 'devmgr', 'http'],
+  ['kms_swe', 'kms', 'swe', 'key'], ['kms_hsm', 'kms', 'hsm', 'key'], ['kms_aws', 'kms', 'awskms', 'key'], ['kms_az', 'kms', 'azkv', 'key'], ['kms_gcp', 'kms', 'gcpkms', 'key'],
+  ['aws_core', 'awsiot', 'iotcore', 'http'], ['al_smtp', 'alerts', 'smtp', 'http'], ['al_teams', 'alerts', 'teams', 'http'], ['al_hook', 'alerts', 'webhook', 'http'],
+  ['ev_dms', 'dms', 'rabbit', 'event'], ['ev_devmgr', 'devmgr', 'rabbit', 'event'], ['ev_va', 'va', 'rabbit', 'event'], ['ev_ca', 'ca', 'rabbit', 'event'],
+  ['ev_aws', 'awsiot', 'rabbit', 'event'], ['ev_kms', 'kms', 'rabbit', 'event'], ['ev_alerts', 'alerts', 'rabbit', 'event'],
+  ['st_rabbit', 'storage', 'rabbit', 'infra'], ['st_pg', 'storage', 'persist', 'infra'],
+  ['db_authz_l', 'authz', 'db_authz', 'db', { hidden: true }], ['db_dms_l', 'dms', 'db_dms', 'db', { hidden: true }],
+  ['db_devmgr_l', 'devmgr', 'db_devmgr', 'db', { hidden: true }], ['db_ca_l', 'ca', 'db_ca', 'db', { hidden: true }],
+  ['db_va_l', 'va', 'db_va', 'db', { hidden: true }], ['db_kms_l', 'kms', 'db_kms', 'db', { hidden: true }], ['db_alerts_l', 'alerts', 'db_alerts', 'db', { hidden: true }],
+  // medium level
+  ['gw_lp', 'envoy', 'lamassu', 'http', { med: true }], ['lp_ev', 'lamassu', 'rabbit', 'event', { med: true }],
+  ['lp_hsm', 'lamassu', 'hsm', 'key', { med: true }], ['lp_aws', 'lamassu', 'awskms', 'key', { med: true }],
+  ['lp_az', 'lamassu', 'azkv', 'key', { med: true }], ['lp_gcp', 'lamassu', 'gcpkms', 'key', { med: true }],
+  ['lp_core', 'lamassu', 'iotcore', 'http', { med: true }],
+  ['lp_smtp', 'lamassu', 'smtp', 'http', { med: true }], ['lp_teams', 'lamassu', 'teams', 'http', { med: true }], ['lp_hook', 'lamassu', 'webhook', 'http', { med: true }],
+  ['db_dms_m', 'lamassu', 'db_dms', 'db', { med: true, hidden: true }], ['db_devmgr_m', 'lamassu', 'db_devmgr', 'db', { med: true, hidden: true }],
+  ['db_ca_m', 'lamassu', 'db_ca', 'db', { med: true, hidden: true }], ['db_va_m', 'lamassu', 'db_va', 'db', { med: true, hidden: true }],
+  ['db_kms_m', 'lamassu', 'db_kms', 'db', { med: true, hidden: true }], ['db_alerts_m', 'lamassu', 'db_alerts', 'db', { med: true, hidden: true }]
+];
+const META = {};
+for (const [id, from, to, type, o = {}] of META_LIST) {
+  const cls = o.med ? 'med' : (NATIVE.has(from) || NATIVE.has(to)) ? 'low' : 'common';
+  META[id] = { id, from, to, type, hidden: !!o.hidden, cls };
+}
+// low-level edge -> medium-level edge (null: internal to the platform, hidden at medium)
+const MAP = {
+  gw_ui: 'gw_lp', gw_job: 'gw_lp', gw_dms: 'gw_lp', gw_va: 'gw_lp',
+  ev_dms: 'lp_ev', ev_devmgr: 'lp_ev', ev_va: 'lp_ev', ev_ca: 'lp_ev', ev_aws: 'lp_ev', ev_kms: 'lp_ev', ev_alerts: 'lp_ev',
+  kms_hsm: 'lp_hsm', kms_aws: 'lp_aws', kms_az: 'lp_az', kms_gcp: 'lp_gcp',
+  aws_core: 'lp_core', al_smtp: 'lp_smtp', al_teams: 'lp_teams', al_hook: 'lp_hook',
+  db_dms_l: 'db_dms_m', db_devmgr_l: 'db_devmgr_m', db_ca_l: 'db_ca_m', db_va_l: 'db_va_m', db_kms_l: 'db_kms_m', db_alerts_l: 'db_alerts_m',
+  dms_ca: null, ca_kms: null, va_ca: null, aws_dms: null, aws_dev: null, kms_swe: null
+};
+const STY = {
+  http:  { c: C.b6, w: 1.6, glow: C.b4 },
+  event: { c: C.c6, w: 1.5, glow: C.c4 },
+  auth:  { c: C.v6, w: 1.28, dash: [5, 4], glow: C.v5 },
+  key:   { c: C.a5, w: 1.4, glow: C.a4 },
+  infra: { c: C.g4, w: 1.08, glow: C.g4 },
+  db:    { c: C.g5, w: 1.08, dash: [2, 3], glow: C.g4 }
+};
+const TYPE_ORDER = { db: 0, infra: 1, key: 2, event: 3, auth: 4, http: 5 };
+
+// level blend factors (lv: 0 = low, 1 = medium)
+const lowF = lv => 1 - smooth(lv / 0.6);          // low-only elements fade out first
+const medF = lv => smooth((lv - 0.4) / 0.6);      // medium-only elements fade in last
+const boxF = lv => smooth((lv - 0.15) / 0.7);     // platform box grows
+const miniF = lv => smooth((lv - 0.1) / 0.75);    // services shrink to chips
+const levelAlpha = (cls, lv) => cls === 'low' ? lowF(lv) : cls === 'med' ? medF(lv) : 1;
+
+/* =====================================================================
+   TIMELINE (shared storyline)
+   ===================================================================== */
+const STATES = [
+  { t0: 0, t1: 3, n: '01', title: 'Overview', sub: 'Lamassu native services behind a single Envoy ingress', spot: null },
+  { t0: 3, t1: 7, n: '02', title: 'Inbound request', sub: 'Device → Envoy Gateway → ext_authz → DMS Manager → CA → KMS',
+    spot: ['device', 'lb', 'envoy', 'authz', 'dms', 'ca', 'kms'], edges: ['in_device', 'ext_authz', 'gw_dms', 'dms_ca', 'ca_kms'] },
+  { t0: 7, t1: 10, n: '03', title: 'Cryptographic operation', sub: 'CA → KMS → PKCS#11 / HSM · private keys stay behind KMS',
+    spot: ['ca', 'kms', 'swe', 'hsm', 'awskms', 'azkv', 'gcpkms', 'db_ca'], edges: ['ca_kms', 'kms_hsm', 'kms_aws', 'kms_az', 'kms_gcp', 'kms_swe', 'db_ca_l'] },
+  { t0: 10, t1: 15, n: '04', title: 'Domain event', sub: 'CA publishes a certificate CloudEvent → RabbitMQ → subscribers',
+    spot: ['ca', 'rabbit', 'devmgr', 'va', 'alerts', 'awsiot'], edges: ['ev_ca', 'ev_devmgr', 'ev_va', 'ev_alerts', 'ev_aws', 'bus'] },
+  { t0: 15, t1: 18.6, n: '05', title: 'External propagation', sub: 'AWS IoT Connector → AWS IoT Core · Alerts → SMTP / Teams / Webhook',
+    spot: ['awsiot', 'iotcore', 'alerts', 'smtp', 'teams', 'webhook'], edges: ['aws_core', 'al_smtp', 'al_teams', 'al_hook'] },
+  { t0: 18.6, t1: 22.8, n: '06', title: 'Validation', sub: 'OCSP → Envoy → VA → CA GetCertificateBySerialNumber → response',
+    spot: ['api', 'lb', 'envoy', 'va', 'ca'], edges: ['in_api', 'gw_va', 'va_ca'] },
+  { t0: 22.8, t1: 24, n: '07', title: 'Reset', sub: 'Back to the steady state', spot: null }
+];
+const FLOWS = [];
+function F(e, t0, dur, kind, rev = false) { const m = META[e]; FLOWS.push({ e, t0, dur, kind, rev, arrive: rev ? m.from : m.to, src: rev ? m.to : m.from }); }
+F('db_dms_l', 0.7, 0.9, 'db'); F('db_devmgr_l', 1.6, 0.8, 'db'); F('db_va_l', 23.0, 0.8, 'db');
+F('in_device', 3.0, 0.95, 'http');
+F('ext_authz', 4.0, 0.42, 'auth'); F('ext_authz', 4.5, 0.42, 'auth', true);
+F('gw_dms', 5.0, 0.85, 'http'); F('dms_ca', 5.95, 0.5, 'http'); F('ca_kms', 6.5, 0.5, 'http');
+F('kms_hsm', 7.05, 0.8, 'key'); F('kms_hsm', 8.0, 0.8, 'key', true); F('ca_kms', 8.9, 0.5, 'key', true); F('db_ca_l', 9.35, 0.6, 'db');
+F('ev_ca', 10.0, 1.35, 'event');
+F('ev_devmgr', 11.65, 1.05, 'event', true); F('ev_va', 11.8, 0.95, 'event', true);
+F('ev_alerts', 11.95, 1.1, 'event', true); F('ev_aws', 12.1, 1.05, 'event', true);
+F('aws_core', 15.0, 1.0, 'http'); F('al_smtp', 15.45, 0.8, 'http'); F('al_teams', 15.65, 0.85, 'http'); F('al_hook', 15.85, 0.9, 'http');
+F('aws_core', 16.8, 0.9, 'http', true);
+F('in_api', 18.6, 0.95, 'http'); F('gw_va', 19.6, 0.85, 'http');
+F('va_ca', 20.55, 0.45, 'http'); F('va_ca', 21.05, 0.45, 'http', true);
+F('gw_va', 21.6, 0.65, 'http', true); F('in_api', 22.3, 0.7, 'http', true);
+const RABBIT_FANOUT = 11.35;
+const stateAt = t => STATES.find(s => t >= s.t0 && t < s.t1) || STATES[0];
+const flowEase = p => 0.35 * p + 0.65 * (0.5 - 0.5 * Math.cos(Math.PI * p));
+
+/* =====================================================================
+   SHARED EDGE HELPERS (screen-space polylines in logical px)
+   ===================================================================== */
+function prepEdge(e) {
+  e.len = [0];
+  for (let i = 1; i < e.sp.length; i++) e.len.push(e.len[i - 1] + Math.hypot(e.sp[i][0] - e.sp[i - 1][0], e.sp[i][1] - e.sp[i - 1][1]));
+  e.total = e.len[e.len.length - 1];
+  e.vis = e.sp.slice(0, e.draw ? e.draw + 1 : e.sp.length);
+}
+function pointAt(e, d) {
+  d = clamp(d, 0, e.total);
+  for (let i = 1; i < e.sp.length; i++) if (d <= e.len[i] || i === e.sp.length - 1) {
+    const s = e.len[i] - e.len[i - 1] || 1, u = (d - e.len[i - 1]) / s, a = e.sp[i - 1], b = e.sp[i];
+    return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, i - 1];
+  }
+  const l = e.sp[e.sp.length - 1]; return [l[0], l[1], e.sp.length - 2];
+}
+function strokeRange(e, d0, d1) {
+  g.beginPath(); const a = pointAt(e, d0); g.moveTo(a[0], a[1]);
+  for (let i = 1; i < e.sp.length; i++) if (e.len[i] > d0 && e.len[i] < d1) g.lineTo(e.sp[i][0], e.sp[i][1]);
+  const b = pointAt(e, d1); g.lineTo(b[0], b[1]); g.stroke();
+}
+function drawPacket(kind, x, y, a, ang) {
+  if (a <= 0.01) return;
+  g.globalAlpha = a;
+  if (kind === 'event') {
+    circ(x, y, 7, rgba(C.c4, 0.18));
+    g.beginPath(); g.moveTo(x, y - 5); g.lineTo(x + 5, y); g.lineTo(x, y + 5); g.lineTo(x - 5, y); g.closePath();
+    g.fillStyle = C.c4; g.fill(); g.strokeStyle = C.c6; g.lineWidth = 1.2; g.stroke();
+  } else if (kind === 'db') circ(x, y, 2.6, C.g5);
+  else {
+    const col = kind === 'key' ? C.a5 : kind === 'auth' ? C.v5 : C.b5, hal = kind === 'key' ? C.a4 : kind === 'auth' ? C.v5 : C.b4;
+    circ(x, y, 7, rgba(hal, 0.18));
+    g.save(); g.translate(x, y); g.rotate(ang); rr(-5, -3, 10, 6, 3); g.fillStyle = col; g.fill(); g.strokeStyle = '#ffffff'; g.lineWidth = 1.3; g.stroke(); g.restore();
+  }
+  g.globalAlpha = 1;
+}
+// shared pass: progressive illumination, glow, packets
+function drawFlowOverlays(V, fs, alphaMul = 1) {
+  for (const A of fs.active) {
+    const e = V.E[A.eid]; if (!e) continue;
+    const la = levelAlpha(META[A.eid].cls, fs.lv) * alphaMul; if (la <= 0.02) continue;
+    const s2 = STY[e.type];
+    g.globalAlpha = (A.f.kind === 'db' ? 0.45 : 0.85) * la; g.strokeStyle = A.f.kind === 'key' ? C.a5 : s2.glow;
+    g.lineWidth = s2.w + (A.f.kind === 'db' ? 0.6 : 1.6); g.lineCap = 'round'; g.setLineDash([]);
+    if (!A.f.rev) strokeRange(e, 0, e.total * A.p); else strokeRange(e, e.total * (1 - A.p), e.total);
+    g.globalAlpha = 1;
+  }
+  for (const id in fs.glow) {
+    const e = V.E[id]; if (!e || fs.glow[id] >= 1) continue;
+    const la = levelAlpha(META[id].cls, fs.lv) * alphaMul; if (la <= 0.02) continue;
+    g.globalAlpha = fs.glow[id] * (e.type === 'db' ? 0.22 : 0.45) * la; g.strokeStyle = STY[e.type].glow; g.lineWidth = STY[e.type].w + 2.4; g.lineCap = 'round';
+    strokeRange(e, 0, e.total); g.globalAlpha = 1;
+  }
+}
+function drawPackets(V, fs, alphaMul = 1) {
+  for (const A of fs.active) {
+    const e = V.E[A.eid]; if (!e) continue;
+    const la = levelAlpha(META[A.eid].cls, fs.lv) * alphaMul;
+    const q = pointAt(e, A.f.rev ? e.total * (1 - A.p) : e.total * A.p), i = Math.min(q[2], e.sp.length - 2);
+    const ang = Math.atan2(e.sp[i + 1][1] - e.sp[i][1], e.sp[i + 1][0] - e.sp[i][0]);
+    drawPacket(A.f.kind, q[0], q[1], la * Math.min(1, A.p / 0.08, (1 - A.p) / 0.08 + 0.35), ang);
+  }
+}
+function annAlpha(a, fs) {
+  const lf = a.lvl === 'low' ? lowF(fs.lv) : a.lvl === 'med' ? medF(fs.lv) : 1;
+  const fa = a.e.some(id => (!fs.FE || fs.FE.has(id))) ? 1 : Math.max(fs.dimE, 0.25);
+  return lf * fa;
+}
+
+/* =====================================================================
+   VIEW 3D  (isometric)
+   ===================================================================== */
+function makeView3D() {
+  let K = 22, OX = 800, OY = 120;
+  const P = (x, y, z = 0) => [OX + (x - y) * K, OY + (x + y) * K * 0.5 - z];
+  const rect4 = (x0, y0, x1, y1, z = 0) => [P(x0, y0, z), P(x1, y0, z), P(x1, y1, z), P(x0, y1, z)];
+  const PAL = {
+    svc: { t: '#3b82f6', l: '#1d4ed8', r: '#1e3a8a', e: '#93c5fd' },
+    pad: { t: '#dbeafe', l: '#bfdbfe', r: '#93c5fd', e: '#eff6ff' },
+    gw: { t: '#2563eb', l: '#1e3a8a', r: '#172554', e: '#60a5fa' },
+    gwTop: { t: '#60a5fa', l: '#2563eb', r: '#1d4ed8', e: '#bfdbfe' },
+    auth: { t: '#8b5cf6', l: '#7c3aed', r: '#4c1d95', e: '#c4b5fd' },
+    inf: { t: '#e2e8f0', l: '#94a3b8', r: '#64748b', e: '#f8faff' },
+    infPad: { t: '#f8faff', l: '#e2e8f0', r: '#cbd5e1', e: '#ffffff' },
+    ext: { t: '#ffffff', l: '#dbeafe', r: '#93c5fd', e: '#eff6ff' },
+    cli: { t: '#f8faff', l: '#bfdbfe', r: '#60a5fa', e: '#ffffff' },
+    dark: { t: '#1e3a8a', l: '#172554', r: '#08152e', e: '#3b82f6' },
+    rab: { t: '#1e3a8a', l: '#172554', r: '#0f1f3d', e: '#60a5fa' },
+    chip: { t: '#dbeafe', l: '#93c5fd', r: '#60a5fa', e: '#eff6ff' },
+    db: { t: '#e2e8f0', l: '#94a3b8', r: '#64748b', e: '#f8faff' },
+    slab: { t: '#1d4ed8', l: '#1e3a8a', r: '#172554', e: '#60a5fa' }
+  };
+  const ZONES = [
+    { id: 'cluster', label: 'KUBERNETES CLUSTER', x0: 0, x1: 30.4, y0: -2.8, y1: 24.6, fill: LD('#edf2ff', '#0d1424'), stroke: C.P, dash: [7, 5], lw: 1.4, plate: 6, lc: C.P, lab: { ax: 'x', x: 15.6, y: -2.55, base: 'top', align: 'left' } },
+    { id: 'clients', label: 'EXTERNAL CLIENTS', x0: -11.0, x1: -6.1, y0: -1.1, y1: 9.9, fill: LD('rgba(255,255,255,0.55)', 'rgba(15,23,42,0.55)'), stroke: C.g4, dash: [5, 4], lw: 1.1, lc: C.g6, lab: { ax: 'x', x: -10.5, y: 9.6, base: 'bottom', align: 'left' } },
+    { id: 'entry', label: 'ENTRY · SECURITY', x0: 1.0, x1: 8.0, y0: -1.9, y1: 12.8, fill: LD('#e7edff', '#101a30'), stroke: C.b4, dash: [5, 4], lw: 1.1, lc: LD(C.b9, C.b3), small: true, lab: { ax: 'y', x: 1.26, y: 10.9, base: 'top' } },
+    { id: 'native', label: 'LAMASSU NATIVE SERVICES', x0: 8.5, x1: 29.6, y0: -1.3, y1: 12.2, fill: LD('#e3ebff', '#0f1b34'), stroke: C.P, dash: [5, 4], lw: 1.2, lc: C.P, tag: true },
+    { id: 'crypto', label: 'KMS BOUNDARY', x0: 23.7, x1: 29.2, y0: -0.9, y1: 3.45, fill: LD('rgba(245,158,11,0.045)', 'rgba(245,158,11,0.09)'), stroke: C.a5, dash: [3, 3], lw: 1.1, lc: LD('#b45309', '#fbbf24'), small: true, dynamic: true, lab: { ax: 'x', x: 26.0, y: 3.15, base: 'bottom', align: 'left' } },
+    { id: 'platform', label: 'PLATFORM INFRASTRUCTURE', x0: 1.0, x1: 29.6, y0: 13.1, y1: 24.0, fill: LD('#eef1f7', '#121722'), stroke: C.g4, dash: [5, 4], lw: 1.1, lc: C.g6, lab: { ax: 'x', x: 15.0, y: 23.74, base: 'bottom' } },
+    { id: 'persist', label: 'PERSISTENCE · DATABASE / SCHEMA PER SERVICE', x0: 1.6, x1: 29.0, y0: 20.0, y1: 23.2, fill: LD('#e9edf4', '#10141c'), stroke: C.g3, dash: [3, 3], lw: 1, lc: C.g5, small: true, lab: { ax: 'x', x: 4.6, y: 22.92, base: 'bottom', align: 'left' } },
+    { id: 'external', label: 'EXTERNAL INTEGRATIONS', x0: 31.9, x1: 37.6, y0: -4.4, y1: 16.0, fill: LD('rgba(255,255,255,0.55)', 'rgba(15,23,42,0.55)'), stroke: C.g4, dash: [5, 4], lw: 1.1, lc: C.g6, lab: { ax: 'x', x: 32.4, y: 15.72, base: 'bottom', align: 'left' } }
+  ];
+  const ZI = {}; for (const z of ZONES) ZI[z.id] = z;
+  const SLAB = { x0: 8.9, x1: 29.2, y0: -0.9, y1: 11.8, h: 26 };
+
+  const N = {}, LIST = [];
+  const node = (id, o) => { const n = Object.assign({ id, lab: 'top', cat: CATS[id] }, o); N[id] = n; LIST.push(n); };
+  node('device', { name: 'Device', kind: 'device', x: -8.6, y: 0.8, pad: 0.6 });
+  node('admin', { name: 'Admin Console', kind: 'console', x: -8.6, y: 4.4, pad: 0.6 });
+  node('api', { name: 'External API', kind: 'api', x: -8.6, y: 8.0, pad: 0.6 });
+  node('lb', { name: 'Load Balancer', kind: 'lb', x: 0.0, y: 4.4, pad: 0.5, lab: 'left', small: true });
+  node('envoy', { name: 'Envoy Gateway', sub: 'TLS termination', kind: 'gateway', x: 4.4, y: 4.4, pad: 1.35 });
+  node('authz', { name: 'authz', sub: '/v1/ext_authz/check', kind: 'authz', x: 4.4, y: -0.4, pad: 0.95 });
+  node('certmgr', { name: 'cert-manager', kind: 'certmgr', x: 3.0, y: 9.0, pad: 0.85, small: true });
+  node('ui', { name: 'UI / Console API', kind: 'service', x: 9.8, y: 2.0, pad: 0.95 });
+  node('dms', { name: 'DMS Manager', kind: 'service', x: 13.4, y: 2.0, pad: 0.95 });
+  node('ca', { name: 'CA', kind: 'service', x: 19.4, y: 2.0, pad: 0.95 });
+  node('kms', { name: 'KMS', kind: 'kms', x: 25.0, y: 2.0, pad: 0.95 });
+  node('swe', { name: 'Software Engine', kind: 'engine', x: 27.8, y: 0.15, pad: 0.5, small: true });
+  node('job', { name: 'Job Manager', sub: 'perimeter HTTP integration', kind: 'service', x: 10.4, y: 10.6, pad: 0.95 });
+  node('devmgr', { name: 'Device Manager', kind: 'service', x: 14.6, y: 10.6, pad: 0.95 });
+  node('va', { name: 'Validation Authority', sub: 'OCSP / CRL', kind: 'service', x: 19.0, y: 10.6, pad: 0.95 });
+  node('awsiot', { name: 'AWS IoT Connector', kind: 'service', x: 23.8, y: 10.6, pad: 0.95 });
+  node('alerts', { name: 'Alerts', kind: 'service', x: 27.8, y: 10.6, pad: 0.95 });
+  node('keycloak', { name: 'OIDC / Keycloak', kind: 'keycloak', x: 4.4, y: 15.8, pad: 0.85 });
+  node('storage', { name: 'Persistent Storage', kind: 'storage', x: 9.4, y: 17.4, pad: 0.75 });
+  node('rabbit', { name: 'RabbitMQ', sub: 'AMQP / CloudEvents', kind: 'rabbit', x: 17.0, y: 17.4, padW: 2.3, padD: 1.2 });
+  for (const [id, name, sub, x] of [['db_authz', 'authz', 'grants / policies', 3.4], ['db_dms', 'dms', null, 11.8], ['db_devmgr', 'devices', null, 14.2],
+    ['db_ca', 'ca', null, 20.7], ['db_va', 'va', 'VA configuration', 23.3], ['db_kms', 'kms', null, 26.1], ['db_alerts', 'alerts', null, 28.0]])
+    node(id, { name, sub, kind: 'db', x, y: 21.5, pad: 0.55, small: true, mono: true, owner: OWNER[id] });
+  node('hsm', { name: 'PKCS#11 / HSM', kind: 'hsm', x: 33.4, y: -3.0, pad: 0.65, lab: 'right', small: true });
+  node('awskms', { name: 'AWS KMS', kind: 'cloudkms', x: 33.4, y: -1.0, pad: 0.65, lab: 'right', small: true });
+  node('azkv', { name: 'Azure Key Vault', kind: 'cloudkms', x: 33.4, y: 1.0, pad: 0.65, lab: 'right', small: true });
+  node('gcpkms', { name: 'GCP Cloud KMS', kind: 'cloudkms', x: 33.4, y: 3.0, pad: 0.65, lab: 'right', small: true });
+  node('iotcore', { name: 'AWS IoT Core', kind: 'iotcore', x: 34.2, y: 5.3, pad: 1.2, lab: 'right' });
+  node('smtp', { name: 'SMTP', kind: 'chan', glyph: 'mail', x: 33.4, y: 10.0, pad: 0.65, lab: 'right', small: true });
+  node('teams', { name: 'Microsoft Teams', kind: 'chan', glyph: 'chat', x: 33.4, y: 12.2, pad: 0.65, lab: 'right', small: true });
+  node('webhook', { name: 'Webhook', kind: 'chan', glyph: 'hook', x: 33.4, y: 14.4, pad: 0.65, lab: 'right', small: true });
+  // platform box (medium level)
+  node('lamassu', { name: 'Lamassu PKI Platform', kind: 'slab', x: (SLAB.x0 + SLAB.x1) / 2, y: (SLAB.y0 + SLAB.y1) / 2, box: true });
+
+  // edge geometry (world coordinates)
+  const TR = 4.4, AT = 5.3, BUS = 14.8, STEM = 17.0, RAB_Y0 = 16.2, B0 = 9.65, B1 = 11.55, MX = -5.2, PB = 31.2;
+  const toRab = x => [[x, BUS], [STEM, BUS], [STEM, RAB_Y0]];
+  const GEO = {
+    in_admin: [[[-8.0, TR], [3.05, TR]], { seg: 0, at: 0.8 }],
+    in_device: [[[-8.0, 0.8], [MX, 0.8], [MX, TR], [3.05, TR]], false],
+    in_api: [[[-8.0, 8.0], [MX, 8.0], [MX, TR], [3.05, TR]], false],
+    ext_authz: [[[4.4, 3.05], [4.4, 0.55]], { seg: 0, at: 0.62 }],
+    cm_tls: [[[3.4, 8.15], [3.4, 5.75]], { seg: 0, at: 0.55 }],
+    jwks_gw: [[[5.2, 14.95], [5.2, 5.75]], { seg: 0, at: 0.3 }],
+    jwks_authz: [[[5.25, 15.8], [7.2, 15.8], [7.2, -0.4], [5.35, -0.4]], { seg: 1, at: 0.3 }],
+    gw_ui: [[[5.75, TR], [9.8, TR], [9.8, 2.95]], { seg: 1, at: 0.6 }],
+    gw_job: [[[5.75, TR], [10.8, TR], [10.8, B0]], { seg: 1, at: 0.72 }],
+    gw_dms: [[[5.75, TR], [12.95, TR], [12.95, 2.95]], { seg: 1, at: 0.6 }],
+    gw_va: [[[5.75, TR], [18.7, TR], [18.7, B0]], { seg: 1, at: 0.8 }],
+    dms_ca: [[[14.35, 2.45], [18.45, 2.45]], { seg: 0, at: 0.5 }],
+    ca_kms: [[[20.35, 2.45], [24.05, 2.45]], { seg: 0, at: 0.5 }],
+    va_ca: [[[19.4, B0], [19.4, 2.95]], { seg: 0, at: 0.2 }],
+    aws_dms: [[[24.2, B0], [24.2, AT], [13.8, AT], [13.8, 2.95]], { seg: 2, at: 0.5 }],
+    aws_dev: [[[24.2, B0], [24.2, AT], [15.2, AT], [15.2, B0]], { seg: 2, at: 0.6 }],
+    kms_swe: [[[25.95, 1.6], [27.8, 1.6], [27.8, 0.65]], false],
+    kms_hsm: [[[25.95, 1.6], [PB, 1.6], [PB, -3.0], [32.75, -3.0]], false],
+    kms_aws: [[[25.95, 1.6], [PB, 1.6], [PB, -1.0], [32.75, -1.0]], false],
+    kms_az: [[[25.95, 1.6], [PB, 1.6], [PB, 1.0], [32.75, 1.0]], false],
+    kms_gcp: [[[25.95, 1.6], [PB, 1.6], [PB, 3.0], [32.75, 3.0]], { seg: 0, at: 0.6 }],
+    aws_core: [[[24.2, B0], [24.2, AT], [33.0, AT]], { seg: 1, at: 0.83 }],
+    al_smtp: [[[28.75, 10.6], [PB, 10.6], [PB, 10.0], [32.75, 10.0]], { seg: 0, at: 0.6 }],
+    al_teams: [[[28.75, 10.6], [PB, 10.6], [PB, 12.2], [32.75, 12.2]], false],
+    al_hook: [[[28.75, 10.6], [PB, 10.6], [PB, 14.4], [32.75, 14.4]], false],
+    ev_dms: [[[12.6, 2.95], ...toRab(12.6)], { seg: 0, at: 0.92 }, 1],
+    ev_devmgr: [[[14.6, B1], ...toRab(14.6)], false, 1],
+    ev_va: [[[19.0, B1], ...toRab(19.0)], false, 1],
+    ev_ca: [[[20.1, 2.95], ...toRab(20.1)], { seg: 0, at: 0.94 }, 1],
+    ev_aws: [[[23.4, B1], ...toRab(23.4)], { seg: 0, at: 0.4, rev: true }, 1],
+    ev_kms: [[[25.6, 2.95], ...toRab(25.6)], { seg: 0, at: 0.96 }, 1],
+    ev_alerts: [[[27.4, B1], ...toRab(27.4)], { seg: 0, at: 0.4, rev: true }, 1],
+    st_rabbit: [[[10.15, 17.4], [14.7, 17.4]], false],
+    st_pg: [[[9.4, 18.15], [9.4, 20.0]], false],
+    db_authz_l: [[[3.45, -0.4], [1.6, -0.4], [1.6, 21.5], [2.85, 21.5]], false],
+    db_dms_l: [[[12.45, 1.5], [11.8, 1.5], [11.8, 20.95]], false],
+    db_devmgr_l: [[[14.2, B1], [14.2, 20.95]], false],
+    db_ca_l: [[[20.35, 1.4], [20.7, 1.4], [20.7, 20.95]], false],
+    db_va_l: [[[19.6, B1], [19.6, 20.3], [23.3, 20.3], [23.3, 20.95]], false],
+    db_kms_l: [[[25.95, 2.7], [26.1, 2.7], [26.1, 20.95]], false],
+    db_alerts_l: [[[28.0, B1], [28.0, 20.95]], false],
+    // medium
+    gw_lp: [[[5.75, TR], [SLAB.x0, TR]], { seg: 0, at: 0.62 }],
+    lp_ev: [[[STEM, SLAB.y1], [STEM, RAB_Y0]], { seg: 0, at: 0.45, both: true }],
+    lp_hsm: [[[SLAB.x1, 1.6], [PB, 1.6], [PB, -3.0], [32.75, -3.0]], false],
+    lp_aws: [[[SLAB.x1, 1.6], [PB, 1.6], [PB, -1.0], [32.75, -1.0]], false],
+    lp_az: [[[SLAB.x1, 1.6], [PB, 1.6], [PB, 1.0], [32.75, 1.0]], false],
+    lp_gcp: [[[SLAB.x1, 1.6], [PB, 1.6], [PB, 3.0], [32.75, 3.0]], { seg: 0, at: 0.5 }],
+    lp_core: [[[SLAB.x1, AT], [33.0, AT]], { seg: 0, at: 0.7 }],
+    lp_smtp: [[[SLAB.x1, 10.6], [PB, 10.6], [PB, 10.0], [32.75, 10.0]], { seg: 0, at: 0.5 }],
+    lp_teams: [[[SLAB.x1, 10.6], [PB, 10.6], [PB, 12.2], [32.75, 12.2]], false],
+    lp_hook: [[[SLAB.x1, 10.6], [PB, 10.6], [PB, 14.4], [32.75, 14.4]], false],
+    db_dms_m: [[[11.8, SLAB.y1], [11.8, 20.95]], false],
+    db_devmgr_m: [[[14.2, SLAB.y1], [14.2, 20.95]], false],
+    db_ca_m: [[[20.7, SLAB.y1], [20.7, 20.95]], false],
+    db_va_m: [[[23.3, SLAB.y1], [23.3, 20.95]], false],
+    db_kms_m: [[[26.1, SLAB.y1], [26.1, 20.95]], false],
+    db_alerts_m: [[[28.0, SLAB.y1], [28.0, 20.95]], false]
+  };
+  const E = {}, ELIST = [];
+  for (const id in GEO) {
+    const [pts, arrow, draw] = GEO[id], m = META[id];
+    E[id] = { id, type: m.type, hidden: m.hidden, cls: m.cls, pts, arrow, draw };
+    ELIST.push(E[id]);
+  }
+  ELIST.sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type]);
+
+  const ANN = [
+    { t: 'HTTPS / EST / REST', x: -2.95, y: TR - 0.22, ax: 'x', base: 'bottom', e: ['in_admin', 'in_device', 'in_api'], fam: MONO, size: 8.6, lvl: 'both' },
+    { t: 'ext_authz', x: 4.62, y: 1.8, ax: 'y', base: 'top', e: ['ext_authz'], col: C.v6, fam: MONO, size: 8.6, lvl: 'both' },
+    { t: 'TLS cert', x: 3.18, y: 6.95, ax: 'y', base: 'bottom', e: ['cm_tls'], col: C.g5, lvl: 'both' },
+    { t: 'JWKS / JWT validation', x: 7.42, y: 13.5, ax: 'y', base: 'top', e: ['jwks_gw', 'jwks_authz'], col: C.v6, lvl: 'both' },
+    { t: 'HTTPRoute', x: 7.9, y: TR - 0.22, ax: 'x', base: 'bottom', e: ['gw_ui', 'gw_job', 'gw_dms', 'gw_va', 'gw_lp'], fam: MONO, size: 8.6, lvl: 'both' },
+    { t: 'certificate issuance', x: 16.4, y: 3.2, ax: 'x', base: 'top', e: ['dms_ca'], lvl: 'low' },
+    { t: 'sign / key operations', x: 22.2, y: 3.2, ax: 'x', base: 'top', e: ['ca_kms'], lvl: 'low' },
+    { t: 'certificate status', x: 19.62, y: 7.5, ax: 'y', base: 'top', e: ['va_ca'], lvl: 'low' },
+    { t: 'key operation', x: 29.55, y: 1.38, ax: 'x', base: 'bottom', e: ['kms_hsm', 'kms_aws', 'kms_az', 'kms_gcp'], col: '#b45309', lvl: 'low' },
+    { t: 'via KMS', x: 30.2, y: 1.38, ax: 'x', base: 'bottom', e: ['lp_hsm', 'lp_aws', 'lp_az', 'lp_gcp'], col: '#b45309', lvl: 'med' },
+    { t: 'KEY PROVIDERS', x: 30.98, y: -2.3, ax: 'y', base: 'bottom', e: ['kms_hsm', 'kms_aws', 'kms_az', 'kms_gcp', 'lp_hsm', 'lp_aws', 'lp_az', 'lp_gcp'], col: C.g5, fam: MONO, size: 8, w: 700, ls: 1, lvl: 'both' },
+    { t: 'CA / Thing / certificate', x: 27.95, y: AT + 0.24, ax: 'x', base: 'top', e: ['aws_core'], lvl: 'low' },
+    { t: 'synchronization', x: 27.95, y: AT + 0.64, ax: 'x', base: 'top', e: ['aws_core'], lvl: 'low' },
+    { t: 'event-driven', x: 30.1, y: 10.38, ax: 'x', base: 'bottom', e: ['al_smtp', 'al_teams', 'al_hook', 'lp_smtp', 'lp_teams', 'lp_hook'], lvl: 'both' },
+    { t: 'NOTIFICATION CHANNELS', x: 30.98, y: 12.9, ax: 'y', base: 'bottom', e: ['al_smtp', 'al_teams', 'al_hook', 'lp_smtp', 'lp_teams', 'lp_hook'], col: C.g5, fam: MONO, size: 7.6, w: 700, ls: 0.6, lvl: 'both' },
+    { t: 'AMQP / CloudEvents', x: 22.3, y: BUS + 0.34, ax: 'x', base: 'top', e: ['bus'], col: C.c6, fam: MONO, size: 8.8, w: 600, lvl: 'low' },
+    { t: 'AMQP / CloudEvents · pub / sub', x: 17.25, y: 14.0, ax: 'y', base: 'top', e: ['lp_ev'], col: C.c6, fam: MONO, size: 8.4, w: 600, lvl: 'med' },
+    { t: 'ca.#  ·  certificate.#', x: 17.0, y: 19.15, ax: 'x', base: 'middle', e: ['bus', 'lp_ev'], col: C.c6, fam: MONO, size: 8.4, lvl: 'both' },
+    { t: 'device / metadata events', x: 17.0, y: 19.6, ax: 'x', base: 'middle', e: ['bus', 'lp_ev'], col: C.c6, fam: MONO, size: 8.4, lvl: 'both' },
+    { t: 'PVC', x: 12.4, y: 17.18, ax: 'x', base: 'bottom', e: ['st_rabbit'], col: C.g5, fam: MONO, size: 8.4, lvl: 'both' }
+  ];
+
+  // ---- primitives bound to this projection
+  function shadow(x, y, w, d) { poly(rect4(x - w / 2 + 0.16, y - d / 2 + 0.3, x + w / 2 + 0.16, y + d / 2 + 0.3), `${C.shadow}0.085)`); }
+  function box(x, y, w, d, z0, h, c, hl = 0) {
+    const x0 = x - w / 2, x1 = x + w / 2, y0 = y - d / 2, y1 = y + d / 2, z1 = z0 + h;
+    poly([P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)], mix(c.l, '#ffffff', hl * 0.16));
+    poly([P(x1, y1, z0), P(x1, y0, z0), P(x1, y0, z1), P(x1, y1, z1)], mix(c.r, '#ffffff', hl * 0.13));
+    poly(rect4(x0, y0, x1, y1, z1), mix(c.t, '#ffffff', hl * 0.2), c.e, 1);
+    seg(P(x1, y1, z0), P(x1, y1, z1), 'rgba(255,255,255,0.2)', 1);
+    return { x0, x1, y0, y1, z0, z1 };
+  }
+  const FY = (b, u, v) => P(b.x0 + (b.x1 - b.x0) * u, b.y1, b.z0 + (b.z1 - b.z0) * v);
+  const FX = (b, u, v) => P(b.x1, b.y1 - (b.y1 - b.y0) * u, b.z0 + (b.z1 - b.z0) * v);
+  function plane(x, y, z, fn) { const o = P(x, y, z); g.save(); g.translate(o[0], o[1]); g.transform(K, K * 0.5, -K, K * 0.5, 0, 0); fn(); g.restore(); }
+  function cyl(x, y, r, z0, h, c, hl = 0) {
+    const b = P(x, y, z0), t = P(x, y, z0 + h), rx = r * K * 1.4142, ry = rx * 0.5;
+    g.beginPath(); g.moveTo(b[0] - rx, t[1]); g.lineTo(b[0] - rx, b[1]); g.ellipse(b[0], b[1], rx, ry, 0, Math.PI, 0, true); g.lineTo(b[0] + rx, t[1]); g.closePath();
+    g.fillStyle = mix(c.l, '#ffffff', hl * 0.16); g.fill();
+    g.save(); g.clip(); g.fillStyle = mix(c.r, '#ffffff', hl * 0.13); g.fillRect(b[0] + rx * 0.08, t[1] - ry, rx, (b[1] - t[1]) + ry * 2.2); g.restore();
+    for (const f of [0.38, 0.68]) { const m = P(x, y, z0 + h * f); g.beginPath(); g.ellipse(m[0], m[1], rx, ry, 0, Math.PI, 0, true); g.strokeStyle = 'rgba(255,255,255,0.28)'; g.lineWidth = 1; g.stroke(); }
+    g.beginPath(); g.ellipse(t[0], t[1], rx, ry, 0, 0, Math.PI * 2); g.fillStyle = mix(c.t, '#ffffff', hl * 0.2); g.fill(); g.strokeStyle = c.e; g.lineWidth = 1; g.stroke();
+    return t;
+  }
+  function gtext(t, x, y, axis, o = {}) {
+    const p = P(x, y, o.z || 0);
+    g.save(); g.translate(p[0], p[1]);
+    if (axis === 'x') g.transform(0.8944, 0.4472, -0.8944, 0.4472, 0, 0); else g.transform(0.8944, -0.4472, 0.8944, 0.4472, 0, 0);
+    font(o.size || 9.5, o.w || 500, o.fam || SANS); ls(o.ls || 0);
+    g.textAlign = o.align || 'center'; g.textBaseline = o.base || 'middle'; g.fillStyle = o.col || C.b9; g.fillText(t, 0, 0); ls(0);
+    g.restore();
+  }
+
+  // ---- object renderers (s: t, hl, lift, pulse, act, a = mini factor, base = slab z)
+  function vents(b, led, t, phase) {
+    seg(FY(b, 0.14, 0.36), FY(b, 0.56, 0.36), 'rgba(147,197,253,0.55)', 1);
+    seg(FY(b, 0.14, 0.64), FY(b, 0.56, 0.64), 'rgba(147,197,253,0.4)', 1);
+    seg(FX(b, 0.18, 0.5), FX(b, 0.82, 0.5), 'rgba(96,165,250,0.32)', 1);
+    dot(FY(b, 0.8, 0.5), 1.35, rgba(led, 0.55 + 0.45 * (0.55 + 0.45 * Math.sin(t * 2.1 + phase))));
+  }
+  function stack(n, s, col, led) {
+    const { x, y } = n, a = s.a || 0, base = s.base || 0, ga = g.globalAlpha;
+    if (a < 0.99) {
+      g.globalAlpha = ga * (1 - a);
+      if (base < 0.5) shadow(x, y, 2.05, 2.05);
+      box(x, y, 1.9, 1.9, base, 3, PAL.pad, s.hl);
+      g.globalAlpha = ga;
+    }
+    const bw = lerp(1.46, 1.02, a), u = lerp(11, 4.2, a), z1 = base + lerp(4, 0, a) + s.lift, gap = lerp(1.5, 0.8, a);
+    const b1 = box(x, y, bw, bw, z1, u, col, s.hl);
+    if (a < 0.5) vents(b1, led, s.t, n.x);
+    const b2 = box(x, y, bw, bw, z1 + u + gap, u, col, s.hl);
+    if (a < 0.5) vents(b2, led, s.t, n.x + 1.7);
+    return z1 + 2 * u + gap;
+  }
+  const R = {
+    service(n, s) {
+      const top = stack(n, s, PAL.svc, C.ok);
+      const r = lerp(0.34, 0.22, s.a || 0);
+      poly(rect4(n.x - r, n.y - r, n.x + r, n.y + r, top), null, 'rgba(219,234,254,0.6)', 1);
+      return top;
+    },
+    kms(n, s) {
+      const top = stack(n, s, PAL.svc, C.a4), k = lerp(1, 0.7, s.a || 0);
+      plane(n.x, n.y, top, () => {
+        g.scale(k, k);
+        g.lineWidth = 0.075; g.strokeStyle = '#b45309'; g.fillStyle = C.a4;
+        g.beginPath(); g.arc(-0.26, 0.02, 0.19, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.beginPath(); g.arc(-0.26, 0.02, 0.07, 0, Math.PI * 2); g.fillStyle = C.b9; g.fill();
+        g.beginPath(); g.moveTo(-0.07, 0.02); g.lineTo(0.45, 0.02); g.moveTo(0.3, 0.02); g.lineTo(0.3, 0.17); g.moveTo(0.41, 0.02); g.lineTo(0.41, 0.13);
+        g.strokeStyle = C.a4; g.lineWidth = 0.09; g.stroke();
+      });
+      return top;
+    },
+    authz(n, s) {
+      const top = stack(n, s, PAL.auth, C.ok);
+      plane(n.x, n.y, top, () => { g.strokeStyle = '#ede9fe'; g.lineWidth = 0.08; g.beginPath(); g.moveTo(-0.26, -0.02); g.lineTo(-0.06, 0.2); g.lineTo(0.3, -0.24); g.stroke(); });
+      return top;
+    },
+    gateway(n, s) {
+      const { x, y } = n;
+      shadow(x, y, 2.9, 2.9); box(x, y, 2.7, 2.7, 0, 3, PAL.pad, s.hl);
+      const b = box(x, y, 2.3, 2.3, 4 + s.lift, 13, PAL.gw, s.hl);
+      for (let i = 0; i < 6; i++) { const on = (Math.floor(s.t * 3 + i * 1.7) % 5) !== 0; dot(FY(b, 0.12 + i * 0.12, 0.45), 1.3, i === 0 ? C.ok : (on ? C.b4 : C.b9)); }
+      seg(FX(b, 0.12, 0.45), FX(b, 0.88, 0.45), 'rgba(96,165,250,0.35)', 1);
+      box(x, y, 1.5, 1.5, 17 + s.lift, 6, PAL.gwTop, s.hl);
+      const top = 23 + s.lift;
+      plane(x, y, top, () => {
+        g.strokeStyle = '#ffffff'; g.lineWidth = 0.075; g.lineCap = 'round';
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          g.beginPath(); g.moveTo(dx * 0.1, dy * 0.1); g.lineTo(dx * 0.5, dy * 0.5);
+          g.moveTo(dx * 0.5 - dy * 0.12 - dx * 0.12, dy * 0.5 + dx * 0.12 - dy * 0.12); g.lineTo(dx * 0.5, dy * 0.5);
+          g.lineTo(dx * 0.5 + dy * 0.12 - dx * 0.12, dy * 0.5 - dx * 0.12 - dy * 0.12); g.stroke();
+        }
+      });
+      return top;
+    },
+    infra(n, s, glyph) {
+      const { x, y } = n;
+      shadow(x, y, 1.8, 1.8); box(x, y, 1.7, 1.7, 0, 3, PAL.infPad, s.hl);
+      const b = box(x, y, 1.3, 1.3, 4 + s.lift, 14, PAL.inf, s.hl);
+      seg(FY(b, 0.15, 0.4), FY(b, 0.6, 0.4), 'rgba(255,255,255,0.45)', 1); dot(FY(b, 0.8, 0.4), 1.3, C.ok);
+      const top = 18 + s.lift; plane(x, y, top, glyph); return top;
+    },
+    keycloak(n, s) { return R.infra(n, s, () => { g.strokeStyle = C.v6; g.lineWidth = 0.08; g.beginPath(); g.arc(0, 0, 0.3, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(0, 0, 0.1, 0, Math.PI * 2); g.fillStyle = C.v5; g.fill(); }); },
+    certmgr(n, s) {
+      return R.infra(n, s, () => {
+        g.fillStyle = '#ffffff'; g.strokeStyle = C.b6; g.lineWidth = 0.05;
+        g.beginPath(); g.rect(-0.3, -0.22, 0.6, 0.44); g.fill(); g.stroke();
+        g.beginPath(); g.moveTo(-0.2, -0.08); g.lineTo(0.08, -0.08); g.moveTo(-0.2, 0.04); g.lineTo(0.0, 0.04); g.stroke();
+        g.beginPath(); g.arc(0.17, 0.1, 0.08, 0, Math.PI * 2); g.fillStyle = C.b5; g.fill();
+      });
+    },
+    lb(n, s) {
+      const { x, y } = n; shadow(x, y, 1.1, 2.1); box(x, y, 0.95, 2.0, 0, 7, PAL.inf, s.hl);
+      plane(x, y, 7, () => { g.strokeStyle = '#ffffff'; g.lineWidth = 0.08; for (const oy of [-0.45, 0.45]) { g.beginPath(); g.moveTo(-0.2, oy - 0.2); g.lineTo(0.1, oy); g.lineTo(-0.2, oy + 0.2); g.stroke(); } });
+      return 7;
+    },
+    storage(n, s) { const { x, y } = n; shadow(x, y, 1.6, 1.6); for (let i = 0; i < 3; i++) cyl(x, y, 0.68, i * 6.2 + (i ? s.lift : 0), 5, PAL.inf, s.hl); return 17.4 + s.lift; },
+    db(n, s) {
+      const { x, y } = n;
+      g.beginPath(); const c = P(x + 0.12, y + 0.22); g.ellipse(c[0], c[1], 0.62 * K * 1.414, 0.31 * K * 1.414, 0, 0, Math.PI * 2); g.fillStyle = `${C.shadow}0.08)`; g.fill();
+      const t = cyl(x, y, 0.52, 0, 15 + s.lift, PAL.db, s.hl);
+      g.beginPath(); g.ellipse(t[0], t[1], 0.28 * K * 1.414, 0.14 * K * 1.414, 0, 0, Math.PI * 2); g.strokeStyle = s.act > 0 ? C.b4 : rgba(C.b5, 0.55); g.lineWidth = 1; g.stroke();
+      return 15 + s.lift;
+    },
+    rabbit(n, s) {
+      const { x, y } = n;
+      shadow(x, y, 4.8, 2.6); box(x, y, 4.6, 2.4, 0, 3, PAL.pad, s.hl);
+      const b = box(x, y, 4.1, 1.9, 4 + s.lift, 16, PAL.rab, s.hl);
+      seg(FY(b, 0.03, 0.3), FY(b, 0.97, 0.3), rgba(C.c4, 0.75 + 0.25 * s.pulse), 1.4);
+      seg(FX(b, 0.06, 0.3), FX(b, 0.94, 0.3), rgba(C.c4, 0.5 + 0.3 * s.pulse), 1.2);
+      for (let i = 0; i < 7; i++) dot(FY(b, 0.1 + i * 0.05, 0.62), 1.1, i < 2 ? C.ok : rgba(C.b4, 0.7));
+      const top = 20 + s.lift;
+      for (let j = 0; j < 3; j++) {
+        const yy = y - 0.55 + j * 0.55;
+        poly(rect4(x - 1.7, yy - 0.13, x + 1.7, yy + 0.13, top), mix('#0e7490', C.c4, 0.25 + 0.6 * s.pulse));
+        for (let k = 0; k < 3; k++) { const u = ((s.t * 0.12 + k / 3 + j * 0.21) % 1), xx = x - 1.6 + u * 3.2; poly(rect4(xx - 0.12, yy - 0.08, xx + 0.12, yy + 0.08, top), rgba('#ecfeff', 0.35 + 0.5 * s.pulse)); }
+      }
+      return top;
+    },
+    engine(n, s) {
+      const { x, y } = n, a = s.a || 0, base = s.base || 0, w = lerp(0.95, 0.8, a), h = lerp(5, 3.5, a);
+      if (base < 0.5) shadow(x, y, 1.1, 1.1);
+      const b = box(x, y, w, w, base, h + s.lift, PAL.chip, s.hl);
+      if (a < 0.5) for (let i = 0; i < 4; i++) seg(FY(b, 0.15 + i * 0.22, 0), FY(b, 0.15 + i * 0.22, 0.55), 'rgba(29,78,216,0.5)', 1);
+      plane(x, y, base + h + s.lift, () => { g.fillStyle = C.a5; g.fillRect(-0.16, -0.16, 0.32, 0.32); });
+      return base + h + s.lift;
+    },
+    hsm(n, s) {
+      const { x, y } = n; shadow(x, y, 1.4, 1.4);
+      const b = box(x, y, 1.25, 1.25, 0, 13 + s.lift, PAL.dark, s.hl);
+      seg(FY(b, 0.15, 0.62), FY(b, 0.7, 0.62), C.a5, 1.6); seg(FY(b, 0.15, 0.32), FY(b, 0.7, 0.32), 'rgba(96,165,250,0.45)', 1); dot(FY(b, 0.85, 0.62), 1.4, C.a4);
+      return 13 + s.lift;
+    },
+    cloudkms(n, s) {
+      const { x, y } = n; shadow(x, y, 1.4, 1.4);
+      const b = box(x, y, 1.25, 1.25, 0, 7 + s.lift, PAL.ext, s.hl);
+      seg(FY(b, 0.15, 0.5), FY(b, 0.65, 0.5), 'rgba(37,99,235,0.45)', 1);
+      plane(x, y, 7 + s.lift, () => { g.fillStyle = C.a5; g.beginPath(); g.arc(0, -0.08, 0.13, 0, Math.PI * 2); g.fill(); g.beginPath(); g.moveTo(-0.07, -0.02); g.lineTo(0.07, -0.02); g.lineTo(0.12, 0.26); g.lineTo(-0.12, 0.26); g.closePath(); g.fill(); });
+      return 7 + s.lift;
+    },
+    iotcore(n, s) {
+      const { x, y } = n; shadow(x, y, 2.5, 2.5); box(x, y, 2.4, 2.4, 0, 5, PAL.ext, s.hl);
+      const c = P(x, y, 18 + s.lift);
+      g.beginPath(); g.arc(c[0] - 10, c[1] + 2, 7, Math.PI * 0.5, Math.PI * 1.5); g.arc(c[0] - 2, c[1] - 5, 9, Math.PI * 1.05, Math.PI * 1.85); g.arc(c[0] + 9, c[1], 7, Math.PI * 1.35, Math.PI * 0.5); g.closePath();
+      g.fillStyle = mix('#ffffff', C.b1, s.hl * 0.6); g.fill(); g.strokeStyle = C.b6; g.lineWidth = 1.3; g.stroke();
+      const hub = [[c[0] - 7, c[1] + 4], [c[0], c[1] - 3], [c[0] + 7, c[1] + 4]];
+      g.beginPath(); g.moveTo(hub[0][0], hub[0][1]); g.lineTo(hub[1][0], hub[1][1]); g.lineTo(hub[2][0], hub[2][1]); g.strokeStyle = C.b5; g.lineWidth = 1; g.stroke();
+      for (const h of hub) dot(h, 2, C.P);
+      seg(P(x, y, 5), P(x, y, 11 + s.lift), C.b3, 1);
+      return 30 + s.lift;
+    },
+    chan(n, s) {
+      const { x, y } = n; shadow(x, y, 1.4, 1.4); box(x, y, 1.25, 1.25, 0, 7 + s.lift, PAL.ext, s.hl);
+      plane(x, y, 7 + s.lift, () => {
+        g.strokeStyle = C.b6; g.lineWidth = 0.06;
+        if (n.glyph === 'mail') { g.beginPath(); g.rect(-0.34, -0.22, 0.68, 0.44); g.stroke(); g.beginPath(); g.moveTo(-0.34, -0.22); g.lineTo(0, 0.05); g.lineTo(0.34, -0.22); g.stroke(); }
+        else if (n.glyph === 'chat') { g.beginPath(); g.rect(-0.32, -0.25, 0.64, 0.36); g.stroke(); g.beginPath(); g.moveTo(-0.14, 0.11); g.lineTo(-0.24, 0.3); g.lineTo(0.02, 0.11); g.stroke(); }
+        else { const p = [[-0.28, 0.18], [0, -0.25], [0.28, 0.18]]; g.beginPath(); g.moveTo(p[0][0], p[0][1]); g.lineTo(p[1][0], p[1][1]); g.lineTo(p[2][0], p[2][1]); g.stroke(); g.fillStyle = C.P; for (const q of p) { g.beginPath(); g.arc(q[0], q[1], 0.08, 0, Math.PI * 2); g.fill(); } }
+      });
+      return 7 + s.lift;
+    },
+    device(n, s) {
+      const { x, y } = n; shadow(x, y, 1.1, 1.1);
+      const b = box(x, y, 1.0, 1.0, 0, 9 + s.lift, PAL.cli, s.hl);
+      dot(FY(b, 0.75, 0.5), 1.3, C.ok); seg(FY(b, 0.15, 0.5), FY(b, 0.5, 0.5), 'rgba(37,99,235,0.5)', 1);
+      const a1 = P(x + 0.25, y - 0.25, 9 + s.lift), a2 = P(x + 0.25, y - 0.25, 21 + s.lift); seg(a1, a2, C.b9, 1.2); dot(a2, 2, C.b5);
+      return 21 + s.lift;
+    },
+    console(n, s) {
+      const { x, y } = n; shadow(x, y, 1.6, 1.0);
+      box(x, y, 1.0, 0.6, 0, 1.6, PAL.cli, s.hl); box(x, y, 0.14, 0.14, 1.6, 5 + s.lift, PAL.gw, s.hl);
+      const m = box(x, y, 1.8, 0.16, 6.6 + s.lift, 13, { t: C.b9, l: C.n3, r: C.navy, e: C.b6 }, s.hl);
+      poly([FY(m, 0.06, 0.1), FY(m, 0.94, 0.1), FY(m, 0.94, 0.9), FY(m, 0.06, 0.9)], mix(C.b1, '#ffffff', s.hl * 0.4));
+      seg(FY(m, 0.14, 0.72), FY(m, 0.5, 0.72), C.b5, 1.6); seg(FY(m, 0.14, 0.5), FY(m, 0.78, 0.5), C.b3, 1.4); seg(FY(m, 0.14, 0.3), FY(m, 0.64, 0.3), C.b3, 1.4);
+      return 19.6 + s.lift;
+    },
+    api(n, s) {
+      const { x, y } = n; shadow(x, y, 1.4, 1.4);
+      for (let i = 0; i < 3; i++) box(x, y, 1.25, 1.25, i * 5 + (i ? s.lift * i / 2 : 0), 3.2, i === 2 ? PAL.gwTop : PAL.cli, s.hl);
+      const top = 13.2 + s.lift;
+      plane(x, y, top, () => { g.strokeStyle = '#ffffff'; g.lineWidth = 0.08; g.lineCap = 'round'; g.beginPath(); g.moveTo(-0.12, -0.3); g.lineTo(-0.34, 0); g.lineTo(-0.12, 0.3); g.moveTo(0.12, -0.3); g.lineTo(0.34, 0); g.lineTo(0.12, 0.3); g.moveTo(0.06, -0.3); g.lineTo(-0.06, 0.3); g.stroke(); });
+      return top;
+    },
+    slab() { return 0; }
+  };
+
+  function plate(n, sx, sy, anchor, focus, mini) {
+    const title = mini ? SHORT3[n.id] : n.name, sub = mini ? null : n.sub;
+    const tSize = mini ? 8.8 : n.small ? 10 : 11, fam = mini || n.mono ? MONO : SANS;
+    font(tSize, 600, fam); const tw = g.measureText(title).width;
+    let sw = 0; if (sub) { font(8.6, 500, MONO); sw = g.measureText(sub).width; }
+    const w = Math.ceil(Math.max(tw + 10, sw) + (mini ? 10 : 13)), h = sub ? (n.small ? 27 : 29) : (mini ? 15 : n.small ? 17 : 18);
+    let x, y;
+    if (anchor === 'right') { x = sx; y = sy - h / 2; } else if (anchor === 'left') { x = sx - w; y = sy - h / 2; } else { x = sx - w / 2; y = sy - h; }
+    x = Math.round(x) + 0.5; y = Math.round(y) + 0.5;
+    rr(x + 1, y + 1.6, w, h, 3); g.fillStyle = `${C.shadow}0.07)`; g.fill();
+    rr(x, y, w, h, 3); g.fillStyle = mini ? rgba(C.w, 0.92) : C.w; g.fill();
+    g.strokeStyle = focus ? C.P : `${C.border}0.22)`; g.lineWidth = focus ? 1.3 : 1; g.stroke();
+    const cy = y + (mini ? 7.8 : n.small ? 9 : 9.5);
+    g.beginPath(); g.arc(x + (mini ? 6.5 : 8), cy, mini ? 1.9 : 2.3, 0, Math.PI * 2); g.fillStyle = CAT[n.cat] || C.P; g.fill();
+    font(tSize, 600, fam); g.fillStyle = C.text; g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillText(title, x + (mini ? 12 : 15), cy + 0.5);
+    if (sub) { font(8.6, 500, MONO); g.fillStyle = C.g6; g.fillText(sub, x + 7, y + h - 8); }
+    return { x, y, w, h };
+  }
+
+  // ---- layout fit
+  function fit() {
+    let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9;
+    for (const z of ZONES) for (const [x, y] of [[z.x0, z.y0], [z.x1, z.y0], [z.x1, z.y1], [z.x0, z.y1]]) { a0 = Math.min(a0, x - y); a1 = Math.max(a1, x - y); b0 = Math.min(b0, x + y); b1 = Math.max(b1, x + y); }
+    const left = 26, right = LW - 26, top = 104, bottom = LH - 22;
+    K = Math.min((right - left) / (a1 - a0), (bottom - top) / ((b1 - b0) / 2));
+    OX = (left + right) / 2 - ((a0 + a1) / 2) * K;
+    OY = top - b0 * K / 2 + ((bottom - top) - (b1 - b0) * K / 2) / 2;
+    for (const e of ELIST) { e.sp = e.pts.map(p => P(p[0], p[1])); prepEdge(e); }
+  }
+
+  // ---- static layers
+  function renderGrid() {
+    g.fillStyle = C.bg; g.fillRect(0, 0, LW, LH);
+    for (let i = -70; i <= 110; i++) {
+      const col = i % 4 === 0 ? 'rgba(29,78,216,0.075)' : 'rgba(29,78,216,0.038)';
+      seg(P(i, -80), P(i, 110), col, 1); seg(P(-80, i), P(110, i), col, 1);
+    }
+    edgeFade();
+  }
+  function zoneStyleDraw(z, pts, alpha, withPlate) {
+    g.globalAlpha = alpha;
+    if (z.plate && withPlate) {
+      const q = [[z.x0, z.y1], [z.x1, z.y1], [z.x1, z.y0]].map(([x, y]) => P(x, y));
+      poly([q[0], q[1], [q[1][0], q[1][1] + z.plate], [q[0][0], q[0][1] + z.plate]], '#c9d6f7');
+      poly([q[1], q[2], [q[2][0], q[2][1] + z.plate], [q[1][0], q[1][1] + z.plate]], '#b3c4ef');
+    }
+    poly(pts, z.fill);
+    g.setLineDash(z.dash); poly(pts, null, z.stroke, z.lw); g.setLineDash([]);
+    g.globalAlpha = 1;
+  }
+  function drawZone(z, alpha = 1) {
+    const pts = rect4(z.x0, z.y0, z.x1, z.y1);
+    zoneStyleDraw(z, pts, alpha, true);
+    g.globalAlpha = alpha;
+    for (const [cx, cy, sx, sy] of [[z.x0, z.y0, 1, 1], [z.x1, z.y0, -1, 1], [z.x1, z.y1, -1, -1], [z.x0, z.y1, 1, -1]]) { path([P(cx + sx * 0.5, cy), P(cx, cy), P(cx, cy + sy * 0.5)]); g.strokeStyle = z.stroke; g.lineWidth = z.lw + 0.6; g.stroke(); }
+    if (!z.tag) { const L = z.lab; gtext(z.label, L.x, L.y, L.ax, { align: L.align || 'center', base: L.base, size: z.small ? 8 : 9.4, w: 700, fam: MONO, col: z.lc, ls: z.small ? 0.8 : 1.4 }); }
+    g.globalAlpha = 1;
+  }
+  function renderZones() { for (const z of ZONES) if (!z.dynamic) drawZone(z); }
+
+  // ---- dynamic pieces
+  function drawBus(alpha, t, act) {
+    if (alpha <= 0.01) return;
+    g.globalAlpha = alpha;
+    const x0 = 12.2, x1 = 27.8, w = 0.17;
+    poly(rect4(x0, BUS - w - 0.12, x1, BUS + w + 0.12), `${C.halo}0.95)`);
+    poly(rect4(x0, BUS - w, x1, BUS + w), mix('#a5e8f5', C.c4, act * 0.6), C.c6, 1);
+    poly(rect4(STEM - w, BUS, STEM + w, RAB_Y0), mix('#a5e8f5', C.c4, act * 0.6), C.c6, 1);
+    g.save(); path([P(x0 + 0.1, BUS), P(x1 - 0.1, BUS)]); g.setLineDash([3, 9]); g.lineDashOffset = -t * 14; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 1.2; g.stroke(); g.restore();
+    g.globalAlpha = 1;
+  }
+  function chevron(px, py, ang, col) { g.save(); g.translate(px, py); g.rotate(ang); g.beginPath(); g.moveTo(4.2, 0); g.lineTo(-3.2, -3.4); g.lineTo(-1.6, 0); g.lineTo(-3.2, 3.4); g.closePath(); g.fillStyle = col; g.fill(); g.restore(); }
+  function drawEdge(e, alpha) {
+    const st = STY[e.type], pts = e.vis;
+    g.globalAlpha = alpha; g.lineJoin = 'round'; g.lineCap = 'butt';
+    path(pts); g.setLineDash([]); g.strokeStyle = `${C.halo}0.95)`; g.lineWidth = st.w + 4.2; g.stroke();
+    path(pts); g.setLineDash(st.dash || []); g.strokeStyle = st.c; g.lineWidth = st.w; g.stroke(); g.setLineDash([]);
+    if (e.arrow) {
+      const i = Math.min(e.arrow.seg, pts.length - 2), a = pts[i], b = pts[i + 1];
+      const put = (u, rev) => { const px = a[0] + (b[0] - a[0]) * u, py = a[1] + (b[1] - a[1]) * u; let ang = Math.atan2(b[1] - a[1], b[0] - a[0]); if (rev) ang += Math.PI; chevron(px, py, ang, st.c); };
+      if (e.arrow.both) { put(0.3, true); put(0.7, false); } else put(e.arrow.at, e.arrow.rev);
+    }
+    g.globalAlpha = 1;
+  }
+  function slabPolys(hgt) {
+    const { x0, x1, y0, y1 } = SLAB;
+    return {
+      top: rect4(x0, y0, x1, y1, hgt),
+      left: [P(x0, y1, 0), P(x1, y1, 0), P(x1, y1, hgt), P(x0, y1, hgt)],
+      right: [P(x1, y1, 0), P(x1, y0, 0), P(x1, y0, hgt), P(x1, y1, hgt)],
+      sil: [P(x0, y0, hgt), P(x1, y0, hgt), P(x1, y0, 0), P(x1, y1, 0), P(x0, y1, 0), P(x0, y1, hgt)]
+    };
+  }
+  function drawSlab(b, fs, hl) {
+    const hgt = SLAB.h * b, p = slabPolys(hgt), pz = fs.pulse.lamassu || 0;
+    g.globalAlpha = b * fs.nA('lamassu');
+    poly(p.sil.map(q => [q[0] + 4, q[1] + 6]), `${C.shadow}0.1)`);
+    poly(p.left, mix(PAL.slab.l, C.b6, hl * 0.25 + pz * 0.2)); poly(p.right, mix(PAL.slab.r, C.b9, hl * 0.25 + pz * 0.2));
+    poly(p.top, mix(PAL.slab.t, C.b5, hl * 0.35 + pz * 0.45), mix(PAL.slab.e, '#ffffff', pz), 1.4);
+    const s1 = P(SLAB.x0, SLAB.y1, hgt * 0.45), s2 = P(SLAB.x1, SLAB.y1, hgt * 0.45), s3 = P(SLAB.x1, SLAB.y0, hgt * 0.45);
+    seg(s1, s2, rgba(C.b4, 0.7), 1.2); seg(s2, s3, rgba(C.b4, 0.55), 1.2);
+    const cx = (SLAB.x0 + SLAB.x1) / 2, cy = (SLAB.y0 + SLAB.y1) / 2;
+    { const o = P(cx, cy, hgt); g.save(); g.translate(o[0], o[1]); g.transform(0.8944, 0.4472, -0.8944, 0.4472, 0, 0); drawLogo(0, 0, 170, '#ffffff'); g.restore(); }
+    g.globalAlpha = 1;
+  }
+  function drawCrypto(fs) {
+    const z = ZI.crypto, a0 = 1 - fs.lv; if (a0 <= 0.01) return;
+    drawZone(z, a0);
+    const t = fs.t, cg = t >= 7 && t < 10 ? smooth((t - 7) / 0.4) * smooth((10 - t) / 0.5) : 0;
+    if (cg > 0) {
+      const br = 0.6 + 0.4 * Math.sin((t - 7) * 5), pts = rect4(z.x0, z.y0, z.x1, z.y1);
+      g.globalAlpha = a0; poly(pts, rgba(C.a4, 0.08 * cg)); g.setLineDash([4, 3]); poly(pts, null, rgba(C.a5, cg * br), 2); g.setLineDash([]); g.globalAlpha = 1;
+    }
+  }
+  function drawTag() {
+    const z = ZI.native, p = P(z.x0, z.y0);
+    font(9, 700, MONO); ls(1.2);
+    const w = g.measureText(z.label).width + 18, x = Math.round(p[0] + 10) + 0.5, y = Math.round(p[1] - 26) + 0.5;
+    rr(x, y, w, 18, 3); g.fillStyle = z.stroke; g.fill();
+    g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(z.label, x + 9, y + 9.5); ls(0);
+    seg([p[0], p[1]], [x, y + 18], z.stroke, 1);
+  }
+
+  // per-node state for drawing
+  function nodeState(n, fs) {
+    const isF = fs.focusId === n.id, pz = fs.pulse[n.id] || 0;
+    const nat = NATIVE.has(n.id), a = nat ? miniF(fs.lv) : 0, base = nat ? SLAB.h * boxF(fs.lv) : 0;
+    return { t: fs.t, hl: Math.max(isF ? 1 : (fs.FN && fs.focusId && fs.FN.has(n.id) ? 0.35 : 0), pz), lift: (isF ? 2 : 0) + pz * 2, pulse: pz, act: pz, a, base, isF };
+  }
+  function drawObject(n, s, alpha) {
+    if (NATIVE.has(n.id)) alpha *= 1 - smooth((s.a || 0) / 0.85);
+    if (alpha <= 0.01) return 0;
+    g.globalAlpha = alpha;
+    if (s.pulse > 0.02 && !n.box) {
+      const r = (n.pad || 1) * (1 - 0.35 * (s.a || 0)) + 0.25 + (1 - s.pulse) * 0.6, rw = n.padW ? n.padW + (1 - s.pulse) * 0.6 : r, rd = n.padD ? n.padD + (1 - s.pulse) * 0.6 : r;
+      const col = n.id === 'rabbit' ? C.c4 : n.cat === 'crypto' ? C.a5 : n.cat === 'auth' ? C.v5 : C.b5;
+      poly(rect4(n.x - rw, n.y - rd, n.x + rw, n.y + rd, s.base || 0), null, rgba(col, s.pulse * 0.8), 1.4);
+    }
+    const top = R[n.kind](n, s);
+    g.globalAlpha = 1;
+    return top;
+  }
+  function drawPlates(n, s, top, alpha) {
+    const hw = n.padW || n.pad || 1;
+    let bb = null;
+    const a = s.a || 0;
+    if (a < 0.55) {
+      g.globalAlpha = alpha * (1 - smooth(a / 0.55));
+      if (n.lab === 'right') { const p = P(n.x, n.y, top * 0.5); bb = plate(n, p[0] + hw * K * 1.2 + 6, p[1], 'right', s.isF); }
+      else if (n.lab === 'left') { const p = P(n.x, n.y, top * 0.5); bb = plate(n, p[0] - hw * K * 1.2 - 6, p[1], 'left', s.isF); }
+      else { const p = P(n.x, n.y, top); bb = plate(n, p[0], p[1] - (n.kind === 'iotcore' ? 4 : 9), 'top', s.isF); }
+    }
+    g.globalAlpha = 1;
+    if (bb) {
+      const c0 = P(n.x - hw, n.y + hw), c1 = P(n.x + hw, n.y - hw), ct = P(n.x - hw, n.y - hw, top), cb = P(n.x + hw, n.y + hw);
+      n.bb = [bb, { x: c0[0], y: ct[1], w: c1[0] - c0[0], h: cb[1] - ct[1] }];
+    }
+  }
+  const present = (n, lv) => n.box ? lv >= 0.5 : NATIVE.has(n.id) ? lv < 0.5 : true;
+
+  // ---- full frame
+  function frame(fs) {
+    const lv = fs.lv, b = boxF(lv);
+    drawCrypto(fs);
+    if (b > 0.01) drawSlab(b, fs, fs.focusId === 'lamassu' ? 1 : 0);
+    drawBus(lowF(lv) * (fs.FE && !fs.FE.has('bus') ? fs.dimE : 1), fs.t, fs.busAct);
+    for (const e of ELIST) { const a = fs.edgeAlpha(e.id); if (a > 0.01) drawEdge(e, a); }
+    drawFlowOverlays(api, fs);
+    for (const an of ANN) { const a = annAlpha(an, fs); if (a <= 0.01) continue; g.globalAlpha = a; gtext(an.t, an.x, an.y, an.ax, { base: an.base, col: an.col || C.b9, fam: an.fam, size: an.size, w: an.w, ls: an.ls }); g.globalAlpha = 1; }
+    const order = LIST.filter(n => !n.box).sort((p, q) => (p.x + p.y) - (q.x + q.y));
+    const plates = [];
+    for (const n of order) { const s = nodeState(n, fs), al = fs.nA(n.id); const top = drawObject(n, s, al); plates.push([n, s, top, al]); }
+    drawPackets(api, fs);
+    for (const [n, s, top, al] of plates) drawPlates(n, s, top, al);
+    const box = N.lamassu;
+    if (b > 0.01) { const p = slabPolys(SLAB.h * b); box.sil = p.sil; }
+    drawTag();
+  }
+  // node drawn at an arbitrary screen offset (for the 2D <-> 3D morph)
+  function drawNodeAt(id, dx, dy, alpha, fs, rise) {
+    const n = N[id]; if (!n || n.box) return;
+    const s = nodeState(n, fs), anc = P(n.x, n.y);
+    g.save(); g.translate(anc[0] + dx, anc[1] + dy); g.scale(1, rise); g.translate(-anc[0], -anc[1]);
+    const top = drawObject(n, s, alpha);
+    g.restore();
+    g.save(); g.translate(dx, dy + (1 - rise) * top * 0.6); drawPlates(n, s, top, alpha); g.restore();
+  }
+  function hit(mx, my, lv) {
+    let best = null;
+    for (const n of LIST) {
+      if (!present(n, lv) || n.box || !n.bb) continue;
+      for (const b of n.bb) if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) if (!best || (n.x + n.y) > (best.x + best.y)) best = n;
+    }
+    if (!best && lv >= 0.5 && N.lamassu.sil && pip([mx, my], N.lamassu.sil)) best = N.lamassu;
+    return best;
+  }
+  const api = {
+    id: '3d', N, E, ZONES, ZI, fit, renderGrid, renderZones, frame, drawNodeAt, hit, drawEdge, drawBus, drawCrypto, drawTag, drawSlab,
+    ELIST, ANN, gtext,
+    sub: 'Isometric view · synchronous HTTP, CloudEvents over AMQP, KMS-mediated key operations',
+    anchor: id => { const n = N[id]; return P(n.x, n.y); },
+    zoneCorners: id => { const z = ZI[id]; return rect4(z.x0, z.y0, z.x1, z.y1); },
+    boxCorners: b => rect4(SLAB.x0, SLAB.y0, SLAB.x1, SLAB.y1, SLAB.h * b),
+    zoneDraw: (id, pts, alpha) => zoneStyleDraw(ZI[id], pts, alpha, false),
+    present, depth: id => N[id].x + N[id].y,
+    tipAnchor: id => { const n = N[id]; return n.bb ? n.bb[0] : null; }
+  };
+  return api;
+}
+
+/* =====================================================================
+   VIEW 2D  (orthogonal)
+   ===================================================================== */
+function makeView2D() {
+  const ZONES = [
+    { id: 'cluster', label: 'KUBERNETES CLUSTER', x0: 232, y0: 122, x1: 1360, y1: 866, fill: LD('#edf2ff', '#0d1424'), stroke: C.P, dash: [7, 5], lw: 1.4, solid: true },
+    { id: 'clients', label: 'EXTERNAL CLIENTS', x0: 22, y0: 168, x1: 178, y1: 498, fill: LD('rgba(255,255,255,0.7)', 'rgba(15,23,42,0.7)'), stroke: C.g4, dash: [5, 4], lw: 1.1, lc: C.g6 },
+    { id: 'entry', label: 'ENTRY · SECURITY', x0: 254, y0: 150, x1: 468, y1: 590, fill: LD('#e7edff', '#101a30'), stroke: C.b4, dash: [5, 4], lw: 1.1, lc: LD(C.b9, C.b3) },
+    { id: 'native', label: 'LAMASSU NATIVE SERVICES', x0: 482, y0: 150, x1: 1344, y1: 590, fill: LD('#e2eaff', '#0f1b34'), stroke: C.P, dash: [5, 4], lw: 1.2, solid: true },
+    { id: 'crypto', label: 'KMS BOUNDARY', x0: 1150, y0: 166, x1: 1336, y1: 300, fill: LD('rgba(245,158,11,0.05)', 'rgba(245,158,11,0.09)'), stroke: C.a5, dash: [3, 3], lw: 1.1, lc: LD('#b45309', '#fbbf24'), small: true, labelRight: true, dynamic: true },
+    { id: 'platform', label: 'PLATFORM INFRASTRUCTURE', x0: 254, y0: 610, x1: 1344, y1: 850, fill: LD('#eef1f7', '#121722'), stroke: C.g4, dash: [5, 4], lw: 1.1, lc: C.g6 },
+    { id: 'persist', label: 'PERSISTENCE · DATABASE / SCHEMA PER SERVICE', x0: 270, y0: 768, x1: 1326, y1: 838, fill: LD('#e7ebf2', '#10141c'), stroke: C.g3, dash: [3, 3], lw: 1, lc: C.g5, small: true },
+    { id: 'external', label: 'EXTERNAL INTEGRATIONS', x0: 1386, y0: 150, x1: 1584, y1: 640, fill: LD('rgba(255,255,255,0.7)', 'rgba(15,23,42,0.7)'), stroke: C.g4, dash: [5, 4], lw: 1.1, lc: C.g6 }
+  ];
+  const ZI = {}; for (const z of ZONES) ZI[z.id] = z;
+  const BX = { x0: 496, y0: 170, x1: 1330, y1: 578 };
+
+  const N = {}, LIST = [];
+  const node = (id, o) => { const n = Object.assign({ id, w: 124, h: 46, cat: CATS[id] }, o); N[id] = n; LIST.push(n); };
+  node('device', { name: 'Device', icon: 'device', x: 99, y: 220, w: 130, h: 44 });
+  node('admin', { name: 'Admin Console', icon: 'console', x: 99, y: 330, w: 130, h: 44 });
+  node('api', { name: 'External API', icon: 'api', x: 99, y: 440, w: 130, h: 44 });
+  node('lb', { name: 'Load Balancer', icon: 'lb', x: 232, y: 330, w: 26, h: 64, kind: 'lb' });
+  node('authz', { name: 'authz', sub: '/v1/ext_authz/check', icon: 'shield', x: 356, y: 190, w: 158 });
+  node('envoy', { name: 'Envoy Gateway', sub: 'TLS · HTTPRoute · JWT', icon: 'gateway', x: 356, y: 330, w: 180, h: 56, big: true });
+  node('certmgr', { name: 'cert-manager', icon: 'cert', x: 382, y: 470, w: 130, h: 40, small: true });
+  node('ui', { name: 'UI / Console API', icon: 'server', x: 579, y: 205, w: 162 });
+  node('dms', { name: 'DMS Manager', sub: 'EST', icon: 'server', x: 765, y: 205, w: 150 });
+  node('ca', { name: 'CA', icon: 'server', x: 997, y: 205, w: 90 });
+  node('kms', { name: 'KMS', sub: 'key abstraction', icon: 'key', x: 1229, y: 205, w: 138 });
+  node('swe', { name: 'Software Engine', icon: 'chip', x: 1262, y: 272, w: 132, h: 26, tiny: true });
+  node('job', { name: 'Job Manager', sub: 'perimeter HTTP integration', icon: 'server', x: 594, y: 395, w: 192 });
+  node('devmgr', { name: 'Device Manager', icon: 'server', x: 782, y: 395, w: 164 });
+  node('va', { name: 'Validation Authority', sub: 'OCSP / CRL', icon: 'server', x: 997, y: 395, w: 190 });
+  node('awsiot', { name: 'AWS IoT Connector', icon: 'server', x: 1231, y: 395, w: 182 });
+  node('alerts', { name: 'Alerts', sub: 'event consumer', icon: 'bell', x: 1267, y: 530, w: 134 });
+  node('keycloak', { name: 'OIDC / Keycloak', sub: 'JWKS', icon: 'id', x: 382, y: 690, w: 162 });
+  node('storage', { name: 'Persistent Storage', icon: 'disks', x: 580, y: 704, w: 180 });
+  node('rabbit', { name: 'RabbitMQ', sub: 'AMQP / CloudEvents', icon: 'queue', x: 900, y: 704, w: 270, h: 56, kind: 'rabbit' });
+  for (const [id, name, sub, x, w] of [['db_authz', 'authz', 'grants / policies', 345, 134], ['db_dms', 'dms', null, 705, 80], ['db_devmgr', 'devices', null, 805, 96],
+    ['db_ca', 'ca', null, 905, 80], ['db_va', 'va', 'VA configuration', 1022, 128], ['db_kms', 'kms', null, 1140, 80], ['db_alerts', 'alerts', null, 1242, 96]])
+    node(id, { name, sub, icon: 'db', x, y: 803, w, h: 34, owner: OWNER[id], mono: true, small: true });
+  const XC = 1484, XW = 178, XL = XC - XW / 2, PB = 1374;
+  node('hsm', { name: 'PKCS#11 / HSM', icon: 'hsm', x: XC, y: 190, w: XW, h: 38, small: true, dark: true });
+  node('awskms', { name: 'AWS KMS', icon: 'vault', x: XC, y: 238, w: XW, h: 38, small: true, dark: true });
+  node('azkv', { name: 'Azure Key Vault', icon: 'vault', x: XC, y: 286, w: XW, h: 38, small: true, dark: true });
+  node('gcpkms', { name: 'GCP Cloud KMS', icon: 'vault', x: XC, y: 334, w: XW, h: 38, small: true, dark: true });
+  node('iotcore', { name: 'AWS IoT Core', sub: 'CA / Thing / cert sync', icon: 'cloud', x: XC, y: 410, w: XW, h: 50 });
+  node('smtp', { name: 'SMTP', icon: 'mail', x: XC, y: 510, w: XW, h: 36, small: true });
+  node('teams', { name: 'Microsoft Teams', icon: 'chat', x: XC, y: 556, w: XW, h: 36, small: true });
+  node('webhook', { name: 'Webhook', icon: 'hook', x: XC, y: 602, w: XW, h: 36, small: true });
+  node('lamassu', { name: 'Lamassu PKI Platform', icon: 'server', x: (BX.x0 + BX.x1) / 2, y: (BX.y0 + BX.y1) / 2, w: BX.x1 - BX.x0, h: BX.y1 - BX.y0, box: true });
+  for (const n of LIST) { n.x0 = n.x - n.w / 2; n.x1 = n.x + n.w / 2; n.y0 = n.y - n.h / 2; n.y1 = n.y + n.h / 2; }
+  { const c = document.createElement('canvas').getContext('2d'); c.font = `600 9.4px ${SANS}`; for (const id of NATIVE) N[id].cw = Math.ceil(c.measureText(SHORT[id]).width) + 34; }
+
+  const TR = 330, AT = 252, BUS = 636, STEM = 900, RAB0 = 676;
+  const toRab = x => [[x, BUS], [STEM, BUS], [STEM, RAB0]];
+  const GEO = {
+    in_admin: [[[164, TR], [266, TR]], 'end'], in_device: [[[164, 220], [196, 220], [196, TR], [266, TR]], false], in_api: [[[164, 440], [196, 440], [196, TR], [266, TR]], false],
+    ext_authz: [[[356, 302], [356, 213]], 'end'], cm_tls: [[[382, 450], [382, 358]], 'end'],
+    jwks_gw: [[[310, 667], [310, 358]], 'end'], jwks_authz: [[[456, 667], [456, 190], [435, 190]], 'end'],
+    gw_ui: [[[446, TR], [560, TR], [560, 228]], 'end'], gw_job: [[[446, TR], [612, TR], [612, 372]], 'end'],
+    gw_dms: [[[446, TR], [730, TR], [730, 228]], 'end'], gw_va: [[[446, TR], [940, TR], [940, 372]], 'end'],
+    dms_ca: [[[840, 198], [952, 198]], 'end'], ca_kms: [[[1042, 198], [1160, 198]], 'end'], va_ca: [[[1012, 372], [1012, 228]], 'end'],
+    aws_dms: [[[1176, 372], [1176, AT], [792, AT], [792, 228]], 'end'], aws_dev: [[[1176, 372], [1176, AT], [792, AT], [792, 372]], 'end'],
+    kms_swe: [[[1262, 228], [1262, 259]], false],
+    kms_hsm: [[[1298, 198], [PB, 198], [PB, 190], [XL, 190]], 'end'], kms_aws: [[[1298, 198], [PB, 198], [PB, 238], [XL, 238]], 'end'],
+    kms_az: [[[1298, 198], [PB, 198], [PB, 286], [XL, 286]], 'end'], kms_gcp: [[[1298, 198], [PB, 198], [PB, 334], [XL, 334]], 'end'],
+    aws_core: [[[1322, 395], [PB, 395], [PB, 410], [XL, 410]], 'end'],
+    al_smtp: [[[1334, 530], [PB, 530], [PB, 510], [XL, 510]], 'end'], al_teams: [[[1334, 530], [PB, 530], [PB, 556], [XL, 556]], 'end'], al_hook: [[[1334, 530], [PB, 530], [PB, 602], [XL, 602]], 'end'],
+    ev_dms: [[[840, 218], [880, 218], ...toRab(880)], 'end', 2], ev_devmgr: [[[782, 418], ...toRab(782)], 'both', 1], ev_va: [[[985, 418], ...toRab(985)], 'both', 1],
+    ev_ca: [[[1042, 218], [1106, 218], ...toRab(1106)], 'end', 2], ev_kms: [[[1160, 222], [1122, 222], ...toRab(1122)], 'end', 2],
+    ev_aws: [[[1160, 418], ...toRab(1160)], 'start', 1], ev_alerts: [[[1267, 553], ...toRab(1267)], 'start', 1],
+    st_rabbit: [[[670, 704], [765, 704]], false], st_pg: [[[580, 727], [580, 768]], false],
+    db_authz_l: [[[277, 190], [266, 190], [266, 756], [345, 756], [345, 786]], false],
+    db_dms_l: [[[710, 228], [710, 756], [705, 756], [705, 786]], false], db_devmgr_l: [[[830, 418], [830, 756], [805, 756], [805, 786]], false],
+    db_ca_l: [[[975, 228], [975, 756], [905, 756], [905, 786]], false], db_va_l: [[[1060, 418], [1060, 756], [1022, 756], [1022, 786]], false],
+    db_kms_l: [[[1280, 228], [1280, 756], [1140, 756], [1140, 786]], false], db_alerts_l: [[[1300, 553], [1300, 756], [1242, 756], [1242, 786]], false],
+    // medium
+    gw_lp: [[[446, TR], [BX.x0, TR]], 'end'], lp_ev: [[[STEM, BX.y1], [STEM, RAB0]], 'both'],
+    lp_hsm: [[[BX.x1, 198], [PB, 198], [PB, 190], [XL, 190]], 'end'], lp_aws: [[[BX.x1, 198], [PB, 198], [PB, 238], [XL, 238]], 'end'],
+    lp_az: [[[BX.x1, 198], [PB, 198], [PB, 286], [XL, 286]], 'end'], lp_gcp: [[[BX.x1, 198], [PB, 198], [PB, 334], [XL, 334]], 'end'],
+    lp_core: [[[BX.x1, 395], [PB, 395], [PB, 410], [XL, 410]], 'end'],
+    lp_smtp: [[[BX.x1, 530], [PB, 530], [PB, 510], [XL, 510]], 'end'], lp_teams: [[[BX.x1, 530], [PB, 530], [PB, 556], [XL, 556]], 'end'], lp_hook: [[[BX.x1, 530], [PB, 530], [PB, 602], [XL, 602]], 'end'],
+    db_dms_m: [[[705, BX.y1], [705, 786]], false], db_devmgr_m: [[[750, BX.y1], [750, 756], [805, 756], [805, 786]], false],
+    db_ca_m: [[[1050, BX.y1], [1050, 750], [905, 750], [905, 786]], false], db_va_m: [[[1070, BX.y1], [1070, 760], [1022, 760], [1022, 786]], false],
+    db_kms_m: [[[1140, BX.y1], [1140, 786]], false], db_alerts_m: [[[1242, BX.y1], [1242, 786]], false]
+  };
+  const E = {}, ELIST = [];
+  for (const id in GEO) { const [pts, arrow, draw] = GEO[id], m = META[id]; E[id] = { id, type: m.type, hidden: m.hidden, cls: m.cls, pts, sp: pts, arrow, draw }; prepEdge(E[id]); ELIST.push(E[id]); }
+  ELIST.sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type]);
+
+  const ANN = [
+    { t: 'HTTPS / EST / REST', x: 206, y: 388, rot: -Math.PI / 2, align: 'center', fam: MONO, size: 8.6, e: ['in_admin', 'in_device', 'in_api'], lvl: 'both' },
+    { t: 'ext_authz', x: 364, y: 258, fam: MONO, size: 8.6, col: C.v6, e: ['ext_authz'], lvl: 'both' },
+    { t: 'TLS cert', x: 390, y: 404, col: C.g5, e: ['cm_tls'], lvl: 'both' },
+    { t: 'JWKS / JWT validation', x: 447, y: 542, rot: -Math.PI / 2, align: 'center', col: C.v6, size: 9, e: ['jwks_gw', 'jwks_authz'], lvl: 'both' },
+    { t: 'HTTPRoute', x: 462, y: 320, fam: MONO, size: 8.6, e: ['gw_ui', 'gw_job', 'gw_dms', 'gw_va', 'gw_lp'], lvl: 'both' },
+    { t: 'certificate issuance', x: 896, y: 186, align: 'center', size: 9, e: ['dms_ca'], lvl: 'low' },
+    { t: 'sign / key operations', x: 1097, y: 186, align: 'center', size: 9, e: ['ca_kms'], lvl: 'low' },
+    { t: 'certificate status', x: 1020, y: 292, size: 9, e: ['va_ca'], lvl: 'low' },
+    { t: 'via KMS', x: 1320, y: 188, align: 'right', fam: MONO, size: 8.6, w: 700, col: '#fcd34d', e: ['lp_hsm', 'lp_aws', 'lp_az', 'lp_gcp'], lvl: 'med' },
+    { t: 'KEY PROVIDERS', x: 1398, y: 168, fam: MONO, size: 7.8, w: 700, ls: 1, col: C.g5, e: ['kms_hsm', 'kms_aws', 'kms_az', 'kms_gcp', 'lp_hsm', 'lp_aws', 'lp_az', 'lp_gcp'], lvl: 'both' },
+    { t: 'NOTIFICATION CHANNELS', x: 1398, y: 474, fam: MONO, size: 7.8, w: 700, ls: 0.8, col: C.g5, e: ['al_smtp', 'al_teams', 'al_hook', 'lp_smtp', 'lp_teams', 'lp_hook'], lvl: 'both' },
+    { t: 'event-driven notifications', x: 1398, y: 486, size: 8.6, col: C.b9, e: ['al_smtp', 'al_teams', 'al_hook', 'lp_smtp', 'lp_teams', 'lp_hook'], lvl: 'both' },
+    { t: 'AMQP / CloudEvents', x: 1050, y: 651, fam: MONO, size: 8.6, w: 600, col: C.c6, e: ['bus'], lvl: 'low' },
+    { t: 'AMQP / CloudEvents · pub / sub', x: 910, y: 627, fam: MONO, size: 8.6, w: 600, col: C.c6, e: ['lp_ev'], lvl: 'med' },
+    { t: 'ca.#  ·  certificate.#', x: 1050, y: 698, fam: MONO, size: 8.4, col: C.c6, e: ['bus', 'lp_ev'], lvl: 'both' },
+    { t: 'device / metadata events', x: 1050, y: 711, fam: MONO, size: 8.4, col: C.c6, e: ['bus', 'lp_ev'], lvl: 'both' },
+    { t: 'PVC', x: 717, y: 695, align: 'center', fam: MONO, size: 8.4, col: C.g5, e: ['st_rabbit'], lvl: 'both' }
+  ];
+
+  function glyph(kind, cx, cy, s, col = '#ffffff', t = 0) {
+    g.save(); g.translate(cx, cy); g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.5; g.lineCap = 'round'; g.lineJoin = 'round';
+    const k = s / 20; g.scale(k, k);
+    switch (kind) {
+      case 'server': for (let i = 0; i < 3; i++) { rr(-8, -8 + i * 5.6, 16, 4.4, 1.2); g.stroke(); circ(5, -5.8 + i * 5.6, 0.9, col); } break;
+      case 'gateway':
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          g.beginPath(); g.moveTo(dx * 2.5, dy * 2.5); g.lineTo(dx * 8.5, dy * 8.5); g.stroke();
+          g.beginPath(); g.moveTo(dx * 8.5 - dy * 3 - dx * 3, dy * 8.5 + dx * 3 - dy * 3); g.lineTo(dx * 8.5, dy * 8.5); g.lineTo(dx * 8.5 + dy * 3 - dx * 3, dy * 8.5 - dx * 3 - dy * 3); g.stroke();
+        }
+        circ(0, 0, 1.6, col); break;
+      case 'shield':
+        g.beginPath(); g.moveTo(0, -8.5); g.lineTo(7, -5.5); g.lineTo(6.2, 2.5); g.quadraticCurveTo(4, 7, 0, 9); g.quadraticCurveTo(-4, 7, -6.2, 2.5); g.lineTo(-7, -5.5); g.closePath(); g.stroke();
+        g.beginPath(); g.moveTo(-3.2, 0.2); g.lineTo(-0.8, 2.8); g.lineTo(3.6, -2.4); g.stroke(); break;
+      case 'key':
+        g.strokeStyle = C.a4; g.fillStyle = C.a4; g.lineWidth = 1.8; circ(-4.5, 0, 4, null, C.a4, 1.8); circ(-4.5, 0, 1.2, C.a4);
+        g.beginPath(); g.moveTo(-0.5, 0); g.lineTo(8.5, 0); g.moveTo(5.5, 0); g.lineTo(5.5, 3.5); g.moveTo(8, 0); g.lineTo(8, 2.6); g.stroke(); break;
+      case 'chip':
+        rr(-5, -5, 10, 10, 1.5); g.stroke();
+        for (let i = -1; i <= 1; i++) { line(i * 3, -5, i * 3, -8, col, 1.2); line(i * 3, 5, i * 3, 8, col, 1.2); line(-5, i * 3, -8, i * 3, col, 1.2); line(5, i * 3, 8, i * 3, col, 1.2); }
+        g.fillStyle = C.a4; g.fillRect(-2, -2, 4, 4); break;
+      case 'hsm': rr(-8, -6, 16, 12, 1.5); g.stroke(); line(-5, 1.5, 3, 1.5, C.a4, 1.8); circ(5, -2, 1.2, C.a4); break;
+      case 'vault': rr(-7.5, -7, 15, 14, 2); g.stroke(); circ(0, -1.5, 2.2, C.a4); g.fillStyle = C.a4; g.beginPath(); g.moveTo(-1.2, 0); g.lineTo(1.2, 0); g.lineTo(2, 4.5); g.lineTo(-2, 4.5); g.closePath(); g.fill(); break;
+      case 'cloud':
+        g.beginPath(); g.arc(-4.5, 1.5, 4, Math.PI * 0.5, Math.PI * 1.5); g.arc(0.5, -2.5, 5.5, Math.PI * 1.1, Math.PI * 1.9); g.arc(5, 1.5, 4, Math.PI * 1.45, Math.PI * 0.5); g.closePath(); g.stroke();
+        circ(-3, 2.5, 1.1, col); circ(0.5, -0.8, 1.1, col); circ(4, 2.5, 1.1, col); g.lineWidth = 1; g.beginPath(); g.moveTo(-3, 2.5); g.lineTo(0.5, -0.8); g.lineTo(4, 2.5); g.stroke(); break;
+      case 'mail': rr(-8, -5.5, 16, 11, 1.5); g.stroke(); g.beginPath(); g.moveTo(-8, -5); g.lineTo(0, 1); g.lineTo(8, -5); g.stroke(); break;
+      case 'chat': rr(-8, -7, 16, 11, 2.5); g.stroke(); g.beginPath(); g.moveTo(-3.5, 4); g.lineTo(-5.5, 8); g.lineTo(0.5, 4); g.stroke(); line(-4.5, -2.5, 4.5, -2.5, col, 1.2); line(-4.5, 0.5, 2, 0.5, col, 1.2); break;
+      case 'hook': g.beginPath(); g.moveTo(-6, 5); g.lineTo(0, -5); g.lineTo(6, 5); g.stroke(); for (const [x, y] of [[-6, 5], [0, -5], [6, 5]]) circ(x, y, 2.3, col); break;
+      case 'device': rr(-8, -1, 16, 8, 1.5); g.stroke(); line(4, -1, 4, -8, col, 1.4); circ(4, -8.5, 1.4, col); circ(-4.5, 3, 1, C.ok); line(-1.5, 3, 2, 3, col, 1.2); break;
+      case 'console': rr(-8.5, -7, 17, 11.5, 1.5); g.stroke(); line(0, 4.5, 0, 8, col, 1.4); line(-4, 8, 4, 8, col, 1.4); line(-5.5, -3.5, 1, -3.5, col, 1.2); line(-5.5, -0.5, 4.5, -0.5, col, 1.2); break;
+      case 'api': g.beginPath(); g.moveTo(-3, -7); g.lineTo(-8, 0); g.lineTo(-3, 7); g.moveTo(3, -7); g.lineTo(8, 0); g.lineTo(3, 7); g.moveTo(1.5, -7); g.lineTo(-1.5, 7); g.stroke(); break;
+      case 'lb': line(0, -9, 0, 9, col, 1.3); for (const y of [-5, 5]) { g.beginPath(); g.moveTo(-3, y - 3); g.lineTo(0, y); g.lineTo(3, y - 3); g.stroke(); } break;
+      case 'cert': rr(-8, -6, 16, 12, 1.5); g.stroke(); line(-5, -2.5, 2, -2.5, col, 1.1); line(-5, 0.5, 0, 0.5, col, 1.1); circ(4.5, 2.5, 2.3, col); break;
+      case 'id': circ(0, 0, 7.5, null, col, 1.5); circ(0, -2, 2.6, null, col, 1.4); g.beginPath(); g.arc(0, 6, 5, Math.PI * 1.2, Math.PI * 1.8); g.stroke(); break;
+      case 'disks': for (let i = 0; i < 3; i++) { g.beginPath(); g.ellipse(0, -6 + i * 5.5, 7.5, 2.2, 0, 0, Math.PI * 2); g.stroke(); } line(-7.5, -6, -7.5, 5, col, 1.5); line(7.5, -6, 7.5, 5, col, 1.5); break;
+      case 'queue':
+        for (let i = 0; i < 3; i++) { rr(-9, -7 + i * 5, 18, 3.6, 1); g.stroke(); }
+        for (let i = 0; i < 3; i++) { const u = ((t * 0.35 + i * 0.37) % 1); g.fillStyle = C.c4; g.fillRect(-8 + u * 13, -6.3 + i * 5, 3, 2.2); } break;
+      case 'bell':
+        g.beginPath(); g.moveTo(-6, 4); g.quadraticCurveTo(-5, -1, -5, -2.5); g.quadraticCurveTo(-4.6, -7.5, 0, -7.5); g.quadraticCurveTo(4.6, -7.5, 5, -2.5); g.quadraticCurveTo(5, -1, 6, 4); g.closePath(); g.stroke(); line(-2, 7, 2, 7, col, 1.5); break;
+      case 'db':
+        g.beginPath(); g.ellipse(0, -5.5, 6.5, 2.4, 0, 0, Math.PI * 2); g.stroke();
+        g.beginPath(); g.moveTo(-6.5, -5.5); g.lineTo(-6.5, 5.5); g.ellipse(0, 5.5, 6.5, 2.4, 0, Math.PI, 0, true); g.lineTo(6.5, -5.5); g.stroke();
+        g.beginPath(); g.ellipse(0, 0, 6.5, 2.4, 0, 0, Math.PI); g.stroke(); break;
+    }
+    g.restore();
+  }
+
+  const accentOf = n => n.cat === 'event' ? C.c6 : n.cat === 'auth' ? C.v6 : n.cat === 'infra' ? C.g5 : n.cat === 'client' ? C.b5 : n.cat === 'ext' ? C.b6 : n.dark ? C.n3 : C.P;
+  function drawNode(n, s) {
+    const a = s.a || 0, lift = s.lift;
+    if (n.kind === 'lb') {
+      const x = n.x0, y = n.y0 - lift;
+      rr(x + 1.5, y + 2.5, n.w, n.h, 5); g.fillStyle = `${C.shadow}0.07)`; g.fill();
+      rr(x, y, n.w, n.h, 5); g.fillStyle = mix(C.g2, C.w, s.hl * 0.5); g.fill(); g.strokeStyle = s.isF ? C.P : C.g4; g.lineWidth = 1; g.stroke();
+      glyph('lb', n.x, n.y - lift, 18, C.g6);
+      text('Load Balancer', n.x + 2, y - 9, { align: 'center', size: 8.4, w: 600, col: C.g6 });
+      return;
+    }
+    const w = lerp(n.w, n.cw || n.w, a), h = lerp(n.h, 24, a), x = n.x - w / 2, y = n.y - h / 2 - lift;
+    const accent = accentOf(n);
+    rr(x + 1.5, y + 2.5 + lift * 0.5, w, h, 6); g.fillStyle = `${C.shadow}${(0.07 + lift * 0.02) * (1 - a * 0.5)})`; g.fill();
+    rr(x, y, w, h, lerp(6, 5, a)); g.fillStyle = mix(C.w, C.b0, s.hl * 0.8); g.fill();
+    g.strokeStyle = s.isF ? C.P : (s.pulse > 0.05 ? mix('#c7d2fe', accent, s.pulse) : a > 0.5 ? `${C.border}0.32)` : `${C.border}0.24)`);
+    g.lineWidth = s.isF ? 1.5 : 1; g.stroke();
+    const ib = lerp(n.tiny ? h - 8 : h - 10, 16, a), ix = x + lerp(n.tiny ? 4 : 5, 4, a), iy = y + (h - ib) / 2;
+    rr(ix, iy, ib, ib, lerp(n.tiny ? 3 : 5, 3, a));
+    g.fillStyle = n.kind === 'rabbit' ? mix(C.b9, C.c6, 0.3 + 0.5 * s.pulse) : mix(accent, '#ffffff', s.hl * 0.12); g.fill();
+    glyph(n.icon, ix + ib / 2, iy + ib / 2, ib * (n.tiny ? 0.8 : 0.62), '#ffffff', s.t);
+    const tx = ix + ib + lerp(8, 6, a), ga = g.globalAlpha;
+    if (a < 0.99) {
+      g.globalAlpha = ga * (1 - smooth(a / 0.5));
+      const tSize = n.big ? 12.5 : n.small || n.tiny ? 10 : 11;
+      if (n.sub) { text(n.name, tx, y + h / 2 - 6.5, { size: tSize, w: 650, col: C.text, fam: n.mono ? MONO : SANS }); text(n.sub, tx, y + h / 2 + 7.5, { size: 8.2, w: 500, col: C.g6, fam: MONO }); }
+      else text(n.name, tx, y + h / 2 + 0.5, { size: tSize, w: 650, col: C.text, fam: n.mono ? MONO : SANS });
+      if (!n.tiny && n.icon !== 'db') circ(x + w - 8, y + 8, 2.1, rgba(n.cat === 'crypto' ? C.a5 : C.ok, 0.5 + 0.5 * (0.55 + 0.45 * Math.sin(s.t * 2.2 + n.x * 0.05))));
+      else if (n.icon === 'db' && s.act > 0.02) circ(x + w - 7, y + 7, 2, rgba(C.b5, s.act));
+      g.globalAlpha = ga;
+    }
+    if (n.kind === 'rabbit') {
+      const qx = x + 160, qw = w - 172;
+      for (let j = 0; j < 3; j++) {
+        const qy = y + 13 + j * 11;
+        rr(qx, qy, qw, 6, 2); g.fillStyle = mix(C.b1, C.c4, 0.25 + 0.6 * s.pulse); g.fill();
+        for (let k = 0; k < 3; k++) { const u = ((s.t * 0.14 + k / 3 + j * 0.23) % 1); g.fillStyle = mix(C.c6, C.c4, s.pulse); g.fillRect(qx + 2 + u * (qw - 10), qy + 1.5, 6, 3); }
+      }
+    }
+  }
+
+  function edgeFadeLocal() { edgeFade(); }
+  function renderGrid() {
+    g.fillStyle = C.bg; g.fillRect(0, 0, LW, LH);
+    for (let x = 0; x <= LW; x += 20) line(x + 0.5, 0, x + 0.5, LH, x % 100 === 0 ? 'rgba(29,78,216,0.07)' : 'rgba(29,78,216,0.033)', 1);
+    for (let y = 0; y <= LH; y += 20) line(0, y + 0.5, LW, y + 0.5, y % 100 === 0 ? 'rgba(29,78,216,0.07)' : 'rgba(29,78,216,0.033)', 1);
+    for (let x = 0; x <= LW; x += 100) for (let y = 0; y <= LH; y += 100) { line(x - 3, y + 0.5, x + 4, y + 0.5, 'rgba(29,78,216,0.16)', 1); line(x + 0.5, y - 3, x + 0.5, y + 4, 'rgba(29,78,216,0.16)', 1); }
+    edgeFadeLocal();
+  }
+  function zoneStyleDraw(z, pts, alpha) {
+    g.globalAlpha = alpha; poly(pts, z.fill); g.setLineDash(z.dash); poly(pts, null, z.stroke, z.lw); g.setLineDash([]); g.globalAlpha = 1;
+  }
+  function drawZone(z, alpha = 1) {
+    g.globalAlpha = alpha;
+    rr(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0, z.small ? 6 : 10); g.fillStyle = z.fill; g.fill();
+    g.setLineDash(z.dash); g.strokeStyle = z.stroke; g.lineWidth = z.lw; g.stroke(); g.setLineDash([]);
+    for (const [cx, cy, sx, sy] of [[z.x0, z.y0, 1, 1], [z.x1, z.y0, -1, 1], [z.x1, z.y1, -1, -1], [z.x0, z.y1, 1, -1]]) {
+      g.beginPath(); g.moveTo(cx + sx * 12, cy + sy * 0.5); g.lineTo(cx + sx * 0.5, cy + sy * 0.5); g.lineTo(cx + sx * 0.5, cy + sy * 12); g.strokeStyle = z.stroke; g.lineWidth = z.lw + 0.5; g.stroke();
+    }
+    font(z.small ? 7.8 : 8.8, 700, MONO); ls(z.small ? 0.8 : 1.3);
+    const tw = g.measureText(z.label).width, cw = tw + 16, ch = z.small ? 14 : 17;
+    const cx = z.labelRight ? z.x1 - cw - 14 : z.x0 + 16, cy = z.y0 - ch / 2;
+    rr(cx, cy, cw, ch, 3);
+    if (z.solid) { g.fillStyle = z.stroke; g.fill(); } else { g.fillStyle = C.w; g.fill(); g.strokeStyle = z.stroke; g.lineWidth = 1; g.stroke(); }
+    g.fillStyle = z.solid ? '#ffffff' : z.lc; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(z.label, cx + 8, cy + ch / 2 + 0.5); ls(0);
+    g.globalAlpha = 1;
+  }
+  function renderZones() { for (const z of ZONES) if (!z.dynamic) drawZone(z); }
+
+  // orthogonal edges: rounded corners + line jumps
+  let VSEGS = [];
+  function collectVerticals(list) {
+    VSEGS = [];
+    for (const e of list) for (let i = 1; i < e.vis.length; i++) { const a = e.vis[i - 1], b = e.vis[i]; if (Math.abs(a[0] - b[0]) < 0.5) VSEGS.push({ x: a[0], y0: Math.min(a[1], b[1]), y1: Math.max(a[1], b[1]), id: e.id }); }
+  }
+  function hopsFor(e, a, b) {
+    if (Math.abs(a[1] - b[1]) > 0.5) return [];
+    const y = a[1], xa = Math.min(a[0], b[0]), xb = Math.max(a[0], b[0]), out = [];
+    for (const v of VSEGS) { if (v.id === e.id) continue; if (v.x > xa + 7 && v.x < xb - 7 && y > v.y0 + 3 && y < v.y1 - 3 && !out.some(x => Math.abs(x - v.x) < 1)) out.push(v.x); }
+    out.sort((p, q) => p - q); return a[0] <= b[0] ? out : out.reverse();
+  }
+  function tracePath(e, pts) {
+    g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], c = pts[i + 1], dir = Math.sign(b[0] - a[0]);
+      for (const hx of hopsFor(e, a, b)) { g.lineTo(hx - dir * 4.5, a[1]); g.arc(hx, a[1], 4.5, dir > 0 ? Math.PI : 0, dir > 0 ? 0 : Math.PI, dir < 0); }
+      if (c) g.arcTo(b[0], b[1], c[0], c[1], 6); else g.lineTo(b[0], b[1]);
+    }
+  }
+  function arrowHead(x, y, ang, col) { g.save(); g.translate(x, y); g.rotate(ang); g.beginPath(); g.moveTo(0.5, 0); g.lineTo(-6.5, -3.6); g.lineTo(-4.8, 0); g.lineTo(-6.5, 3.6); g.closePath(); g.fillStyle = col; g.fill(); g.restore(); }
+  function drawEdge(e, alpha) {
+    const st = STY[e.type], pts = e.vis;
+    g.globalAlpha = alpha; g.lineJoin = 'round'; g.lineCap = 'butt';
+    tracePath(e, pts); g.setLineDash([]); g.strokeStyle = `${C.halo}0.9)`; g.lineWidth = st.w + 3.4; g.stroke();
+    tracePath(e, pts); g.setLineDash(st.dash || []); g.strokeStyle = st.c; g.lineWidth = st.w; g.stroke(); g.setLineDash([]);
+    const L = pts.length - 1;
+    if (e.arrow === 'end' || e.arrow === 'both') arrowHead(pts[L][0], pts[L][1], Math.atan2(pts[L][1] - pts[L - 1][1], pts[L][0] - pts[L - 1][0]), st.c);
+    if (e.arrow === 'start' || e.arrow === 'both') arrowHead(pts[0][0], pts[0][1], Math.atan2(pts[0][1] - pts[1][1], pts[0][0] - pts[1][0]), st.c);
+    g.globalAlpha = 1;
+  }
+  function drawBus(alpha, t, act) {
+    if (alpha <= 0.01) return;
+    g.globalAlpha = alpha;
+    const x0 = 766, x1 = 1284;
+    rr(x0 - 2, BUS - 6, x1 - x0 + 4, 12, 6); g.fillStyle = `${C.halo}0.95)`; g.fill();
+    rr(x0, BUS - 4, x1 - x0, 8, 4); g.fillStyle = mix('#b6ecf6', C.c4, act * 0.6); g.fill(); g.strokeStyle = C.c6; g.lineWidth = 1; g.stroke();
+    g.fillStyle = mix('#b6ecf6', C.c4, act * 0.6); g.fillRect(STEM - 4, BUS + 3, 8, RAB0 - BUS - 3);
+    line(STEM - 4, BUS + 4, STEM - 4, RAB0, C.c6, 1); line(STEM + 4, BUS + 4, STEM + 4, RAB0, C.c6, 1);
+    g.save(); g.beginPath(); g.moveTo(x0 + 4, BUS); g.lineTo(x1 - 4, BUS); g.setLineDash([3, 9]); g.lineDashOffset = -t * 16; g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 1.3; g.stroke(); g.restore();
+    g.globalAlpha = 1;
+  }
+  function drawCrypto(fs) {
+    const z = ZI.crypto, a0 = 1 - fs.lv; if (a0 <= 0.01) return;
+    drawZone(z, a0);
+    const t = fs.t, cg = t >= 7 && t < 10 ? smooth((t - 7) / 0.4) * smooth((10 - t) / 0.5) : 0;
+    if (cg > 0) {
+      const br = 0.6 + 0.4 * Math.sin((t - 7) * 5);
+      g.globalAlpha = a0; rr(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0, 6); g.fillStyle = rgba(C.a4, 0.1 * cg); g.fill();
+      g.setLineDash([4, 3]); g.strokeStyle = rgba(C.a5, cg * br); g.lineWidth = 2; g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+    }
+  }
+  function boxRect(b) {
+    const z = ZI.native;
+    return { x0: lerp(z.x0 + 4, BX.x0, b), y0: lerp(z.y0 + 4, BX.y0, b), x1: lerp(z.x1 - 4, BX.x1, b), y1: lerp(z.y1 - 4, BX.y1, b) };
+  }
+  function drawBox(b, fs, hl) {
+    const r = boxRect(b), pz = fs.pulse.lamassu || 0, w = r.x1 - r.x0, h = r.y1 - r.y0, cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
+    g.globalAlpha = b * fs.nA('lamassu');
+    rr(r.x0 + 2, r.y0 + 4, w, h, 12); g.fillStyle = `${C.shadow}0.12)`; g.fill();
+    rr(r.x0, r.y0, w, h, 12); g.fillStyle = mix(C.P, C.b5, hl * 0.3 + pz * 0.45); g.fill();
+    g.strokeStyle = mix(C.b9, '#ffffff', pz * 0.8); g.lineWidth = 1.4; g.stroke();
+    rr(r.x0 + 8, r.y0 + 8, w - 16, h - 16, 8); g.strokeStyle = 'rgba(191,219,254,0.35)'; g.lineWidth = 1; g.setLineDash([4, 4]); g.stroke(); g.setLineDash([]);
+    drawLogo(cx, cy, 170, '#ffffff');
+    g.globalAlpha = 1;
+  }
+  function drawTag() {}
+
+  function nodeState(n, fs) {
+    const isF = fs.focusId === n.id, pz = fs.pulse[n.id] || 0, nat = NATIVE.has(n.id);
+    return { t: fs.t, isF, pulse: pz, act: pz, hl: Math.max(isF ? 1 : (fs.FN && fs.focusId && fs.FN.has(n.id) ? 0.35 : 0), pz), lift: (isF ? 1.5 : 0) + pz * 1.5, a: nat ? miniF(fs.lv) : 0 };
+  }
+  function drawObject(n, s, alpha) {
+    if (NATIVE.has(n.id)) alpha *= 1 - smooth((s.a || 0) / 0.85);
+    if (alpha <= 0.01) return;
+    g.globalAlpha = alpha;
+    if (s.pulse > 0.02) {
+      const grow = (1 - s.pulse) * 7, col = n.id === 'rabbit' ? C.c4 : n.cat === 'crypto' ? C.a5 : n.cat === 'auth' ? C.v5 : C.b5;
+      const w = lerp(n.w, n.cw || n.w, s.a), h = lerp(n.h, 24, s.a);
+      rr(n.x - w / 2 - 3 - grow, n.y - h / 2 - 3 - grow, w + 6 + grow * 2, h + 6 + grow * 2, 8 + grow); g.strokeStyle = rgba(col, s.pulse * 0.75); g.lineWidth = 1.4; g.stroke();
+    }
+    drawNode(n, s);
+    g.globalAlpha = 1;
+  }
+  const present = (n, lv) => n.box ? lv >= 0.5 : NATIVE.has(n.id) ? lv < 0.5 : true;
+
+  function frame(fs) {
+    const lv = fs.lv, b = boxF(lv);
+    drawCrypto(fs);
+    if (b > 0.01) drawBox(b, fs, fs.focusId === 'lamassu' ? 1 : 0);
+    const visible = [], alphas = {};
+    for (const e of ELIST) { const a = fs.edgeAlpha(e.id); if (a > 0.01) { visible.push(e); alphas[e.id] = a; } }
+    collectVerticals(visible);
+    VSEGS.push({ x: STEM, y0: BUS, y1: RAB0, id: 'bus' });
+    drawBus(lowF(lv) * (fs.FE && !fs.FE.has('bus') ? fs.dimE : 1), fs.t, fs.busAct);
+    for (const e of visible) drawEdge(e, alphas[e.id]);
+    drawFlowOverlays(api, fs);
+    for (const an of ANN) { const a = annAlpha(an, fs); if (a <= 0.01) continue; g.globalAlpha = a; text(an.t, an.x, an.y, { rot: an.rot, align: an.align, fam: an.fam, size: an.size || 9.5, w: an.w || 500, col: an.col || C.b9, ls: an.ls }); g.globalAlpha = 1; }
+    for (const n of LIST) { if (n.box) continue; drawObject(n, nodeState(n, fs), fs.nA(n.id)); }
+    drawPackets(api, fs);
+  }
+  function drawNodeAt(id, dx, dy, alpha, fs, scale) {
+    const n = N[id]; if (!n || n.box) return;
+    g.save(); g.translate(n.x + dx, n.y + dy); g.scale(scale, scale); g.translate(-n.x, -n.y);
+    drawObject(n, nodeState(n, fs), alpha); g.restore();
+  }
+  function hit(mx, my, lv) {
+    for (let i = LIST.length - 1; i >= 0; i--) {
+      const n = LIST[i]; if (!present(n, lv) || n.box) continue;
+      if (mx >= n.x0 - 3 && mx <= n.x1 + 3 && my >= n.y0 - (n.kind === 'lb' ? 18 : 3) && my <= n.y1 + 3) return n;
+    }
+    if (lv >= 0.5 && mx >= BX.x0 && mx <= BX.x1 && my >= BX.y0 && my <= BX.y1) return N.lamassu;
+    return null;
+  }
+  const api = {
+    id: '2d', N, E, ZONES, ZI, fit: () => {}, renderGrid, renderZones, frame, drawNodeAt, hit, drawEdge, drawBus, drawCrypto, drawTag, drawBox, ELIST, ANN,
+    sub: 'Orthogonal view · synchronous HTTP, CloudEvents over AMQP, KMS-mediated key operations',
+    anchor: id => [N[id].x, N[id].y],
+    zoneCorners: id => { const z = ZI[id]; return [[z.x0, z.y0], [z.x1, z.y0], [z.x1, z.y1], [z.x0, z.y1]]; },
+    boxCorners: b => { const r = boxRect(b); return [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]]; },
+    zoneDraw: (id, pts, alpha) => zoneStyleDraw(ZI[id], pts, alpha),
+    present, depth: () => 0,
+    tipAnchor: id => { const n = N[id]; return { x: n.x0, y: n.y0, w: n.w, h: n.h }; }
+  };
+  return api;
+}
+
+function edgeFade() {
+  const fades = [[0, 0, LW, 60, 0, 0, 0, 60], [0, LH - 50, LW, 50, 0, LH, 0, LH - 50], [0, 0, 50, LH, 0, 0, 50, 0], [LW - 50, 0, 50, LH, LW, 0, LW - 50, 0]];
+  for (const [x, y, w, h, a, b, c, d] of fades) { const gr = g.createLinearGradient(a, b, c, d); gr.addColorStop(0, rgba(C.bg, 1)); gr.addColorStop(1, rgba(C.bg, 0)); g.fillStyle = gr; g.fillRect(x, y, w, h); }
+}
+
+/* =====================================================================
+   CONTROLLER
+   ===================================================================== */
+const V3 = makeView3D(), V2 = makeView2D();
+V3.fit();
+const view = document.getElementById('view'), vctx = view.getContext('2d');
+const scene = document.createElement('canvas'), sctx = scene.getContext('2d');
+const layers = { '3d': { grid: document.createElement('canvas'), zones: document.createElement('canvas') }, '2d': { grid: document.createElement('canvas'), zones: document.createElement('canvas') } };
+let S = 1, DPR = 1, offX = 0, offY = 0;
+
+const ST = { mode: '3d', level: 'low', m: 1, lv: 0, lock: false };
+{
+  const h = location.hash.toLowerCase();
+  let mode = null, level = null;
+  try { mode = localStorage.getItem('lamassu.view'); level = localStorage.getItem('lamassu.level'); } catch (e) {}
+  if (/(^|[#&])2d\b/.test(h)) mode = '2d'; else if (/(^|[#&])3d\b/.test(h)) mode = '3d';
+  if (/(^|[#&])medium\b/.test(h)) level = 'medium'; else if (/(^|[#&])low\b/.test(h)) level = 'low';
+  ST.lock = /(^|[#&])lock\b/.test(h);
+  ST.mode = mode === '2d' ? '2d' : '3d'; ST.level = level === 'medium' ? 'medium' : 'low';
+  if (ST.lock) ST.level = 'medium'; // embeds that lock the level always start at (and stay at) medium
+  ST.m = ST.mode === '3d' ? 1 : 0; ST.lv = ST.level === 'medium' ? 1 : 0;
+}
+function setMode(m) { if (m === ST.mode) return; ST.mode = m; hover = null; pinned = null; try { localStorage.setItem('lamassu.view', m); } catch (e) {} }
+function setLevel(l) { if (ST.lock || l === ST.level) return; ST.level = l; hover = null; pinned = null; try { localStorage.setItem('lamassu.level', l); } catch (e) {} }
+
+// ---- controls (HUD, logical coords)
+const CTL = {
+  level: { x: 818, y: 38, w: 140, h: 28, label: 'LEVEL', opts: ['Low', 'Medium'] },
+  view: { x: ST.lock ? 818 : 1034, y: 38, w: 112, h: 28, label: 'VIEW', opts: ['2D', '3D'] }
+};
+const inCtl = (c, mx, my) => mx >= c.x - 42 && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h;
+function drawSegmented(c, k) {
+  const { x, y, w, h } = c, half = w / 2;
+  text(c.label, x - 8, y + h / 2 + 0.5, { size: 8.4, w: 700, fam: MONO, col: C.g5, ls: 1.2, align: 'right' });
+  rr(x + 1, y + 2, w, h, 6); g.fillStyle = `${C.shadow}0.06)`; g.fill();
+  rr(x, y, w, h, 6); g.fillStyle = C.w; g.fill(); g.strokeStyle = `${C.border}0.25)`; g.lineWidth = 1; g.stroke();
+  rr(x + 3 + k * half, y + 3, half - 6, h - 6, 4); g.fillStyle = C.P; g.fill();
+  const fnt = c.opts[0].length > 2 ? SANS : MONO, sz = c.opts[0].length > 2 ? 10.5 : 10.5, wt = c.opts[0].length > 2 ? 650 : 700;
+  text(c.opts[0], x + half / 2, y + h / 2 + 0.5, { size: sz, w: wt, fam: fnt, col: mix(C.g6, '#ffffff', 1 - k), align: 'center' });
+  text(c.opts[1], x + half * 1.5, y + h / 2 + 0.5, { size: sz, w: wt, fam: fnt, col: mix(C.g6, '#ffffff', k), align: 'center' });
+}
+
+// ---- per-frame shared state
+let hover = null, pinned = null, mouse = null;
+function adjacency(id, lv) {
+  const nodes = new Set([id]), edges = new Set(), allowed = lv < 0.5 ? ['common', 'low'] : ['common', 'med'];
+  for (const m of META_LIST) { const e = META[m[0]]; if (!allowed.includes(e.cls)) continue; if (e.from === id || e.to === id) { edges.add(e.id); nodes.add(e.from); nodes.add(e.to); } }
+  if (OWNER[id]) nodes.add(lv >= 0.5 && NATIVE.has(OWNER[id]) ? 'lamassu' : OWNER[id]);
+  if (lv < 0.5 && ['dms', 'ca', 'kms', 'devmgr', 'va', 'awsiot', 'alerts'].includes(id)) edges.add('bus');
+  if (id === 'rabbit') { edges.add('bus'); for (const m of META_LIST) { const e = META[m[0]]; if (e.type === 'event' && allowed.includes(e.cls)) { edges.add(e.id); nodes.add(e.from); } } }
+  return { nodes, edges };
+}
+function frameState(t, lv) {
+  const st = stateAt(t), focusId = (ST.m === 0 || ST.m === 1) ? (pinned || hover) : null;
+  let FN = null, FE = null, dimN = 1, dimE = 1;
+  if (focusId) { const a = adjacency(focusId, lv); FN = a.nodes; FE = a.edges; dimN = 0.32; dimE = 0.1; }
+  else if (st.spot) {
+    const k = smooth((t - st.t0) / 0.5) * smooth((st.t1 - t) / 0.5);
+    FN = new Set(st.spot); FE = new Set(st.edges);
+    for (const id of st.edges) if (MAP[id]) FE.add(MAP[id]);
+    if (st.spot.some(id => NATIVE.has(id))) FN.add('lamassu');
+    dimN = 1 - 0.42 * k; dimE = 1 - 0.55 * k;
+  }
+  const pulse = {}, glow = {}, active = [];
+  for (const f of FLOWS) {
+    const end = f.t0 + f.dur, eid = lv < 0.5 ? f.e : (f.e in MAP ? MAP[f.e] : f.e);
+    if (t >= f.t0 && t <= end) { if (eid) { active.push({ f, eid, p: flowEase((t - f.t0) / f.dur) }); glow[eid] = 1; } }
+    else if (t > end && t < end + 0.9) { const k = 1 - (t - end) / 0.9; pulse[f.arrive] = Math.max(pulse[f.arrive] || 0, k); if (eid) glow[eid] = Math.max(glow[eid] || 0, k * 0.8); }
+    if (t >= f.t0 - 0.05 && t < f.t0 + 0.3) pulse[f.src] = Math.max(pulse[f.src] || 0, 0.5);
+  }
+  const rp = clamp(1 - Math.abs(t - RABBIT_FANOUT - 0.05) / 0.55);
+  pulse.rabbit = Math.max(pulse.rabbit || 0, rp);
+  let lp = 0; for (const id of NATIVE) lp = Math.max(lp, pulse[id] || 0); pulse.lamassu = lp * boxF(lv);
+  const busAct = Math.max(glow.ev_ca || 0, glow.ev_va || 0, glow.ev_aws || 0, rp);
+  const eA = id => (!FE || FE.has(id)) ? 1 : dimE;
+  const fs = {
+    t, lv, st, focusId, FN, FE, dimN, dimE, pulse, glow, active, busAct,
+    nA: id => (!FN || FN.has(id)) ? 1 : dimN,
+    edgeAlpha: id => {
+      const m = META[id], la = levelAlpha(m.cls, lv); if (la <= 0.005) return 0;
+      if (m.hidden) { const show = (focusId && FE && FE.has(id)) ? 1 : (glow[id] || 0); return show * 0.9 * la; }
+      return eA(id) * la;
+    }
+  };
+  return fs;
+}
+
+// ---- 2D <-> 3D morph frame
+function morphFrame(e, fs) {
+  const lv = fs.lv;
+  g.globalAlpha = 1 - e; g.drawImage(layers['2d'].grid, 0, 0, LW, LH);
+  g.globalAlpha = e; g.drawImage(layers['3d'].grid, 0, 0, LW, LH);
+  g.globalAlpha = 1;
+  // zones glide between rectangles and isometric parallelograms
+  for (const z of V2.ZONES) {
+    if (z.id === 'crypto' && lv >= 0.99) continue;
+    const c2 = V2.zoneCorners(z.id), c3 = V3.zoneCorners(z.id), pts = c2.map((p, i) => lerp2(p, c3[i], e));
+    const za = z.id === 'crypto' ? 1 - lv : 1;
+    V2.zoneDraw(z.id, pts, (1 - e) * za); V3.zoneDraw(z.id, pts, e * za);
+  }
+  const b = boxF(lv);
+  if (b > 0.01) {
+    const c2 = V2.boxCorners(b), c3 = V3.boxCorners(b), pts = c2.map((p, i) => lerp2(p, c3[i], e));
+    g.globalAlpha = b; poly(pts, C.P, C.b9, 1.4); g.globalAlpha = 1;
+  }
+  // routed links of the source/target views fade at the ends; rubber bands carry the topology in flight
+  const a2 = clamp(1 - e / 0.28), a3 = clamp((e - 0.72) / 0.28);
+  for (const [V, a] of [[V2, a2], [V3, a3]]) {
+    if (a <= 0.01) continue;
+    for (const ed of V.ELIST) { const al = fs.edgeAlpha(ed.id) * a; if (al > 0.01) V.drawEdge(ed, al); }
+  }
+  const pos = id => { const p2 = V2.anchor(id), p3 = V3.anchor(id); return lerp2(p2, p3, e); };
+  const band = Math.sin(Math.PI * e);
+  if (band > 0.02) {
+    g.lineCap = 'round';
+    for (const m of META_LIST) {
+      const ed = META[m[0]]; if (ed.hidden || !V2.N[ed.to] || !V2.N[ed.from]) continue;
+      const la = levelAlpha(ed.cls, lv); if (la < 0.3) continue;
+      const p = pos(ed.from), q = pos(ed.to);
+      g.globalAlpha = 0.55 * band * la; g.strokeStyle = STY[ed.type].c; g.lineWidth = 1.2; g.setLineDash(STY[ed.type].dash || []);
+      g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); g.setLineDash([]);
+    }
+    g.globalAlpha = 1;
+  }
+  // nodes: flat cards travel and fade out, isometric objects travel and rise in
+  const ids = Object.keys(V2.N).filter(id => !V2.N[id].box);
+  const f2 = 1 - smooth((e - 0.25) / 0.45), f3 = smooth((e - 0.3) / 0.45), rise = lerp(0.35, 1, smooth((e - 0.35) / 0.65));
+  if (f2 > 0.01) for (const id of ids) { const p = pos(id), a = V2.anchor(id); V2.drawNodeAt(id, p[0] - a[0], p[1] - a[1], f2 * fs.nA(id), fs, lerp(1, 0.72, e)); }
+  if (f3 > 0.01) {
+    const order = ids.slice().sort((p, q) => V3.depth(p) - V3.depth(q));
+    for (const id of order) { const p = pos(id), a = V3.anchor(id); V3.drawNodeAt(id, p[0] - a[0], p[1] - a[1], f3 * fs.nA(id), fs, rise); }
+  }
+}
+
+function drawHUD(t, st, sub) {
+  text('LAMASSU PKI', 34, 38, { size: 10, w: 700, fam: MONO, col: C.P, ls: 2.2 });
+  text('Kubernetes deployment architecture', 34, 62, { size: 19, w: 650, col: C.text });
+  text(sub, 34, 84, { size: 11, w: 450, col: C.g5 });
+  // legend
+  const lx = 20, ly = 700, lw = 204, lh = 176;
+  rr(lx + 1, ly + 2, lw, lh, 5); g.fillStyle = `${C.shadow}0.06)`; g.fill();
+  rr(lx, ly, lw, lh, 5); g.fillStyle = rgba(C.w, 0.95); g.fill(); g.strokeStyle = `${C.border}0.2)`; g.lineWidth = 1; g.stroke();
+  text('CONNECTION LANGUAGE', lx + 12, ly + 16, { size: 8.2, w: 700, fam: MONO, col: C.g5, ls: 1.1 });
+  const rows = [['http', 'Synchronous HTTP'], ['event', 'AMQP / CloudEvents'], ['auth', 'AuthN / AuthZ · JWKS'], ['key', 'Key operation'], ['infra', 'Infrastructure'], ['db', 'Persistence (on focus)']];
+  rows.forEach(([k, label], i) => {
+    const yy = ly + 36 + i * 17, s2 = STY[k];
+    g.setLineDash(s2.dash || []); line(lx + 12, yy, lx + 44, yy, s2.c, s2.w + 0.2); g.setLineDash([]);
+    if (k !== 'infra' && k !== 'db') drawPacket(k, lx + 28, yy, 1, 0);
+    text(label, lx + 54, yy + 0.5, { size: 10.3, col: C.text });
+  });
+  text('Hover to trace · click to pin', lx + 12, ly + lh - 24, { size: 9.3, w: 450, col: C.g5 });
+  text(ST.lock ? 'Key: V view' : 'Keys: V view · L level', lx + 12, ly + lh - 11, { size: 9, w: 450, col: C.g4 });
+  // step card
+  const sw = 410, sh = 62, sx = LW - sw - 30, sy = 26;
+  rr(sx + 1, sy + 2, sw, sh, 5); g.fillStyle = `${C.shadow}0.06)`; g.fill();
+  rr(sx, sy, sw, sh, 5); g.fillStyle = rgba(C.w, 0.96); g.fill(); g.strokeStyle = `${C.border}0.2)`; g.stroke();
+  text(st.n + ' / 07', sx + 14, sy + 17, { size: 10, w: 700, fam: MONO, col: C.P });
+  text(st.title, sx + 70, sy + 17, { size: 12.5, w: 650, col: C.text });
+  text(st.sub, sx + 14, sy + 35, { size: 10, w: 450, col: C.g6 });
+  const segW = (sw - 28 - 24) / 7;
+  STATES.forEach((s2, i) => {
+    const x = sx + 14 + i * (segW + 4), y = sy + 48;
+    rr(x, y, segW, 3, 1.5); g.fillStyle = C.b1; g.fill();
+    const p = clamp((t - s2.t0) / (s2.t1 - s2.t0));
+    if (p > 0) { rr(x, y, Math.max(3, segW * p), 3, 1.5); g.fillStyle = s2 === st ? C.P : C.b3; g.fill(); }
+  });
+  if (!ST.lock) drawSegmented(CTL.level, easeIO(ST.lv));
+  drawSegmented(CTL.view, easeIO(ST.m));
+}
+
+function drawTooltip(V, id) {
+  const lines = DESC[id] || [], name = id === 'lamassu' ? 'Lamassu PKI Platform' : (V.N[id].name);
+  font(11.5, 650); let w = g.measureText(name).width;
+  font(10.5, 450); for (const l of lines) w = Math.max(w, g.measureText(l).width);
+  w = Math.ceil(w) + 26; const h = 30 + lines.length * 15;
+  const mp = mouse || V.anchor(id);
+  let ref = id === 'lamassu' || !V.tipAnchor(id) ? { x: mp[0] - 1, y: mp[1] - 8, w: 2, h: 2 } : V.tipAnchor(id);
+  let x = ref.x + ref.w / 2 - w / 2, y = ref.y - h - 10;
+  if (y < 100) y = ref.y + ref.h + 12;
+  x = clamp(x, 10, LW - w - 10); y = clamp(y, 10, LH - h - 10);
+  rr(x + 1.5, y + 2.5, w, h, 5); g.fillStyle = `${C.shadow}0.1)`; g.fill();
+  rr(x, y, w, h, 5); g.fillStyle = C.w; g.fill(); g.strokeStyle = rgba(C.P, 0.45); g.lineWidth = 1; g.stroke();
+  g.fillStyle = CAT[CATS[id]] || C.P; g.fillRect(x, y + 6, 2.5, h - 12);
+  text(name, x + 13, y + 16, { size: 11.5, w: 650, col: C.text });
+  lines.forEach((l, i) => text(l, x + 13, y + 34 + i * 15, { size: 10.5, w: 450, col: C.g6 }));
+}
+
+// ---- input
+const toLogical = ev => [(ev.clientX - offX) / S, (ev.clientY - offY) / S];
+const settled = () => (ST.m === 0 || ST.m === 1);
+const curView = () => ST.m >= 0.5 ? V3 : V2;
+function pointer(mx, my, click) {
+  if (!ST.lock && inCtl(CTL.level, mx, my)) { if (click) setLevel(mx < CTL.level.x + CTL.level.w / 2 && mx >= CTL.level.x ? 'low' : mx >= CTL.level.x + CTL.level.w / 2 ? 'medium' : (ST.level === 'low' ? 'medium' : 'low')); return 'ctl'; }
+  if (inCtl(CTL.view, mx, my)) { if (click) setMode(mx < CTL.view.x + CTL.view.w / 2 && mx >= CTL.view.x ? '2d' : mx >= CTL.view.x + CTL.view.w / 2 ? '3d' : (ST.mode === '3d' ? '2d' : '3d')); return 'ctl'; }
+  if (!settled()) return null;
+  const n = curView().hit(mx, my, ST.lv);
+  return n ? n.id : null;
+}
+view.addEventListener('mousemove', ev => { mouse = toLogical(ev); const r = pointer(mouse[0], mouse[1], false); hover = r && r !== 'ctl' ? r : null; view.style.cursor = r ? 'pointer' : 'default'; });
+view.addEventListener('mouseleave', () => { hover = null; mouse = null; });
+view.addEventListener('click', ev => { const [mx, my] = toLogical(ev); mouse = [mx, my]; const r = pointer(mx, my, true); if (r === 'ctl') return; pinned = r ? (pinned === r ? null : r) : null; });
+view.addEventListener('touchstart', ev => { const t = ev.touches[0]; if (!t) return; const [mx, my] = toLogical(t); mouse = [mx, my]; const r = pointer(mx, my, true); if (r !== 'ctl') pinned = r; }, { passive: true });
+window.addEventListener('keydown', ev => {
+  const k = (ev.key || '').toLowerCase();
+  if (k === 'v') setMode(ST.mode === '3d' ? '2d' : '3d');
+  else if (k === '2') setMode('2d'); else if (k === '3') setMode('3d');
+  else if (k === 'l' && !ST.lock) setLevel(ST.level === 'low' ? 'medium' : 'low');
+  else if (k === 'f') toggleFullscreen();
+});
+
+// ---- fullscreen
+const fsBtn = document.getElementById('fs-btn');
+const FS_EXPAND = fsBtn.innerHTML;
+const FS_COMPRESS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M9 21v-3a2 2 0 0 0-2-2H4M15 21v-3a2 2 0 0 1 2-2h3"/></svg>';
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => {});
+}
+function updateFsBtn() {
+  const active = !!document.fullscreenElement;
+  fsBtn.innerHTML = active ? FS_COMPRESS : FS_EXPAND;
+  const label = active ? 'Exit fullscreen' : 'Enter fullscreen';
+  fsBtn.setAttribute('aria-label', label);
+  fsBtn.title = label + ' (F)';
+}
+fsBtn.addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', () => { updateFsBtn(); resize(); });
+if (!document.fullscreenEnabled) fsBtn.style.display = 'none';
+
+// ---- frame loop
+const start = performance.now();
+let freeze = null, last = performance.now();
+const readHash = () => { const m = /t=([\d.]+)/.exec(location.hash); freeze = m ? parseFloat(m[1]) : null; };
+readHash(); window.addEventListener('hashchange', readHash);
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const tm = ST.mode === '3d' ? 1 : 0, tl = ST.level === 'medium' ? 1 : 0;
+  ST.m = tm > ST.m ? Math.min(tm, ST.m + dt / 1.15) : Math.max(tm, ST.m - dt / 1.15);
+  ST.lv = tl > ST.lv ? Math.min(tl, ST.lv + dt / 0.95) : Math.max(tl, ST.lv - dt / 0.95);
+  const T = freeze !== null ? freeze : (now - start) / 1000, t = T % LOOP;
+  const fs = frameState(t, ST.lv);
+
+  g = sctx;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, scene.width, scene.height);
+  if (ST.m === 0 || ST.m === 1) {
+    const V = ST.m === 1 ? V3 : V2, Lr = layers[V.id];
+    g.drawImage(Lr.grid, 0, 0); g.drawImage(Lr.zones, 0, 0);
+    g.setTransform(S * DPR, 0, 0, S * DPR, 0, 0);
+    V.frame(fs);
+    drawHUD(t, fs.st, V.sub);
+    const tip = hover || pinned; if (tip && V.N[tip]) drawTooltip(V, tip);
+  } else {
+    g.setTransform(S * DPR, 0, 0, S * DPR, 0, 0);
+    const e = easeIO(ST.m);
+    morphFrame(e, fs);
+    drawHUD(t, fs.st, e < 0.5 ? V2.sub : V3.sub);
+  }
+  vctx.setTransform(1, 0, 0, 1, 0, 0);
+  vctx.fillStyle = C.bg; vctx.fillRect(0, 0, view.width, view.height);
+  vctx.drawImage(scene, Math.round(offX * DPR), Math.round(offY * DPR));
+  requestAnimationFrame(frame);
+}
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 3);
+  const w = window.innerWidth, h = window.innerHeight;
+  view.width = Math.round(w * DPR); view.height = Math.round(h * DPR);
+  S = Math.min(w / LW, h / LH); offX = (w - LW * S) / 2; offY = (h - LH * S) / 2;
+  scene.width = Math.round(LW * S * DPR); scene.height = Math.round(LH * S * DPR);
+  for (const [id, V] of [['3d', V3], ['2d', V2]]) {
+    for (const k of ['grid', 'zones']) { const c = layers[id][k]; c.width = scene.width; c.height = scene.height; }
+    g = layers[id].grid.getContext('2d'); g.setTransform(S * DPR, 0, 0, S * DPR, 0, 0); V.renderGrid();
+    g = layers[id].zones.getContext('2d'); g.setTransform(S * DPR, 0, 0, S * DPR, 0, 0); g.clearRect(0, 0, LW, LH); V.renderZones();
+  }
+  g = sctx;
+}
+resize();
+window.addEventListener('resize', resize);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

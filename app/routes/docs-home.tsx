@@ -108,16 +108,17 @@ export default function DocsHome() {
               <div className="pl-4 text-white/60">2: eth0: ... inet 192.168.1.101/24 ...</div>
               <div className="pt-2 text-white/40"># 2. Despliega Lamassu con esa IP</div>
               <div>
-                <span className="text-blue-300">./scripts/lamassu-fast-lane.sh</span> \
+                <span className="text-blue-300">curl</span> -fsSL "https://raw.githubusercontent.com/lamassuiot/lamassu-helm/refs/heads/main/scripts/lamassu-fast-lane.sh"
+                \
+              </div>
+              <div className="pl-4">
+                | <span className="text-blue-300">bash</span> -s -- \
               </div>
               <div className="pl-4">
                 <span className="text-emerald-300">-n</span> \
               </div>
               <div className="pl-4">
-                <span className="text-emerald-300">--local-chart-path</span> ./charts/lamassu \
-              </div>
-              <div className="pl-4">
-                <span className="text-emerald-300">--domain</span> lab.lamassu.io \
+                <span className="text-emerald-300">--domain</span> lamassu.mypki \
               </div>
               <div className="pl-4">
                 <span className="text-emerald-300">--sample-data</span> \
@@ -126,7 +127,7 @@ export default function DocsHome() {
                 <span className="text-emerald-300">-ip</span> 192.168.1.101
               </div>
               <div className="pt-2 text-white/40"># → clúster listo</div>
-              <div className="text-cyan-300">✓ Lamassu disponible en https://lab.lamassu.io</div>
+              <div className="text-cyan-300">✓ Lamassu disponible en https://lamassu.mypki</div>
             </div>
           </div>
         </div>

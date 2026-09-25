@@ -111,6 +111,19 @@ article td,
   --lm-callout-background: hsl(48, 52%, 22%);
 }
 
+/* Info notices: the shared amber surface above is nearly invisible against
+   the new white background, leaving only the blue icon/rail visible — so an
+   info callout reads as "a blue thing" instead of a notice. Tint its
+   background to match its own indicator color instead; theme-adaptive via
+   color-mix so it works in light and dark without a separate override. */
+.prose div[style*='--color-fd-info'] {
+  --lm-callout-background: color-mix(in oklab, var(--color-fd-info) 12%, var(--color-fd-background));
+}
+
+.dark .prose div[style*='--color-fd-info'] {
+  --lm-callout-background: color-mix(in oklab, var(--color-fd-info) 16%, var(--color-fd-background));
+}
+
 /* Code blocks: flat containers instead of Fumadocs' bordered/rounded card. */
 .shiki {
   border: 0;

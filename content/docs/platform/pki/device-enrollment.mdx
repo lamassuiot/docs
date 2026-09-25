@@ -1,73 +1,73 @@
 ---
 title: Device Management Service
-description: Define cómo una flota recibe, renueva y utiliza sus identidades.
+description: Define how a fleet receives, renews and uses its identities.
 sidebar:
   group: RA
-  label: Visión general
+  label: Overview
 ---
 
-Un **Device Management Service (DMS)** actúa como autoridad de registro frente a una flota. Recibe solicitudes, aplica la política de autenticación y encarga la emisión a la CA configurada.
+A **Device Management Service (DMS)** acts as the registration authority facing a fleet. It receives requests, applies the authentication policy and delegates issuance to the configured CA.
 
-Cada DMS es un límite operativo independiente: puede representar una línea de producto, un entorno o un tipo de dispositivo con su propia CA, reglas de autenticación, confianza distribuida y ventana de renovación.
+Each DMS is an independent operational boundary: it can represent a product line, an environment or a device type with its own CA, authentication rules, distributed trust and renewal window.
 
-## Antes de empezar
+## Before you begin
 
-- Crea o importa al menos una CA activa.
-- Decide cómo se autenticarán los dispositivos durante el primer enrolamiento.
-- Define qué autoridades debe recibir el dispositivo como anclas de confianza.
-- Asegúrate de tener permisos para administrar DMS.
+- Create or import at least one active CA.
+- Decide how devices will authenticate during initial enrollment.
+- Define which authorities the device should receive as anchors of trust.
+- Make sure you have permissions to administer DMSs.
 
-## Configura un DMS
+## Configure a DMS
 
 <Steps>
   <Step>
-    ### Identifica la flota
+    ### Identify the fleet
 
-    Asigna al DMS un nombre que describa su alcance, por ejemplo una familia de dispositivos o un entorno.
+    Give the DMS a name that describes its scope, for example a device family or an environment.
   </Step>
 
   <Step>
-    ### Selecciona la CA de enrolamiento
+    ### Select the enrollment CA
 
-    Elige la autoridad que emitirá las identidades. Su política y periodo de validez condicionan los certificados que podrá obtener la flota.
+    Choose the authority that will issue the identities. Its policy and validity period constrain the certificates the fleet can obtain.
   </Step>
 
   <Step>
-    ### Configura EST
+    ### Configure EST
 
-    Define la autenticación de `enroll`, la política de `reenroll`, la ventana de renovación y, si se necesita, `serverkeygen`.
+    Define the authentication of `enroll`, the `reenroll` policy, the renewal window and, if needed, `serverkeygen`.
   </Step>
 
   <Step>
-    ### Distribuye la confianza
+    ### Distribute trust
 
-    Configura **CA Distribution** para controlar la respuesta del endpoint `cacerts`.
+    Configure **CA Distribution** to control the response of the `cacerts` endpoint.
   </Step>
 
   <Step>
-    ### Verifica los endpoints
+    ### Verify the endpoints
 
-    Desde el menú del DMS, abre **EST (RFC-7030)** y comprueba la URL base y los ejemplos de invocación antes de integrar el firmware.
+    From the DMS menu, open **EST (RFC-7030)** and check the base URL and the invocation examples before integrating the firmware.
   </Step>
 </Steps>
 
-## Distribución de confianza
+## Trust distribution
 
-- **Include Lamassu System CA** distribuye el certificado TLS del servidor Lamassu, útil para *pinning*. No representa una CA de emisión.
-- **Include Enrollment CA** añade la autoridad configurada para emitir las identidades del DMS.
-- **Managed CAs** permite incluir autoridades adicionales que el dispositivo debe considerar de confianza.
+- **Include Lamassu System CA** distributes the TLS certificate of the Lamassu server, useful for *pinning*. It does not represent an issuing CA.
+- **Include Enrollment CA** adds the authority configured to issue the DMS's identities.
+- **Managed CAs** lets you include additional authorities the device must consider trusted.
 
-## Opera el inventario de DMS
+## Operate the DMS inventory
 
-- **Edit** modifica la política del DMS.
-- **Go to DMS owned devices** abre únicamente los dispositivos de esa flota.
-- **Show/Edit Metadata** permite gestionar configuración avanzada y datos de integraciones.
-- **EST (RFC-7030)** muestra los endpoints y ejemplos específicos del DMS.
-- **Delete** elimina el DMS y su configuración. La acción es irreversible.
+- **Edit** modifies the DMS policy.
+- **Go to DMS owned devices** opens only the devices of that fleet.
+- **Show/Edit Metadata** manages advanced configuration and integration data.
+- **EST (RFC-7030)** shows the endpoints and examples specific to the DMS.
+- **Delete** removes the DMS and its configuration. The action is irreversible.
 
-## Integra los dispositivos
+## Integrate the devices
 
 <Cards>
-  <Card title="Enrolamiento EST" description="Configura autenticación, endpoints y flujos para firmware." href="/docs/platform/pki/est-enrollment" />
-  <Card title="Dispositivos e identidades" description="Consulta estados, historial y acciones operativas." href="/docs/platform/pki/device-management" />
+  <Card title="EST enrollment" description="Configure authentication, endpoints and flows for firmware." href="/docs/platform/pki/est-enrollment" />
+  <Card title="Devices and identities" description="Review statuses, history and operational actions." href="/docs/platform/pki/device-management" />
 </Cards>

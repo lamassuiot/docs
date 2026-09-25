@@ -1,41 +1,41 @@
 ---
-title: Validación online con OCSP
-description: Consulta en tiempo real si un certificado sigue vigente o se ha revocado.
+title: Online validation with OCSP
+description: Check in real time whether a certificate is still valid or has been revoked.
 sidebar:
   group: VA
   label: OCSP
 ---
 
-# Servicio OCSP
+# OCSP service
 
-OCSP (Online Certificate Status Protocol) es el mecanismo que permite a una parte que confía comprobar, en tiempo real, si un certificado concreto está vigente o ha sido revocado. En lugar de descargar una lista completa de certificados revocados, el cliente envía una consulta con el número de serie del certificado y recibe una respuesta firmada con el estado actual.
+OCSP (Online Certificate Status Protocol) is the mechanism that lets a relying party check, in real time, whether a specific certificate is valid or has been revoked. Instead of downloading a full list of revoked certificates, the client sends a query with the certificate's serial number and receives a signed response with the current status.
 
-Lamassu integra un respondedor OCSP propio que atiende estas consultas consultando directamente la base de datos interna de certificados. No se requiere ningún componente externo.
+Lamassu integrates its own OCSP responder that serves these queries by consulting the internal certificate database directly. No external component is required.
 
-## Cómo funciona el respondedor en Lamassu
+## How the responder works in Lamassu
 
-Cuando un cliente solicita el estado de un certificado, el respondedor localiza el certificado por su número de serie y determina su estado según el registro interno:
+When a client requests the status of a certificate, the responder locates the certificate by its serial number and determines its status from the internal record:
 
-- Si el certificado está activo, la respuesta indica `Good`.
-- Si el certificado ha sido revocado, la respuesta indica `Revoked` e incluye la marca de tiempo de revocación y el código de razón conforme a RFC 5280.
-- Si el número de serie no se encuentra o el estado no es reconocible, la respuesta indica `Unknown`.
+- If the certificate is active, the response indicates `Good`.
+- If the certificate has been revoked, the response indicates `Revoked` and includes the revocation timestamp and the RFC 5280 reason code.
+- If the serial number is not found or the status is not recognizable, the response indicates `Unknown`.
 
-La respuesta OCSP es firmada por la CA emisora del certificado consultado, utilizando el motor criptográfico asociado a esa CA. Lamassu no utiliza un certificado delegado de firma OCSP: la CA actúa directamente como respondedor.
+The OCSP response is signed by the issuing CA of the queried certificate, using the cryptographic engine associated with that CA. Lamassu does not use a delegated OCSP signing certificate: the CA acts directly as the responder.
 
-Cada respuesta tiene una ventana de validez de 24 horas, reflejada en los campos `thisUpdate` y `nextUpdate` de la respuesta. Los clientes que cacheen respuestas deben tener en cuenta esta ventana al determinar durante cuánto tiempo una respuesta sigue siendo válida.
+Each response has a validity window of 24 hours, reflected in the response's `thisUpdate` and `nextUpdate` fields. Clients that cache responses must take this window into account when determining how long a response remains valid.
 
-## Enlace en los certificados emitidos
+## Embedding in issued certificates
 
-La URL del respondedor OCSP se incorpora automáticamente en la extensión AIA (*Authority Information Access*) de todos los certificados emitidos por Lamassu. Los clientes que verifican certificados pueden leer esta URL directamente del certificado sin necesidad de configuración adicional.
+The OCSP responder URL is automatically embedded in the AIA (*Authority Information Access*) extension of every certificate issued by Lamassu. Clients that verify certificates can read this URL directly from the certificate without additional configuration.
 
-## Endpoints HTTP
+## HTTP endpoints
 
-El respondedor acepta los dos formatos definidos en RFC 6960:
+The responder accepts both formats defined in RFC 6960:
 
-- `GET /ocsp/{ocsp_request}` incluye la petición OCSP codificada en Base64url dentro de la propia URL.
-- `POST /ocsp` envía la petición en el cuerpo con `Content-Type: application/ocsp-request`.
+- `GET /ocsp/{ocsp_request}` includes the OCSP request Base64url-encoded within the URL itself.
+- `POST /ocsp` sends the request in the body with `Content-Type: application/ocsp-request`.
 
-Ejemplo de consulta con `curl` mediante POST:
+Example query with `curl` using POST:
 
 ```bash
 curl -X POST https://<LAMASSU_HOST>/ocsp \
@@ -44,18 +44,18 @@ curl -X POST https://<LAMASSU_HOST>/ocsp \
   -o response.der
 ```
 
-La respuesta tiene `Content-Type: application/ocsp-response` y contiene la respuesta OCSP en formato DER.
+The response has `Content-Type: application/ocsp-response` and contains the OCSP response in DER format.
 
-## Comprobación desde la interfaz
+## Check from the interface
 
-Desde la pantalla de certificados de Lamassu es posible lanzar una petición OCSP directamente sobre el certificado seleccionado mediante la acción **OCSP Check**. Esta acción muestra el estado devuelto por el respondedor sin necesidad de herramientas externas.
+From the certificates screen of Lamassu you can launch an OCSP request directly against the selected certificate with the **OCSP Check** action. This action shows the status returned by the responder without needing external tools.
 
-## Referencias
+## References
 
 - RFC 6960 - *X.509 Internet Public Key Infrastructure Online Certificate Status Protocol – OCSP*
-- RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile* (razones de revocación, sección 5.3.1)
+- RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile* (revocation reasons, section 5.3.1)
 
 <Cards>
-  <Card title="Servicio CRL" href="/docs/platform/pki/crl" />
-  <Card title="Validación de certificados" href="/docs/platform/pki/certificate-validation" />
+  <Card title="CRL service" href="/docs/platform/pki/crl" />
+  <Card title="Certificate validation" href="/docs/platform/pki/certificate-validation" />
 </Cards>

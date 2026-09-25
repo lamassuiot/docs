@@ -1,4 +1,6 @@
-'use client';
+"use client";
+import { create } from "@orama/orama";
+import { useDocsSearch } from "fumadocs-core/search/client";
 import {
   SearchDialog,
   SearchDialogClose,
@@ -9,32 +11,35 @@ import {
   SearchDialogList,
   SearchDialogOverlay,
   type SharedProps,
-} from 'fumadocs-ui/components/dialog/search';
-import { useDocsSearch } from 'fumadocs-core/search/client';
-import { create } from '@orama/orama';
-import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import { asset } from '@/lib/asset';
+} from "fumadocs-ui/components/dialog/search";
+import { useI18n } from "fumadocs-ui/contexts/i18n";
+import { asset } from "@/lib/asset";
 
-function initOrama() {
+function initOrama(locale?: string) {
   return create({
-    schema: { _: 'string' },
-    language: 'english',
+    schema: { _: "string" },
+    language: locale === "es" ? "spanish" : "english",
   });
 }
 
 export default function DefaultSearchDialog(props: SharedProps) {
   const { locale } = useI18n();
   const { search, setSearch, query } = useDocsSearch({
-    type: 'static',
+    type: "static",
     // Defaults to a root-absolute '/api/search', which misses the base path
     // this site is served under (see `base` in vite.config.ts).
-    from: asset('api/search'),
+    from: asset("api/search"),
     initOrama,
     locale,
   });
 
   return (
-    <SearchDialog search={search} onSearchChange={setSearch} isLoading={query.isLoading} {...props}>
+    <SearchDialog
+      search={search}
+      onSearchChange={setSearch}
+      isLoading={query.isLoading}
+      {...props}
+    >
       <SearchDialogOverlay />
       <SearchDialogContent>
         <SearchDialogHeader>
@@ -42,7 +47,7 @@ export default function DefaultSearchDialog(props: SharedProps) {
           <SearchDialogInput />
           <SearchDialogClose />
         </SearchDialogHeader>
-        <SearchDialogList items={query.data !== 'empty' ? query.data : null} />
+        <SearchDialogList items={query.data !== "empty" ? query.data : null} />
       </SearchDialogContent>
     </SearchDialog>
   );

@@ -1,0 +1,212 @@
+---
+title: Instala con Helm
+description: Prepara las dependencias, configura el chart de Lamassu y verifica un despliegue controlado en Kubernetes.
+---
+
+# Instala Lamassu con Helm
+
+Usa Helm cuando necesites control explícito sobre identidad, bases de datos, mensajería, certificados, almacenamiento y upgrades. Para un entorno de evaluación en el que el script pueda tomar esas decisiones, usa [Fastlane](/docs/deployment/self-hosted/fastlane).
+
+## Antes de comenzar
+
+Prepara los servicios de plataforma que quedan deliberadamente fuera del chart de Lamassu:
+
+- un clúster Kubernetes 1.24+ y Helm 3.2+
+- un servidor PostgreSQL accesible y un rol autorizado para crear bases de datos y schemas
+- un broker RabbitMQ accesible y sus credenciales
+- un proveedor OIDC, normalmente Keycloak, con un realm/tenant y un cliente para Lamassu
+- Envoy Gateway 1.8+ y una `GatewayClass`
+- cert-manager 1.14+; para TLS de confianza, un emisor de confianza o un Secret TLS de Kubernetes
+- una StorageClass y un [diseño de tráfico externo](/docs/deployment/self-hosted/networking)
+
+El chart usa por defecto una `GatewayClass` llamada `eg`. Cambia `gateway.className` si tu equipo de plataforma utiliza otro nombre.
+
+<Callout type="info" title="Qué hace Helm con PostgreSQL">
+  Tú proporcionas el servidor PostgreSQL. El job de pre-install del chart se conecta con las credenciales indicadas, crea las bases de datos `pki`, `authz` y `wfx` y los schemas de los servicios, ejecuta las migraciones y aplica `services.authz.bootstrap`.
+</Callout>
+
+El chart no tiene dependencias Helm que instalen PostgreSQL, RabbitMQ, un proveedor OIDC, Envoy Gateway ni cert-manager.
+
+## 1. Instala los requisitos del Gateway
+
+Instala o actualiza las CRD de Envoy Gateway antes de su controlador. Estos comandos usan la misma versión que el repositorio Helm de Lamassu:
+
+```bash
+export ENVOY_GATEWAY_VERSION=v1.8.0
+
+helm template eg-crds oci://docker.io/envoyproxy/gateway-crds-helm \
+  --version "$ENVOY_GATEWAY_VERSION" \
+  --set crds.gatewayAPI.enabled=true \
+  --set crds.gatewayAPI.channel=experimental \
+  --set crds.envoyGateway.enabled=true \
+  | kubectl apply --server-side --force-conflicts -f -
+
+helm upgrade --install eg oci://docker.io/envoyproxy/gateway-helm \
+  --version "$ENVOY_GATEWAY_VERSION" \
+  --namespace envoy-gateway-system \
+  --create-namespace
+```
+
+Crea la `GatewayClass` predeterminada si todavía no existe. Guarda este manifiesto como `gateway-class.yaml`:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+```
+
+```bash
+kubectl apply -f gateway-class.yaml
+kubectl rollout status deployment/envoy-gateway -n envoy-gateway-system
+```
+
+Instala cert-manager por separado antes de Lamassu. El chart actual renderiza sus recursos de issuer self-signed y certificado CA incluso cuando `tls.type: external` hace que el Gateway use un Secret TLS existente. Seleccionar TLS externo no elimina por tanto el requisito de cert-manager.
+
+## 2. Crea un archivo de valores
+
+Parte de los valores predeterminados del chart y sobrescribe los específicos del entorno. Este ejemplo supone que PostgreSQL, RabbitMQ y Keycloak son accesibles mediante DNS de Kubernetes y expone Keycloak en `/auth` a través del Gateway compartido:
+
+```yaml
+postgres:
+  hostname: postgresql
+  port: 5432
+  username: lamassu
+  password: change-me
+
+amqp:
+  hostname: rabbitmq
+  port: 5672
+  username: lamassu
+  password: change-me
+  tls: false
+
+tls:
+  type: certManager
+  certManagerOptions:
+    clusterIssuer: production-issuer
+    certSpec:
+      commonName: pki.example.com
+      hostnames:
+        - pki.example.com
+
+gateway:
+  className: eg
+  ports:
+    http: 80
+    https: 443
+  extraRouting:
+    - name: auth
+      path: /auth
+      target:
+        host: auth-keycloak
+        port: 80
+
+auth:
+  oidc:
+    frontend:
+      clientId: frontend
+      authority: https://pki.example.com/auth/realms/lamassu
+    apiGateway:
+      jwks:
+        - name: oidc-authn
+          uri: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
+
+services:
+  ca:
+    domains:
+      - pki.example.com
+  authz:
+    jwkUrl: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
+    bootstrap:
+      - principal_id: "oidc:pki-admin"
+        principal_name: "PKI Admin"
+        principal_type: "oidc"
+        policy_ids:
+          - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+        auth_config:
+          claims:
+            - claim: realm_access.roles
+              operator: contains
+              value: pki-admin
+```
+
+No añadas `gateway.addresses` por defecto. Deja la asignación de dirección a la implementación del balanceador salvo que tu diseño de red requiera una VIP concreta en Kubernetes. La IP pública de un NAT o proxy upstream no corresponde a este valor.
+
+Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OIDC hacia él y omite la entrada `/auth` de `gateway.extraRouting`.
+
+### TLS con un Secret existente
+
+Crea un Secret con `tls.crt` y `tls.key` y referéncialo:
+
+```yaml
+tls:
+  type: external
+  externalOptions:
+    secretName: lamassu-downstream-tls
+```
+
+### Provisiona el primer administrador
+
+No existe un superusuario implícito. Crea en el proveedor OIDC el rol o grupo esperado por `services.authz.bootstrap` y asígnalo al menos a un administrador antes de exponer Lamassu.
+
+El job de pre-install y pre-upgrade aplica el bootstrap de forma idempotente: conserva los principales existentes y añade los grants que falten.
+
+<Callout type="warn" title="Valida el acceso antes de exponer la plataforma">
+  Prueba una identidad autorizada y otra denegada. Si ningún token coincide con un principal activo del bootstrap, nadie podrá administrar la PKI.
+</Callout>
+
+Consulta [Control de acceso](/docs/platform/pki/access-control) para conocer el modelo de principales y políticas.
+
+## 3. Instala Lamassu
+
+```bash
+helm repo add lamassu https://lamassuiot.github.io/lamassu-helm
+helm repo update
+
+helm upgrade --install lamassu lamassu/lamassu \
+  --namespace lamassu \
+  --create-namespace \
+  --values values.yaml \
+  --wait
+```
+
+Para instalar un checkout local:
+
+```bash
+helm upgrade --install lamassu ./charts/lamassu \
+  --namespace lamassu \
+  --create-namespace \
+  --values values.yaml \
+  --wait
+```
+
+## 4. Verifica el despliegue
+
+```bash
+kubectl get pods -n lamassu
+kubectl get gateway,httproute -n lamassu
+kubectl get service -A
+helm test lamassu -n lamassu --logs
+```
+
+El Gateway debe mostrar `PROGRAMMED=True`. Si está programado pero no tiene una dirección utilizable, continúa con [Expón el Gateway](/docs/deployment/self-hosted/networking).
+
+El test de Helm comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y verifica la respuesta de la UI.
+
+## Decisiones para producción
+
+Antes de pasar a producción, revisa:
+
+- backup y recuperación de PostgreSQL y volúmenes persistentes
+- un motor KMS de producción; el motor filesystem predeterminado no ofrece alta disponibilidad
+- almacenamiento compartido para VA antes de aumentar sus réplicas
+- roles OIDC gestionados y eliminación de credenciales de evaluación
+- un emisor TLS de confianza o un certificado gestionado externamente
+- recursos, réplicas, autoscaling, disruption budgets y placement
+- SMTP, observabilidad y entrega de alertas
+- las notas de migración de `charts/lamassu/CHANGELOG/` antes de cada upgrade
+
+La referencia completa de valores se mantiene en `charts/lamassu/VALUES.md` dentro del repositorio Helm.

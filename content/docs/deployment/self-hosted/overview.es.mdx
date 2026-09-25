@@ -1,0 +1,79 @@
+---
+title: Kubernetes self-managed
+description: Elige un flujo de instalación y una arquitectura de red para Lamassu en tu clúster Kubernetes.
+---
+
+# Despliegue self-managed con Kubernetes
+
+Ejecuta Lamassu en un clúster Kubernetes operado por tu equipo. El chart Helm despliega los servicios de Lamassu y sus recursos de enrutamiento; tú proporcionas el clúster, el almacenamiento persistente, el proveedor de identidad, PostgreSQL, RabbitMQ y la ruta de red utilizada por los clientes.
+
+## Elige un flujo de instalación
+
+| Flujo | Úsalo para | Qué instala |
+|---|---|---|
+| [Helm](/docs/deployment/self-hosted/helm) | Producción y entornos controlados | Servicios de Lamassu y recursos de Gateway API |
+| [Fastlane](/docs/deployment/self-hosted/fastlane) | Evaluación, demos, CI y pequeños clústeres de laboratorio | PostgreSQL, Keycloak, RabbitMQ, Envoy Gateway y Lamassu |
+
+## Qué proporciona el chart de Lamassu
+
+El chart de Lamassu es un **chart de aplicación**, no un chart de bootstrap del clúster. Crea los recursos Kubernetes que ejecutan y configuran Lamassu, pero espera que ya existan los servicios de plataforma de los que dependen.
+
+| Área | El chart de Lamassu proporciona | Tú proporcionas |
+|---|---|---|
+| Aplicaciones Lamassu | Deployments y StatefulSets para la UI y las APIs, Services internos, ConfigMaps, una ServiceAccount y HPA/PDB opcionales | Un clúster Kubernetes operativo, capacidad de cómputo y acceso a las imágenes |
+| Datos PostgreSQL | Un job de pre-install/pre-upgrade que crea las bases de datos y schemas necesarios, ejecuta migraciones y aplica el bootstrap de autorización | Un servidor PostgreSQL accesible, credenciales autorizadas para crear bases de datos y schemas, y operaciones de backup/HA |
+| Mensajería | Configuración de conexión a RabbitMQ para los servicios Lamassu | Un broker RabbitMQ accesible, credenciales y la gestión de su ciclo de vida |
+| Identidad | Configuración OIDC/JWT y de autorización externa, además de los principales iniciales de Lamassu | Un proveedor OIDC, realm/tenant, cliente, usuarios, grupos y roles |
+| Enrutamiento externo | Un `Gateway`, recursos `HTTPRoute`, una configuración `EnvoyProxy` y políticas de seguridad de Envoy | Las CRD de Gateway API y Envoy, el controlador Envoy Gateway, una `GatewayClass`, un balanceador y la ruta de red externa |
+| TLS | Recursos `Issuer` y `Certificate` CA de cert-manager; un `Certificate` downstream gestionado por el chart o una referencia a tu Secret TLS | cert-manager; para TLS de confianza, un emisor de confianza o un Secret TLS ya poblado |
+| Datos persistentes de la aplicación | PersistentVolumeClaims necesarios para el almacenamiento local predeterminado de KMS y VA | Una StorageClass, almacenamiento físico, backups y un backend compartido/externo cuando el escalado lo requiera |
+| Integraciones opcionales | Puntos de configuración para observabilidad, conectores AWS y conectividad PKCS#11/HSM | Los backends de observabilidad, credenciales cloud y un HSM de producción o servicio externo de claves |
+
+<Callout type="warn" title="Un recurso Gateway no es un balanceador">
+  El chart crea el `Gateway` y las rutas de Lamassu. No instala el controlador Envoy Gateway ni hace que el Service `LoadBalancer` generado sea accesible desde tu red.
+</Callout>
+
+<Callout type="info" title="Recomendación para una VM pequeña de un solo nodo">
+  Usa un único Gateway de Lamassu en los puertos 80 y 443 y deja que sus HTTPRoutes distribuyan el tráfico a todos los servicios. Proporciona a ese Gateway un único endpoint accesible mediante el balanceador del clúster, o reenvía tráfico desde un proxy externo o un dispositivo NAT. No necesitas un Gateway por servicio.
+</Callout>
+
+## Cómo encaja el despliegue
+
+```text
+Clientes
+  |
+  | Nombre DNS o IP accesible
+  v
+LoadBalancer, puerto del nodo o proxy/NAT externo
+  |
+  v
+Un Envoy Gateway (TLS termina aquí)
+  |
+  +-- HTTPRoutes --> UI
+  +-- HTTPRoutes --> CA, VA, KMS y APIs de dispositivos
+  +-- HTTPRoutes --> servicios de autorización y workflows
+  +-- ruta opcional --> proveedor OIDC
+```
+
+El chart crea un `Gateway` compartido por cada release de Helm. Todos los recursos `HTTPRoute` gestionados por el chart se conectan a él. Envoy Gateway provisiona el data plane del proxy y un Service `LoadBalancer` de Kubernetes para ese Gateway.
+
+El valor `gateway.addresses` solo solicita una dirección al controlador del Gateway. No hace que una IP sea enrutable, abre un firewall, configura DNS ni crea NAT. Consulta [Expón el Gateway](/docs/deployment/self-hosted/networking) antes de definirlo.
+
+## Requisitos de plataforma
+
+- Kubernetes 1.24 o posterior
+- Helm 3.2 o posterior
+- Envoy Gateway 1.8 o posterior y una `GatewayClass`
+- cert-manager 1.14 o posterior; el chart actual renderiza recursos issuer y certificate de cert-manager
+- almacenamiento persistente adecuado para la configuración elegida de PostgreSQL, RabbitMQ, VA y KMS
+- una implementación de balanceador o alguna otra ruta deliberada desde los clientes hasta el Gateway
+
+Los despliegues KMS que usan el sidecar PKCS#11 nativo requieren Kubernetes 1.29 o posterior.
+
+## Elige la siguiente página
+
+<Cards>
+  <Card title="Instala con Helm" description="Prepara dependencias, configura valores, instala y verifica un despliegue controlado." href="/docs/deployment/self-hosted/helm" />
+  <Card title="Expón el Gateway" description="Elige un diseño de tráfico externo, comprende gateway.addresses y gestiona varios Gateways." href="/docs/deployment/self-hosted/networking" />
+  <Card title="Usa Fastlane" description="Arranca un entorno completo de evaluación o laboratorio con un script." href="/docs/deployment/self-hosted/fastlane" />
+</Cards>

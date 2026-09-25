@@ -36,6 +36,7 @@ import { MdxLink } from "@/components/mdx-link";
 import { VersionSelector } from "@/components/version-selector";
 import { docsPath } from "@/lib/base-path";
 import { baseOptions, gitConfig } from "@/lib/layout.shared";
+import { DEFAULT_LOCALE, splitLocaleSlugs } from "@/lib/locales";
 import { source } from "@/lib/source";
 import type { Route } from "./+types/docs";
 
@@ -120,48 +121,53 @@ function createFolder(
  * their group in content (frontmatter `sidebar.group`, or `group` in a
  * subfolder's meta.json — see source.config.ts); within a group they keep
  * their meta.json order. A group name not listed here becomes a new folder
- * after these; anything without a group goes to "Otros".
+ * after these; anything without a group goes to the monitoring group.
+ * `source` is the content-side key (locale-independent), `name` is what the
+ * reader sees.
  */
 const OPERATION_GROUPS: {
   source: string;
-  name: string;
+  name: { es: string; en: string };
   id: string;
   icon: ReactNode;
 }[] = [
   {
     source: "KMS",
-    name: "Claves y motores",
+    name: { es: "Claves y motores", en: "Keys and engines" },
     id: "kms",
     icon: <KeyRound size={16} className="shrink-0" />,
   },
   {
     source: "CA",
-    name: "Autoridades y certificados",
+    name: {
+      es: "Autoridades y certificados",
+      en: "Authorities and certificates",
+    },
     id: "ca",
     icon: <ShieldCheck size={16} className="shrink-0" />,
   },
   {
     source: "RA",
-    name: "Enrolamiento",
+    name: { es: "Enrolamiento", en: "Enrollment" },
     id: "ra",
     icon: <ClipboardList size={16} className="shrink-0" />,
   },
   {
     source: "VA",
-    name: "Validación",
+    name: { es: "Validación", en: "Validation" },
     id: "va",
     icon: <BadgeCheck size={16} className="shrink-0" />,
   },
   {
     source: "Gestión de flotas",
-    name: "Dispositivos",
+    name: { es: "Dispositivos", en: "Devices" },
     id: "flotas",
     icon: <Cpu size={16} className="shrink-0" />,
   },
 ];
 const OTHER_GROUP = {
   source: "Otros",
-  name: "Monitorización",
+  name: { es: "Monitorización", en: "Monitoring" },
   id: "monitorizacion",
   icon: <Bell size={16} className="shrink-0" />,
 };
@@ -169,6 +175,11 @@ const OTHER_GROUP = {
 /** Group names match ignoring case and accents, so 'gestion de flotas' still lands in the right folder. */
 function groupKey(name: string): string {
   return name.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase();
+}
+
+/** The meta.json separator that marks where grouping starts, per locale. */
+function operationSeparatorName(locale: string): string {
+  return locale === "es" ? "Operar Lamassu" : "operate lamassu";
 }
 
 function sidebarPlacement(node: PageTreeNode): {
@@ -181,12 +192,15 @@ function sidebarPlacement(node: PageTreeNode): {
   return {};
 }
 
-function groupOperationNodes(children: PageTreeNode[]): PageTreeNode[] {
+function groupOperationNodes(
+  children: PageTreeNode[],
+  locale: string,
+): PageTreeNode[] {
   const separatorIndex = children.findIndex(
     (node) =>
       node.type === "separator" &&
       typeof node.name === "string" &&
-      node.name.toLowerCase() === "operar lamassu",
+      node.name.toLowerCase() === operationSeparatorName(locale),
   );
 
   if (separatorIndex === -1) {
@@ -208,7 +222,7 @@ function groupOperationNodes(children: PageTreeNode[]): PageTreeNode[] {
 
   type OperationGroup = {
     source: string;
-    name: string;
+    name: { es: string; en: string };
     id: string;
     icon?: ReactNode;
     items: PageTreeNode[];
@@ -230,7 +244,7 @@ function groupOperationNodes(children: PageTreeNode[]): PageTreeNode[] {
     if (!group && name && key) {
       group = {
         source: name,
-        name,
+        name: { es: name, en: name },
         id: key.replace(/[^a-z0-9]+/g, "-"),
         items: [],
       };
@@ -252,7 +266,7 @@ function groupOperationNodes(children: PageTreeNode[]): PageTreeNode[] {
     .filter((group) => group.items.length > 0)
     .map((group) =>
       createFolder(
-        group.name,
+        locale === "es" ? group.name.es : (group.name.en ?? group.source),
         group.items,
         `operar-lamassu-${group.id}`,
         group.icon,
@@ -266,14 +280,14 @@ function groupOperationNodes(children: PageTreeNode[]): PageTreeNode[] {
   ];
 }
 
-function mapPageTreeNode(node: PageTreeNode): PageTreeNode {
+function mapPageTreeNode(node: PageTreeNode, locale: string): PageTreeNode {
   if (node.type === "folder") {
-    const groupedChildren = groupOperationNodes(node.children);
+    const groupedChildren = groupOperationNodes(node.children, locale);
 
     const folder: PageTreeFolder = {
       ...node,
       name: mapTreeNodeName(node.name, true),
-      children: groupedChildren.map(mapPageTreeNode),
+      children: groupedChildren.map((child) => mapPageTreeNode(child, locale)),
     };
 
     if (node.index) {
@@ -301,14 +315,16 @@ function mapPageTreeNode(node: PageTreeNode): PageTreeNode {
   };
 }
 
-function mapPageTree(root: PageTreeRoot): PageTreeRoot {
-  const groupedChildren = groupOperationNodes(root.children);
+function mapPageTree(root: PageTreeRoot, locale: string): PageTreeRoot {
+  const groupedChildren = groupOperationNodes(root.children, locale);
 
   return {
     ...root,
     name: mapTreeNodeName(root.name, true),
-    children: groupedChildren.map(mapPageTreeNode),
-    fallback: root.fallback ? mapPageTree(root.fallback) : root.fallback,
+    children: groupedChildren.map((child) => mapPageTreeNode(child, locale)),
+    fallback: root.fallback
+      ? mapPageTree(root.fallback, locale)
+      : root.fallback,
   };
 }
 
@@ -351,29 +367,37 @@ const DOC_REDIRECTS: Record<string, string> = {
 export async function loader({ params, request }: Route.LoaderArgs) {
   const slugs = params["*"].split("/").filter((v) => v.length > 0);
   if (slugs.length === 0) throw new Response("Not found", { status: 404 });
-  const legacyPath = slugs.join("/");
+
+  const { locale, content } = splitLocaleSlugs(slugs);
+  const legacyPath = content.join("/");
   const redirectPath = DOC_REDIRECTS[legacyPath];
   if (redirectPath) {
     const search = new URL(request.url).search;
-    throw redirect(`${docsPath(redirectPath)}${search}`, 301);
+    const localePrefix = locale === DEFAULT_LOCALE ? "" : `${locale}/`;
+    throw redirect(`${docsPath(localePrefix + redirectPath)}${search}`, 301);
   }
-  const page = source.getPage(slugs);
+  const page = source.getPage(content, locale);
   if (!page) throw new Response("Not found", { status: 404 });
-  const pageTree = mapPageTree(source.getPageTree());
+  const pageTree = mapPageTree(source.getPageTree(locale), locale);
 
   return {
     slugs: page.slugs,
     path: page.path,
     url: page.url,
-    affected: affectedPages(),
+    locale,
+    affected: affectedPages(locale),
     pageTree: await source.serializePageTree(pageTree),
   };
 }
 
 /** PR previews only: every page the PR touches, for the diff panel. */
-function affectedPages(): AffectedPages | undefined {
+function affectedPages(locale: string): AffectedPages | undefined {
   if (!__DOCS_DIFF__) return undefined;
-  const byPath = new Map(source.getPages().map((page) => [page.path, page]));
+  const byPath = new Map(
+    source
+      .getPages(locale)
+      .map((page) => [page.path.replace(/\.es\.mdx$/, ".mdx"), page]),
+  );
   const pages = __DOCS_DIFF__.pages.flatMap(({ path, isNew }) => {
     const page = byPath.get(path);
     return page
@@ -401,11 +425,13 @@ const clientLoader = browserCollections.docs.createClientLoader({
       slugs,
       path,
       url,
+      locale,
       affected,
     }: {
       slugs: string[];
       path: string;
       url: string;
+      locale: string;
       affected?: AffectedPages;
     },
   ) {
@@ -447,7 +473,12 @@ const clientLoader = browserCollections.docs.createClientLoader({
             frontmatter.description
           )}
         </DocsDescription>
-        <DiffToggle diff={diff} affected={affected} currentUrl={url} />
+        <DiffToggle
+          diff={diff}
+          affected={affected}
+          currentUrl={url}
+          locale={locale}
+        />
         <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
           <LLMCopyButton markdownUrl={markdownUrl} />
           <ViewOptions
@@ -471,6 +502,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
   return (
     <DocsLayout
       {...baseOptions()}
+      i18n
       tree={pageTree}
       sidebar={{ banner: <VersionSelector /> }}
     >

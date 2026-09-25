@@ -1,11 +1,19 @@
-import type { Config } from '@react-router/dev/config';
-import { glob } from 'node:fs/promises';
-import { createGetUrl, getSlugs } from 'fumadocs-core/source';
+import { glob } from "node:fs/promises";
+import type { Config } from "@react-router/dev/config";
+import { getSlugs } from "fumadocs-core/source";
+import {
+  docsUrl,
+  i18nConfig,
+  LOCALES,
+  parseLocaleFile,
+} from "./app/lib/locales";
 
 // Mount point for this build — see app/lib/base-path.ts. Read from process.env
 // because this config is loaded in Node, not bundled.
-const basePath = (process.env.VITE_DOCS_BASE_PATH ?? '/docs').replace(/\/+$/, '');
-const getUrl = createGetUrl(basePath);
+const basePath = (process.env.VITE_DOCS_BASE_PATH ?? "/docs").replace(
+  /\/+$/,
+  "",
+);
 
 export default {
   ssr: false,
@@ -20,10 +28,19 @@ export default {
       if (!excluded.includes(path)) paths.push(path);
     }
 
-
-    for await (const entry of glob('**/*.mdx', { cwd: 'content/docs' })) {
-      const slugs = getSlugs(entry);
-      paths.push(getUrl(slugs), `/llms.mdx/docs/${[...slugs, 'index.mdx'].join('/')}`);
+    for await (const entry of glob("**/*.{mdx,md}", { cwd: "content/docs" })) {
+      // The dot parser strips the locale suffix from the virtual path, so
+      // slugs must come from the stripped path (overview.en.mdx -> overview).
+      const { path } = parseLocaleFile(entry);
+      const slugs = getSlugs(path);
+      for (const target of LOCALES) {
+        // Every locale gets a page URL: untranslated pages fall back to the
+        // default language's content at the locale's URL.
+        paths.push(docsUrl(basePath, target, slugs));
+        paths.push(
+          `/llms.mdx/docs/${[...(target === i18nConfig.defaultLanguage ? [] : [target]), ...slugs, "index.mdx"].join("/")}`,
+        );
+      }
     }
 
     return paths;

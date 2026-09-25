@@ -1,134 +1,135 @@
 ---
 title: AWS IoT Core
-description: El conector de Lamassu para AWS IoT Core sincroniza las identidades de los dispositivos con la plataforma AWS, gestionando el registro de CAs, el aprovisionamiento de Things y el ciclo de vida de los certificados de forma automática y orientada a eventos.
+description: Lamassu's connector for AWS IoT Core syncs device identities with the AWS platform, handling CA registration, Thing provisioning and certificate lifecycle automatically and event-driven.
 ---
 
-La integración de Lamassu con AWS IoT Core cubre el puente entre la PKI gestionada por Lamassu y la plataforma de conectividad de AWS. Cuando un dispositivo obtiene su certificado a través del proceso de enrolamiento EST, el conector se encarga de que ese certificado y la identidad asociada sean reconocidos en AWS IoT Core sin intervención manual. El resultado es que el dispositivo puede autenticarse directamente en AWS con el mismo certificado X.509 que Lamassu emitió.
+Lamassu's integration with AWS IoT Core bridges the PKI managed by Lamassu and AWS's connectivity platform. When a device obtains its certificate through the EST enrollment process, the connector ensures that certificate and its associated identity are recognized in AWS IoT Core without manual intervention. The result is that the device can authenticate directly to AWS with the same X.509 certificate Lamassu issued.
 
-Desde el punto de vista del protocolo, el dispositivo se autentica ante AWS IoT Core mediante TLS mutuo (mTLS): presenta su certificado X.509 emitido por Lamassu como certificado de cliente, y AWS IoT Core verifica la cadena de certificados hasta llegar a la CA registrada en la cuenta. Lamassu actúa como autoridad de certificación (CA); el conector se encarga de que esa CA esté registrada en AWS y de que el certificado del dispositivo sea conocido por la plataforma antes de que el dispositivo intente conectarse (en modo `auto`) o en su primera conexión (en modo JITP).
+From a protocol standpoint, the device authenticates to AWS IoT Core via mutual TLS (mTLS): it presents its Lamassu-issued X.509 certificate as the client certificate, and AWS IoT Core verifies the certificate chain up to the CA registered in the account. Lamassu acts as the certification authority (CA); the connector ensures that CA is registered in AWS and that the device's certificate is known to the platform before the device attempts to connect (in `auto` mode) or on its first connection (in JITP mode).
 
-Este documento está dirigido tanto al administrador PKI, que necesita configurar el conector y registrar las CAs, como al desarrollador de firmware de dispositivos, que necesita entender cómo se nombran los Things, cómo funciona el Device Shadow y qué ocurre cuando un certificado se revoca. Para el desarrollador de firmware, el dato más importante es que el **nombre del Thing en AWS (ThingName) corresponde siempre al Common Name (CN) del certificado emitido por Lamassu**, independientemente del modo de aprovisionamiento.
+This document is aimed both at the PKI administrator, who needs to configure the connector and register CAs, and at the device firmware developer, who needs to understand how Things are named, how the Device Shadow works and what happens when a certificate is revoked. For the firmware developer, the most important fact is that **the AWS Thing name (ThingName) always corresponds to the Common Name (CN) of the certificate issued by Lamassu**, regardless of the provisioning mode.
 
-## Arquitectura del conector
+## Connector architecture
 
-El conector de AWS IoT Core es un proceso Go independiente, un binario o contenedor separado del núcleo de Lamassu. En un despliegue monolítico se compila por defecto (etiqueta de compilación `!noaws`) y se activa mediante `aws_iot_manager.enabled: true` en el fichero de configuración. En despliegues distribuidos, se ejecuta como un contenedor propio con acceso a los servicios de CA, DMS Manager y Device Manager de Lamassu a través de HTTP.
+The AWS IoT Core connector is an independent Go process, a binary or container separate from Lamassu's core. In a monolithic deployment it is compiled by default (build tag `!noaws`) and activated with `aws_iot_manager.enabled: true` in the configuration file. In distributed deployments, it runs as its own container with access to Lamassu's CA, DMS Manager and Device Manager services over HTTP.
 
-El conector no sondea los servicios de Lamassu periódicamente. En su lugar, **se suscribe al bus de eventos interno** de Lamassu (AMQP o AWS SQS/SNS, configurable) y reacciona a los eventos que le interesan: creación o actualización de CAs, creación o actualización de DMS, vinculación de identidad de dispositivo, cambio de estado de certificado, actualización de metadatos de certificado y actualización de metadatos de dispositivo. Este modelo orientado a eventos garantiza que la sincronización con AWS sea casi inmediata y no genere carga de sondeo.
+The connector does not poll Lamassu's services periodically. Instead, it **subscribes to Lamassu's internal event bus** (AMQP or AWS SQS/SNS, configurable) and reacts to the events it cares about: CA creation or update, DMS creation or update, device identity binding, certificate status change, certificate metadata update and device metadata update. This event-driven model ensures synchronization with AWS is nearly immediate and produces no polling load.
 
-Para evitar bucles infinitos, el conector ignora cualquier evento cuyo campo `source` de CloudEvent coincida con su propia URI de origen. Esto previene que las escrituras de metadatos que el propio conector realiza vuelvan a disparar el mismo flujo.
+To avoid infinite loops, the connector ignores any event whose CloudEvent `source` field matches its own origin URI. This prevents the metadata writes the connector itself performs from re-triggering the same flow.
 
-Cuando se ejecutan varios conectores en paralelo, por ejemplo, para distintas cuentas de AWS, cada instancia tiene su propio `connector_id`. Todos los metadatos que el conector escribe en Lamassu se almacenan bajo la clave `lamassu.io/iot/{connector_id}`, lo que permite coexistencia sin colisiones.
+When several connectors run in parallel, for example for different AWS accounts, each instance has its own `connector_id`. All metadata the connector writes to Lamassu is stored under the key `lamassu.io/iot/{connector_id}`, allowing coexistence without collisions.
 
-## Prerrequisitos
+## Prerequisites
 
-Antes de activar el conector es necesario disponer de una cuenta AWS con los permisos IAM adecuados y tener el conector correctamente configurado. El proceso de despliegue (Docker Compose, Kubernetes o binario) se describe en la [documentación de despliegue](/docs/deployment/overview).
+Before enabling the connector you need an AWS account with the proper IAM permissions and the connector correctly configured. The deployment process (Docker Compose, Kubernetes or binary) is described in the [deployment documentation](/docs/deployment/overview).
 
-### Permisos IAM necesarios
+### Required IAM permissions
 
-La identidad IAM con la que opera el conector debe tener al mínimo los siguientes permisos sobre los recursos de la cuenta destino:
+The IAM identity operating the connector needs at minimum the following permissions on the target account's resources:
 
-| Acción IAM | Propósito |
+| IAM action | Purpose |
 |---|---|
-| `iot:GetRegistrationCode` | Obtener el código de verificación para el registro de CA en Primary Account |
-| `iot:RegisterCACertificate` | Registrar la CA en AWS IoT |
-| `iot:DescribeCACertificate` | Consultar el estado del registro de la CA |
-| `iot:CreateThing` / `iot:UpdateThing` | Crear o actualizar Things en IoT Core |
-| `iot:RegisterThing` | Aprovisionar Things mediante plantilla |
-| `iot:RegisterCertificate` | Registrar certificados de dispositivo |
-| `iot:UpdateCertificate` | Cambiar el estado de un certificado (ACTIVE / INACTIVE / REVOKED) |
-| `iot:CreatePolicy` / `iot:AttachPolicy` | Crear y adjuntar políticas IoT |
-| `iot:CreateThingGroup` / `iot:AddThingToThingGroup` | Gestionar grupos de Things |
-| `iot:CreateProvisioningTemplate` | Crear plantillas JITP |
-| `iotdata:GetThingShadow` / `iotdata:UpdateThingShadow` | Leer y escribir el Device Shadow |
+| `iot:GetRegistrationCode` | Obtain the verification code for CA registration in the Primary Account |
+| `iot:RegisterCACertificate` | Register the CA in AWS IoT |
+| `iot:DescribeCACertificate` | Check the CA registration status |
+| `iot:CreateThing` / `iot:UpdateThing` | Create or update Things in IoT Core |
+| `iot:RegisterThing` | Provision Things through a template |
+| `iot:RegisterCertificate` | Register device certificates |
+| `iot:UpdateCertificate` | Change a certificate's status (ACTIVE / INACTIVE / REVOKED) |
+| `iot:CreatePolicy` / `iot:AttachPolicy` | Create and attach IoT policies |
+| `iot:CreateThingGroup` / `iot:AddThingToThingGroup` | Manage Thing groups |
+| `iot:CreateProvisioningTemplate` | Create JITP templates |
+| `iotdata:GetThingShadow` / `iotdata:UpdateThingShadow` | Read and write the Device Shadow |
 
-Para el mecanismo de desconexión forzada tras revocación también se requiere acceso a la API del plano de datos de AWS IoT (`iot:Connect` con SigV4 sobre WebSocket), que se negocia de forma implícita con las credenciales del conector.
+The forced-disconnect mechanism after revocation also requires access to the AWS IoT data plane API (`iot:Connect` with SigV4 over WebSocket), negotiated implicitly with the connector's credentials.
 
-### Parámetros de configuración
+### Configuration parameters
 
-| Parámetro | Tipo | Requerido | Descripción |
+| Parameter | Type | Required | Description |
 |---|---|---|---|
-| `connector_id` | string | Sí | Identificador único de esta instancia del conector. Se usa como espacio de nombres para los metadatos: `lamassu.io/iot/{connector_id}`. |
-| `aws_config.region` | string | Sí | Región AWS donde opera el conector. |
-| `aws_config.auth_method` | string | Sí | Método de autenticación: `static`, `role` o vacío (cadena de credenciales por defecto del SDK). |
-| `aws_config.access_key_id` | string | Solo con `auth_method=static` | Clave de acceso AWS. |
-| `aws_config.secret_access_key` | string | Solo con `auth_method=static` | Clave secreta AWS. |
-| `aws_config.session_token` | string | No | Token de sesión (con `auth_method=static`). |
-| `aws_config.role_arn` | string | Solo con `auth_method=role` | ARN del rol a asumir. |
-| `aws_config.endpoint_url` | string | No | URL alternativa para todos los servicios AWS (útil con LocalStack en pruebas). |
-| `subscriber_event_bus` | objeto | Sí | Configuración del bus de eventos al que se suscribe el conector (AMQP o AWS SQS/SNS). |
-| `dms_manager_client` | string | Sí | URL HTTP del servicio DMS Manager de Lamassu. |
-| `device_manager_client` | string | Sí | URL HTTP del Device Manager de Lamassu. |
-| `ca_client` | string | Sí | URL HTTP del servicio de CA de Lamassu. |
+| `connector_id` | string | Yes | Unique identifier of this connector instance. Used as the metadata namespace: `lamassu.io/iot/{connector_id}`. |
+| `aws_config.region` | string | Yes | AWS region where the connector operates. |
+| `aws_config.auth_method` | string | Yes | Authentication method: `static`, `role` or empty (SDK default credential chain). |
+| `aws_config.access_key_id` | string | Only with `auth_method=static` | AWS access key. |
+| `aws_config.secret_access_key` | string | Only with `auth_method=static` | AWS secret key. |
+| `aws_config.session_token` | string | No | Session token (with `auth_method=static`). |
+| `aws_config.role_arn` | string | Only with `auth_method=role` | ARN of the role to assume. |
+| `aws_config.endpoint_url` | string | No | Alternative URL for all AWS services (useful with LocalStack in tests). |
+| `subscriber_event_bus` | object | Yes | Configuration of the event bus the connector subscribes to (AMQP or AWS SQS/SNS). |
+| `dms_manager_client` | string | Yes | HTTP URL of Lamassu's DMS Manager service. |
+| `device_manager_client` | string | Yes | HTTP URL of Lamassu's Device Manager. |
+| `ca_client` | string | Yes | HTTP URL of Lamassu's CA service. |
 
-## Registro de la CA en AWS IoT Core
+## CA registration in AWS IoT Core
 
-Para que los dispositivos puedan autenticarse en AWS IoT Core con certificados emitidos por una CA de Lamassu, esa CA debe registrarse previamente en la cuenta AWS. El conector gestiona este registro de forma automática en respuesta a los eventos `EventCreateCAKey`, `EventImportCAKey` y `EventUpdateCAMetadataKey`, pero la operación **solo se dispara cuando el administrador la solicita explícitamente** mediante el campo de metadatos de la CA.
+For devices to authenticate to AWS IoT Core with certificates issued by a Lamassu CA, that CA must first be registered in the AWS account. The connector handles this registration automatically in response to the `EventCreateCAKey`, `EventImportCAKey` and `EventUpdateCAMetadataKey` events, but the operation **only fires when the administrator explicitly requests it** through the CA metadata field.
 
-### Cómo solicitar el registro
+### How to request registration
 
-El registro se desencadena estableciendo el valor `registration.status = "REQUESTED"` en la clave `lamassu.io/iot/{connector_id}` de los metadatos de la CA. Esto puede hacerse desde la consola de Lamassu en la sección de gestión de la CA o mediante la API.
+Registration is triggered by setting `registration.status = "REQUESTED"` on the `lamassu.io/iot/{connector_id}` key of the CA's metadata. This can be done from the Lamassu console in the CA management section or through the API.
 
-Una vez recibido el evento, el conector intenta registrar la CA en AWS y actualiza el campo `registration.status` en los metadatos de la CA con el resultado: `"SUCCEEDED"` si el registro fue correcto, o `"FAILED"` acompañado de un mensaje de error en caso contrario. El proceso es asíncrono, por lo que es necesario consultar periódicamente el estado de los metadatos hasta que la operación concluya.
+Once the event is received, the connector attempts to register the CA in AWS and updates the `registration.status` field in the CA's metadata with the result: `"SUCCEEDED"` if registration was successful, or `"FAILED"` with an error message otherwise. The process is asynchronous, so you must periodically check the metadata status until the operation completes.
 
 ### Primary Account
 
-Cuando el parámetro `primary_account` es `true`, el conector ejecuta el flujo completo de registro con verificación de posesión de clave privada:
+When the `primary_account` parameter is `true`, the connector runs the full registration flow with proof-of-possession of the private key:
 
-1. Llama a `iot:GetRegistrationCode` para obtener el código de verificación de AWS.
-2. El conector genera internamente un par de claves RSA-2048 efímero y construye un CSR cuyo Common Name es exactamente ese código de registro. A continuación llama al servicio de firma de Lamassu para que la CA registrada emita un certificado de verificación X.509 real firmando ese CSR. La clave privada efímera se usa únicamente para este propósito y no se almacena ni se envía a AWS.
-3. Envía a AWS la CA (en PEM) y el certificado de verificación mediante `iot:RegisterCACertificate`, activando el registro con `AllowAutoRegistration: true`.
+1. It calls `iot:GetRegistrationCode` to obtain AWS's verification code.
+2. The connector internally generates an ephemeral RSA-2048 key pair and builds a CSR whose Common Name is exactly that registration code. It then calls Lamassu's signing service so the registered CA issues a real X.509 verification certificate signing that CSR. The ephemeral private key is used only for this purpose and is neither stored nor sent to AWS.
+3. It sends the CA (in PEM) and the verification certificate to AWS via `iot:RegisterCACertificate`, enabling registration with `AllowAutoRegistration: true`.
 
-Solo una cuenta puede ser propietaria de una CA en una región AWS dada. Si la CA ya está registrada con el mismo número de serie, el conector omite el paso silenciosamente.
+Only one account can own a CA in a given AWS region. If the CA is already registered with the same serial number, the connector silently skips the step.
 
-Los tags que AWS IoT Core aplica al certificado de CA registrado son `LMS.CA.ID`, `LMS.CA.SN` y `LMS.CA.CN`.
+The tags AWS IoT Core applies to the registered CA certificate are `LMS.CA.ID`, `LMS.CA.SN` and `LMS.CA.CN`.
 
 ### Secondary Account (SNI-only)
 
-Cuando `primary_account` es `false`, el conector registra la CA usando el modo `CertificateMode: SNI_ONLY`. Este modo no requiere código de verificación ni acceso a la clave privada de la CA, por lo que es la opción adecuada cuando la CA se gestiona desde otra cuenta de AWS o cuando el administrador no dispone de la clave privada. Es el método habitual para registrar la misma CA en varias cuentas de AWS simultáneamente.
+When `primary_account` is `false`, the connector registers the CA using `CertificateMode: SNI_ONLY`. This mode requires no verification code or access to the CA's private key, so it is the right choice when the CA is managed from another AWS account or when the administrator does not hold the private key. It is the usual method to register the same CA in several AWS accounts simultaneously.
 
-## Configuración del DMS
+## DMS configuration
 
-Cada DMS que participe en la integración con AWS IoT Core debe tener configurada la clave de metadatos `lamassu.io/iot/{connector_id}`. El campo más importante de esa configuración es `registration_mode`, que determina cómo se aprovisionan los dispositivos en AWS.
+Each DMS participating in the AWS IoT Core integration must have the metadata key `lamassu.io/iot/{connector_id}` configured. The most important field of that configuration is `registration_mode`, which determines how devices are provisioned in AWS.
 
-Existen tres modos de registro, y la elección entre ellos depende de la estrategia de aprovisionamiento de la flota.
+There are three registration modes, and the choice among them depends on the fleet's provisioning strategy.
 
-### Modo `none`
+### `none` mode
 
-En este modo el conector **no crea Things, grupos ni políticas** en AWS IoT Core. Se limita a sincronizar el estado de los certificados (activo, revocado, suspendido) a medida que cambian en Lamassu. Es el modo adecuado cuando el aprovisionamiento de Things en AWS se gestiona por un sistema externo y solo se necesita que Lamassu mantenga el estado de los certificados actualizado.
+In this mode the connector **creates no Things, groups or policies** in AWS IoT Core. It only syncs certificate status (active, revoked, suspended) as it changes in Lamassu. It is the right mode when Thing provisioning in AWS is managed by an external system and Lamassu only needs to keep certificate status up to date.
 
-### Modo `auto`
+### `auto` mode
 
-El modo `auto` delega en Lamassu el aprovisionamiento completo del dispositivo en AWS en el momento del enrolamiento. Cuando el dispositivo completa con éxito su enrolamiento EST y Lamassu emite el evento `EventBindDeviceIdentityKey`, el conector ejecuta automáticamente la siguiente secuencia:
+`auto` mode delegates full device provisioning in AWS to Lamassu at enrollment time. When the device successfully completes its EST enrollment and Lamassu emits the `EventBindDeviceIdentityKey` event, the connector automatically executes the following sequence:
 
-1. Crea o actualiza las políticas IoT configuradas en el DMS.
-2. Crea el grupo raíz `LAMASSU` en la cuenta AWS (si no existe) y los grupos hijos configurados en el DMS como subgrupos de `LAMASSU`. Si los grupos ya existen, el error `ResourceAlreadyExistsException` se ignora, por lo que la operación es idempotente.
-3. Si el Thing ya existía en AWS IoT Core, el conector itera todos los certificados (principals) actualmente adjuntos a ese Thing y los marca como `REVOKED` en AWS, para garantizar que los certificados anteriores no puedan seguir siendo usados para autenticarse.
-4. Llama a `iot:RegisterThing` con una plantilla de aprovisionamiento de estilo CloudFormation que crea el Thing, registra el certificado del dispositivo (PEM del certificado del dispositivo y del certificado de la CA emisora) y adjunta las políticas configuradas.
-Una vez completado el aprovisionamiento, el conector almacena el ARN del certificado resultante en los metadatos del certificado de Lamassu bajo la clave `lamassu.io/iot/{connector_id}` y marca el dispositivo como `Registered: true` en Device Manager.
+1. Creates or updates the IoT policies configured in the DMS.
+2. Creates the root group `LAMASSU` in the AWS account (if it does not exist) and the child groups configured in the DMS as subgroups of `LAMASSU`. If the groups already exist, the `ResourceAlreadyExistsException` error is ignored, making the operation idempotent.
+3. If the Thing already existed in AWS IoT Core, the connector iterates all certificates (principals) currently attached to that Thing and marks them as `REVOKED` in AWS, ensuring previous certificates cannot keep being used to authenticate.
+4. Calls `iot:RegisterThing` with a CloudFormation-style provisioning template that creates the Thing, registers the device's certificate (PEM of the device certificate and of the issuing CA certificate) and attaches the configured policies.
 
-**El nombre del Thing en AWS es el Common Name (CN) del certificado del dispositivo.** Esta convención es fundamental para el desarrollador de firmware: el valor `/CN=` que el dispositivo incluye en su CSR al enrolarse se convierte en el ThingName con el que deberá identificarse en todas las operaciones MQTT contra AWS IoT Core.
+Once provisioning completes, the connector stores the resulting certificate's ARN in the Lamassu certificate's metadata under the key `lamassu.io/iot/{connector_id}` and marks the device as `Registered: true` in Device Manager.
 
-### Modo `jitp`
+**The Thing name in AWS is the Common Name (CN) of the device's certificate.** This convention is fundamental for the firmware developer: the `/CN=` value the device includes in its CSR when enrolling becomes the ThingName it must identify itself with in all MQTT operations against AWS IoT Core.
 
-El modo Just-In-Time Provisioning (JITP) delega el aprovisionamiento en AWS en lugar de hacerlo el conector directamente. Cuando el conector detecta que el DMS está en modo `jitp`, crea una plantilla de aprovisionamiento JITP en AWS IoT Core y la adjunta al certificado de CA registrado. Esta plantilla se crea o actualiza en el momento en que el DMS se crea o actualiza en Lamassu - no en el momento del enrolamiento del dispositivo. A partir de ese momento, cuando un dispositivo con un certificado emitido por esa CA se conecta por primera vez a AWS IoT Core, AWS ejecuta la plantilla automáticamente: crea el Thing, registra el certificado y lo activa.
+### `jitp` mode
 
-El nombre del Thing en la plantilla JITP se deriva de `AWS::IoT::Certificate::CommonName`, que corresponde al CN del certificado del dispositivo - la misma convención que el modo `auto`.
+Just-In-Time Provisioning (JITP) mode delegates provisioning to AWS instead of the connector doing it directly. When the connector detects the DMS is in `jitp` mode, it creates a JITP provisioning template in AWS IoT Core and attaches it to the registered CA certificate. This template is created or updated at the moment the DMS is created or updated in Lamassu — not at device enrollment time. From then on, when a device with a certificate issued by that CA connects to AWS IoT Core for the first time, AWS executes the template automatically: it creates the Thing, registers the certificate and activates it.
 
-Este modo requiere que se configure el campo `jitp_config.provisioning_role_arn` con el ARN de un rol IAM que AWS IoT Core pueda asumir para ejecutar la plantilla. Si no se configura, el conector utiliza el valor por defecto `arn:aws:iam::{account}:role/JITPRole` y registra un aviso en el log. El administrador debe asegurarse de que ese rol existe en la cuenta y tiene los permisos necesarios antes de activar el modo JITP.
+The Thing name in the JITP template is derived from `AWS::IoT::Certificate::CommonName`, which corresponds to the device certificate's CN — the same convention as `auto` mode.
 
-## Aprovisionamiento de dispositivos (modo automático)
+This mode requires the `jitp_config.provisioning_role_arn` field to be configured with the ARN of an IAM role AWS IoT Core can assume to execute the template. If not configured, the connector uses the default `arn:aws:iam::{account}:role/JITPRole` and logs a warning. The administrator must ensure that role exists in the account and has the necessary permissions before enabling JITP mode.
 
-Para el desarrollador de firmware, el modo `auto` es transparente: el dispositivo realiza su enrolamiento EST de la forma habitual y, como efecto secundario, queda aprovisionado en AWS IoT Core sin ningún paso adicional.
+## Device provisioning (automatic mode)
 
-El flujo completo desde el punto de vista del dispositivo es el siguiente:
+For the firmware developer, `auto` mode is transparent: the device performs its EST enrollment as usual and, as a side effect, it is provisioned in AWS IoT Core with no additional step.
+
+The full flow from the device's perspective is:
 
 ```bash
-# 1. El dispositivo genera su clave privada y su CSR con el CN que será su ThingName
+# 1. The device generates its private key and CSR with the CN that will be its ThingName
 openssl ecparam -name prime256v1 -genkey -noout -out device.key
 openssl req -new -key device.key -sha256 -out device.csr \
-  -subj "/CN=mi-dispositivo-001/O=Acme/OU=IoT"
+  -subj "/CN=my-device-001/O=Acme/OU=IoT"
 
-# 2. El dispositivo se enrola en Lamassu vía EST
+# 2. The device enrolls in Lamassu via EST
 openssl req -in device.csr -outform DER | base64 -w 0 > device.csr.b64
 curl -s --cacert lamassu-trust.pem \
   --cert bootstrap.crt --key bootstrap.key \
@@ -137,66 +138,66 @@ curl -s --cacert lamassu-trust.pem \
   "https://<EST_HOST>/.well-known/est/<DMS_ID>/simpleenroll" \
   -o enroll.b64
 
-# 3. El dispositivo extrae su certificado
+# 3. The device extracts its certificate
 base64 -d -i enroll.b64 | openssl pkcs7 -inform DER -print_certs -out device.crt
 
-# A partir de este punto, el conector crea automáticamente el Thing "mi-dispositivo-001"
-# en AWS IoT Core. El dispositivo puede conectarse a AWS con el mismo certificado.
+# From this point on, the connector automatically creates the Thing "my-device-001"
+# in AWS IoT Core. The device can connect to AWS with the same certificate.
 ```
 
-Una vez que el conector completa el aprovisionamiento, el dispositivo puede conectarse al endpoint AWS IoT Core de MQTT usando su clave privada y el certificado emitido por Lamassu. El ThingName con el que debe identificarse en AWS es exactamente el CN del certificado.
+Once the connector completes provisioning, the device can connect to the AWS IoT Core MQTT endpoint using its private key and the certificate issued by Lamassu. The ThingName it must identify itself with in AWS is exactly the certificate's CN.
 
-## Aprovisionamiento de dispositivos (modo JITP)
+## Device provisioning (JITP mode)
 
-En el modo JITP el dispositivo también realiza su enrolamiento EST de forma convencional y obtiene su certificado de Lamassu. La diferencia es que AWS IoT Core no conoce al dispositivo hasta que este intenta conectarse por primera vez.
+In JITP mode the device also performs its EST enrollment conventionally and obtains its certificate from Lamassu. The difference is that AWS IoT Core does not know the device until it attempts its first connection.
 
-Cuando el dispositivo establece su primera conexión MQTT a AWS IoT Core presentando el certificado emitido por Lamassu, AWS detecta que el certificado pertenece a una CA registrada con una plantilla JITP, ejecuta esa plantilla y crea el Thing automáticamente. La conexión inicial puede fallar o demorarse mientras se ejecuta la plantilla; el firmware debe estar preparado para reintentar la conexión.
+When the device establishes its first MQTT connection to AWS IoT Core presenting the Lamassu-issued certificate, AWS detects that the certificate belongs to a CA registered with a JITP template, executes that template and creates the Thing automatically. The initial connection may fail or be delayed while the template runs; firmware must be prepared to retry the connection.
 
-Para que el flujo JITP funcione correctamente:
+For the JITP flow to work correctly:
 
-- La CA debe estar registrada en AWS en modo Primary Account (el modo SNI-only no admite JITP).
-- El rol IAM configurado en `jitp_config.provisioning_role_arn` debe existir y tener permisos para crear Things, registrar certificados y adjuntar políticas en la cuenta AWS.
-- El dispositivo debe presentar tanto su certificado como el certificado de la CA emisora en el handshake TLS con AWS IoT Core.
+- The CA must be registered in AWS in Primary Account mode (SNI-only mode does not support JITP).
+- The IAM role configured in `jitp_config.provisioning_role_arn` must exist and have permissions to create Things, register certificates and attach policies in the AWS account.
+- The device must present both its certificate and the issuing CA's certificate in the TLS handshake with AWS IoT Core.
 
-Los certificados aprovisionados mediante JITP **no tienen asociada la clave de metadatos del conector** (`lamassu.io/iot/{connector_id}`) en Lamassu. Como consecuencia, los cambios de estado de esos certificados en Lamassu no se sincronizan automáticamente con AWS a través del mecanismo de sincronización de estado descrito en la siguiente sección.
+Certificates provisioned via JITP **do not have the connector's metadata key** (`lamassu.io/iot/{connector_id}`) in Lamassu. As a consequence, status changes of those certificates in Lamassu are not automatically synced to AWS through the state synchronization mechanism described in the next section.
 
-## Sincronización del estado del certificado
+## Certificate status synchronization
 
-El conector escucha el evento `EventUpdateCertificateStatusKey` y, cuando un certificado que tiene la clave de metadatos del conector cambia de estado en Lamassu, replica ese cambio en AWS IoT Core. La tabla siguiente muestra la correspondencia de estados:
+The connector listens for the `EventUpdateCertificateStatusKey` event and, when a certificate holding the connector's metadata key changes status in Lamassu, replicates that change in AWS IoT Core. The following table shows the status mapping:
 
-| Estado en Lamassu | Razón de revocación | Estado en AWS IoT Core |
+| Status in Lamassu | Revocation reason | Status in AWS IoT Core |
 |---|---|---|
-| `Active` | Ninguna | `ACTIVE` |
+| `Active` | None | `ACTIVE` |
 | `Revoked` | `certificateHold` | `INACTIVE` |
-| `Revoked` | Cualquier otra razón | `REVOKED` |
+| `Revoked` | Any other reason | `REVOKED` |
 
-Solo los estados `Active` y `Revoked` producen una llamada a `iot:UpdateCertificate`. Los demás estados del ciclo de vida de Lamassu (`RenewalWindow`, `AboutToExpire`, `Expired`) no se sincronizan con AWS IoT Core; el estado del certificado en AWS permanece sin cambios hasta que el estado en Lamassu sea `Active` o `Revoked`.
+Only the `Active` and `Revoked` states produce a call to `iot:UpdateCertificate`. The other lifecycle states of Lamassu (`RenewalWindow`, `AboutToExpire`, `Expired`) are not synced to AWS IoT Core; the certificate status in AWS remains unchanged until the status in Lamassu becomes `Active` or `Revoked`.
 
-### Desconexión forzada al revocar
+### Forced disconnect on revocation
 
-Cuando el conector marca un certificado como `REVOKED` o `INACTIVE` en AWS, ejecuta adicionalmente una desconexión forzada del dispositivo. Para ello abre una conexión MQTT sobre WebSocket (con autenticación SigV4 con las credenciales del conector) al endpoint de datos de AWS IoT Core, usando el CN del certificado como identificador de cliente MQTT, y la cierra inmediatamente. Esto termina cualquier sesión MQTT activa que el dispositivo pueda tener en ese momento.
+When the connector marks a certificate as `REVOKED` or `INACTIVE` in AWS, it additionally performs a forced disconnect of the device. To do so it opens an MQTT connection over WebSocket (with SigV4 authentication using the connector's credentials) to the AWS IoT Core data endpoint, using the certificate's CN as the MQTT client identifier, and closes it immediately. This terminates any active MQTT session the device may have at that moment.
 
-Esta desconexión forzada se produce en el momento en que Lamassu registra el cambio de estado. Si el dispositivo vuelve a intentar conectarse tras la desconexión, AWS IoT Core rechazará la conexión porque el certificado ya figura como `REVOKED` o `INACTIVE`.
+This forced disconnect happens at the moment Lamassu records the status change. If the device tries to reconnect after the disconnect, AWS IoT Core will reject the connection because the certificate is already listed as `REVOKED` or `INACTIVE`.
 
-Los certificados aprovisionados en modo JITP no disponen de esta sincronización automática, ya que no tienen la clave de metadatos del conector.
+Certificates provisioned in JITP mode do not have this automatic sync, since they lack the connector's metadata key.
 
-## Device Shadow y automatización
+## Device Shadow and automation
 
-El conector puede escribir en el Device Shadow de AWS IoT Core para enviar señales de acción al firmware del dispositivo. Esta funcionalidad se activa por DMS mediante `shadow_config.enable: true`.
+The connector can write to the AWS IoT Core Device Shadow to send action signals to the device firmware. This feature is enabled per DMS with `shadow_config.enable: true`.
 
-Si `shadow_config.shadow_name` contiene un valor, el conector usa un Named Shadow con ese nombre; en caso contrario, usa el Classic Shadow (shadow predeterminado del Thing).
+If `shadow_config.shadow_name` holds a value, the connector uses a Named Shadow with that name; otherwise it uses the Classic Shadow (the Thing's default shadow).
 
-### Qué escribe el conector en el shadow
+### What the connector writes to the shadow
 
-El conector escribe en el campo `desired.identity_actions` del documento shadow. Cada entrada contiene un timestamp Unix en milisegundos. El firmware del dispositivo debe leer este campo y actuar en consecuencia.
+The connector writes to the `desired.identity_actions` field of the shadow document. Each entry contains a Unix timestamp in milliseconds. The device firmware must read this field and act accordingly.
 
-Existen dos tipos de acciones:
+There are two action types:
 
-**`UPDATE_CERTIFICATE`**: se escribe cuando la ventana de renovación preventiva de un certificado se activa - es decir, cuando el campo `triggered` de la delta de renovación preventiva pasa de `false` a `true`. Esta acción indica al dispositivo que debe iniciar el proceso de re-enrolamiento para renovar su certificado antes de que expire.
+**`UPDATE_CERTIFICATE`**: written when a certificate's preventive renewal window activates — that is, when the `triggered` field of the preventive renewal delta flips from `false` to `true`. This action tells the device it must start the re-enrollment process to renew its certificate before it expires.
 
-**`UPDATE_TRUST_ANCHOR_LIST`**: se escribe en todos los dispositivos de un DMS cuando la lista `ManagedCAs` del DMS cambia. Esta acción indica al dispositivo que debe actualizar su almacén de CAs de confianza.
+**`UPDATE_TRUST_ANCHOR_LIST`**: written to all devices of a DMS when the DMS's `ManagedCAs` list changes. This action tells the device it must update its trusted CA store.
 
-El proceso de escritura en el shadow consiste en leer el shadow actual (`iotdata:GetThingShadow`), combinar las nuevas acciones con las existentes y escribir el resultado (`iotdata:UpdateThingShadow`). Si el shadow no existe, el conector lo crea. Tras una escritura correcta, la lista de acciones pendientes en los metadatos del dispositivo en Lamassu se limpia.
+The shadow write process consists of reading the current shadow (`iotdata:GetThingShadow`), merging the new actions with the existing ones and writing the result (`iotdata:UpdateThingShadow`). If the shadow does not exist, the connector creates it. After a successful write, the list of pending actions in the device's metadata in Lamassu is cleared.
 
 ```json
 {
@@ -211,9 +212,9 @@ El proceso de escritura en el shadow consiste en leer el shadow actual (`iotdata
 }
 ```
 
-## Políticas de AWS IoT
+## AWS IoT policies
 
-El conector crea y adjunta las políticas que se configuran en el DMS. Una política típica para un dispositivo que usa MQTT y Device Shadow tiene la siguiente estructura:
+The connector creates and attaches the policies configured in the DMS. A typical policy for a device using MQTT and the Device Shadow has this structure:
 
 ```json
 {
@@ -262,60 +263,60 @@ El conector crea y adjunta las políticas que se configuran en el DMS. Una polí
 }
 ```
 
-En la política anterior, los marcadores `<AWS_REGION>` y `<AWS_ACCOUNT_ID>` deben reemplazarse por la región AWS y el identificador de cuenta de doce dígitos de la cuenta destino antes de aplicar la política. La variable `${iot:Connection.Thing.ThingName}` limita automáticamente cada permiso al Thing al que el dispositivo está conectado, siguiendo el principio de mínimo privilegio. La variable `${ShadowName}` en los ARN de shadow es un marcador que debe reemplazarse con el valor de `shadow_config.shadow_name` configurado en el DMS; si se usa el Classic Shadow, se puede simplificar eliminando el segmento `name/${ShadowName}/`. Las políticas de AWS IoT no admiten expresiones regulares con alternancia; la notación `[name/${ShadowName}/]*` representa la opcionalidad del segmento dentro de las restricciones de la sintaxis de ARN.
+In the policy above, the `<AWS_REGION>` and `<AWS_ACCOUNT_ID>` placeholders must be replaced with the AWS region and the twelve-digit account identifier of the target account before applying the policy. The `${iot:Connection.Thing.ThingName}` variable automatically limits each permission to the Thing the device is connected as, following the principle of least privilege. The `${ShadowName}` variable in the shadow ARNs is a placeholder that must be replaced with the `shadow_config.shadow_name` value configured in the DMS; if the Classic Shadow is used, it can be simplified by removing the `name/${ShadowName}/` segment. AWS IoT policies do not support regex alternation; the `[name/${ShadowName}/]*` notation represents the optionality of that segment within ARN syntax constraints.
 
-El primer statement permite que el dispositivo se conecte usando su ThingName como identificador MQTT. El segundo autoriza la publicación en el topic MQTT genérico del Thing y en los topics del shadow, necesario para que el dispositivo pueda actualizar el estado reportado. Los dos últimos statements otorgan permisos de suscripción y recepción sobre los mismos topics, lo que permite al dispositivo recibir actualizaciones del shadow (por ejemplo, las acciones `UPDATE_CERTIFICATE` y `UPDATE_TRUST_ANCHOR_LIST` escritas por el conector).
+The first statement lets the device connect using its ThingName as the MQTT identifier. The second authorizes publishing to the Thing's generic MQTT topic and to the shadow topics, needed so the device can update its reported state. The last two statements grant subscribe and receive permissions over the same topics, letting the device receive shadow updates (for example, the `UPDATE_CERTIFICATE` and `UPDATE_TRUST_ANCHOR_LIST` actions written by the connector).
 
-## Solución de problemas
+## Troubleshooting
 
-**Síntoma:** El registro de la CA permanece indefinidamente en estado `REQUESTED`.
+**Symptom:** The CA registration stays in `REQUESTED` indefinitely.
 
-**Causa:** El conector no está en ejecución o no está suscrito al bus de eventos. También puede indicar credenciales IAM incorrectas, permisos insuficientes o que la clave de metadatos se escribió con un `connector_id` incorrecto.
+**Cause:** The connector is not running or is not subscribed to the event bus. It can also indicate incorrect IAM credentials, insufficient permissions or that the metadata key was written with a wrong `connector_id`.
 
-**Resolución:** Verificar que el proceso del conector está activo y que los logs no muestran errores de comunicación con AWS. Comprobar que el campo de metadatos se escribió bajo la clave exacta `lamassu.io/iot/{connector_id}`. Si el error persiste, el conector actualizará el estado a `FAILED` con un mensaje descriptivo en los metadatos de la CA.
-
----
-
-**Síntoma:** El estado de un certificado no se sincroniza con AWS tras una revocación.
-
-**Causa:** Lo más habitual es que el certificado fue aprovisionado en modo JITP. Los certificados JITP no tienen la clave de metadatos del conector y quedan fuera del mecanismo de sincronización de estado. Si el DMS está en modo `auto`, puede indicar que el aprovisionamiento inicial no completó correctamente y el ARN de AWS no se almacenó en los metadatos del certificado.
-
-**Resolución:** Para certificados JITP, migrar el DMS a modo `auto` y re-aprovisionar los dispositivos afectados. Para certificados en modo `auto`, verificar que el certificado tiene el ARN de AWS almacenado en sus metadatos; si no lo tiene, repetir el aprovisionamiento.
+**Resolution:** Verify the connector process is active and the logs show no AWS communication errors. Check the metadata field was written under the exact key `lamassu.io/iot/{connector_id}`. If the error persists, the connector will update the status to `FAILED` with a descriptive message in the CA metadata.
 
 ---
 
-**Síntoma:** La desconexión forzada no termina la sesión MQTT del dispositivo tras la revocación.
+**Symptom:** A certificate's status is not synced to AWS after a revocation.
 
-**Causa:** El dispositivo usa un client ID MQTT diferente al CN del certificado. La desconexión forzada abre una conexión usando el CN como client ID; si el firmware usa otro identificador, la desconexión no afecta a esa sesión.
+**Cause:** Most commonly the certificate was provisioned in JITP mode. JITP certificates lack the connector's metadata key and are outside the state synchronization mechanism. If the DMS is in `auto` mode, it may indicate the initial provisioning did not complete correctly and the AWS ARN was not stored in the certificate metadata.
 
-**Resolución:** Asegurarse de que el firmware usa exactamente el CN del certificado como identificador de cliente MQTT. Ese CN coincide con el ThingName en AWS IoT Core.
-
----
-
-**Síntoma:** El dispositivo recibe `CLIENT_ID_REJECTED` al conectarse a AWS IoT Core.
-
-**Causa:** El client ID MQTT no coincide con el ThingName, que es siempre el CN del certificado emitido por Lamassu.
-
-**Resolución:** Verificar que el firmware usa exactamente el valor del campo CN incluido en el CSR de enrolamiento como identificador de cliente MQTT.
+**Resolution:** For JITP certificates, migrate the DMS to `auto` mode and re-provision the affected devices. For `auto` mode certificates, verify the certificate has the AWS ARN stored in its metadata; if not, repeat the provisioning.
 
 ---
 
-**Síntoma:** La primera conexión MQTT del dispositivo en modo JITP falla o excede el tiempo de espera.
+**Symptom:** The forced disconnect does not terminate the device's MQTT session after revocation.
 
-**Causa:** Es el comportamiento esperado mientras AWS ejecuta la plantilla JITP en la primera conexión del dispositivo.
+**Cause:** The device uses an MQTT client ID different from the certificate's CN. The forced disconnect opens a connection using the CN as client ID; if the firmware uses another identifier, the disconnect does not affect that session.
 
-**Resolución:** El firmware debe implementar reintentos con backoff exponencial para la primera conexión. Si el fallo persiste más allá de unos minutos, verificar que el rol IAM configurado en `jitp_config.provisioning_role_arn` existe en la cuenta y tiene permisos para crear Things, registrar certificados y adjuntar políticas.
+**Resolution:** Make sure the firmware uses exactly the certificate's CN as the MQTT client identifier. That CN matches the ThingName in AWS IoT Core.
 
 ---
 
-**Síntoma:** El Device Shadow no se actualiza cuando debería.
+**Symptom:** The device receives `CLIENT_ID_REJECTED` when connecting to AWS IoT Core.
 
-**Causa:** La función de shadow está desactivada en la configuración del DMS, las credenciales del conector carecen de permisos sobre la API de datos de IoT, o el firmware lee un shadow diferente al configurado.
+**Cause:** The MQTT client ID does not match the ThingName, which is always the CN of the certificate issued by Lamassu.
 
-**Resolución:** Comprobar que `shadow_config.enable` está a `true` en los metadatos del conector para el DMS correspondiente. Si se usa Named Shadow, verificar que `shadow_config.shadow_name` contiene el nombre correcto y que el firmware lee ese Named Shadow y no el Classic Shadow. Confirmar que las credenciales del conector tienen permisos `iotdata:GetThingShadow` y `iotdata:UpdateThingShadow`.
+**Resolution:** Verify the firmware uses exactly the value of the CN field included in the enrollment CSR as the MQTT client identifier.
+
+---
+
+**Symptom:** The device's first MQTT connection in JITP mode fails or times out.
+
+**Cause:** This is expected behavior while AWS executes the JITP template on the device's first connection.
+
+**Resolution:** Firmware must implement retries with exponential backoff for the first connection. If the failure persists beyond a few minutes, verify the IAM role configured in `jitp_config.provisioning_role_arn` exists in the account and has permissions to create Things, register certificates and attach policies.
+
+---
+
+**Symptom:** The Device Shadow is not updated when it should be.
+
+**Cause:** The shadow feature is disabled in the DMS configuration, the connector's credentials lack IoT data-plane permissions, or the firmware reads a different shadow than the configured one.
+
+**Resolution:** Check that `shadow_config.enable` is `true` in the connector metadata for the corresponding DMS. If a Named Shadow is used, verify `shadow_config.shadow_name` holds the correct name and that the firmware reads that Named Shadow and not the Classic Shadow. Confirm the connector's credentials have `iotdata:GetThingShadow` and `iotdata:UpdateThingShadow` permissions.
 
 <Cards>
-  <Card title="Configurar un DMS" href="/docs/platform/pki/device-enrollment" />
-  <Card title="Enrolamiento de dispositivos (EST)" href="/docs/platform/pki/est-enrollment" />
-  <Card title="Gestión de certificados" href="/docs/platform/pki/certificates" />
+  <Card title="Configure a DMS" href="/docs/platform/pki/device-enrollment" />
+  <Card title="Device enrollment (EST)" href="/docs/platform/pki/est-enrollment" />
+  <Card title="Certificate management" href="/docs/platform/pki/certificates" />
 </Cards>

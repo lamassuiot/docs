@@ -1,72 +1,72 @@
 ---
-title: Modelo de confianza
-description: Entiende dónde nace la confianza, cómo se distribuye y qué valida cada componente.
+title: Trust model
+description: Understand where trust originates, how it is distributed and what each component validates.
 ---
 
-En Lamassu, confianza no significa simplemente que un certificado exista en el inventario. Un consumidor confía en una identidad cuando puede construir una cadena hasta una raíz que reconoce, comprobar que el certificado sirve para el uso esperado y verificar que sigue vigente.
+In Lamassu, trust does not simply mean that a certificate exists in the inventory. A consumer trusts an identity when it can build a chain to a root it recognizes, check that the certificate is fit for the intended use and verify that it is still valid.
 
-## Las cuatro decisiones de confianza
+## The four trust decisions
 
-### Quién puede emitir
+### Who can issue
 
-La jerarquía de CAs define qué autoridades pueden firmar. Una CA raíz establece el ancla de confianza; las CAs intermedias separan ámbitos operativos y evitan utilizar la raíz para cada emisión.
+The CA hierarchy defines which authorities can sign. A root CA establishes the anchor of trust; intermediate CAs separate operating domains and avoid using the root for every issuance.
 
-### Qué puede emitirse
+### What can be issued
 
-Los [perfiles de certificado](/docs/platform/pki/certificate-profiles) limitan validez, sujeto, usos, extensiones y parámetros criptográficos. La posesión de una CA no sustituye a una política de emisión.
+[Certificate profiles](/docs/platform/pki/certificate-profiles) limit validity, subject, uses, extensions and cryptographic parameters. Possessing a CA does not replace an issuance policy.
 
-### Quién puede solicitarlo
+### Who can request it
 
-El DMS actúa como punto de enrolamiento. Puede autenticar una solicitud EST con certificado cliente, webhook externo o una combinación de ambos. Las CAs configuradas para validar al solicitante no tienen por qué ser la CA que emitirá la identidad nueva.
+The DMS acts as the enrollment point. It can authenticate an EST request with a client certificate, an external webhook or a combination of both. CAs configured to validate the requester do not have to be the CA that will issue the new identity.
 
-### Quién acepta el resultado
+### Who accepts the result
 
-El servicio o dispositivo consumidor mantiene su propio almacén de confianza. Lamassu puede distribuir la CA del sistema, la CA de enrolamiento y otras CAs gestionadas mediante `/cacerts`, pero el consumidor decide cuáles instala y cómo aplica la validación.
+The consuming service or device keeps its own trust store. Lamassu can distribute the system CA, the enrollment CA and other managed CAs through `/cacerts`, but the consumer decides which ones it installs and how it applies validation.
 
-## Flujo de una identidad
+## Identity flow
 
-1. El dispositivo demuestra que puede enrolarse según la política del DMS.
-2. El DMS valida la solicitud y remite la CSR a la CA de enrolamiento.
-3. La CA aplica el perfil y firma sin recibir la clave privada del dispositivo.
-4. El dispositivo instala el certificado y la cadena que necesita.
-5. El sistema que confía en el dispositivo valida cadena, fechas, usos y estado de revocación.
+1. The device proves it can enroll according to the DMS policy.
+2. The DMS validates the request and forwards the CSR to the enrollment CA.
+3. The CA applies the profile and signs without ever receiving the device's private key.
+4. The device installs the certificate and the chain it needs.
+5. The system that trusts the device validates the chain, dates, uses and revocation status.
 
-<Callout type="info" title="Autenticación y autorización son límites distintos">
-  OIDC o X.509 identifica al operador que llama a Lamassu. El servicio de autorización decide qué acciones puede realizar. La jerarquía X.509, en cambio, determina si un certificado presentado por un dispositivo es confiable.
+<Callout type="info" title="Authentication and authorization are different boundaries">
+  OIDC or X.509 identifies the operator calling Lamassu. The authorization service decides which actions it may perform. The X.509 hierarchy, on the other hand, determines whether a certificate presented by a device is trustworthy.
 </Callout>
 
-## CAs de enrolamiento, validación y distribución
+## Enrollment, validation and distribution CAs
 
-Un DMS relaciona tres conjuntos que conviene diseñar por separado:
+A DMS relates three sets that are worth designing separately:
 
-- **CA de enrolamiento:** firma las nuevas identidades.
-- **CAs de validación:** autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, Lamassu prueba primero la CA de enrolamiento y después las CAs de validación adicionales.
-- **CAs distribuidas:** forman el contenido que el dispositivo obtiene mediante EST `/cacerts`. Puedes incluir la CA del sistema, la CA de enrolamiento y una lista de CAs gestionadas.
+- **Enrollment CA:** signs the new identities.
+- **Validation CAs:** authenticate the client certificates used for enrollment or migration. During re-enrollment, Lamassu tries the enrollment CA first and then the additional validation CAs.
+- **Distributed CAs:** form the content the device obtains through EST `/cacerts`. You can include the system CA, the enrollment CA and a list of managed CAs.
 
-Esta separación permite migrar una flota: aceptas temporalmente certificados de la jerarquía anterior, emites con la nueva y distribuyes ambas cadenas durante el solapamiento.
+This separation makes it possible to migrate a fleet: you temporarily accept certificates from the old hierarchy, issue with the new one and distribute both chains during the overlap.
 
-## Validación y revocación
+## Validation and revocation
 
-Una cadena válida no garantiza por sí sola que el certificado deba aceptarse. El consumidor también debe comprobar:
+A valid chain does not by itself guarantee that a certificate should be accepted. The consumer must also check:
 
-- que la fecha actual está entre `Not Before` y `Not After`;
-- que `Key Usage` y `Extended Key Usage` permiten la operación;
-- que nombres, SANs y sujeto coinciden con la identidad esperada;
-- que el certificado no aparece revocado mediante [OCSP](/docs/platform/pki/ocsp) o una [CRL](/docs/platform/pki/crl).
+- that the current date is between `Not Before` and `Not After`;
+- that `Key Usage` and `Extended Key Usage` allow the operation;
+- that names, SANs and subject match the expected identity;
+- that the certificate does not appear revoked in [OCSP](/docs/platform/pki/ocsp) or a [CRL](/docs/platform/pki/crl).
 
-Durante la autenticación mTLS de un DMS, Lamassu intenta comprobar la revocación. Si el certificado no contiene información suficiente para efectuar esa comprobación, el backend registra una advertencia y continúa tratándolo como no revocado. Diseña los perfiles y puntos de distribución para evitar esa situación en producción.
+During the mTLS authentication of a DMS, Lamassu attempts to check revocation. If the certificate does not contain enough information to perform that check, the backend logs a warning and continues treating it as not revoked. Design your profiles and distribution points to avoid that situation in production.
 
-## Límites de custodia
+## Custody limits
 
-El KMS conserva la referencia de la clave y delega la operación al motor configurado. Con un HSM o un KMS cloud, la clave privada puede permanecer no exportable. Eso protege la custodia, pero no impide por sí solo el uso indebido: todavía debes restringir quién puede ordenar una firma y auditar esas operaciones.
+The KMS keeps the reference to the key and delegates the operation to the configured engine. With an HSM or a cloud KMS, the private key can remain non-exportable. That protects custody, but it does not by itself prevent misuse: you still must restrict who can request a signature and audit those operations.
 
-## Patrón recomendado
+## Recommended pattern
 
-- Mantén la raíz fuera de las operaciones diarias o con acceso muy restringido.
-- Emite desde CAs intermedias separadas por entorno o dominio de riesgo.
-- Asigna perfiles explícitos a cada caso de uso.
-- Distribuye la nueva confianza antes de comenzar una rotación.
-- Mantén solapamiento suficiente para renovar una flota desconectada.
-- Valida desde el sistema consumidor, no solo desde la consola de Lamassu.
+- Keep the root out of daily operations, or with very restricted access.
+- Issue from intermediate CAs separated by environment or risk domain.
+- Assign explicit profiles to every use case.
+- Distribute the new trust before starting a rotation.
+- Keep enough overlap to renew a disconnected fleet.
+- Validate from the consuming system, not only from the Lamassu console.
 
-Continúa con [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation) para convertir este modelo en un procedimiento operativo.
+Continue with [CA hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) to turn this model into an operating procedure.

@@ -1,109 +1,109 @@
 ---
-title: Control de acceso
-description: Diseña quién puede acceder a Lamassu mediante principales, políticas, permisos sobre recursos y autorización de rutas HTTP.
+title: Access control
+description: Design who can access Lamassu through principals, policies, resource permissions and HTTP route authorization.
 ---
 
-El control de acceso de Lamassu transforma una identidad autenticada en permisos concretos. El proveedor OIDC o el certificado cliente demuestra **quién** realiza una petición; el servicio `authz` decide **qué puede hacer** esa identidad y **sobre qué recursos**.
+Lamassu access control turns an authenticated identity into concrete permissions. The OIDC provider or the client certificate proves **who** makes a request; the `authz` service decides **what that identity can do** and **over which resources**.
 
-Lamassu no asigna permisos directamente a usuarios. La cadena completa es:
-
-```text
-credencial → principal coincidente → políticas concedidas → reglas → decisión
-```
-
-Este modelo permite representar personas, grupos del proveedor de identidad, cuentas de servicio y dispositivos sin acoplar la autorización a un proveedor concreto.
-
-## Conceptos esenciales
-
-Un **principal** conecta una credencial con Lamassu. Define cómo reconocer una identidad OIDC o X.509 y puede estar activo o desactivado.
-
-Una **política** agrupa permisos reutilizables. Puede concederse a varios principales y puede contener reglas sobre entidades de Lamassu, reglas sobre rutas HTTP o ambas.
-
-Una **regla de entidad** concede acciones sobre recursos como autoridades certificadoras, certificados, perfiles de emisión, dispositivos, DMS, claves o suscripciones de alertas. Puede abarcar todos los recursos de un tipo o limitarse por identificador, relación o atributo.
-
-Una **regla HTTP** concede acciones asociadas a rutas de una API. Es el mecanismo que utiliza el Gateway para decidir si una petición puede atravesar el perímetro.
-
-Un **grant** es la asociación entre un principal y una política. Quitar el grant elimina todos los permisos aportados por esa política, sin modificarla para los demás principales.
-
-<Callout type="info" title="Autenticación y autorización son controles distintos">
-  Un JWT válido o un certificado cliente válido no concede acceso por sí mismo. La credencial debe coincidir con al menos un principal activo y alguna de sus políticas debe permitir la operación solicitada.
-</Callout>
-
-## Dos sistemas de decisión
-
-Lamassu utiliza dos caminos de autorización según quién implementa el servicio protegido. Comparten principales, políticas y grants, pero no interpretan las reglas de la misma manera.
+Lamassu does not assign permissions directly to users. The full chain is:
 
 ```text
-Servicios HTTP integrados o externos → Gateway → reglas HTTP
-Servicios desarrollados por Lamassu  → middleware del servicio → reglas de entidad
+credential → matching principal → granted policies → rules → decision
 ```
 
-<Callout type="info" title="La diferencia está en el punto de integración">
-  Un servicio externo puede quedar protegido sin conocer el modelo interno de autorización de Lamassu. Un servicio desarrollado por Lamassu integra el motor de autorización y puede decidir sobre recursos concretos y filtrar sus consultas.
+This model lets you represent people, identity-provider groups, service accounts and devices without coupling authorization to a specific provider.
+
+## Essential concepts
+
+A **principal** connects a credential to Lamassu. It defines how to recognize an OIDC or X.509 identity and can be active or disabled.
+
+A **policy** groups reusable permissions. It can be granted to several principals and can contain rules about Lamassu entities, rules about HTTP routes or both.
+
+An **entity rule** grants actions over resources such as certification authorities, certificates, issuance profiles, devices, DMSs, keys or alert subscriptions. It can cover all resources of a type or be limited by identifier, relation or attribute.
+
+An **HTTP rule** grants actions associated with API routes. It is the mechanism the Gateway uses to decide whether a request may cross the perimeter.
+
+A **grant** is the association between a principal and a policy. Removing the grant removes all permissions contributed by that policy, without modifying it for other principals.
+
+<Callout type="info" title="Authentication and authorization are distinct controls">
+  A valid JWT or a valid client certificate does not grant access by itself. The credential must match at least one active principal and one of its policies must allow the requested operation.
 </Callout>
 
-### Servicios HTTP integrados o externos
+## Two decision systems
 
-Este camino protege APIs que se incorporan a la plataforma a través del Gateway pero que no implementan de forma nativa el SDK de autorización de Lamassu. Job Manager es el ejemplo actual. El mismo patrón permite integrar otros servicios HTTP siempre que sus rutas estén descritas en un esquema HTTP de `authz`.
+Lamassu uses two authorization paths depending on who implements the protected service. They share principals, policies and grants, but they do not interpret the rules the same way.
 
-La decisión se toma **antes de reenviar la petición al servicio**:
+```text
+Integrated or external HTTP services → Gateway → HTTP rules
+Services developed by Lamassu  → service middleware → entity rules
+```
 
-1. Envoy Gateway autentica la petición, normalmente validando un JWT contra el JWKS del proveedor OIDC.
-2. Para una ruta protegida, Envoy envía el método, la URL, las cabeceras y los datos necesarios a `/v1/ext_authz/check`.
-3. `authz` extrae la credencial y resuelve todos los principales activos que coinciden con ella.
-4. Carga por separado las políticas concedidas a cada principal.
-5. El esquema HTTP traduce la combinación de método y ruta a una acción lógica, como `nbi-job-read` o `nbi-workflow-create`.
-6. `authz` busca una regla HTTP que conceda esa acción.
-7. Si la ruta declara restricciones, compara datos de la petición con los atributos normalizados del mismo principal que aporta la política.
-8. Un resultado satisfactorio permite a Envoy reenviar la petición; cualquier otra respuesta la bloquea en el Gateway.
-
-Cuando permite el acceso, `authz` devuelve el principal seleccionado en `x-current-user`. El Gateway puede propagar esa cabecera al servicio para conservar el contexto de identidad.
-
-Las reglas HTTP responden principalmente a **“¿puede esta identidad llamar a esta operación de la API?”**. Por sí solas no generan filtros sobre la base de datos del servicio externo. Para limitar una ruta a un dispositivo, tenant o cliente concreto, el esquema debe declarar una restricción que relacione un valor de la petición con un atributo normalizado del principal.
-
-### Servicios desarrollados por Lamassu
-
-Los servicios nativos de Lamassu integran autorización en su middleware y conocen las entidades sobre las que operan: certificados, CAs, perfiles de emisión, claves, dispositivos, DMS o suscripciones, entre otras.
-
-La decisión se toma con el contexto de la operación de dominio:
-
-1. El middleware extrae la credencial y resuelve los principales coincidentes.
-2. El endpoint identifica la acción, el tipo de entidad y, cuando corresponde, la clave del recurso solicitado.
-3. `authz` reúne las reglas de entidad de las políticas concedidas.
-4. El motor evalúa grants directos, filtros por atributos y relaciones con otras entidades.
-5. Para una operación individual, comprueba que el recurso concreto satisface el alcance calculado.
-6. Para un listado, genera un filtro SQL que el servicio añade a su propia consulta.
-
-Aquí el motor responde a **“¿puede esta identidad realizar esta acción sobre este recurso concreto?”**.
-
-Las acciones se dividen en dos grupos:
-
-- Las **acciones globales** no necesitan un identificador de recurso. `create`, `import` o el acceso a una sección de la interfaz son ejemplos habituales.
-- Las **acciones atómicas** se evalúan sobre una instancia concreta. En certificados aparecen `read`, `metadata-update`, `status-update` y `delete`; para una CA también existen `sign`, `reissue` y otras operaciones de ciclo de vida.
-
-El filtrado dentro del servicio evita fugas en listados: los recursos no autorizados quedan fuera de la consulta SQL en lugar de recuperarse y ocultarse después en la interfaz.
-
-### Cómo se relacionan ambos caminos
-
-No son dos controles equivalentes aplicados dos veces. Las reglas HTTP protegen el perímetro de un servicio integrado; las reglas de entidad expresan permisos sobre el modelo de datos de los servicios nativos.
-
-Una política puede contener ambos tipos de reglas cuando una identidad necesita operar recursos de Lamassu y también llamar a una API integrada. Conceder una regla de entidad no concede automáticamente una acción HTTP, ni una regla HTTP crea acceso sobre una entidad.
-
-<Callout type="warn" title="Denegación por defecto">
-  Si ninguna combinación de principal, política y regla permite la operación, Lamassu la deniega. Además, `auth.externalAuthorization.failOpen` vale `false` por defecto: si `authz` no está disponible, el Gateway bloquea las rutas protegidas.
+<Callout type="info" title="The difference lies in the integration point">
+  An external service can be protected without knowing Lamassu's internal authorization model. A service developed by Lamassu embeds the authorization engine and can decide on concrete resources and filter its queries.
 </Callout>
 
-## Principales OIDC
+### Integrated or external HTTP services
 
-Un principal OIDC coincide con los claims de un JWT validado. Es apropiado para usuarios humanos, grupos corporativos, roles del IdP y cuentas de servicio que obtienen tokens.
+This path protects APIs that join the platform through the Gateway but do not natively implement Lamassu's authorization SDK. Job Manager is the current example. The same pattern allows integrating other HTTP services as long as their routes are described in an `authz` HTTP schema.
 
-El siguiente principal representa a cualquier identidad que tenga el rol `pki-operators` en Keycloak:
+The decision is made **before forwarding the request to the service**:
 
-```json title="Principal OIDC por rol"
+1. Envoy Gateway authenticates the request, usually validating a JWT against the OIDC provider's JWKS.
+2. For a protected route, Envoy sends the method, URL, headers and required data to `/v1/ext_authz/check`.
+3. `authz` extracts the credential and resolves all active principals matching it.
+4. It separately loads the policies granted to each principal.
+5. The HTTP schema translates the method and route combination into a logical action, such as `nbi-job-read` or `nbi-workflow-create`.
+6. `authz` looks for an HTTP rule granting that action.
+7. If the route declares constraints, it compares request data with the normalized attributes of the same principal contributing the policy.
+8. A satisfying result lets Envoy forward the request; any other response blocks it at the Gateway.
+
+When it allows access, `authz` returns the selected principal in `x-current-user`. The Gateway can propagate that header to the service to preserve the identity context.
+
+HTTP rules primarily answer **"can this identity call this API operation?"**. On their own they do not produce filters over the external service's database. To limit a route to a specific device, tenant or client, the schema must declare a constraint relating a request value to a normalized attribute of the principal.
+
+### Services developed by Lamassu
+
+Lamassu's native services embed authorization in their middleware and know the entities they operate on: certificates, CAs, issuance profiles, keys, devices, DMSs or subscriptions, among others.
+
+The decision is made with the domain operation context:
+
+1. The middleware extracts the credential and resolves the matching principals.
+2. The endpoint identifies the action, the entity type and, when applicable, the key of the requested resource.
+3. `authz` gathers the entity rules of the granted policies.
+4. The engine evaluates direct grants, attribute filters and relations with other entities.
+5. For an individual operation, it checks that the concrete resource satisfies the computed scope.
+6. For a listing, it generates a SQL filter that the service adds to its own query.
+
+Here the engine answers **"can this identity perform this action on this concrete resource?"**.
+
+Actions fall into two groups:
+
+- **Global actions** do not need a resource identifier. `create`, `import` or access to a console section are common examples.
+- **Atomic actions** are evaluated on a concrete instance. For certificates these include `read`, `metadata-update`, `status-update` and `delete`; for a CA there are also `sign`, `reissue` and other lifecycle operations.
+
+Filtering inside the service prevents leaks in listings: unauthorized resources are excluded from the SQL query instead of being fetched and hidden later in the interface.
+
+### How the two paths relate
+
+They are not two equivalent controls applied twice. HTTP rules protect the perimeter of an integrated service; entity rules express permissions over the data model of the native services.
+
+A policy can contain both rule types when an identity needs to operate Lamassu resources and also call an integrated API. Granting an entity rule does not automatically grant an HTTP action, nor does an HTTP rule create access over an entity.
+
+<Callout type="warn" title="Deny by default">
+  If no combination of principal, policy and rule allows the operation, Lamassu denies it. Additionally, `auth.externalAuthorization.failOpen` is `false` by default: if `authz` is unavailable, the Gateway blocks protected routes.
+</Callout>
+
+## OIDC principals
+
+An OIDC principal matches the claims of a validated JWT. It is appropriate for human users, corporate groups, IdP roles and service accounts that obtain tokens.
+
+The following principal represents any identity holding the `pki-operators` role in Keycloak:
+
+```json title="OIDC principal by role"
 {
   "id": "oidc:pki-operators",
-  "name": "Operadores de PKI",
-  "description": "Equipo responsable de la operación diaria",
+  "name": "PKI Operators",
+  "description": "Team responsible for daily operation",
   "type": "oidc",
   "active": true,
   "auth_config": {
@@ -118,84 +118,84 @@ El siguiente principal representa a cualquier identidad que tenga el rol `pki-op
 }
 ```
 
-Las rutas de claims pueden estar anidadas, como `realm_access.roles`. Dentro de un mismo principal, **todas** las condiciones deben cumplirse. Esto permite exigir, por ejemplo, un grupo y una audiencia organizativa a la vez.
+Claim paths can be nested, such as `realm_access.roles`. Within a single principal, **all** conditions must hold. This lets you require, for example, a group and an organizational audience at the same time.
 
-Los operadores implementados son:
+The implemented operators are:
 
-- `equals`, para igualdad exacta;
-- `contains`, para comprobar la pertenencia a una lista o la presencia de texto en un valor escalar.
+- `equals`, for exact equality;
+- `contains`, to check membership in a list or the presence of text in a scalar value.
 
-Diseña la coincidencia con atributos estables. Para personas, suele ser mejor enlazar permisos a grupos o roles gestionados centralmente que al correo o al nombre de usuario. Para una cuenta de servicio, un `sub` estable evita que sus permisos se mezclen con los de un operador humano.
+Design matching with stable attributes. For people, it is usually better to bind permissions to centrally managed groups or roles than to the email or username. For a service account, a stable `sub` keeps its permissions from mixing with a human operator's.
 
-<Callout type="warn" title="No uses matches todavía">
-  Aunque el modelo reconoce el nombre de operador `matches`, la implementación actual no evalúa expresiones regulares y la condición nunca coincide. Usa `equals` o `contains`.
+<Callout type="warn" title="Do not use matches yet">
+  Although the model recognizes the operator name `matches`, the current implementation does not evaluate regular expressions and the condition never matches. Use `equals` or `contains`.
 </Callout>
 
-## Principales X.509
+## X.509 principals
 
-Un principal X.509 permite reconocer una carga de trabajo o un dispositivo mediante su certificado cliente. Lamassu comprueba la firma del certificado contra la CA configurada y, según el modo, también su número de serie o Common Name.
+An X.509 principal lets you recognize a workload or a device by its client certificate. Lamassu checks the certificate signature against the configured CA and, depending on the mode, also its serial number or Common Name.
 
-Los modos disponibles son:
+The available modes are:
 
-- `serial_and_ca`: un certificado exacto, identificado por número de serie y CA;
-- `cn_and_ca`: un Common Name exacto o con comodines y una CA concreta;
-- `any_from_ca`: cualquier certificado emitido directamente por la CA indicada.
+- `serial_and_ca`: an exact certificate, identified by serial number and CA;
+- `cn_and_ca`: an exact or wildcard Common Name and a specific CA;
+- `any_from_ca`: any certificate issued directly by the given CA.
 
-Este ejemplo reconoce certificados cuyo CN comienza por `factory-a-` y que están firmados por la CA configurada:
+This example recognizes certificates whose CN starts with `factory-a-` and that are signed by the configured CA:
 
-```json title="Principal X.509 por CN y CA"
+```json title="X.509 principal by CN and CA"
 {
   "id": "x509:factory-a-devices",
-  "name": "Dispositivos de la fábrica A",
+  "name": "Factory A devices",
   "type": "x509",
   "active": true,
   "auth_config": {
     "match_mode": "cn_and_ca",
     "subject_cn": "factory-a-*",
     "ca_trust": {
-      "pem": "<certificado-CA-en-PEM-o-base64>",
+      "pem": "<CA-certificate-in-PEM-or-base64>",
       "identity_type": "fingerprint",
-      "value": "SHA256:<huella-sha256-de-la-ca>"
+      "value": "SHA256:<sha256-fingerprint-of-the-ca>"
     }
   }
 }
 ```
 
-`ca_trust.identity_type` acepta `fingerprint` o `authority_key_id`. En ambos casos debes aportar el certificado de la CA en `ca_trust.pem`; Lamassu verifica tanto la firma como la identidad esperada de la CA.
+`ca_trust.identity_type` accepts `fingerprint` or `authority_key_id`. In both cases you must provide the CA certificate in `ca_trust.pem`; Lamassu verifies both the signature and the expected identity of the CA.
 
-Usa `any_from_ca` únicamente cuando todas las identidades emitidas por esa CA deban compartir los mismos permisos. Si una CA emite certificados para poblaciones distintas, separa el acceso por serie o CN, o utiliza CAs de emisión diferentes.
+Use `any_from_ca` only when every identity issued by that CA should share the same permissions. If a CA issues certificates for different populations, separate access by serial or CN, or use different issuing CAs.
 
-## Cuando coinciden varios principales
+## When several principals match
 
-Una misma credencial puede coincidir con más de un principal. Es habitual que un usuario coincida con un principal de su equipo y con otro de su función operativa.
+A single credential can match more than one principal. It is common for a user to match a principal of their team and another of their operational function.
 
-Para permisos de entidad, Lamassu combina los permisos con lógica OR: basta con que una de las políticas de uno de los principales permita la acción. Los listados contienen la unión de los recursos visibles para todos ellos.
+For entity permissions, Lamassu combines permissions with OR logic: it is enough that one policy of one of the principals allows the action. Listings contain the union of the resources visible to all of them.
 
-Las rutas HTTP con restricciones son más estrictas. El mismo principal que aporta la política debe satisfacer también los atributos exigidos por la ruta. Lamassu no combina la política de un principal con un atributo perteneciente a otro.
+HTTP routes with constraints are stricter. The same principal contributing the policy must also satisfy the attributes required by the route. Lamassu does not combine one principal's policy with an attribute belonging to another.
 
-Por esta razón, añadir un principal coincidente solo puede ampliar el acceso. Antes de crear reglas solapadas, revisa el conjunto completo de políticas que recibirá una identidad real.
+For this reason, adding a matching principal can only broaden access. Before creating overlapping rules, review the full set of policies a real identity will receive.
 
-## Cómo expresan acceso las políticas
+## How policies express access
 
-### Acceso global y acceso directo
+### Global and direct access
 
-Una regla identifica el dominio (`namespace`), el esquema de datos (`schema_name`) y el tipo de entidad (`entity_type`). `actions` enumera las operaciones permitidas.
+A rule identifies the domain (`namespace`), the data schema (`schema_name`) and the entity type (`entity_type`). `actions` lists the allowed operations.
 
-`direct_grants` limita la regla a identificadores concretos. El valor `*` abarca todas las instancias del tipo. Una política de superadministrador utiliza comodines en esquema, entidad, acciones y grants; una política de mínimo privilegio debe evitarlos siempre que sea posible.
+`direct_grants` limits the rule to concrete identifiers. The value `*` covers all instances of the type. A superadministrator policy uses wildcards in schema, entity, actions and grants; a least-privilege policy should avoid them whenever possible.
 
-### Acceso heredado por relaciones
+### Access inherited through relations
 
-Las reglas pueden seguir relaciones declaradas entre entidades. Por ejemplo, el esquema conoce la relación de un certificado con su CA emisora y la de un dispositivo con su DMS. Una política puede conceder acceso a un recurso padre y propagar acciones seleccionadas hacia sus recursos relacionados.
+Rules can follow relations declared between entities. For example, the schema knows the relation of a certificate to its issuing CA and of a device to its DMS. A policy can grant access to a parent resource and propagate selected actions to its related resources.
 
-Esto permite expresar modelos como “puede operar los dispositivos de este DMS” sin mantener una lista individual de cada dispositivo. Cuando se añade un recurso bajo esa relación, hereda el alcance previsto por la política.
+This lets you express models like "can operate the devices of this DMS" without maintaining an individual list of every device. When a resource is added under that relation, it inherits the scope planned by the policy.
 
-### Acceso filtrado por atributos
+### Attribute-filtered access
 
-`column_filters` aplica condiciones a columnas que el esquema haya declarado como filtrables. Todos los filtros de una misma regla se combinan con AND.
+`column_filters` applies conditions to columns the schema has declared filterable. All filters of the same rule are combined with AND.
 
-Por ejemplo, esta regla permite leer certificados activos emitidos por una CA concreta:
+For example, this rule allows reading active certificates issued by a specific CA:
 
-```json title="Regla limitada por atributos"
+```json title="Attribute-limited rule"
 {
   "namespace": "pki",
   "schema_name": "ca",
@@ -219,37 +219,37 @@ Por ejemplo, esta regla permite leer certificados activos emitidos por una CA co
 }
 ```
 
-Los operadores disponibles son `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in` y `like`. Usa comparaciones coherentes con el tipo de columna: `like` para texto, comparaciones de orden para números o fechas y `in` cuando haya una colección de valores aceptados.
+The available operators are `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in` and `like`. Use comparisons consistent with the column type: `like` for text, ordering comparisons for numbers or dates and `in` when there is a collection of accepted values.
 
-### Reglas HTTP
+### HTTP rules
 
-Las reglas HTTP no apuntan directamente a tablas. Referencian un esquema de rutas y conceden sus acciones lógicas. Las políticas del Job Manager son un ejemplo: distinguen lectura, creación, actualización y eliminación de workflows o jobs.
+HTTP rules do not point directly at tables. They reference a route schema and grant its logical actions. Job Manager's policies are an example: they distinguish reading, creating, updating and deleting workflows or jobs.
 
-Algunas rutas también comparan un valor de la petición —extraído de la ruta, query, cabecera o cuerpo JSON— con un atributo normalizado del principal. Así puede verificarse que un dispositivo solo consulte trabajos dirigidos a su propio `client_id`.
+Some routes also compare a request value — taken from the path, query, header or JSON body — with a normalized attribute of the principal. This way you can verify that a device only queries jobs addressed to its own `client_id`.
 
-Los atributos normalizados desacoplan la política del mecanismo de autenticación. `subject_attribute_mappings` puede derivar, por ejemplo, `device_id` desde `oidc.claim.device_id` o desde `x509.subject.cn`. La regla consume `device_id` en ambos casos.
+Normalized attributes decouple the policy from the authentication mechanism. `subject_attribute_mappings` can derive, for example, `device_id` from `oidc.claim.device_id` or from `x509.subject.cn`. The rule consumes `device_id` in both cases.
 
-## Políticas incluidas
+## Included policies
 
-La precarga de `authz` instala políticas reutilizables para los dominios principales. Entre ellas se encuentran:
+The `authz` preload installs reusable policies for the main domains. Among them are:
 
-- acceso completo y de solo lectura a certificados y autoridades;
-- acceso completo y de solo lectura a KMS;
-- acceso completo y de solo lectura a Device Manager, DMS Manager, Validation Authority y alertas;
-- una política `Auditor` de lectura de PKI y visibilidad de autorización;
-- acceso a la interfaz;
-- políticas de administración y observación para las APIs NBI y SBI del Job Manager;
-- `SUPER ADMIN`, que concede todas las acciones sobre los dominios `authz` y `pki`.
+- full and read-only access to certificates and authorities;
+- full and read-only access to the KMS;
+- full and read-only access to Device Manager, DMS Manager, Validation Authority and alerts;
+- an `Auditor` policy with PKI read access and authorization visibility;
+- console access;
+- administration and observation policies for the Job Manager NBI and SBI APIs;
+- `SUPER ADMIN`, which grants all actions over the `authz` and `pki` domains.
 
-Empieza por estas políticas antes de crear otras. Si ninguna refleja el límite que necesitas, crea una política específica y pequeña en lugar de copiar `SUPER ADMIN` y retirar permisos de forma informal.
+Start with these policies before creating others. If none reflects the boundary you need, create a specific, small policy instead of copying `SUPER ADMIN` and informally removing permissions.
 
-## Provisiona el primer administrador
+## Provision the first administrator
 
-<Callout type="warn" title="No existe un superusuario implícito">
-  Una instalación sin un principal que coincida con tu identidad queda sin nadie capaz de administrar la autorización. Configura el IdP y el bootstrap antes de exponer la plataforma.
+<Callout type="warn" title="There is no implicit superuser">
+  An installation without a principal matching your identity is left with nobody able to administer authorization. Configure the IdP and the bootstrap before exposing the platform.
 </Callout>
 
-El chart incluye un principal de bootstrap que busca el rol OIDC `pki-admin` en `realm_access.roles`. Le concede `SUPER ADMIN` y, cuando Job Manager está habilitado, la política administrativa de su API NBI.
+The chart includes a bootstrap principal that looks for the OIDC role `pki-admin` in `realm_access.roles`. It grants it `SUPER ADMIN` and, when Job Manager is enabled, the administrative policy of its NBI API.
 
 ```yaml title="values.yaml"
 auth:
@@ -280,107 +280,107 @@ services:
               value: "pki-admin"
 ```
 
-El Job Helm de preinstalación y preactualización ejecuta las migraciones de `authz`, precarga las políticas y crea los principales de bootstrap antes de iniciar los servicios. Si el principal ya existe, no lo reemplaza: añade únicamente los grants configurados que todavía falten. Puedes conservar la entrada en `values.yaml` durante las actualizaciones.
+The pre-install and pre-upgrade Helm Job runs the `authz` migrations, preloads the policies and creates the bootstrap principals before the services start. If the principal already exists, it does not replace it: it only adds the configured grants that are still missing. You can keep the entry in `values.yaml` across upgrades.
 
 <Steps>
   <Step>
-    ### Prepara el proveedor de identidad
+    ### Prepare the identity provider
 
-    Crea el rol o grupo que utilizarás para recuperar y administrar Lamassu. Asígnalo al menos a dos identidades humanas controladas. Si tu proveedor no usa `realm_access.roles`, adapta la ruta del claim tanto en el frontend como en `auth_config.claims`.
+    Create the role or group you will use to administer Lamassu. Assign it to at least two controlled human identities. If your provider does not use `realm_access.roles`, adapt the claim path in both the frontend and `auth_config.claims`.
   </Step>
 
   <Step>
-    ### Configura las dos validaciones JWT
+    ### Configure the two JWT validations
 
-    El Gateway utiliza `auth.authentication.apiGateway.jwks` para autenticar peticiones. `authz` utiliza `services.authz.jwkUrl` para resolver los principales OIDC. Ambos endpoints deben contener las claves del mismo emisor y ser alcanzables desde sus respectivos componentes.
+    The Gateway uses `auth.authentication.apiGateway.jwks` to authenticate requests. `authz` uses `services.authz.jwkUrl` to resolve OIDC principals. Both endpoints must contain the keys of the same issuer and be reachable from their respective components.
   </Step>
 
   <Step>
-    ### Instala y verifica el acceso administrativo
+    ### Install and verify administrative access
 
-    Inicia sesión con una identidad que tenga `pki-admin`. Confirma que puede acceder a la administración de autorización y realizar una operación de lectura no destructiva.
+    Sign in with an identity holding `pki-admin`. Confirm it can access authorization administration and perform a non-destructive read operation.
   </Step>
 
   <Step>
-    ### Prueba una identidad sin privilegios
+    ### Test an unprivileged identity
 
-    Usa un segundo usuario sin el rol y confirma que la misma operación queda denegada. Esta prueba detecta claims mal interpretados, políticas demasiado amplias y configuraciones `failOpen` accidentales.
+    Use a second user without the role and confirm the same operation is denied. This test catches misread claims, overly broad policies and accidental `failOpen` configurations.
   </Step>
 
   <Step>
-    ### Reduce el uso del administrador de bootstrap
+    ### Reduce use of the bootstrap administrator
 
-    Crea principales operativos con políticas de menor alcance. Reserva `pki-admin` para administración de autorización y recuperación, no para el trabajo diario.
+    Create operational principals with narrower policies. Reserve `pki-admin` for authorization administration and recovery, not for daily work.
   </Step>
 </Steps>
 
-## Bootstrap de Fastlane
+## Fastlane bootstrap
 
-Fastlane instala un realm de Keycloak para laboratorio y crea el usuario `lamassu` con contraseña temporal `lamassu`, rol `pki-admin` y cambio de contraseña obligatorio. Su principal de bootstrap coincide mediante `preferred_username=lamassu`.
+Fastlane installs a Keycloak realm for the lab and creates the user `lamassu` with the temporary password `lamassu`, the role `pki-admin` and a mandatory password change. Its bootstrap principal matches through `preferred_username=lamassu`.
 
-<Callout type="warn" title="Credenciales solo para bootstrap">
-  Cambia la contraseña en el primer acceso. No reutilices el usuario, la contraseña ni el IdP de Fastlane como diseño de producción.
+<Callout type="warn" title="Credentials for bootstrap only">
+  Change the password on first login. Do not reuse the Fastlane user, password or IdP as a production design.
 </Callout>
 
-## Diseña roles de mínimo privilegio
+## Design least-privilege roles
 
-Evita reproducir la estructura interna de tu empresa con decenas de políticas casi idénticas. Empieza por las responsabilidades que realmente necesitan acceso:
+Avoid reproducing your company's internal structure with dozens of nearly identical policies. Start from the responsibilities that actually need access:
 
-- **Administración de autorización**: gestiona principales, políticas y grants. Debe pertenecer a un grupo pequeño y separado.
-- **Operación de PKI**: administra CAs, perfiles y certificados, pero no necesariamente puede modificar quién obtiene acceso.
-- **Registro de dispositivos**: opera dispositivos y DMS sin recibir permisos sobre claves o configuración de autorización.
-- **Auditoría**: consulta configuración y actividad sin crear, modificar, firmar, revocar ni eliminar.
-- **Automatización**: utiliza una cuenta técnica o certificado independiente, con permisos limitados al flujo y recursos que controla.
+- **Authorization administration**: manages principals, policies and grants. It should belong to a small, separate group.
+- **PKI operation**: administers CAs, profiles and certificates, but not necessarily who gets access.
+- **Device registration**: operates devices and DMSs without receiving permissions over keys or authorization configuration.
+- **Audit**: reviews configuration and activity without creating, modifying, signing, revoking or deleting.
+- **Automation**: uses a technical account or a separate certificate, with permissions limited to the flow and resources it controls.
 
-Para cada rol, separa “ver” de “cambiar”, limita los recursos mediante grants, relaciones o atributos y evita `*` salvo que el rol deba abarcar futuras acciones automáticamente.
+For each role, separate "view" from "change", limit resources through grants, relations or attributes and avoid `*` unless the role must automatically cover future actions.
 
-<Callout type="info" title="Los comodines también conceden acciones futuras">
-  Una regla con `actions: ["*"]` se expande a todas las acciones definidas por el esquema. Cuando una versión nueva añade una acción, una política con comodín puede empezar a concederla. Revisa estas políticas durante cada actualización.
+<Callout type="info" title="Wildcards also grant future actions">
+  A rule with `actions: ["*"]` expands to every action defined by the schema. When a new version adds an action, a wildcard policy may start granting it. Review these policies on every upgrade.
 </Callout>
 
-## Cambios y revocación de acceso
+## Changes and access revocation
 
-Para retirar acceso de inmediato, desactiva el principal o revoca sus grants. Desactivar un principal conserva su configuración y asociaciones para investigación o restauración, pero deja de participar en la coincidencia.
+To revoke access immediately, disable the principal or revoke its grants. Disabling a principal keeps its configuration and associations for investigation or restoration, but it stops taking part in matching.
 
-Eliminar un rol o grupo en el IdP evita que nuevos tokens contengan el claim, pero un token ya emitido puede seguir siendo válido hasta expirar. Si la retirada es urgente, combina el cambio en el IdP con la desactivación del principal en Lamassu y la revocación de sesiones o tokens en el proveedor.
+Deleting a role or group in the IdP prevents new tokens from containing the claim, but an already-issued token may remain valid until it expires. If removal is urgent, combine the IdP change with disabling the principal in Lamassu and revoking sessions or tokens at the provider.
 
-Cuando edites una política compartida, recuerda que el cambio afecta a todos sus principales. Para probar un nuevo alcance, crea una política separada, concédela a una identidad de prueba y valida operaciones permitidas y denegadas antes de sustituir la anterior.
+When you edit a shared policy, remember the change affects all its principals. To test a new scope, create a separate policy, grant it to a test identity and validate allowed and denied operations before replacing the old one.
 
-## Lista de comprobación operativa
+## Operational checklist
 
-- Mantén `failOpen: false` salvo que una evaluación de riesgo documentada justifique lo contrario.
-- Usa grupos o roles estables para personas e identidades independientes para automatizaciones.
-- Conserva al menos dos administradores de recuperación y prueba su acceso periódicamente.
-- Revisa los principales activos, sus coincidencias y sus grants después de cambios en el IdP.
-- Busca comodines en políticas antes de actualizar Lamassu.
-- Prueba siempre una operación permitida y otra denegada para cada rol.
-- Correlaciona los cambios de principales, políticas y grants con los [registros de auditoría](/docs/platform/pki/audit-logs).
+- Keep `failOpen: false` unless a documented risk assessment justifies otherwise.
+- Use groups or stable roles for people and independent identities for automations.
+- Keep at least two recovery administrators and test their access periodically.
+- Review active principals, their matches and their grants after IdP changes.
+- Search for wildcards in policies before upgrading Lamassu.
+- Always test one allowed and one denied operation for each role.
+- Correlate changes to principals, policies and grants with the [audit logs](/docs/platform/pki/audit-logs).
 
-## Diagnóstico
+## Diagnostics
 
-### La respuesta es 401
+### The response is 401
 
-La autenticación falló antes de evaluar permisos. Comprueba la firma y expiración del JWT, el emisor, la audiencia y la disponibilidad del JWKS configurado en el Gateway. Para X.509, revisa que el certificado cliente llegue hasta el punto que extrae la credencial.
+Authentication failed before permissions were evaluated. Check the JWT signature and expiration, issuer, audience and the availability of the JWKS configured in the Gateway. For X.509, check that the client certificate reaches the point that extracts the credential.
 
-### La respuesta es 403
+### The response is 403
 
-La credencial pudo procesarse, pero no produjo una autorización positiva. Revisa en este orden:
+The credential could be processed but did not produce a positive authorization. Review in this order:
 
-1. que exista un principal activo del tipo correcto;
-2. que las rutas de claims y sus valores coincidan exactamente con el token real;
-3. que todas las condiciones del principal se cumplan;
-4. que el principal tenga concedida la política esperada;
-5. que la política incluya la acción y el tipo de recurso o ruta solicitados;
-6. que el identificador, relación, filtro de columna o restricción HTTP incluya el recurso real.
+1. that an active principal of the correct type exists;
+2. that the claim paths and values match the real token exactly;
+3. that all of the principal's conditions hold;
+4. that the principal has the expected policy granted;
+5. that the policy includes the action and the requested resource type or route;
+6. that the identifier, relation, column filter or HTTP constraint includes the real resource.
 
-En los logs de `authz`, una decisión del endpoint externo incluye `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` y el código de estado. Estos campos permiten separar un fallo de coincidencia de un fallo de permisos.
+In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure.
 
-### Todo devuelve 403
+### Everything returns 403
 
-Comprueba que el principal de bootstrap fue creado y que las políticas fueron precargadas por el Job de migración. Verifica también que `services.authz.jwkUrl` sea alcanzable desde el pod de `authz`; no asumas que una URL pública accesible desde el navegador también funciona dentro del clúster.
+Check that the bootstrap principal was created and that the policies were preloaded by the migration Job. Also verify that `services.authz.jwkUrl` is reachable from the `authz` pod; do not assume that a URL accessible from the browser also works inside the cluster.
 
-### Todo falla cuando authz no está disponible
+### Everything fails when authz is unavailable
 
-Es el comportamiento esperado con `failOpen: false`. Restaura el servicio, su conexión con PostgreSQL y su conectividad con el JWKS. No cambies temporalmente a `failOpen: true` sin aceptar que las rutas protegidas podrían quedar accesibles sin decisión de autorización.
+This is the expected behavior with `failOpen: false`. Restore the service, its PostgreSQL connection and its JWKS connectivity. Do not temporarily switch to `failOpen: true` without accepting that protected routes could become accessible without an authorization decision.
 
-Continúa con [Registros de auditoría](/docs/platform/pki/audit-logs) para investigar cambios de configuración o con [Resolución de problemas](/docs/platform/pki/troubleshooting) para diagnosticar el despliegue.
+Continue with [Audit logs](/docs/platform/pki/audit-logs) to investigate configuration changes or with [Troubleshooting](/docs/platform/pki/troubleshooting) to diagnose the deployment.

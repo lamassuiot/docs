@@ -1,63 +1,63 @@
 ---
-title: Crea tu primera CA
-description: Crea una autoridad raíz y comprueba que está preparada para emitir certificados.
+title: Create your first CA
+description: Create a root authority and check that it is ready to issue certificates.
 ---
 
-En este quickstart crearás una autoridad de certificación raíz con un nuevo par de claves. Al terminar tendrás una CA activa que podrás usar en el siguiente quickstart.
+In this quickstart you will create a root certification authority with a new key pair. When you finish you will have an active CA that you can use in the next quickstart.
 
-## Antes de empezar
+## Before you begin
 
-- Acceso a la consola con permisos para gestionar autoridades.
-- Al menos un motor criptográfico disponible.
-- Un nombre que identifique el propósito de la CA, por ejemplo `Acme Device Root CA`.
+- Console access with permissions to manage authorities.
+- At least one cryptographic engine available.
+- A name that identifies the purpose of the CA, for example `Acme Device Root CA`.
 
-<Callout type="info" title="Raíz o intermedia">
-  Una CA raíz se autofirma y actúa como ancla de confianza. Para producción suele ser preferible mantener la raíz más protegida y emitir desde una CA intermedia.
+<Callout type="info" title="Root or intermediate">
+  A root CA is self-signed and acts as the anchor of trust. For production it is usually preferable to keep the root more protected and issue from an intermediate CA.
 </Callout>
 
 <Steps>
   <Step>
-    ### Abre el asistente de creación
+    ### Open the creation wizard
 
-    En el menú lateral, abre **Certification Authorities** y selecciona **Create New CA**.
+    In the side menu, open **Certification Authorities** and select **Create New CA**.
 
-    Elige crear una CA con un par de claves nuevo. Si ya tienes la clave en el KMS, usa **Create New CA (Existing Key)**.
+    Choose to create a CA with a new key pair. If you already have the key in the KMS, use **Create New CA (Existing Key)**.
   </Step>
 
   <Step>
-    ### Selecciona la clave
+    ### Select the key
 
-    Elige el motor criptográfico que custodiará la clave y configura el algoritmo. Para una primera CA puedes usar **EC P-384**, siempre que sea compatible con tus consumidores.
+    Choose the cryptographic engine that will keep the key and configure the algorithm. For a first CA you can use **EC P-384**, as long as it is compatible with your consumers.
 
-    La clave privada permanecerá bajo el control del motor seleccionado.
+    The private key will remain under the control of the selected engine.
   </Step>
 
   <Step>
-    ### Define la autoridad
+    ### Define the authority
 
-    Selecciona **Root CA** y completa:
+    Select **Root CA** and complete:
 
-    - **CA Name**: un nombre único y reconocible.
-    - **Subject**: al menos la organización y el país que identificarán a la autoridad.
-    - **CA Certificate Expiration**: una validez mayor que la de los certificados que emitirá.
-    - **Default End-Entity Certificate Issuance Expiration**: la validez predeterminada de los certificados finales.
+    - **CA Name**: a unique, recognizable name.
+    - **Subject**: at least the organization and country that will identify the authority.
+    - **CA Certificate Expiration**: a validity longer than that of the certificates it will issue.
+    - **Default End-Entity Certificate Issuance Expiration**: the default validity of end-entity certificates.
 
-    El nombre de la CA se utilizará como `Common Name` del certificado.
+    The CA name will be used as the certificate's `Common Name`.
   </Step>
 
   <Step>
-    ### Revisa y crea la CA
+    ### Review and create the CA
 
-    Comprueba el algoritmo, el sujeto y las fechas antes de confirmar. Estos valores definen el ancla de confianza y no deberían elegirse como simples datos de prueba en un entorno productivo.
+    Check the algorithm, subject and dates before confirming. These values define the anchor of trust and should not be chosen as throwaway test data in a production environment.
   </Step>
 
   <Step>
-    ### Verifica el resultado
+    ### Verify the result
 
-    Abre la nueva CA desde el listado. Debe aparecer activa y mostrar su certificado PEM, la fecha de expiración y la pestaña **Issued Certificates**.
+    Open the new CA from the list. It should appear active and show its PEM certificate, the expiration date and the **Issued Certificates** tab.
   </Step>
 </Steps>
 
-## Siguiente paso
+## Next step
 
-Usa la autoridad para [emitir tu primer certificado](/docs/platform/pki/quickstarts/issue-certificate), o consulta la [guía completa de autoridades](/docs/platform/pki/certificate-authorities) para crear una CA intermedia, importar una CA o definir perfiles avanzados.
+Use the authority to [issue your first certificate](/docs/platform/pki/quickstarts/issue-certificate), or see the [full authorities guide](/docs/platform/pki/certificate-authorities) to create an intermediate CA, import a CA or define advanced profiles.

@@ -10,6 +10,8 @@ Un **Device Management Service (DMS)** actúa como autoridad de registro frente 
 
 Cada DMS es un límite operativo independiente: puede representar una línea de producto, un entorno o un tipo de dispositivo con su propia CA, reglas de autenticación, confianza distribuida y ventana de renovación.
 
+Cada DMS expone un único protocolo de enrolamiento, seleccionado al crearlo o editarlo: **EST (RFC 7030)** o **CMP (RFC 9483 Lightweight CMP Profile / RFC 4210)**. Los dos protocolos son mutuamente excluyentes: cambiar el protocolo de un DMS existente sustituye por completo su configuración de enrolamiento, sin migración automática de ajustes. La configuración de cada protocolo y la guía de integración para dispositivos se documentan en las páginas de [EST](/docs/platform/pki/est-enrollment) y [CMP](/docs/platform/pki/cmp).
+
 ## Antes de empezar
 
 - Crea o importa al menos una CA activa.
@@ -33,15 +35,15 @@ Cada DMS es un límite operativo independiente: puede representar una línea de 
   </Step>
 
   <Step>
-    ### Configura EST
+    ### Configura el protocolo de enrolamiento
 
-    Define la autenticación de `enroll`, la política de `reenroll`, la ventana de renovación y, si se necesita, `serverkeygen`.
+    Selecciona EST (RFC 7030) o CMP (RFC 9483) y define la autenticación de `enroll`, la política de `reenroll`, la ventana de renovación y, si se necesita, la generación de claves en servidor.
   </Step>
 
   <Step>
     ### Distribuye la confianza
 
-    Configura **CA Distribution** para controlar la respuesta del endpoint `cacerts`.
+    Configura **CA Distribution** para controlar qué autoridades recibe el dispositivo como anclas de confianza, con independencia del protocolo de enrolamiento.
   </Step>
 
   <Step>
@@ -69,5 +71,6 @@ Cada DMS es un límite operativo independiente: puede representar una línea de 
 
 <Cards>
   <Card title="Enrolamiento EST" description="Configura autenticación, endpoints y flujos para firmware." href="/docs/platform/pki/est-enrollment" />
+  <Card title="Enrolamiento CMP" description="Configura autenticación, operaciones y transacciones para firmware." href="/docs/platform/pki/cmp" />
   <Card title="Dispositivos e identidades" description="Consulta estados, historial y acciones operativas." href="/docs/platform/pki/device-management" />
 </Cards>

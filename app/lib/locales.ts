@@ -97,7 +97,8 @@ export function localePath(locale: Locale, path = ""): string {
  * Rewrite a same-site docs URL to another locale. Handles both shapes a URL
  * can arrive in: 'platform/pki/overview' (relative) and full site paths such
  * as '/docs/platform/pki/overview' or '/docs/en/platform/pki/overview'.
- * Non-docs links (api-reference, llms endpoints) pass through untouched.
+ * The API reference keeps its unprefixed URL; links outside the mount point
+ * (llms endpoints) pass through untouched.
  */
 export function rewriteDocsUrlToLocale(url: string, locale: Locale): string {
   const [path, hash] = url.split("#", 2);
@@ -110,7 +111,12 @@ export function rewriteDocsUrlToLocale(url: string, locale: Locale): string {
   const mountedContent = segments.slice(mount.length);
   const hasLocalePrefix = isLocale(mountedContent[0] ?? "");
   const content = hasLocalePrefix ? mountedContent.slice(1) : mountedContent;
-  const target = docsUrl(DOCS_BASE_PATH, locale, content);
+  // The API reference is not translated and has no locale-prefixed route.
+  const target = docsUrl(
+    DOCS_BASE_PATH,
+    content[0] === "api-reference" ? DEFAULT_LOCALE : locale,
+    content,
+  );
   return hash !== undefined ? `${target}#${hash}` : target;
 }
 /**

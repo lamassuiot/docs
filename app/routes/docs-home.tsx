@@ -194,7 +194,7 @@ function navLinksFor(locale: Locale) {
     },
     {
       text: locale === "es" ? ES_COPY.navLinks[2] : EN_COPY.navLinks[2],
-      url: "/api-reference/ca",
+      url: docsPath("api-reference/ca"),
     },
   ];
 }
@@ -238,7 +238,7 @@ export default function DocsHome() {
                 >
                   {t.startHere}
                 </Link>
-                <Link to="/api-reference/ca" className="lm-btn">
+                <Link to={docsPath("api-reference/ca")} className="lm-btn">
                   {t.apiReference}
                 </Link>
               </div>
@@ -319,7 +319,7 @@ export default function DocsHome() {
                   </span>
                 </Link>
               ))}
-              <Link to="/api-reference/ca" className="lm-wave lm-wave--api">
+              <Link to={docsPath("api-reference/ca")} className="lm-wave lm-wave--api">
                 <span className="lm-wave-mark lm-wave-mark--svg" aria-hidden>
                   <ScalarIcon />
                 </span>

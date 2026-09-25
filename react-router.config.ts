@@ -7,6 +7,7 @@ import {
   LOCALES,
   parseLocaleFile,
 } from "./app/lib/locales";
+import { API_SERVICES } from "./app/lib/api-services";
 
 // Mount point for this build — see app/lib/base-path.ts. Read from process.env
 // because this config is loaded in Node, not bundled.
@@ -41,6 +42,12 @@ export default {
           `/llms.mdx/docs/${[...(target === i18nConfig.defaultLanguage ? [] : [target]), ...slugs, "index.mdx"].join("/")}`,
         );
       }
+    }
+
+    // The API reference is client-rendered, but GitHub Pages has no SPA
+    // fallback: each service needs its own HTML entry point.
+    for (const { id } of API_SERVICES) {
+      paths.add(`${basePath}/api-reference/${id}`);
     }
 
     return [...paths];

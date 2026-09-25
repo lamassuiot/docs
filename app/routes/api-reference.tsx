@@ -1,6 +1,8 @@
 import { lazy, Suspense, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { asset } from '@/lib/asset';
+import { API_SERVICES as SERVICES } from '@/lib/api-services';
+import { docsPath } from '@/lib/base-path';
 
 const ApiReferenceReact = lazy(() =>
   import('@scalar/api-reference-react').then((mod) => {
@@ -9,44 +11,6 @@ const ApiReferenceReact = lazy(() =>
   }),
 );
 
-const SERVICES = [
-  {
-    id: 'ca',
-    label: 'CA',
-    description: 'Certificate Authority',
-    url: 'https://www.lamassu.io/lamassuiot/ca-openapi.yaml',
-  },
-  {
-    id: 'va',
-    label: 'VA',
-    description: 'Validation Authority',
-    url: 'https://www.lamassu.io/lamassuiot/va-openapi.yaml',
-  },
-  {
-    id: 'device-manager',
-    label: 'Device Manager',
-    description: 'Device lifecycle management',
-    url: 'https://www.lamassu.io/lamassuiot/device-manager-openapi.yaml',
-  },
-  {
-    id: 'dms-manager',
-    label: 'DMS Manager',
-    description: 'Device Manufacturing Service',
-    url: 'https://www.lamassu.io/lamassuiot/dms-manager-openapi.yaml',
-  },
-  {
-    id: 'alerts',
-    label: 'Alerts',
-    description: 'Alerting & notifications',
-    url: 'https://www.lamassu.io/lamassuiot/alerts-openapi.yaml',
-  },
-  {
-    id: 'enroll-reenroll-webhook',
-    label: 'Enroll/Reenroll Webhook',
-    description: 'External EST enrollment authorization webhook',
-    url: 'https://www.lamassu.io/lamassuiot/enroll-reenroll-webhook-openapi.yaml',
-  },
-] as const;
 
 function readStoredDark(): boolean {
   try { return localStorage.getItem('scalar-dark') !== 'false'; } catch {}
@@ -65,9 +29,9 @@ export default function ApiReference() {
   const { service } = useParams<{ service: string }>();
   const [dark, setDark] = useState(readStoredDark);
 
-  if (!service) return <Navigate to="/api-reference/ca" replace />;
+  if (!service) return <Navigate to={docsPath('api-reference/ca')} replace />;
   const current = SERVICES.find((s) => s.id === service);
-  if (!current) return <Navigate to="/api-reference/ca" replace />;
+  if (!current) return <Navigate to={docsPath('api-reference/ca')} replace />;
 
   function toggleDark() {
     setDark((d) => {
@@ -82,7 +46,7 @@ export default function ApiReference() {
       {/* Top bar */}
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-fd-border bg-fd-background px-4">
         <Link
-          to="/"
+          to={docsPath()}
           className="flex items-center gap-2 text-sm font-semibold text-fd-foreground hover:text-fd-foreground/80"
         >
           <img src={asset('images/lamassu.svg')} alt="Lamassu" width={20} height={20} />
@@ -98,7 +62,7 @@ export default function ApiReference() {
             {SERVICES.map((s) => (
               <Link
                 key={s.id}
-                to={`/api-reference/${s.id}`}
+                to={docsPath(`api-reference/${s.id}`)}
                 className={[
                   'rounded-md px-3 py-1 text-xs font-medium transition-colors',
                   s.id === service

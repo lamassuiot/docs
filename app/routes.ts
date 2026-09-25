@@ -11,6 +11,7 @@ export default [
   index("routes/docs-home.tsx"),
   route(PREFIX, "routes/docs-home.tsx", { id: "docs-home-root" }),
   route(`${PREFIX}/es`, "routes/docs-home.tsx", { id: "docs-home-es" }),
+  route(`${PREFIX}/api-reference/:service`, "routes/api-reference.tsx"),
   route(`${PREFIX}/*`, "routes/docs.tsx"),
   route("api/search", "routes/search.ts"),
 
@@ -18,8 +19,6 @@ export default [
   route("llms.txt", "llms/index.ts"),
   route("llms-full.txt", "llms/full.ts"),
   route("llms.mdx/docs/*", "llms/mdx.ts"),
-
-  route("api-reference/:service", "routes/api-reference.tsx"),
 
   route("*", "routes/not-found.tsx"),
 ] satisfies RouteConfig;

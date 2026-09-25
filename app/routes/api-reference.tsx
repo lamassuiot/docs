@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
+import { asset } from '@/lib/asset';
 
 const ApiReferenceReact = lazy(() =>
   import('@scalar/api-reference-react').then((mod) => {
@@ -84,7 +85,7 @@ export default function ApiReference() {
           to="/"
           className="flex items-center gap-2 text-sm font-semibold text-fd-foreground hover:text-fd-foreground/80"
         >
-          <img src="/images/lamassu.svg" alt="Lamassu" width={20} height={20} />
+          <img src={asset('images/lamassu.svg')} alt="Lamassu" width={20} height={20} />
           Lamassu IoT
         </Link>
 

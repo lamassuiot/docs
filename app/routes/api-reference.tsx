@@ -1,4 +1,5 @@
-import { lazy, Suspense, useState } from 'react';
+import { useTheme } from 'next-themes';
+import { type CSSProperties, lazy, Suspense, useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { asset } from '@/lib/asset';
 import { API_SERVICES as SERVICES } from '@/lib/api-services';
@@ -12,11 +13,6 @@ const ApiReferenceReact = lazy(() =>
 );
 
 
-function readStoredDark(): boolean {
-  try { return localStorage.getItem('scalar-dark') !== 'false'; } catch {}
-  return true;
-}
-
 export function HydrateFallback() {
   return (
     <div className="flex h-screen items-center justify-center text-sm text-fd-muted-foreground">
@@ -27,44 +23,44 @@ export function HydrateFallback() {
 
 export default function ApiReference() {
   const { service } = useParams<{ service: string }>();
-  const [dark, setDark] = useState(readStoredDark);
+  // Shares the site-wide theme (next-themes via fumadocs' RootProvider), so the
+  // top bar, Scalar and the rest of the docs all switch together.
+  const { resolvedTheme, setTheme } = useTheme();
+  // resolvedTheme is unknown until hydration; the site defaults to dark.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const dark = !mounted || resolvedTheme !== 'light';
 
   if (!service) return <Navigate to={docsPath('api-reference/ca')} replace />;
   const current = SERVICES.find((s) => s.id === service);
   if (!current) return <Navigate to={docsPath('api-reference/ca')} replace />;
 
-  function toggleDark() {
-    setDark((d) => {
-      const next = !d;
-      try { localStorage.setItem('scalar-dark', String(next)); } catch {}
-      return next;
-    });
-  }
-
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    // The window scrolls, not an inner container: Scalar sizes its sticky
+    // sidebar against the viewport minus --scalar-custom-header-height.
+    <div style={{ '--scalar-custom-header-height': '3rem' } as CSSProperties}>
       {/* Top bar */}
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-fd-border bg-fd-background px-4">
+      <header className="sticky top-0 z-50 flex h-12 items-center gap-3 border-b border-fd-border bg-fd-background px-4">
         <Link
           to={docsPath()}
-          className="flex items-center gap-2 text-sm font-semibold text-fd-foreground hover:text-fd-foreground/80"
+          className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-semibold text-fd-foreground hover:text-fd-foreground/80"
         >
           <img src={asset('images/lamassu.svg')} alt="Lamassu" width={20} height={20} />
           Lamassu IoT
         </Link>
 
-        <span className="text-fd-muted-foreground">/</span>
-        <span className="text-sm text-fd-muted-foreground">OpenAPI 3.0.3</span>
+        <span className="hidden text-fd-muted-foreground md:inline">/</span>
+        <span className="hidden whitespace-nowrap text-sm text-fd-muted-foreground md:inline">OpenAPI 3.0.3</span>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* Service tabs */}
-          <div className="flex items-center gap-1">
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          {/* Service tabs — scroll sideways on narrow screens */}
+          <div className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none]">
             {SERVICES.map((s) => (
               <Link
                 key={s.id}
                 to={docsPath(`api-reference/${s.id}`)}
                 className={[
-                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                  'shrink-0 whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-colors',
                   s.id === service
                     ? 'bg-fd-accent text-fd-accent-foreground'
                     : 'text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-accent-foreground',
@@ -77,14 +73,14 @@ export default function ApiReference() {
           </div>
 
           {/* Divider */}
-          <span className="h-4 w-px bg-fd-border" />
+          <span className="h-4 w-px shrink-0 bg-fd-border" />
 
           {/* Dark / light toggle */}
           <button
             type="button"
-            onClick={toggleDark}
+            onClick={() => setTheme(dark ? 'light' : 'dark')}
             title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="rounded-md p-1.5 text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground"
+            className="shrink-0 rounded-md p-1.5 text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground"
           >
             {dark ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -101,24 +97,25 @@ export default function ApiReference() {
       </header>
 
       {/* Scalar viewer */}
-      <div className="min-h-0 flex-1 overflow-auto">
-        <Suspense
-          fallback={
-            <div className="flex h-full items-center justify-center text-sm text-fd-muted-foreground">
-              Loading…
-            </div>
-          }
-        >
-          <ApiReferenceReact
-            key={`${current.id}-${dark}`}
-            configuration={{
-              url: current.url,
-              darkMode: dark,
-              hideModels: false,
-            }}
-          />
-        </Suspense>
-      </div>
+      <Suspense
+        fallback={
+          <div className="flex h-[calc(100dvh-3rem)] items-center justify-center text-sm text-fd-muted-foreground">
+            Loading…
+          </div>
+        }
+      >
+        <ApiReferenceReact
+          key={`${current.id}-${dark}`}
+          configuration={{
+            url: current.url,
+            // The top bar owns the theme toggle; forcing the state keeps Scalar
+            // from falling back to its own stored preference.
+            forceDarkModeState: dark ? 'dark' : 'light',
+            hideDarkModeToggle: true,
+            hideModels: false,
+          }}
+        />
+      </Suspense>
     </div>
   );
 }

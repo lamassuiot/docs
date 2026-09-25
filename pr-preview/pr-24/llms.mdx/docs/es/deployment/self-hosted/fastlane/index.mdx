@@ -1,0 +1,139 @@
+# Fastlane (/docs/pr-preview/pr-24/es/deployment/self-hosted/fastlane)
+
+
+
+Despliega con Fastlane [#despliega-con-fastlane]
+
+Fastlane es el camino automatizado para evaluaciones, demos, CI y pequeños clústeres de laboratorio. Instala PostgreSQL, Keycloak, RabbitMQ, Envoy Gateway y Lamassu, y los configura para trabajar juntos.
+
+Para producción, usa [Helm](/docs/deployment/self-hosted/helm) para mantener explícitas las decisiones de base de datos, identidad, credenciales, certificados, almacenamiento y upgrades.
+
+Qué añade Fastlane [#qué-añade-fastlane]
+
+Fastlane cubre algunas de las dependencias que el chart de aplicación deja deliberadamente fuera:
+
+| Fastlane instala o configura                                                                                        | Tú sigues proporcionando                                                                       |
+| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Instancias de PostgreSQL, RabbitMQ y Keycloak para evaluación                                                       | El clúster Kubernetes, sus nodos y el almacenamiento persistente                               |
+| Envoy Gateway 1.8 y la `GatewayClass` `eg`                                                                          | cert-manager, accesibilidad desde la red externa, DNS y reglas de firewall/NAT                 |
+| Un flujo de certificado self-signed para Lamassu, credenciales generadas para las dependencias y un usuario inicial | Confianza de los clientes en la CA self-signed, o un certificado de confianza pasado al script |
+| Componentes opcionales de observabilidad y HSM de laboratorio                                                       | Retención de monitorización, backups, HA y un HSM/servicio de claves de producción             |
+
+Fastlane no convierte el stack en un servicio de producción: no crea el clúster, DNS público, reglas de firewall, backups, alta disponibilidad ni un certificado público de confianza.
+
+Antes de comenzar [#antes-de-comenzar]
+
+Necesitas:
+
+* un clúster Kubernetes existente
+* `kubectl` y Helm, o la CLI de MicroK8s
+* `yq`
+* cert-manager
+* `jq` solo si usas `--sample-data`
+* los puertos externos 80 y 443 libres en un host K3s de un único nodo
+
+Fastlane detecta MicroK8s, K3s, kind o un kubeconfig estándar. Usa `--context` cuando el clúster deseado no sea el contexto actual.
+
+<Callout type="warn" title="Comprueba qué clúster está seleccionado">
+  Fastlane instala varios componentes y crea credenciales. Comprueba `kubectl config current-context` o pasa `--context` antes de ejecutarlo.
+</Callout>
+
+Inicio rápido [#inicio-rápido]
+
+Ejecuta el script desde un clon del repositorio Helm:
+
+```bash
+git clone https://github.com/lamassuiot/lamassu-helm.git
+cd lamassu-helm
+
+./scripts/lamassu-fast-lane.sh \
+  --non-interactive \
+  --namespace lamassu-dev \
+  --domain pki.example.com \
+  --local-chart-path ./charts/lamassu
+```
+
+Crea un registro DNS para el dominio elegido antes de probar desde otra máquina. En una VM pequeña, apúntalo a la dirección de la VM o del balanceador que realmente recibe los puertos 80 y 443.
+
+Selección de la dirección del Gateway [#selección-de-la-dirección-del-gateway]
+
+Por defecto, Fastlane ejecuta `hostname -I` y escribe las direcciones devueltas en `gateway.addresses` y en los SAN IP del certificado self-signed.
+
+En una VM de laboratorio con una única interfaz puede seleccionar la dirección esperada. En hosts con Docker, VPN, WireGuard o varias interfaces también puede elegir direcciones inaccesibles para los clientes. Sobrescribe el resultado:
+
+```bash
+./scripts/lamassu-fast-lane.sh \
+  --non-interactive \
+  --domain pki.example.com \
+  --gateway-ip 192.168.1.50
+```
+
+El valor debe ser una dirección gestionada en el lado Kubernetes de la ruta. Si una IP pública de EC2 reenvía tráfico por WireGuard, pasa la dirección accesible de la VM o clúster, no la IP pública de EC2.
+
+Consulta [Expón el Gateway](/docs/deployment/self-hosted/networking) para los conflictos de puertos de K3s, VIP, NAT externo y diseños con varios Gateways.
+
+Opciones de línea de comandos [#opciones-de-línea-de-comandos]
+
+| Opción                     | Valor predeterminado  | Propósito                                                                  |
+| -------------------------- | --------------------- | -------------------------------------------------------------------------- |
+| `-h`, `--help`             | —                     | Muestra la ayuda                                                           |
+| `-c`, `--context`          | contexto actual       | Selecciona el contexto de kubeconfig para kubectl y Helm                   |
+| `-n`, `--non-interactive`  | false                 | Omite prompts y genera credenciales para las dependencias                  |
+| `-ns`, `--namespace`       | `lamassu-dev`         | Namespace de la instalación                                                |
+| `-d`, `--domain`           | `dev.lamassu.io`      | Dominio usado por la UI, OIDC y el certificado                             |
+| `-v`, `--version`          | latest                | Versión del chart de Lamassu                                               |
+| `--https-port`             | `443`                 | Puerto del listener HTTPS                                                  |
+| `--http-port`              | `80`                  | Puerto del listener HTTP                                                   |
+| `--tls-crt`                | —                     | Certificado PEM para TLS downstream                                        |
+| `--tls-key`                | —                     | Clave privada PEM para TLS downstream                                      |
+| `-l`, `--local-chart-path` | chart del repositorio | Usa un chart local de Lamassu sin empaquetar                               |
+| `-ip`, `--gateway-ip`      | detección automática  | Sobrescribe la dirección escrita en `gateway.addresses`                    |
+| `--otel`                   | false                 | Instala Victoria Logs, VictoriaTraces, Jaeger y un OpenTelemetry Collector |
+| `--sample-data`            | false                 | Crea CA, perfiles, certificados, DMS y dispositivos de ejemplo             |
+| `--with-hsm`               | false                 | Instala componentes HSM de laboratorio y configura KMS con PKCS#11         |
+| `--softhsm-chart-path`     | `./charts/softhsm`    | Usa otro chart local de SoftHSM                                            |
+
+Fastlane no ofrece un modo offline. Para entornos sin conexión, usa el flujo manual con Helm y prepara un registro y mirror de charts.
+
+Qué configura el script [#qué-configura-el-script]
+
+Fastlane:
+
+1. valida las herramientas locales y el clúster seleccionado
+2. instala o actualiza Envoy Gateway 1.8 y crea la `GatewayClass` `eg`
+3. crea el namespace
+4. instala PostgreSQL y crea las bases de datos necesarias
+5. instala Keycloak y crea el realm `lamassu`, el cliente frontend, el rol administrador y el usuario inicial
+6. instala RabbitMQ
+7. instala opcionalmente observabilidad y componentes HSM de laboratorio
+8. genera `lamassu.yaml` e instala el chart de Lamassu
+9. carga datos de ejemplo opcionalmente
+
+La configuración generada expone Keycloak en `/auth` a través del mismo Gateway y provisiona al usuario inicial `lamassu` como superadministrador de Lamassu.
+
+Comportamiento TLS [#comportamiento-tls]
+
+Al proporcionar `--tls-crt` y `--tls-key`, Fastlane crea el Secret `downstream-provided-crt` y configura `tls.type: external`.
+
+Sin ellos, configura cert-manager con un emisor self-signed. Es adecuado para laboratorio, pero los clientes no confiarán en él hasta que distribuyas la CA. Usa [Helm](/docs/deployment/self-hosted/helm) si necesitas un Issuer corporativo, un emisor ACME público o un Secret existente gestionado por otro sistema.
+
+Credenciales y archivos generados [#credenciales-y-archivos-generados]
+
+El modo no interactivo genera contraseñas aleatorias para los administradores de PostgreSQL, RabbitMQ y Keycloak. El acceso inicial a Lamassu es `lamassu` / `lamassu` y obliga a cambiar la contraseña en el primer uso.
+
+Fastlane escribe `lamassu.yaml` en el directorio actual e incluye credenciales en él.
+
+<Callout type="warn" title="Fastlane es una herramienta de bootstrap">
+  Protege el archivo de valores generado, guarda las credenciales en un almacén de secretos apropiado y no reutilices la configuración de identidad de evaluación en producción.
+</Callout>
+
+Verifica la instalación [#verifica-la-instalación]
+
+```bash
+kubectl get pods -n lamassu-dev
+kubectl get gateway,httproute -n lamassu-dev
+kubectl get service -A
+helm test lamassu -n lamassu-dev --logs
+```
+
+Abre `https://pki.example.com` e inicia sesión con el usuario inicial. Si el Gateway está programado pero la URL no es accesible, sigue las comprobaciones de [Expón el Gateway](/docs/deployment/self-hosted/networking).

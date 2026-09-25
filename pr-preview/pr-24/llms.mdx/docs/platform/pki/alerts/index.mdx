@@ -1,71 +1,71 @@
-# Alertas y suscripciones (/docs/pr-preview/pr-24/platform/pki/alerts)
+# Alerts and subscriptions (/docs/pr-preview/pr-24/platform/pki/alerts)
 
 
 
-Las suscripciones convierten los eventos de Lamassu en notificaciones accionables. Puedes avisar a un equipo, alimentar un sistema de incidentes o activar una automatización cuando cambia una CA, un certificado o un dispositivo.
+Subscriptions turn Lamassu events into actionable notifications. You can alert a team, feed an incident system or trigger an automation when a CA, certificate or device changes.
 
-Cómo funciona [#cómo-funciona]
+How it works [#how-it-works]
 
-1. Un servicio publica un evento de dominio.
-2. Lamassu evalúa las suscripciones asociadas a ese tipo de evento.
-3. El filtro de cada suscripción decide si debe notificarse.
-4. Lamassu entrega el evento al canal configurado.
+1. A service publishes a domain event.
+2. Lamassu evaluates the subscriptions associated with that event type.
+3. Each subscription's filter decides whether it should be notified.
+4. Lamassu delivers the event to the configured channel.
 
-El inventario de eventos muestra cuándo se observó cada tipo por última vez, cuántas veces ha ocurrido y cuántas suscripciones tiene. Puedes expandir un evento para inspeccionar un ejemplo de su payload JSON antes de crear el filtro.
+The event inventory shows when each type was last observed, how many times it has occurred and how many subscriptions it has. You can expand an event to inspect an example of its JSON payload before creating the filter.
 
-Canales disponibles [#canales-disponibles]
+Available channels [#available-channels]
 
-* **Email** envía avisos a una persona o lista operativa. Solo requiere la dirección de destino.
-* **Microsoft Teams** publica la notificación en un canal mediante su URL de webhook.
-* **Webhook** entrega el evento a una automatización, SIEM o sistema de incidentes mediante `POST` o `PUT`.
+* **Email** sends alerts to a person or an operational list. It only requires the destination address.
+* **Microsoft Teams** posts the notification to a channel through its webhook URL.
+* **Webhook** delivers the event to an automation, SIEM or incident system via `POST` or `PUT`.
 
-Crea una suscripción [#crea-una-suscripción]
+Create a subscription [#create-a-subscription]
 
 <Steps>
   <Step>
-    Elige el evento [#elige-el-evento]
+    Choose the event [#choose-the-event]
 
-    Abre **Alerts**, localiza el tipo de evento y selecciona **Subscribe**. Revisa el último ejemplo JSON para identificar los campos que necesitarás filtrar.
+    Open **Alerts**, locate the event type and select **Subscribe**. Review the latest JSON example to identify the fields you will need to filter on.
   </Step>
 
   <Step>
-    Configura el destino [#configura-el-destino]
+    Configure the destination [#configure-the-destination]
 
-    Selecciona Email, Microsoft Teams o Webhook e introduce los datos del canal.
+    Select Email, Microsoft Teams or Webhook and enter the channel details.
   </Step>
 
   <Step>
-    Limita las notificaciones [#limita-las-notificaciones]
+    Limit the notifications [#limit-the-notifications]
 
-    Añade un filtro si no quieres recibir todas las instancias del evento.
+    Add a filter if you don't want to receive every instance of the event.
 
-    * **None** notifica todas las instancias del evento.
-    * **JSON Path** evalúa uno o varios campos concretos.
-    * **JSON Schema** acepta únicamente payloads con una estructura determinada.
-    * **JavaScript** permite expresar lógica personalizada.
+    * **None** notifies all instances of the event.
+    * **JSON Path** evaluates one or more specific fields.
+    * **JSON Schema** accepts only payloads with a particular structure.
+    * **JavaScript** lets you express custom logic.
 
-    Por ejemplo, `function (event) { return event.data.status == "NO_IDENTITY"; }` limita una suscripción a dispositivos sin identidad.
+    For example, `function (event) { return event.data.status == "NO_IDENTITY"; }` limits a subscription to devices without an identity.
   </Step>
 
   <Step>
-    Revisa y activa [#revisa-y-activa]
+    Review and activate [#review-and-activate]
 
-    Comprueba el evento, el canal y el filtro en el resumen. Selecciona **Confirm Subscription** para comenzar la entrega.
+    Check the event, channel and filter in the summary. Select **Confirm Subscription** to start delivery.
   </Step>
 </Steps>
 
-Gestiona una suscripción [#gestiona-una-suscripción]
+Manage a subscription [#manage-a-subscription]
 
-Abre una suscripción existente para consultar su destino y filtro, modificar la configuración o seleccionar **Unsubscribe**. Elimina las suscripciones que ya no tengan un propietario operativo para evitar entregas ignoradas o endpoints obsoletos.
+Open an existing subscription to review its destination and filter, modify the configuration or select **Unsubscribe**. Remove subscriptions that no longer have an operational owner to avoid ignored deliveries or stale endpoints.
 
-Familias de eventos [#familias-de-eventos]
+Event families [#event-families]
 
-* **Autoridades:** `ca.create`, `ca.import`, `ca.reissue` y `ca.delete`.
-* **Certificados:** `ca.sign.certificate` y `certificate.delete`.
-* **Perfiles:** `profile.create`, `profile.update` y `profile.delete`.
-* **Enrolamiento:** `dms.create`, `dms.update`, `dms.enroll` y `dms.reenroll`.
-* **Dispositivos:** `device.create`, `device.identity.update` y `device.status.update`.
-* **Validación:** `va.role.crl.create`.
-* **Claves:** `kms.create`, `kms.import`, `kms.sign.message` y `kms.delete`.
+* **Authorities:** `ca.create`, `ca.import`, `ca.reissue` and `ca.delete`.
+* **Certificates:** `ca.sign.certificate` and `certificate.delete`.
+* **Profiles:** `profile.create`, `profile.update` and `profile.delete`.
+* **Enrollment:** `dms.create`, `dms.update`, `dms.enroll` and `dms.reenroll`.
+* **Devices:** `device.create`, `device.identity.update` and `device.status.update`.
+* **Validation:** `va.role.crl.create`.
+* **Keys:** `kms.create`, `kms.import`, `kms.sign.message` and `kms.delete`.
 
-Utiliza el catálogo que muestra la consola como fuente para los tipos disponibles en la versión que tienes desplegada.
+Use the catalog shown in the console as the source for the types available in your deployed version.

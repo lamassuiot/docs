@@ -1,59 +1,59 @@
-# Emite tu primer certificado (/docs/pr-preview/pr-24/platform/pki/quickstarts/issue-certificate)
+# Issue your first certificate (/docs/pr-preview/pr-24/platform/pki/quickstarts/issue-certificate)
 
 
 
-En este quickstart Lamassu generará la clave y el CSR en el navegador, y la CA emitirá el certificado. Al terminar descargarás el certificado y su clave privada.
+In this quickstart Lamassu will generate the key and the CSR in the browser, and the CA will issue the certificate. When you finish you will download the certificate and its private key.
 
-Antes de empezar [#antes-de-empezar]
+Before you begin [#before-you-begin]
 
-* Una CA activa con permiso para emitir certificados.
-* Un nombre para la identidad, por ejemplo `device-001.example.internal`.
-* Un lugar seguro en el que custodiar la clave privada descargada.
+* An active CA with permission to issue certificates.
+* A name for the identity, for example `device-001.example.internal`.
+* A safe place to keep the downloaded private key.
 
-<Callout type="warn" title="La clave privada se entrega una sola vez">
-  En este flujo la clave se genera en el navegador y Lamassu no la almacena. Descárgala y protégela antes de cerrar el resultado de la operación.
+<Callout type="warn" title="The private key is delivered only once">
+  In this flow the key is generated in the browser and Lamassu does not store it. Download it and protect it before closing the operation result.
 </Callout>
 
 <Steps>
   <Step>
-    Inicia la emisión [#inicia-la-emisión]
+    Start the issuance [#start-the-issuance]
 
-    Abre la CA creada en el quickstart anterior, entra en **Issued Certificates** y selecciona **Issue New**.
+    Open the CA created in the previous quickstart, go to **Issued Certificates** and select **Issue New**.
   </Step>
 
   <Step>
-    Elige el método [#elige-el-método]
+    Choose the method [#choose-the-method]
 
-    Selecciona **Generate Key & CSR in Browser**. Usa **Upload Existing CSR** cuando la clave privada deba generarse y permanecer en el sistema de destino.
+    Select **Generate Key & CSR in Browser**. Use **Upload Existing CSR** when the private key must be generated and kept on the target system.
   </Step>
 
   <Step>
-    Identifica el certificado [#identifica-el-certificado]
+    Identify the certificate [#identify-the-certificate]
 
-    Introduce el `Common Name` y, si corresponde, la organización, unidad organizativa y ubicación. Añade SANs para cada nombre DNS, dirección IP, correo o URI con el que se vaya a validar la identidad.
+    Enter the `Common Name` and, if applicable, the organization, organizational unit and location. Add SANs for each DNS name, IP address, email or URI the identity will be validated with.
   </Step>
 
   <Step>
-    Configura clave y usos [#configura-clave-y-usos]
+    Configure key and uses [#configure-key-and-uses]
 
-    Elige RSA o ECDSA, define la validez y selecciona los usos de clave. Para una identidad de dispositivo que usa mTLS, habilita **Digital Signature** y **Client Authentication**.
+    Choose RSA or ECDSA, define the validity and select the key usages. For a device identity that uses mTLS, enable **Digital Signature** and **Client Authentication**.
 
-    La validez no puede superar la fecha de expiración de la CA emisora.
+    The validity cannot exceed the expiration date of the issuing CA.
   </Step>
 
   <Step>
-    Emite y descarga [#emite-y-descarga]
+    Issue and download [#issue-and-download]
 
-    Confirma la emisión y descarga inmediatamente el certificado y la clave privada en formato PEM.
+    Confirm the issuance and immediately download the certificate and the private key in PEM format.
   </Step>
 
   <Step>
-    Verifica el resultado [#verifica-el-resultado]
+    Verify the result [#verify-the-result]
 
-    El certificado debe aparecer en **Issued Certificates** con estado activo. Comprueba su sujeto, SANs, emisor, usos y periodo de validez.
+    The certificate should appear in **Issued Certificates** with an active status. Check its subject, SANs, issuer, usages and validity period.
   </Step>
 </Steps>
 
-Siguiente paso [#siguiente-paso]
+Next step [#next-step]
 
-[Registra tu primer dispositivo](/docs/platform/pki/quickstarts/register-device) para asociar la identidad a una entidad gestionada, o consulta la [gestión de certificados](/docs/platform/pki/certificates).
+[Register your first device](/docs/platform/pki/quickstarts/register-device) to associate the identity with a managed entity, or see [certificate management](/docs/platform/pki/certificates).

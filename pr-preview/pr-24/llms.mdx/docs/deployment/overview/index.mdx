@@ -1,29 +1,29 @@
-# Despliega Lamassu (/docs/pr-preview/pr-24/deployment/overview)
+# Deploy Lamassu (/docs/pr-preview/pr-24/deployment/overview)
 
 
 
-Puedes ejecutar Lamassu en tu propio clúster Kubernetes, desplegar una imagen preparada desde AWS Marketplace o consumir la plataforma como servicio gestionado.
+You can run Lamassu on your own Kubernetes cluster, deploy a prebuilt image from AWS Marketplace or consume the platform as a managed service.
 
-Elige un modelo [#elige-un-modelo]
+Choose a model [#choose-a-model]
 
-| Modelo                  | Recomendado para                                            | Quién opera la infraestructura | Punto de partida             |
-| ----------------------- | ----------------------------------------------------------- | ------------------------------ | ---------------------------- |
-| Kubernetes self-managed | Producción, entornos regulados y despliegues personalizados | Tu equipo                      | Helm o Fastlane              |
-| AWS Marketplace         | Evaluación o despliegue dedicado dentro de una cuenta AWS   | Tu equipo                      | Imagen preconfigurada en EC2 |
-| SaaS                    | Equipos que quieren utilizar la plataforma sin operarla     | Lamassu                        | Suscripción gestionada       |
+| Model                   | Recommended for                                            | Who operates the infrastructure | Starting point             |
+| ----------------------- | ---------------------------------------------------------- | ------------------------------- | -------------------------- |
+| Kubernetes self-managed | Production, regulated environments and custom deployments  | Your team                       | Helm or Fastlane           |
+| AWS Marketplace         | Evaluation or a dedicated deployment inside an AWS account | Your team                       | Preconfigured image on EC2 |
+| SaaS                    | Teams that want to use the platform without operating it   | Lamassu                         | Managed subscription       |
 
 <Cards>
-  <Card title="Kubernetes self-managed" description="Controla red, almacenamiento, claves, dependencias y ciclo de actualización." href="/docs/deployment/self-hosted/overview" />
+  <Card title="Kubernetes self-managed" description="Control network, storage, keys, dependencies and the upgrade cycle." href="/docs/deployment/self-hosted/overview" />
 
-  <Card title="AWS Marketplace" description="Lanza una instancia preconfigurada de Lamassu en AWS EC2." href="/docs/deployment/aws-marketplace" />
+  <Card title="AWS Marketplace" description="Launch a preconfigured Lamassu instance on AWS EC2." href="/docs/deployment/aws-marketplace" />
 
-  <Card title="Lamassu SaaS" description="Utiliza una instancia operada y actualizada como servicio gestionado." href="/docs/deployment/saas" />
+  <Card title="Lamassu SaaS" description="Use an operated and updated instance as a managed service." href="/docs/deployment/saas" />
 </Cards>
 
-¿Solo quieres evaluar la plataforma? [#solo-quieres-evaluar-la-plataforma]
+Just want to evaluate the platform? [#just-want-to-evaluate-the-platform]
 
-Usa [Fastlane](/docs/deployment/self-hosted/fastlane) para levantar PostgreSQL, Keycloak, RabbitMQ y Lamassu en un clúster Kubernetes mediante un único flujo. Está pensado para laboratorios, demos y bootstrap; para producción, configura las dependencias y los valores Helm de forma explícita.
+Use [Fastlane](/docs/deployment/self-hosted/fastlane) to bring up PostgreSQL, Keycloak, RabbitMQ and Lamassu on a Kubernetes cluster through a single flow. It is intended for labs, demos and bootstrap; for production, configure dependencies and Helm values explicitly.
 
-Después del despliegue [#después-del-despliegue]
+After deployment [#after-deployment]
 
-Cuando la consola esté disponible, continúa con [Crea tu primera CA](/docs/platform/pki/quickstarts/create-certificate-authority). Ese quickstart verifica que el motor criptográfico y la emisión funcionan correctamente.
+Once the console is available, continue with [Create your first CA](/docs/platform/pki/quickstarts/create-certificate-authority). That quickstart verifies the cryptographic engine and issuance work correctly.

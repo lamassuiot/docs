@@ -1,47 +1,47 @@
-# Despliega desde AWS Marketplace (/docs/pr-preview/pr-24/deployment/aws-marketplace)
+# Deploy from AWS Marketplace (/docs/pr-preview/pr-24/deployment/aws-marketplace)
 
 
 
-La oferta de AWS Marketplace reduce la preparación inicial a una instancia EC2 dentro de tu cuenta. Tú mantienes el control de la red, el almacenamiento y la operación de la máquina.
+The AWS Marketplace offering reduces initial setup to an EC2 instance inside your account. You keep control of the network, storage and operation of the machine.
 
-Antes de empezar [#antes-de-empezar]
+Before you begin [#before-you-begin]
 
-* Permisos para suscribirte a productos de AWS Marketplace y lanzar instancias EC2.
-* Una VPC y una subred desde la que puedan acceder administradores y dispositivos.
-* Un grupo de seguridad que permita los endpoints necesarios.
+* Permissions to subscribe to AWS Marketplace products and launch EC2 instances.
+* A VPC and a subnet from which administrators and devices can reach the instance.
+* A security group allowing the necessary endpoints.
 
-Requisitos de infraestructura [#requisitos-de-infraestructura]
+Infrastructure requirements [#infrastructure-requirements]
 
-* **Cómputo:** una instancia `t3.large` como mínimo. Utiliza `t3.xlarge` o superior cuando la carga lo requiera.
-* **Almacenamiento:** un volumen EBS `gp3` de al menos 50 GB, ajustado al tamaño del inventario y la retención.
-* **Red:** acceso HTTPS desde los consumidores necesarios, restringido a redes de confianza.
+* **Compute:** a `t3.large` instance at minimum. Use `t3.xlarge` or higher when the load requires it.
+* **Storage:** an EBS `gp3` volume of at least 50 GB, sized to your inventory and retention needs.
+* **Network:** HTTPS access from the necessary consumers, restricted to trusted networks.
 
 <Steps>
   <Step>
-    Abre la oferta [#abre-la-oferta]
+    Open the offer [#open-the-offer]
 
-    Accede a [Lamassu IoT en AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-fyfailowg3ewc) y revisa las condiciones antes de suscribirte.
+    Go to [Lamassu IoT on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-fyfailowg3ewc) and review the terms before subscribing.
   </Step>
 
   <Step>
-    Configura la instancia [#configura-la-instancia]
+    Configure the instance [#configure-the-instance]
 
-    Selecciona `t3.large` o superior, asigna al menos 50 GB de almacenamiento `gp3` y elige la VPC y subred de destino.
+    Select `t3.large` or higher, assign at least 50 GB of `gp3` storage and choose the target VPC and subnet.
   </Step>
 
   <Step>
-    Limita el acceso de red [#limita-el-acceso-de-red]
+    Limit network access [#limit-network-access]
 
-    Configura el grupo de seguridad para los puertos `443`, `8443` y `9443`. Restringe los orígenes a las redes administrativas y de dispositivos que realmente necesiten conectarse.
+    Configure the security group for ports `443`, `8443` and `9443`. Restrict the origins to the administrative and device networks that really need to connect.
   </Step>
 
   <Step>
-    Lanza y verifica [#lanza-y-verifica]
+    Launch and verify [#launch-and-verify]
 
-    Inicia la instancia y abre la consola en `https://<ip-publica>`. Comprueba que puedes autenticarte antes de continuar.
+    Start the instance and open the console at `https://<public-ip>`. Check you can authenticate before continuing.
   </Step>
 </Steps>
 
-Siguiente paso [#siguiente-paso]
+Next step [#next-step]
 
-Continúa con [Crea tu primera CA](/docs/platform/pki/quickstarts/create-certificate-authority) para validar la configuración criptográfica de la instancia.
+Continue with [Create your first CA](/docs/platform/pki/quickstarts/create-certificate-authority) to validate the instance's cryptographic configuration.

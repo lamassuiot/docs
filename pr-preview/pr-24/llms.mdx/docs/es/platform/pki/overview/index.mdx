@@ -1,0 +1,69 @@
+# Plataforma Lamassu IoT (/docs/pr-preview/pr-24/es/platform/pki/overview)
+
+
+
+Lamassu IoT centraliza la emisión, distribución, renovación y revocación de identidades X.509 para dispositivos conectados. Puedes construir una PKI privada, proteger sus claves y automatizar el enrolamiento de una flota sin perder visibilidad sobre cada certificado.
+
+Empieza aquí [#empieza-aquí]
+
+<Cards>
+  <Card title="Primeros pasos" description="Crea una CA, emite un certificado y registra tu primer dispositivo." href="/docs/platform/pki/quickstarts/overview" />
+
+  <Card title="Cómo funciona Lamassu" description="Construye el modelo mental de autoridades, claves, identidades y validación." href="/docs/platform/pki/concepts/overview" />
+</Cards>
+
+Capacidades principales [#capacidades-principales]
+
+Construye tu jerarquía de confianza [#construye-tu-jerarquía-de-confianza]
+
+Crea autoridades raíz e intermedias o importa una PKI existente. Define qué autoridad puede emitir cada identidad y conserva la cadena de confianza completa.
+
+Protege las claves criptográficas [#protege-las-claves-criptográficas]
+
+Genera y custodia claves mediante motores software, HSMs PKCS#11 o servicios cloud. Lamassu desacopla las operaciones de la ubicación física de la clave.
+
+Emite y controla certificados [#emite-y-controla-certificados]
+
+Emite certificados desde la consola o a partir de un CSR, consulta su estado y revócalos cuando dejan de ser fiables.
+
+Automatiza identidades de dispositivos [#automatiza-identidades-de-dispositivos]
+
+Define políticas de enrolamiento mediante un Device Management Service (DMS) y deja que los dispositivos soliciten o renueven su identidad a través de EST<ins className="lm-diff-ins"> o CMP</ins>.
+
+Publica el estado de validación [#publica-el-estado-de-validación]
+
+Ofrece validación online mediante OCSP y distribuye CRLs para consumidores que necesitan comprobar certificados sin conexión.
+
+Reacciona a los eventos [#reacciona-a-los-eventos]
+
+Suscríbete a cambios del ciclo de vida y envía notificaciones por correo, Microsoft Teams o webhooks.
+
+Elige tu recorrido [#elige-tu-recorrido]
+
+<Cards>
+  <Card title="Administro la PKI" description="Configura motores, autoridades, emisión y validación." href="/docs/platform/pki/key-management" />
+
+  <div className="lm-diff-del lm-diff-block">
+    <Card title="Integro un dispositivo" description="Configura el DMS y usa EST para obtener una identidad." href="/docs/platform/pki/device-enrollment" />
+  </div>
+
+  <div className="lm-diff-ins lm-diff-block">
+    <Card title="Integro un dispositivo" description="Configura el DMS y usa EST o CMP para obtener una identidad." href="/docs/platform/pki/device-enrollment" />
+  </div>
+
+  <Card title="Opero la plataforma" description="Despliega Lamassu y prepara sus dependencias." href="/docs/deployment/overview" />
+
+  <Card title="Integro otro sistema" description="Conecta Lamassu con AWS IoT Core y otros destinos." href="/docs/platform/pki/integrations/aws-iot-core" />
+</Cards>
+
+Referencia operativa [#referencia-operativa]
+
+<Cards>
+  <Card title="Perfiles de certificado" description="Convierte la política de emisión en restricciones reutilizables." href="/docs/platform/pki/certificate-profiles" />
+
+  <Card title="Jerarquía y rotación" description="Sustituye certificados o claves de CA sin romper la confianza." href="/docs/platform/pki/ca-hierarchy-and-rotation" />
+
+  <Card title="Control de acceso" description="Configura principales, políticas y el primer administrador." href="/docs/platform/pki/access-control" />
+
+  <Card title="Resolución de problemas" description="Diagnostica Gateway, servicios, emisión y enrolamiento." href="/docs/platform/pki/troubleshooting" />
+</Cards>

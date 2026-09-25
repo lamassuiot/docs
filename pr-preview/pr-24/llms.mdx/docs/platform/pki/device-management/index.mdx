@@ -1,93 +1,93 @@
-# Dispositivos e identidades (/docs/pr-preview/pr-24/platform/pki/device-management)
+# Devices and identities (/docs/pr-preview/pr-24/platform/pki/device-management)
 
 
 
-Un dispositivo gestionado representa una entidad de tu flota y conserva el historial de los certificados que ha utilizado. Lamassu separa el dispositivo de su identidad actual para que puedas renovar o sustituir certificados sin perder trazabilidad.
+A managed device represents an entity in your fleet and keeps the history of the certificates it has used. Lamassu separates the device from its current identity so you can renew or replace certificates without losing traceability.
 
-Estados del dispositivo [#estados-del-dispositivo]
+Device states [#device-states]
 
-* **Active** indica que el dispositivo tiene una identidad válida.
-* **No Identity** aparece cuando está registrado, pero todavía no tiene un certificado asociado.
-* **Renewal Pending** señala que ha entrado en la ventana de renovación.
-* **Expiring Soon** advierte que el certificado está próximo a expirar.
-* **Expired** indica que la identidad ha superado su fecha de validez.
-* **Revoked** identifica un certificado invalidado antes de su expiración.
-* **Decommissioned** corresponde a un dispositivo retirado de forma permanente.
+* **Active** indicates the device has a valid identity.
+* **No Identity** appears when it is registered but does not yet have an associated certificate.
+* **Renewal Pending** signals that it has entered the renewal window.
+* **Expiring Soon** warns that the certificate is close to expiring.
+* **Expired** indicates the identity has passed its validity date.
+* **Revoked** identifies a certificate invalidated before its expiration.
+* **Decommissioned** corresponds to a device permanently retired.
 
-El inventario permite filtrar por `Device ID`, etiquetas y estado.
+The inventory lets you filter by `Device ID`, tags and status.
 
-Inspecciona un dispositivo [#inspecciona-un-dispositivo]
+Inspect a device [#inspect-a-device]
 
-La vista de detalle separa dos perspectivas:
+The detail view separates two perspectives:
 
-* **Certificate History** conserva todos los certificados asociados, con su número de serie, emisor, estado y periodo de validez.
-* **Device Event Timeline** ordena cronológicamente registros, enrolamientos, renovaciones y cambios de estado.
+* **Certificate History** keeps every certificate associated with the device, with its serial number, issuer, status and validity period.
+* **Device Event Timeline** orders registrations, enrollments, renewals and status changes chronologically.
 
-Utiliza el historial para auditoría y la línea de tiempo para reconstruir un incidente o diagnosticar una transición inesperada.
+Use the history for audit and the timeline to reconstruct an incident or diagnose an unexpected transition.
 
-Registra un dispositivo manualmente [#registra-un-dispositivo-manualmente]
+Register a device manually [#register-a-device-manually]
 
-El registro previo es útil cuando la política exige que el dispositivo exista antes de solicitar su primer certificado.
+Pre-registration is useful when policy requires the device to exist before requesting its first certificate.
 
 <Steps>
   <Step>
-    Crea el dispositivo [#crea-el-dispositivo]
+    Create the device [#create-the-device]
 
-    Desde **Managed Devices**, abre el formulario de registro.
+    From **Managed Devices**, open the registration form.
   </Step>
 
   <Step>
-    Define su pertenencia [#define-su-pertenencia]
+    Define its membership [#define-its-membership]
 
-    Introduce un **Device ID** único y selecciona el DMS que aplicará las políticas de enrolamiento y renovación.
+    Enter a unique **Device ID** and select the DMS that will apply the enrollment and renewal policies.
   </Step>
 
   <Step>
-    Clasifica el dispositivo [#clasifica-el-dispositivo]
+    Classify the device [#classify-the-device]
 
-    Añade un icono y etiquetas si necesitas agruparlo por modelo, ubicación, entorno u otro criterio operativo.
+    Add an icon and tags if you need to group devices by model, location, environment or another operational criterion.
   </Step>
 
   <Step>
-    Verifica el alta [#verifica-el-alta]
+    Verify the registration [#verify-the-registration]
 
-    El dispositivo debe aparecer con estado **No Identity** hasta que complete el enrolamiento o reciba una identidad manual.
+    The device should appear with status **No Identity** until it completes enrollment or receives a manually assigned identity.
   </Step>
 </Steps>
 
-Asigna una identidad manualmente [#asigna-una-identidad-manualmente]
+Assign an identity manually [#assign-an-identity-manually]
 
-La acción **Assign Identity** está disponible mientras el dispositivo permanece en **No Identity**.
+The **Assign Identity** action is available while the device remains in **No Identity**.
 
-1. Abre el dispositivo y selecciona **Assign Identity**.
-2. Elige un certificado activo cuyo `Common Name` coincida con el `Device ID`.
-3. Si no existe, selecciona **Issue New Instead** y elige una CA vinculada al DMS.
-4. Confirma la asignación.
+1. Open the device and select **Assign Identity**.
+2. Choose an active certificate whose `Common Name` matches the `Device ID`.
+3. If none exists, select **Issue New Instead** and choose a CA linked to the DMS.
+4. Confirm the assignment.
 
-El dispositivo debe cambiar a **Active** y el certificado debe aparecer en su historial.
+The device should change to **Active** and the certificate should appear in its history.
 
-Revoca la identidad actual [#revoca-la-identidad-actual]
+Revoke the current identity [#revoke-the-current-identity]
 
-En **Device Event Timeline**, localiza el último certificado activo y selecciona **Revoke**. Elige una razón conforme a tu política y confirma la operación.
+In **Device Event Timeline**, locate the latest active certificate and select **Revoke**. Choose a reason consistent with your policy and confirm the operation.
 
-La revocación invalida el certificado, pero no elimina el dispositivo. Puedes restaurar su operación asignándole una identidad nueva. `CertificateHold` permite reactivar el certificado retenido; el resto de razones son definitivas.
+Revocation invalidates the certificate but does not delete the device. You can restore its operation by assigning it a new identity. `CertificateHold` allows reactivating the retained certificate; all other reasons are final.
 
-Retira un dispositivo [#retira-un-dispositivo]
+Decommission a device [#decommission-a-device]
 
-<Callout type="warn" title="Decommission es irreversible">
-  Esta acción revoca todos los certificados del dispositivo e impide que vuelva a obtener una identidad.
+<Callout type="warn" title="Decommission is irreversible">
+  This action revokes all the device's certificates and prevents it from obtaining an identity again.
 </Callout>
 
-Usa **Decommission** únicamente cuando el dispositivo haya dejado de operar o ya no sea fiable. Tras confirmar, Lamassu revoca la identidad activa con `CessationOfOperation` y cambia el estado a **Decommissioned**.
+Use **Decommission** only when the device has stopped operating or is no longer trustworthy. After confirming, Lamassu revokes the active identity with `CessationOfOperation` and changes the status to **Decommissioned**.
 
-Automatiza el enrolamiento [#automatiza-el-enrolamiento]
+Automate enrollment [#automate-enrollment]
 
 <Cards>
-  <Card title="Configura un DMS" description="Define la CA, confianza y políticas de la flota." href="/docs/platform/pki/device-enrollment" />
+  <Card title="Configure a DMS" description="Define the CA, trust and policies of the fleet." href="/docs/platform/pki/device-enrollment" />
 
-  <Card title="Integra EST" description="Permite que el dispositivo solicite y renueve su identidad." href="/docs/platform/pki/est-enrollment" />
+  <Card title="Integrate EST" description="Let the device request and renew its identity." href="/docs/platform/pki/est-enrollment" />
 
   <div className="lm-diff-ins lm-diff-block">
-    <Card title="Integra CMP" description="Permite que el dispositivo enrolle y renueve su identidad con CMP." href="/docs/platform/pki/cmp" />
+    <Card title="Integrate CMP" description="Let the device enroll and renew its identity with CMP." href="/docs/platform/pki/cmp" />
   </div>
 </Cards>

@@ -1,4 +1,4 @@
-# Enrolamiento de dispositivos con CMP (/docs/pr-preview/pr-24/platform/pki/cmp)
+# Device enrollment with CMP (/docs/pr-preview/pr-24/platform/pki/cmp)
 
 
 
@@ -7,45 +7,45 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Lamassu IoT implementa el protocolo **CMP (RFC 4210)** siguiendo el perfil **Lightweight CMP (RFC 9483)** como su segundo mecanismo de inscripción de certificados para dispositivos, junto a [EST (RFC 7030)](/docs/platform/pki/est-enrollment). Cada DMS expone uno de los dos protocolos — nunca ambos a la vez — y el que expone CMP actúa como autoridad de registro (RA) frente al cliente.
+  Lamassu IoT implements the **CMP (RFC 4210)** protocol following the **Lightweight CMP (RFC 9483)** profile as its second certificate enrollment mechanism for devices, alongside [EST (RFC 7030)](/docs/platform/pki/est-enrollment). Each DMS exposes one of the two protocols — never both at once — and the one that exposes CMP acts as the Registration Authority (RA) facing the client.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Frente a EST, CMP cambia tres ideas fundamentales:
+  Compared with EST, CMP changes three fundamental ideas:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Aspecto       | EST (RFC 7030)                                     | CMP (RFC 4210 / RFC 9483)                                                                                              |
-  | ------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-  | Endpoint      | Uno por operación (`/cacerts`, `/simpleenroll`, …) | Un **único endpoint multiplexado** (`/.well-known/cmp/p/{id}`); la operación se determina por el contenido del mensaje |
-  | Autenticación | mTLS en la capa de transporte                      | **Protección del propio mensaje** (`PKIMessage`) mediante firma o, en `ir`/`cr`, prueba de posesión CRMF               |
-  | Ajustes       | Bloques generales de enrollment y re-enrollment    | Ajustes generales **más un bloque de política por operación** (`ir`, `cr`, `p10cr`, `kur`, `rr`, `genm`, `ccr`)        |
-  | Confirmación  | La respuesta es el final del flujo                 | Protocolo de confirmación explícito (`certConf`), confirmación implícita negociable y transacciones con estados        |
-  | Renovación    | `/simplereenroll` con el certificado en vigor      | `kur` protegido por el certificado que se renueva, con política de clave e identidad por DMS                           |
+  | Aspect         | EST (RFC 7030)                                     | CMP (RFC 4210 / RFC 9483)                                                                                         |
+  | -------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+  | Endpoint       | One per operation (`/cacerts`, `/simpleenroll`, …) | A **single multiplexed endpoint** (`/.well-known/cmp/p/{id}`); the operation is determined by the message content |
+  | Authentication | mTLS at the transport layer                        | **Protection of the message itself** (`PKIMessage`) by signature or, in `ir`/`cr`, CRMF proof of possession       |
+  | Settings       | General enrollment and re-enrollment blocks        | General settings **plus a per-operation policy block** (`ir`, `cr`, `p10cr`, `kur`, `rr`, `genm`, `ccr`)          |
+  | Confirmation   | The response is the end of the flow                | An explicit confirmation protocol (`certConf`), negotiable implicit confirmation and stateful transactions        |
+  | Renewal        | `/simplereenroll` with the current certificate     | `kur` protected by the certificate being renewed, with per-DMS key and identity policy                            |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El protocolo se selecciona con el campo `protocol` del DMS (`EST_RFC7030` o `CMP_RFC9483`) y cada uno tiene su propio bloque de configuración (`est_settings` / `cmp_settings`). Cambiar el protocolo de un DMS existente sustituye por completo el bloque del protocolo anterior: no hay migración de ajustes entre uno y otro.
+  The protocol is selected with the DMS's `protocol` field (`EST_RFC7030` or `CMP_RFC9483`) and each has its own configuration block (`est_settings` / `cmp_settings`). Changing the protocol of an existing DMS replaces the previous protocol's block entirely: settings are not migrated from one to the other.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Esta guía está dividida en dos partes:
+  This guide is split in two parts:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * [Configuración del DMS](#configuración-del-dms), para el administrador PKI: todos los ajustes disponibles, generales y por operación.
-  * [Integración de dispositivos](#integración-de-dispositivos), para quien consume el endpoint CMP desde firmware, librerías CMP estándar o servicios de aprovisionamiento.
+  * [DMS configuration](#dms-configuration), for the PKI administrator: every available setting, general and per-operation.
+  * [Device integration](#device-integration), for anyone consuming the CMP endpoint from firmware, standard CMP libraries or provisioning services.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Si solo necesita una orientación rápida:
+  If you only need a quick orientation:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Perfil                     | Leer primero                                                                                        | Después                                                                                                               |
-  | -------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-  | Administrador PKI          | [Selección de protocolo](#selección-de-protocolo) y [Ajustes por operación](#ajustes-por-operación) | [Transacciones CMP](#transacciones-cmp) y [Monitor de confirmación](#monitor-de-confirmación)                         |
-  | Integrador de dispositivos | [El endpoint CMP](#el-endpoint-cmp) y [Modelo de autenticación](#modelo-de-autenticación)           | [Operaciones soportadas](#operaciones-soportadas) y [Códigos de error y diagnóstico](#códigos-de-error-y-diagnóstico) |
+  | Profile           | Read first                                                                                      | Then                                                                                                          |
+  | ----------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+  | PKI administrator | [Protocol selection](#protocol-selection) and [Per-operation settings](#per-operation-settings) | [CMP transactions](#cmp-transactions) and [Confirmation monitor](#confirmation-monitor)                       |
+  | Device integrator | [The CMP endpoint](#the-cmp-endpoint) and [Authentication model](#authentication-model)         | [Supported operations](#supported-operations) and [Error codes and diagnostics](#error-codes-and-diagnostics) |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -53,145 +53,145 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Configuración del DMS [#configuración-del-dms]
+  DMS configuration [#dms-configuration]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Requisitos previos [#requisitos-previos]
+  Prerequisites [#prerequisites]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Antes de configurar un DMS para CMP, deben existir los siguientes recursos en la plataforma:
+  Before configuring a DMS for CMP, the following resources must exist on the platform:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * **Una CA disponible**: la CA que actuará como `EnrollmentCA` debe estar creada y en estado activo. Si se habilita la generación de claves en servidor (KGA), las CAs contra las que se validará el certificado destinatario también deben existir (ver [Generación de claves en servidor](#generación-de-claves-en-servidor-central-key-generation)).
-  * **Un certificado de protección**: CMP firma sus propias respuestas. El DMS necesita un certificado de tipo End Entity cuya clave privada resida en el KMS de Lamassu (`protection_certificate`, ver [más abajo](#certificado-de-protección-y-prueba-de-posesión)).
-  * **Un DMS creado**: la configuración CMP se aplica sobre un DMS existente, no lo crea.
+  * **An available CA**: the CA acting as `EnrollmentCA` must be created and active. If server-side key generation (KGA) is enabled, the CAs against which the recipient certificate is validated must also exist (see [Server-side key generation](#server-side-key-generation-central-key-generation)).
+  * **A protection certificate**: CMP signs its own responses. The DMS needs an End Entity certificate whose private key lives in the Lamassu KMS (`protection_certificate`, see [below](#protection-certificate-and-proof-of-possession)).
+  * **A created DMS**: the CMP configuration is applied over an existing DMS, it does not create one.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Los ajustes de **CA Distribution** (qué autoridades recibe el dispositivo como anclas de confianza) son idénticos para ambos protocolos y se describen en la [visión general del DMS](/docs/platform/pki/device-enrollment#distribución-de-confianza).
+  The **CA Distribution** settings (which authorities the device receives as anchors of trust) are identical for both protocols and are described in the [DMS overview](/docs/platform/pki/device-enrollment#trust-distribution).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Selección de protocolo [#selección-de-protocolo]
+  Protocol selection [#protocol-selection]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Al crear o editar un DMS, el campo `protocol` decide qué bloque de configuración aplica:
+  When creating or editing a DMS, the `protocol` field decides which configuration block applies:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Valor         | Protocolo                                                  |
-  | ------------- | ---------------------------------------------------------- |
-  | `EST_RFC7030` | EST — ver la [guía EST](/docs/platform/pki/est-enrollment) |
-  | `CMP_RFC9483` | CMP — esta página                                          |
+  | Value         | Protocol                                                     |
+  | ------------- | ------------------------------------------------------------ |
+  | `EST_RFC7030` | EST — see the [EST guide](/docs/platform/pki/est-enrollment) |
+  | `CMP_RFC9483` | CMP — this page                                              |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Un valor distinto de los dos anteriores hace fallar la creación o edición del DMS con el error `DMS enrollment protocol must be EST_RFC7030 or CMP_RFC9483`. Al cambiar el `protocol` de un DMS, el bloque del protocolo saliente se descarta por completo y se sustituye por el entrante: los ajustes de cada protocolo son autónomos y no se copian entre sí.
+  Any value other than these two makes DMS creation or edition fail with the error `DMS enrollment protocol must be EST_RFC7030 or CMP_RFC9483`. When the `protocol` of an existing DMS changes, the outgoing protocol's block is discarded entirely and replaced by the incoming one: each protocol's settings are self-contained and are not copied across.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Ajustes generales de enrollment [#ajustes-generales-de-enrollment]
+  General enrollment settings [#general-enrollment-settings]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Ajustes compartidos con EST [#ajustes-compartidos-con-est]
+  Settings shared with EST [#settings-shared-with-est]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Estos campos son comunes a los dos protocolos y significan lo mismo en ambos:
+  These fields are common to both protocols and mean the same in each:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                           | Descripción                                                                                                                                                                                                                                                                                                                                                                                                                              |
-  | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `enrollment_ca`                 | CA que firmará los certificados de identidad emitidos por este DMS.                                                                                                                                                                                                                                                                                                                                                                      |
-  | `registration_mode`             | `JITP` (*Just-In-Time Provisioning*) crea el dispositivo automáticamente en la primera inscripción, aplicando el perfil de aprovisionamiento; `PRE_REGISTRATION` exige que el dispositivo exista previamente y rechaza lo contrario con `device not preregistered`.                                                                                                                                                                      |
-  | `device_provisioning_profile`   | Icono, color, metadatos y tags aplicados a cada dispositivo creado en modo JITP.                                                                                                                                                                                                                                                                                                                                                         |
-  | `enable_replaceable_enrollment` | Permite que un dispositivo ya enrolado vuelva a inscribirse. Cuando está inactiva, un segundo intento de `ir`/`cr` sobre un dispositivo existente se rechaza con `forbiddenNewEnrollment`. Si la sustitución de la identidad revoca el certificado anterior (con la razón `superseded`) lo decide `revoke_on_reenrollment`, o el `certificate_behavior` de `cr` — ver [Configuración de re-enrollment](#configuración-de-re-enrollment). |
-  | `verify_csr_signature`          | **Sin efecto en CMP.** El servidor sintetiza el CSR a partir del `CertTemplate` (su firma es sustituida por un valor ficticio) y la prueba de posesión se establece por otras vías: la POPO de `ir`/`cr`, el CSR PKCS#10 de `p10cr` (verificado siempre) o la protección de `kur`.                                                                                                                                                       |
+  | Field                           | Description                                                                                                                                                                                                                                                                                                                                                                                                      |
+  | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `enrollment_ca`                 | CA that will sign the identity certificates issued by this DMS.                                                                                                                                                                                                                                                                                                                                                  |
+  | `registration_mode`             | `JITP` (*Just-In-Time Provisioning*) creates the device automatically on the first enrollment, applying the provisioning profile; `PRE_REGISTRATION` requires the device to exist beforehand and rejects anything else with `device not preregistered`.                                                                                                                                                          |
+  | `device_provisioning_profile`   | Icon, color, metadata and tags applied to each device created in JITP mode.                                                                                                                                                                                                                                                                                                                                      |
+  | `enable_replaceable_enrollment` | Allows an already-enrolled device to enroll again. When inactive, a second `ir`/`cr` attempt against an existing device is rejected with `forbiddenNewEnrollment`. Whether replacing the identity revokes the previous certificate (with the reason `superseded`) is decided by `revoke_on_reenrollment`, or by `cr`'s `certificate_behavior` — see [Re-enrollment configuration](#re-enrollment-configuration). |
+  | `verify_csr_signature`          | **No effect in CMP.** The server synthesizes the CSR from the `CertTemplate` (its signature is replaced with a dummy value) and proof of possession is established through other means: the POPO of `ir`/`cr`, the PKCS#10 CSR of `p10cr` (always verified) or the protection of `kur`.                                                                                                                          |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Modo de autenticación [#modo-de-autenticación]
+  Authentication mode [#authentication-mode]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  `auth_mode` define cómo el DMS valida la identidad del solicitante. CMP reconoce los mismos cuatro modos que EST, pero el mecanismo cambia: **la autenticación se verifica dentro del propio mensaje CMP, no en la capa de transporte**.
+  `auth_mode` defines how the DMS validates the requester's identity. CMP recognizes the same four modes as EST, but the mechanism changes: **authentication is verified inside the CMP message itself, not at the transport layer**.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Modo                                      | Descripción                                                                                                                                                                                                                                                          |
-  | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `CLIENT_CERTIFICATE`                      | El mensaje debe ir **protegido por firma** con el certificado del dispositivo (`extraCerts[0]` del `PKIMessage`), validado contra las CAs declaradas en `client_certificate_settings.validation_cas`. No es mTLS: es la firma sobre el `PKIMessage` (RFC 9483 §3.2). |
-  | `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | Combina los dos controles: firma válida **y** aprobación del webhook.                                                                                                                                                                                                |
-  | `EXTERNAL_WEBHOOK`                        | La decisión de autorización se delega en un servicio HTTP externo, con el mismo contrato que en EST. El mensaje puede llegar sin protección.                                                                                                                         |
-  | `NO_AUTH`                                 | Sin autenticación obligatoria. El mensaje puede llegar sin protección; si trae una firma, igualmente se valida. **Exclusivo para laboratorios o redes de aprovisionamiento aisladas.**                                                                               |
+  | Mode                                      | Description                                                                                                                                                                                                                                                                          |
+  | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `CLIENT_CERTIFICATE`                      | The message must be **protected by signature** with the device's certificate (`extraCerts[0]` of the `PKIMessage`), validated against the CAs declared in `client_certificate_settings.validation_cas`. This is not mTLS: it is the signature over the `PKIMessage` (RFC 9483 §3.2). |
+  | `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | Combines both controls: valid signature **and** webhook approval.                                                                                                                                                                                                                    |
+  | `EXTERNAL_WEBHOOK`                        | The authorization decision is delegated to an external HTTP service, with the same contract as in EST. The message may arrive unprotected.                                                                                                                                           |
+  | `NO_AUTH`                                 | No mandatory authentication. The message may arrive unprotected; if it carries a signature, it is still validated. **For laboratories or isolated provisioning networks only.**                                                                                                      |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Un DMS cuya `auth_mode` está vacía o no definida se considera mal configurado: toda solicitud se rechaza con `DMS auth mode not supported`, en lugar de aceptarse sin autenticación. El valor `NONE` se acepta como alias heredado de `NO_AUTH` desde el panel de administración.
+  A DMS whose `auth_mode` is empty or undefined is considered misconfigured: every request is rejected with `DMS auth mode not supported`, instead of being accepted unauthenticated. The value `NONE` is accepted as a legacy alias of `NO_AUTH` from the admin console.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Cuando el modo incluye `CLIENT_CERTIFICATE`, se configuran los mismos parámetros que en EST: **Validation CAs**, **Chain Validation Level** (`-1` valida la cadena completa) y **Allow Authenticating Expired Certificates**. Cuando incluye `EXTERNAL_WEBHOOK`, se configuran los mismos parámetros de webhook que en EST (URL, método, timeout — 10 segundos por defecto — y modo de autenticación del webhook). El contrato del servicio webhook es idéntico en ambos protocolos; consulte la [sección equivalente de la guía EST](/docs/platform/pki/est-enrollment#enrollment-settings) para el detalle de cada campo y la [referencia del webhook de autorización](/api-reference/enroll-reenroll-webhook) para el esquema.
+  When the mode includes `CLIENT_CERTIFICATE`, the same parameters as in EST are configured: **Validation CAs**, **Chain Validation Level** (`-1` validates the full chain) and **Allow Authenticating Expired Certificates**. When it includes `EXTERNAL_WEBHOOK`, the same webhook parameters as in EST are configured (URL, method, timeout — 10 seconds by default — and the webhook's authentication mode). The webhook service contract is identical in both protocols; see the [equivalent section of the EST guide](/docs/platform/pki/est-enrollment#enrollment-settings) for the detail of each field and the [authorization webhook reference](/api-reference/enroll-reenroll-webhook) for the schema.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  A diferencia de EST, CMP no tiene un modo de autenticación separado para la renovación: `kur` siempre se autentica con la protección por firma del propio certificado que se renueva.
+  Unlike EST, CMP has no separate authentication mode for renewal: `kur` is always authenticated with the signature protection of the certificate being renewed.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Confirmación y flujo de emisión [#confirmación-y-flujo-de-emisión]
+  Confirmation and issuance flow [#confirmation-and-issuance-flow]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  A diferencia de EST, CMP incluye un protocolo de confirmación explícito (RFC 4210 §5.2.8) y admite un flujo de aprobación diferida:
+  Unlike EST, CMP includes an explicit confirmation protocol (RFC 4210 §5.2.8) and supports a deferred-approval flow:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                  | Tipo                | Descripción                                                                                                                                                                                                                                                                                                                                        |
-  | ---------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `accept_implicit`      | booleano            | Permite **omitir** el paso `certConf` cuando el dispositivo solicita confirmación implícita (`id-it-implicitConfirm` en `generalInfo`). Solo tiene efecto si el dispositivo también la solicita; la solicitud sola no la fuerza. Desactivado por defecto.                                                                                          |
-  | `confirmation_timeout` | duración            | Ventana de espera del `certConf` (por ejemplo `30s`, `5m`, `1h`). Un valor cero o negativo usa el por defecto: **5 minutos**.                                                                                                                                                                                                                      |
-  | `workflow`             | `direct` / `phased` | `direct` (por defecto) emite el certificado en línea, en la misma respuesta a `ir`/`cr`/`kur`/`p10cr`. `phased` retiene la solicitud hasta que un administrador la apruebe; el dispositivo recupera el resultado con `pollReq`. La generación de claves en servidor y la certificación cruzada tienen su propio flujo y no dependen de este campo. |
-  | `approval_timeout`     | duración            | Solo aplica con `workflow: phased`. Tiempo que una transacción permanece `PENDING` esperando aprobación. Sin valor, el por defecto es **7 días**.                                                                                                                                                                                                  |
+  | Field                  | Type                | Description                                                                                                                                                                                                                                                                                                               |
+  | ---------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `accept_implicit`      | boolean             | Allows **skipping** the `certConf` step when the device requests implicit confirmation (`id-it-implicitConfirm` in `generalInfo`). It only takes effect if the device also requests it; the request alone does not force it. Disabled by default.                                                                         |
+  | `confirmation_timeout` | duration            | Waiting window for the `certConf` (for example `30s`, `5m`, `1h`). A zero or negative value uses the default: **5 minutes**.                                                                                                                                                                                              |
+  | `workflow`             | `direct` / `phased` | `direct` (default) issues the certificate online, in the same response to `ir`/`cr`/`kur`/`p10cr`. `phased` holds the request until an administrator approves it; the device retrieves the result with `pollReq`. Server-side key generation and cross-certification have their own flow and do not depend on this field. |
+  | `approval_timeout`     | duration            | Only applies with `workflow: phased`. Time a transaction remains `PENDING` awaiting approval. With no value, the default is **7 days**.                                                                                                                                                                                   |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Certificado de protección y prueba de posesión [#certificado-de-protección-y-prueba-de-posesión]
+  Protection certificate and proof of possession [#protection-certificate-and-proof-of-possession]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * **Protection Certificate** (`protection_certificate`): número de serie del certificado End Entity, respaldado por el KMS, con el que el DMS protege (firma) sus respuestas CMP. El servidor no obliga a configurarlo, pero sin él **todas** las respuestas — incluidos los mensajes de error — salen sin protección, y los clientes CMP estándar (`openssl cmp` incluido) rechazan por defecto las respuestas sin protección. En la práctica es imprescindible.
-  * **Enforce POPO** (`enforce_popo`): opción heredada que **ya no gobierna ninguna verificación**. La política de prueba de posesión de `ir`/`cr` vive en su bloque por operación (`proof_of_possession.required`), `kur` y `rr` están siempre protegidos por firma como invariantes del protocolo, y la firma del CSR de `p10cr` se verifica siempre. El campo persiste y round-trip en la API, pero su valor no altera el comportamiento.
-  * **Expected Authenticator** (`expected_authenticator`): respuesta compartida que se compara contra el control `id-regCtrl-authenticator` (RFC 4211 §6.2) cuando una solicitud de emisión (`ir`/`cr`/`kur`) lo incluye. Vacío por defecto: un control presente se acepta sin comparar su valor. Con valor configurado, un control cuyo contenido no coincide se rechaza con `incorrectData`. **Marcado como legado**: almacena un secreto en claro en el DMS; la configuración nueva debe usar los controles `registration_token`/`authenticator_control` por operación, que solo almacenan un modo.
+  * **Protection Certificate** (`protection_certificate`): serial number of the End Entity certificate, backed by the KMS, with which the DMS protects (signs) its CMP responses. The server does not require it, but without it **every** response — including error messages — goes out unprotected, and standard CMP clients (`openssl cmp` included) reject unprotected responses by default. In practice it is essential.
+  * **Enforce POPO** (`enforce_popo`): a legacy option that **no longer governs any verification**. The proof-of-possession policy of `ir`/`cr` lives in its per-operation block (`proof_of_possession.required`), `kur` and `rr` are always signature-protected as protocol invariants, and the `p10cr` CSR signature is always verified. The field persists and round-trips through the API, but its value does not change behavior.
+  * **Expected Authenticator** (`expected_authenticator`): shared answer compared against the `id-regCtrl-authenticator` control (RFC 4211 §6.2) when an issuance request (`ir`/`cr`/`kur`) includes it. Empty by default: a present control is accepted without comparing its value. With a value configured, a control whose content does not match is rejected with `incorrectData`. **Marked as legacy**: it stores a plaintext secret on the DMS; new configuration should use the per-operation `registration_token`/`authenticator_control` controls, which store only a mode.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Ajustes por operación [#ajustes-por-operación]
+  Per-operation settings [#per-operation-settings]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Además de los campos generales anteriores, cada operación CMP tiene su propio bloque de configuración con un interruptor `enabled` y una política específica. Las operaciones de emisión (`ir`, `cr`, `p10cr`, `kur`) admiten además `policy_overrides`:
+  Besides the general fields above, each CMP operation has its own configuration block with an `enabled` switch and a specific policy. The issuance operations (`ir`, `cr`, `p10cr`, `kur`) also support `policy_overrides`:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * `policy_overrides.workflow`: `inherit` (toma el `workflow` general), `direct` o `phased`.
-  * `policy_overrides.confirmation`: `inherit`, `implicit` (fuerza disposición a la confirmación implícita) o `explicit` (fuerza el `certConf`).
-  * `policy_overrides.issuance_profile_id`: fija un perfil de emisión específico para esa operación. Se aplica en `ir`, `cr` y `p10cr`; el `kur` renueva siempre con el perfil general del DMS.
+  * `policy_overrides.workflow`: `inherit` (takes the general `workflow`), `direct` or `phased`.
+  * `policy_overrides.confirmation`: `inherit`, `implicit` (forces willingness to accept implicit confirmation) or `explicit` (forces the `certConf`).
+  * `policy_overrides.issuance_profile_id`: pins a specific issuance profile for that operation. It applies in `ir`, `cr` and `p10cr`; `kur` always renews with the DMS's general profile.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  La confirmación implícita efectiva siempre requiere además que el dispositivo la pida (`id-it-implicitConfirm`): el ajuste solo expresa la disposición del servidor.
+  Effective implicit confirmation always additionally requires the device to request it (`id-it-implicitConfirm`): the setting only expresses the server's willingness.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  <Callout type="warn" title="Bloques por operación con valor por defecto en bloque">
-    Cada bloque por operación detecta si nunca se configuró observando un **campo clave**: `identity_source` en `ir`, `certificate_behavior` en `cr`, `key_policy` en `kur`, `authorization` en `rr`, `access_policy` en `genm` y `workflow` en `ccr`. Si ese campo llega vacío, el bloque se rellena íntegro con sus valores por defecto en cada lectura del DMS — incluido cualquier otro campo que se haya enviado. Para ajustar un campo secundario (por ejemplo, `maximum_active_certificates` de `cr`) debe fijarse también el campo clave del bloque, o la resolución lo devuelve a su valor por defecto. `p10cr` no tiene campo clave: permanece deshabilitado salvo que se ponga `enabled: true` explícitamente.
+  <Callout type="warn" title="Per-operation blocks are defaulted as a whole">
+    Each per-operation block detects whether it has never been configured by observing a **key field**: `identity_source` in `ir`, `certificate_behavior` in `cr`, `key_policy` in `kur`, `authorization` in `rr`, `access_policy` in `genm` and `workflow` in `ccr`. If that field arrives empty, the block is filled in entirely with its default values on every read of the DMS — including any other field that was sent. To adjust a secondary field (for example, `cr`'s `maximum_active_certificates`) you must also set the block's key field, or resolution resets it to the default. `p10cr` has no key field: it stays disabled unless `enabled: true` is set explicitly.
   </Callout>
 </div>
 
@@ -200,21 +200,21 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Alta inicial de un dispositivo nuevo (RFC 9483 §4.1.1), equivalente al `/simpleenroll` de EST. Habilitado por defecto.
+  Initial enrollment of a new device (RFC 9483 §4.1.1), the equivalent of EST's `/simpleenroll`. Enabled by default.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                                              | Descripción                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-  | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `enabled`                                          | Habilita la operación. Deshabilitarla rechaza cualquier `ir` con `notAuthorized`.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-  | `proof_of_possession.required`                     | Si la POPO es obligatoria. Por defecto `true`: un `ir` sin prueba de posesión aceptable se rechaza con `badPOP`.                                                                                                                                                                                                                                                                                                                                                                                                                    |
-  | `proof_of_possession.allowed_methods`              | Métodos de POPO aceptados: `signature` (POPOSigningKey sobre el CertRequest), `trusted_ra` (`raVerified` de una RA de confianza con EKU `id-kp-cmcRA`), `challenge_response` (reto-respuesta `popdecc`/`popdecr`) y `encrypted_certificate` (el certificado se entrega cifrado al destinatario, que demuestra posesión al descifrarlo). Por defecto `signature` + `trusted_ra`. Una lista vacía no admite ningún método.                                                                                                            |
-  | `registration_token`                               | Control RFC 4211 §6.1 con modo `disabled` (por defecto), `optional` o `required`. El modo gobierna la **presencia** del control: `disabled` rechaza un `ir` que lo traiga; `required` exige traerlo; `optional` lo procesa cuando está presente. Los valores de regToken son credenciales de un solo uso, aprovisionadas fuera del DMS (nunca se almacenan en la configuración): un valor ya consumido se rechaza con `the regToken control was already used (RFC 4211 §6.1)`, y el token se quema aunque la emisión falle después. |
-  | `authenticator_control`                            | Control RFC 4211 §6.2 con los mismos tres modos. Con `expected_authenticator` configurado, `optional`/`required` validan el valor; sin él, la presencia basta.                                                                                                                                                                                                                                                                                                                                                                      |
-  | `central_key_generation.allowed_recipient_methods` | Métodos de entrega de la clave generada que acepta esta operación: `rsa_key_transport` y/o `ecdh_key_agreement`. Sin configurar se aceptan ambos; una lista explícitamente vacía deniega cualquier entrega de clave generada.                                                                                                                                                                                                                                                                                                       |
-  | `central_key_generation.enabled`                   | Se funde con el interruptor general `server_key_gen_enabled` y con el de `cr` en una única puerta de KGA (ver [Generación de claves en servidor](#generación-de-claves-en-servidor-central-key-generation)).                                                                                                                                                                                                                                                                                                                        |
-  | `identity_source`                                  | Selecciona de dónde se toma la identidad cuando el subject llega vacío (`subject_only` / `subject_or_san`). **Persistido pero aún no aplicado**: el comportamiento actual es fijo — con subject vacío, la identidad se deduce del SAN (`dNSName`, correo, URI, IP, en ese orden) y el certificado emitido conserva el subject NULL-DN.                                                                                                                                                                                              |
-  | `policy_overrides`                                 | Ver la introducción de esta sección.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+  | Field                                              | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+  | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `enabled`                                          | Enables the operation. Disabling it rejects any `ir` with `notAuthorized`.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+  | `proof_of_possession.required`                     | Whether the POPO is mandatory. Default `true`: an `ir` without an acceptable proof of possession is rejected with `badPOP`.                                                                                                                                                                                                                                                                                                                                                                                   |
+  | `proof_of_possession.allowed_methods`              | Accepted POPO methods: `signature` (POPOSigningKey over the CertRequest), `trusted_ra` (`raVerified` from a trusted RA with EKU `id-kp-cmcRA`), `challenge_response` (challenge-response `popdecc`/`popdecr`) and `encrypted_certificate` (the certificate is delivered encrypted to the recipient, who proves possession by decrypting it). Default `signature` + `trusted_ra`. An empty list admits no method.                                                                                              |
+  | `registration_token`                               | RFC 4211 §6.1 control with mode `disabled` (default), `optional` or `required`. The mode governs the **presence** of the control: `disabled` rejects an `ir` that carries it; `required` demands it; `optional` processes it when present. regToken values are one-use credentials provisioned outside the DMS (never stored in the configuration): an already-consumed value is rejected with `the regToken control was already used (RFC 4211 §6.1)`, and the token is burned even if issuance later fails. |
+  | `authenticator_control`                            | RFC 4211 §6.2 control with the same three modes. With `expected_authenticator` configured, `optional`/`required` validate the value; without it, presence is enough.                                                                                                                                                                                                                                                                                                                                          |
+  | `central_key_generation.allowed_recipient_methods` | Key-delivery methods this operation accepts for the generated key: `rsa_key_transport` and/or `ecdh_key_agreement`. Unset accepts both; an explicitly empty list denies any generated-key delivery.                                                                                                                                                                                                                                                                                                           |
+  | `central_key_generation.enabled`                   | Merges with the general `server_key_gen_enabled` switch and with `cr`'s into a single KGA gate (see [Server-side key generation](#server-side-key-generation-central-key-generation)).                                                                                                                                                                                                                                                                                                                        |
+  | `identity_source`                                  | Selects where the identity is taken from when the subject arrives empty (`subject_only` / `subject_or_san`). **Persisted but not yet enforced**: the current behavior is fixed — with an empty subject, the identity is derived from the SAN (`dNSName`, email, URI, IP, in that order) and the issued certificate keeps the NULL-DN subject.                                                                                                                                                                 |
+  | `policy_overrides`                                 | See the introduction of this section.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -222,20 +222,20 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Emisión para un dispositivo que ya participa en la PKI (RFC 9483 §4.1.2). Habilitado por defecto. Comparte con `ir` la estructura de `proof_of_possession`, `central_key_generation` y `policy_overrides`, y añade:
+  Issuance for a device that already participates in the PKI (RFC 9483 §4.1.2). Enabled by default. Shares with `ir` the `proof_of_possession`, `central_key_generation` and `policy_overrides` structure, and adds:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                         | Descripción                                                                                                                                                                                                                                                                                                                                                                             |
-  | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `require_existing_device`     | Por defecto `true`: un `cr` contra un dispositivo no registrado se rechaza con `certification request requires a pre-existing device identity`. Desactivarlo permite que un `cr` también dé de alta el dispositivo (sujeto al modo de registro y, si el dispositivo ya existe, a `enable_replaceable_enrollment`).                                                                      |
-  | `certificate_behavior`        | `additional` (por defecto) emite un certificado más sin revocar el anterior; `replace` sustituye el certificado activo (el anterior se revoca como `superseded` tras emitir y vincular el nuevo). El modelo de datos mantiene un único slot de identidad activa por dispositivo, así que `additional` no crea una segunda identidad activa en paralelo: solo evita revocar la anterior. |
-  | `maximum_active_certificates` | Límite de certificados no revocados por dispositivo. Por defecto `2`; `0` desactiva el límite. El recuento se revalida bajo bloqueo justo antes de firmar, para cerrar la carrera entre dos `cr` concurrentes.                                                                                                                                                                          |
-  | `allowed_profile_ids`         | Lista blanca de perfiles de emisión permitidos para esta operación. El perfil resuelto (fijado por `policy_overrides.issuance_profile_id` o el general del DMS) debe estar en la lista; vacía no restringe.                                                                                                                                                                             |
+  | Field                         | Description                                                                                                                                                                                                                                                                                                                                                                                         |
+  | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `require_existing_device`     | Default `true`: a `cr` against an unregistered device is rejected with `certification request requires a pre-existing device identity`. Disabling it lets a `cr` also register the device (subject to the registration mode and, if the device already exists, to `enable_replaceable_enrollment`).                                                                                                 |
+  | `certificate_behavior`        | `additional` (default) issues one more certificate without revoking the previous one; `replace` replaces the active certificate (the previous one is revoked as `superseded` after the new one is issued and bound). The data model keeps a single active identity slot per device, so `additional` does not create a second active identity in parallel: it only avoids revoking the previous one. |
+  | `maximum_active_certificates` | Cap on non-revoked certificates per device. Default `2`; `0` disables the cap. The count is revalidated under lock right before signing, to close the race between two concurrent `cr` requests.                                                                                                                                                                                                    |
+  | `allowed_profile_ids`         | Allow-list of issuance profiles permitted for this operation. The resolved profile (pinned by `policy_overrides.issuance_profile_id` or the DMS's general one) must be on the list; empty does not restrict.                                                                                                                                                                                        |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  `cr` hereda además las salvaguardas generales del alta: el dispositivo debe pertenecer a este DMS (un dispositivo registrado en otro DMS se rechaza con `device already registered to another DMS`) y si ya existe se exige `enable_replaceable_enrollment`. Cuando un `cr` con `replace` sustituye la identidad, la política `key_policy` de `kur` también se aplica: con `require_new_key`, el `cr` no puede sustituir el certificado activo usando la misma clave pública.
+  `cr` also inherits the general enrollment safeguards: the device must belong to this DMS (a device registered to another DMS is rejected with `device already registered to another DMS`) and, if it already exists, `enable_replaceable_enrollment` is required. When a `cr` with `replace` replaces the identity, `kur`'s `key_policy` also applies: with `require_new_key`, the `cr` cannot replace the active certificate using the same public key.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -243,19 +243,19 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Alta con un CSR PKCS#10 completo en lugar de la estructura CRMF (RFC 9483 §4.1.4). **Llega deshabilitado**: hay que activar `enabled: true` en el DMS o toda solicitud `p10cr` se rechaza con `notAuthorized`.
+  Enrollment with a complete PKCS#10 CSR instead of the CRMF structure (RFC 9483 §4.1.4). **Shipped disabled**: `enabled: true` must be set on the DMS or every `p10cr` request is rejected with `notAuthorized`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                 | Descripción                                                        |
-  | --------------------- | ------------------------------------------------------------------ |
-  | `enabled`             | Habilita la operación. Deshabilitado por defecto.                  |
-  | `allowed_profile_ids` | Lista blanca de perfiles de emisión permitidos, igual que en `cr`. |
-  | `policy_overrides`    | Ver la introducción de esta sección.                               |
+  | Field                 | Description                                                 |
+  | --------------------- | ----------------------------------------------------------- |
+  | `enabled`             | Enables the operation. Disabled by default.                 |
+  | `allowed_profile_ids` | Allow-list of permitted issuance profiles, same as in `cr`. |
+  | `policy_overrides`    | See the introduction of this section.                       |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Invariantes fijos del protocolo, no configurables: la firma del propio CSR **es** la prueba de posesión y se verifica siempre; no hay POPO CRMF que configurar; la generación de claves en servidor no está disponible (el cliente aporta su clave); y los controles CRMF de registro (`regToken`, `authenticator`) no aplican. La respuesta es un `cp` con `certReqId` `-1`, valor que el `certConf` posterior debe usar (RFC 4210 Errata 8806).
+  Fixed protocol invariants, not configurable: the CSR's own signature **is** the proof of possession and is always verified; there is no CRMF POPO to configure; server-side key generation is not available (the client supplies its key); and the CRMF registration controls (`regToken`, `authenticator`) do not apply. The response is a `cp` with `certReqId` `-1`, the value the subsequent `certConf` must use (RFC 4210 Errata 8806).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -263,20 +263,20 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Renovación de un certificado (RFC 9483 §4.1.3), equivalente al `/simplereenroll` de EST. Habilitado por defecto. El mensaje debe ir **protegido por firma con el certificado que se renueva** — invariante del protocolo, no configurable.
+  Renewal of a certificate (RFC 9483 §4.1.3), the equivalent of EST's `/simplereenroll`. Enabled by default. The message must be **protected by signature with the certificate being renewed** — a protocol invariant, not configurable.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                                         | Descripción                                                                                                                                                                                                                  |
-  | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `enabled`                                     | Habilita la operación.                                                                                                                                                                                                       |
-  | `key_policy`                                  | `require_new_key` (por defecto) exige una clave pública distinta a la del certificado que se renueva (`key update must present a new key`); `permit_reuse` permite renovar sin rotar la clave.                               |
-  | `identity_change_policy`                      | Cuánto puede variar la identidad respecto al certificado vigente: `forbid` (por defecto; subject y SAN deben coincidir), `san_only` (el subject debe coincidir; el SAN puede variar) o `subject_and_san` (cualquier cambio). |
-  | `policy_overrides.workflow` / `.confirmation` | Igual que en las demás operaciones de emisión.                                                                                                                                                                               |
+  | Field                                         | Description                                                                                                                                                                                                      |
+  | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `enabled`                                     | Enables the operation.                                                                                                                                                                                           |
+  | `key_policy`                                  | `require_new_key` (default) requires a public key different from the certificate being renewed (`key update must present a new key`); `permit_reuse` allows renewing without rotating the key.                   |
+  | `identity_change_policy`                      | How much the identity may change relative to the current certificate: `forbid` (default; subject and SAN must match), `san_only` (the subject must match; the SAN may change) or `subject_and_san` (any change). |
+  | `policy_overrides.workflow` / `.confirmation` | Same as in the other issuance operations.                                                                                                                                                                        |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Invariantes fijos: solo puede haber una actualización de clave abierta por certificado (un segundo `kur` mientras el primero espera `certConf` se rechaza con `badRequest`); la identidad anterior sigue activa hasta la confirmación; y un certificado nuevo nunca confirmado se revoca al expirar la ventana. El control opcional `id-regCtrl-oldCertID`, si se envía, debe referenciar exactamente el certificado que se renueva (`badCertId` en caso contrario). `policy_overrides.issuance_profile_id` está definido en el esquema pero **aún no aplicado** en `kur`.
+  Fixed invariants: only one key update may be open per certificate (a second `kur` while the first awaits `certConf` is rejected with `badRequest`); the previous identity stays active until confirmation; and a never-confirmed new certificate is revoked when the window expires. The optional `id-regCtrl-oldCertID` control, if sent, must reference exactly the certificate being renewed (`badCertId` otherwise). `policy_overrides.issuance_profile_id` is defined in the schema but **not yet enforced** in `kur`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -284,22 +284,22 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Revocación vía CMP (RFC 9483 §4.2). Habilitado por defecto. El mensaje **siempre debe ir protegido por firma** — invariante del protocolo, independientemente del `auth_mode`: un `rr` sin firma nunca se acepta, ni siquiera en modo `NO_AUTH`.
+  Revocation over CMP (RFC 9483 §4.2). Enabled by default. The message **must always be protected by signature** — a protocol invariant, independent of `auth_mode`: an unsigned `rr` is never accepted, not even in `NO_AUTH` mode.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                           | Descripción                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+  | Field                           | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
   | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `enabled`                       | Habilita la operación.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-  | `authorization`                 | `self_only` (por defecto): solo el propio dispositivo puede revocar su certificado — el firmante del mensaje debe ser el certificado revocado. `self_and_trusted_ra`: una entidad de gestión PKI de confianza (EKU `id-kp-cmcRA` validado contra las CAs del DMS) puede además revocar el certificado de otro.                                                                                                                                                                                     |
-  | `allow_revival`                 | Por defecto desactivado. Permite reactivar un certificado en estado revocado mediante la razón `removeFromCRL`; la reactivación solo es posible sobre certificados cuya revocación fue una suspensión (`certificateHold`).                                                                                                                                                                                                                                                                         |
-  | `allowed_reasons`               | Lista blanca de razones de revocación aceptadas. Por defecto `unspecified`, `key_compromise`, `cessation_of_operation` y `superseded`. Valores admitidos: `unspecified`, `key_compromise`, `ca_compromise`, `affiliation_changed`, `superseded`, `cessation_of_operation`, `privilege_withdrawn`, `aa_compromise`. La razón `certificateHold` no está en la lista ni está sujeta a ella: suspende el certificado y es la única revocación reversible; la reactivación la gobierna `allow_revival`. |
-  | `trusted_ra.require_cmc_ra_eku` | Por defecto `true`: exige el EKU `id-kp-cmcRA` en el firmante RA.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-  | `trusted_ra.validation_ca_ids`  | Fija qué CAs deben validar el certificado del RA; una lista explícita sustituye el límite general. Vacío: se aplica el límite de confianza general del DMS (la `EnrollmentCA` más las CAs de validación de autenticación y de re-enrollment).                                                                                                                                                                                                                                                      |
+  | `enabled`                       | Enables the operation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+  | `authorization`                 | `self_only` (default): only the device itself may revoke its certificate — the message signer must be the revoked certificate. `self_and_trusted_ra`: a trusted PKI management entity (EKU `id-kp-cmcRA`, validated against the DMS's CAs) may additionally revoke another's certificate.                                                                                                                                                                                                          |
+  | `allow_revival`                 | Disabled by default. Allows reactivating a revoked certificate through the reason `removeFromCRL`; revival is only possible for certificates whose revocation was a suspension (`certificateHold`).                                                                                                                                                                                                                                                                                                |
+  | `allowed_reasons`               | Allow-list of accepted revocation reasons. Default `unspecified`, `key_compromise`, `cessation_of_operation` and `superseded`. Accepted values: `unspecified`, `key_compromise`, `ca_compromise`, `affiliation_changed`, `superseded`, `cessation_of_operation`, `privilege_withdrawn`, `aa_compromise`. The reason `certificateHold` is not on the list and is not subject to it: it suspends the certificate and is the only reversible revocation; reactivation is governed by `allow_revival`. |
+  | `trusted_ra.require_cmc_ra_eku` | Default `true`: requires the EKU `id-kp-cmcRA` on the RA signer.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+  | `trusted_ra.validation_ca_ids`  | Fixes which CAs must validate the RA certificate; an explicit list replaces the general boundary. Empty: the DMS's general trust boundary applies (the `EnrollmentCA` plus the authentication and re-enrollment validation CAs).                                                                                                                                                                                                                                                                   |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Notas operativas: la revocación de un certificado ya caducado nunca está permitida (el servicio de CA rechaza transiciones de estado sobre certificados expirados); el certificado objetivo debe pertenecer a un dispositivo gestionado por este DMS — un RA de confianza no puede revocar certificados de otros DMS (`notAuthorized`); mientras un certificado tenga una actualización de clave pendiente de confirmar, su estado no puede cambiar (`badRequest`); y un `rr` no puede repetirse con el mismo `transactionID` (`transactionIdInUse`).
+  Operational notes: revoking an already-expired certificate is never permitted (the CA service rejects status transitions on expired certificates); the target certificate must belong to a device managed by this DMS — a trusted RA cannot revoke certificates of other DMSs (`notAuthorized`); while a certificate has a key update pending confirmation its status cannot change (`badRequest`); and an `rr` cannot be replayed with the same `transactionID` (`transactionIdInUse`).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -307,38 +307,38 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Canal de descubrimiento (RFC 9483 §4.3): el dispositivo consulta capacidades del DMS y este responde con un `genp`. No emite certificados. Habilitado por defecto.
+  Discovery channel (RFC 9483 §4.3): the device queries the DMS's capabilities and the DMS answers with a `genp`. It issues no certificates. Enabled by default.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                           | Descripción                                                                                                                                                                         |
-  | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `access_policy`                 | `public_discovery` (por defecto) responde sin exigir mensaje protegido; `require_signed` rechaza un `genm` sin firma con `notAuthorized`.                                           |
-  | `preferred_symmetric_algorithm` | Algoritmo simétrico que el DMS anuncia para el cifrado de contenido hacia la CA: `aes128_cbc`, `aes192_cbc`, `aes256_cbc` (por defecto), `aes128_gcm`, `aes192_gcm` o `aes256_gcm`. |
-  | `information_types.*`           | Interruptores independientes por tipo de información — ver la tabla siguiente.                                                                                                      |
+  | Field                           | Description                                                                                                                                                                  |
+  | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `access_policy`                 | `public_discovery` (default) answers without requiring a protected message; `require_signed` rejects an unsigned `genm` with `notAuthorized`.                                |
+  | `preferred_symmetric_algorithm` | Symmetric algorithm the DMS advertises for content encryption toward the CA: `aes128_cbc`, `aes192_cbc`, `aes256_cbc` (default), `aes128_gcm`, `aes192_gcm` or `aes256_gcm`. |
+  | `information_types.*`           | Independent switches per information type — see the table below.                                                                                                             |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Cada interruptor `information_types.*` corresponde a un tipo de información del RFC 9483 §4.3. Los tipos puramente descriptivos (estáticos) están activados por defecto; los que dependen de la configuración concreta del DMS — sus CAs, su perfil de emisión o su cliente VA — quedan desactivados hasta que el operador los habilite:
+  Each `information_types.*` switch corresponds to an RFC 9483 §4.3 information type. The purely descriptive (static) types are enabled by default; the ones that depend on the DMS's concrete configuration — its CAs, its issuance profile or its VA client — stay disabled until the operator enables them:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Tipo de información               | OID (`id-it-*`)          | Por defecto | Contenido de la respuesta                                                                                            |
-  | --------------------------------- | ------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------- |
-  | `ca_certificates`                 | `caCerts` (17)           | Activado    | Certificados de las CAs del DMS, con la misma distribución de confianza que el `/cacerts` de EST.                    |
-  | `signing_key_types`               | `signKeyPairTypes` (2)   | Activado    | Algoritmos de firma admitidos: RSA y ECC (valor estático).                                                           |
-  | `encryption_key_types`            | `encKeyPairTypes` (3)    | Activado    | Algoritmos de cifrado/acuerdo admitidos: RSA (valor estático).                                                       |
-  | `preferred_symmetric_algorithm`   | `preferredSymmAlg` (4)   | Activado    | El algoritmo configurado en `preferred_symmetric_algorithm`.                                                         |
-  | `supported_languages`             | `supportedLangTags` (16) | Activado    | Negociación de idioma para `PKIFreeText`; el único soportado es `en`.                                                |
-  | `root_ca_update`                  | `rootCaCert` (20)        | Desactivado | Actualización de la raíz vigente (`newWithNew`/`newWithOld`), comparada contra la raíz que el dispositivo declara.   |
-  | `certificate_request_template`    | `certReqTemplate` (19)   | Desactivado | Plantilla derivada del perfil de emisión del DMS: algoritmos y tamaños de clave admitidos y validez del certificado. |
-  | `current_crl`                     | `currentCRL` (6)         | Desactivado | CRL vigente, servida a través del cliente VA del servicio DMS Manager.                                               |
-  | `crl_update`                      | `crlStatusList` (22)     | Desactivado | Actualizaciones de CRL por emisor, solo las más recientes que la que el dispositivo declara.                         |
-  | `protocol_encryption_certificate` | `caProtEncCert` (1)      | Desactivado | Siempre se responde sin valor — Lamassu no provisiona un certificado de cifrado de protocolo dedicado.               |
+  | Information type                  | OID (`id-it-*`)          | Default  | Response content                                                                                                |
+  | --------------------------------- | ------------------------ | -------- | --------------------------------------------------------------------------------------------------------------- |
+  | `ca_certificates`                 | `caCerts` (17)           | Enabled  | Certificates of the DMS's CAs, with the same trust distribution as EST's `/cacerts`.                            |
+  | `signing_key_types`               | `signKeyPairTypes` (2)   | Enabled  | Supported signature algorithms: RSA and ECC (static value).                                                     |
+  | `encryption_key_types`            | `encKeyPairTypes` (3)    | Enabled  | Supported encryption/agreement algorithms: RSA (static value).                                                  |
+  | `preferred_symmetric_algorithm`   | `preferredSymmAlg` (4)   | Enabled  | The algorithm configured in `preferred_symmetric_algorithm`.                                                    |
+  | `supported_languages`             | `supportedLangTags` (16) | Enabled  | Language negotiation for `PKIFreeText`; the only supported one is `en`.                                         |
+  | `root_ca_update`                  | `rootCaCert` (20)        | Disabled | Update of the current root (`newWithNew`/`newWithOld`), compared against the root the device declares.          |
+  | `certificate_request_template`    | `certReqTemplate` (19)   | Disabled | Template derived from the DMS's issuance profile: supported key algorithms and sizes, and certificate validity. |
+  | `current_crl`                     | `currentCRL` (6)         | Disabled | Current CRL, served through the VA client of the DMS Manager service.                                           |
+  | `crl_update`                      | `crlStatusList` (22)     | Disabled | CRL updates per issuer, only those newer than the one the device declares.                                      |
+  | `protocol_encryption_certificate` | `caProtEncCert` (1)      | Disabled | Always answered without a value — Lamassu does not provision a dedicated protocol-encryption certificate.       |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Reglas del intercambio: un `genm` que solicite un tipo deshabilitado se rechaza por completo con `notAuthorized`; los tipos `caCerts`, `certReqTemplate`, `currentCRL`, `signKeyPairTypes`, `encKeyPairTypes` y `preferredSymmAlg` deben llegar sin `infoValue`; `supportedLangTags` debe llegar con la lista de lenguajes ofrecidos (si no se soporta ninguno, `badRequest`); `crlStatusList` debe llevar al menos una entrada `CRLStatus`. Un tipo habilitado cuyo proveedor de datos no tenga nada que devolver (por ejemplo, un DMS sin cliente VA para los tipos de CRL, o una raíz sin actualización más reciente) responde con el `infoValue` ausente — un *no disponible* válido según el RFC, no un error. El tipo `id-it-revPassphrase` (RFC 4210bis §5.3.19.9) está deshabilitado de forma permanente: no está conectado al flujo de revocación.
+  Exchange rules: a `genm` requesting a disabled type is rejected entirely with `notAuthorized`; the types `caCerts`, `certReqTemplate`, `currentCRL`, `signKeyPairTypes`, `encKeyPairTypes` and `preferredSymmAlg` must arrive without `infoValue`; `supportedLangTags` must arrive with the list of offered languages (if none is supported, `badRequest`); `crlStatusList` must carry at least one `CRLStatus` entry. An enabled type whose data provider has nothing to return (for example, a DMS without a VA client for the CRL types, or a root with no newer update) answers with the absent `infoValue` — a valid *not available* per the RFC, not an error. The type `id-it-revPassphrase` (RFC 4210bis §5.3.19.9) is permanently disabled: it is not wired into the revocation flow.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -346,141 +346,141 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Certificación cruzada entre CAs (RFC 4210bis §5.3.11): una CA pide a la CA de enrolamiento del DMS un certificado cruzado para su identidad. Es una operación privilegiada CA-a-CA, **deshabilitada por defecto**.
+  Cross-certification between CAs (RFC 4210bis §5.3.11): a CA asks the DMS's enrollment CA for a cross-certificate for its identity. It is a privileged CA-to-CA operation, **disabled by default**.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                         | Descripción                                                                                                                                                                                                                                                                                                                                                          |
-  | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `enabled`                     | Habilita la operación. Deshabilitado por defecto.                                                                                                                                                                                                                                                                                                                    |
-  | `workflow`                    | `administrator_approval` (por defecto) o `direct`. Es independiente del `workflow` general de enrollment: la aprobación administrativa de un `ccr` no se mezcla con la de `ir`/`cr`. Con `administrator_approval`, la solicitud queda `PENDING` (tipo `ccr`) y el CA solicitante recupera el certificado cruzado con `pollReq`.                                      |
-  | `requester_mode`              | `any` (por defecto): cualquier firmante que supere `require_ca_certificate` puede solicitar. `restricted`: el firmante debe encadenar a una CA de `trusted_requester_ca_ids` — una lista vacía en modo `restricted` **no autoriza a nadie**.                                                                                                                         |
-  | `trusted_requester_ca_ids`    | CAs autorizadas en modo `restricted`.                                                                                                                                                                                                                                                                                                                                |
-  | `require_ca_certificate`      | Por defecto `true`: el certificado de protección del firmante debe ser un certificado de CA.                                                                                                                                                                                                                                                                         |
-  | `require_proof_of_possession` | Por defecto `true`: exige una POPO de tipo `POPOSigningKey` sobre la clave del `CertTemplate`. Las POPO de tipo `EncryptedKey` (que revelarían la clave privada del solicitante) se rechazan siempre, con o sin esta opción.                                                                                                                                         |
-  | `maximum_validity`            | Validez máxima del certificado cruzado. Por defecto **8760 horas (365 días)**. El `notBefore` solicitado se respeta tal cual (puede estar en el pasado) y el `notAfter` se **trunca** a este límite, no se rechaza.                                                                                                                                                  |
-  | `subject_constraints`         | Restricciones de identidad del certificado cruzado: `allowed_dn_patterns` (coincidencia por subcadena del subject en formato RFC 2253) y `allowed_dns_suffixes` (coincidencia por sufijo del SAN `dNSName`). Una lista vacía en una dimensión no impone restricción en esa dimensión — a diferencia de la lista de `central_key_generation`, que vacía deniega todo. |
-  | `issuance_profile_id`         | **Persistido pero aún no aplicado**: el certificado cruzado se emite con un perfil interno fijo (`CMP Cross Certification`), que produce un certificado de CA con `keyCertSign`, `cRLSign` y `digitalSignature`.                                                                                                                                                     |
+  | Field                         | Description                                                                                                                                                                                                                                                                                                                                   |
+  | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `enabled`                     | Enables the operation. Disabled by default.                                                                                                                                                                                                                                                                                                   |
+  | `workflow`                    | `administrator_approval` (default) or `direct`. It is independent of the general enrollment `workflow`: the administrative approval of a `ccr` is not mixed with that of `ir`/`cr`. With `administrator_approval`, the request stays `PENDING` (type `ccr`) and the requesting CA retrieves the cross-certificate with `pollReq`.             |
+  | `requester_mode`              | `any` (default): any signer that passes `require_ca_certificate` may request. `restricted`: the signer must chain to a CA in `trusted_requester_ca_ids` — an empty list in `restricted` mode **authorizes nobody**.                                                                                                                           |
+  | `trusted_requester_ca_ids`    | CAs authorized in `restricted` mode.                                                                                                                                                                                                                                                                                                          |
+  | `require_ca_certificate`      | Default `true`: the signer's protection certificate must be a CA certificate.                                                                                                                                                                                                                                                                 |
+  | `require_proof_of_possession` | Default `true`: requires a `POPOSigningKey` POPO over the `CertTemplate` key. `EncryptedKey` POPOs (which would disclose the requester's private key) are always rejected, with or without this option.                                                                                                                                       |
+  | `maximum_validity`            | Maximum validity of the cross-certificate. Default **8760 hours (365 days)**. The requested `notBefore` is honored as-is (it may be in the past) and the `notAfter` is **truncated** to this limit, not rejected.                                                                                                                             |
+  | `subject_constraints`         | Identity constraints of the cross-certificate: `allowed_dn_patterns` (substring match of the subject in RFC 2253 format) and `allowed_dns_suffixes` (suffix match of the `dNSName` SAN). An empty list on a dimension imposes no constraint on that dimension — unlike the `central_key_generation` list, which denies everything when empty. |
+  | `issuance_profile_id`         | **Persisted but not yet enforced**: the cross-certificate is issued with a fixed internal profile (`CMP Cross Certification`), which produces a CA certificate with `keyCertSign`, `cRLSign` and `digitalSignature`.                                                                                                                          |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El `ccr` exige además: `CertTemplate` completo (versión, algoritmo de firma, emisor, validez, subject y clave pública; versión v3 o v1, no v2), una clave con capacidad de firma (las claves solo de acuerdo, como X25519/X448, se rechazan) y ninguna solicitud de generación de claves en servidor. No está pensado para inscripción de dispositivos, sino para interoperabilidad entre PKIs.
+  The `ccr` additionally requires: a complete `CertTemplate` (version, signature algorithm, issuer, validity, subject and public key; version v3 or v1, not v2), a signing-capable key (agreement-only keys such as X25519/X448 are rejected) and no request for server-side key generation. It is not intended for device enrollment, but for interoperability between PKIs.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Generación de claves en servidor (Central Key Generation) [#generación-de-claves-en-servidor-central-key-generation]
+  Server-side key generation (Central Key Generation) [#server-side-key-generation-central-key-generation]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  CMP permite que el propio DMS genere el par de claves del dispositivo cuando la solicitud (`ir`/`cr`) llega con la clave pública vacía en el `CertTemplate` (RFC 9483 §4.1.6, también llamado **KGA**, Key Generation Authority).
+  CMP allows the DMS itself to generate the device's key pair when the request (`ir`/`cr`) arrives with an empty public key in the `CertTemplate` (RFC 9483 §4.1.6, also called **KGA**, Key Generation Authority).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                        | Tipo               | Descripción                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-  | ---------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `server_key_gen_enabled`     | booleano           | Habilita la generación de claves en servidor. Desactivado por defecto: una solicitud con clave pública vacía se rechaza con `notAuthorized`. Este interruptor y los `central_key_generation.enabled` de `ir`/`cr` se resuelven en una única puerta: basta activar cualquiera de los tres, y el valor resultante se reescribe en los tres.                                                                                                                                                                                                                                                                                                                                               |
-  | `ckg_trusted_encryption_cas` | lista de IDs de CA | CAs a las que debe encadenar el certificado destinatario (el certificado al que se cifra la clave generada — el propio certificado de protección del solicitante). Vacío por defecto: en ese caso se aplica el límite de confianza general del DMS (la `EnrollmentCA` más las CAs de validación de `auth_mode` y de `reenrollment_settings.additional_validation_cas`). Una lista explícita **sustituye** ese límite: el destinatario debe encadenar a alguna de las CAs listadas. La validación del destinatario es incondicional, también con `auth_mode: NO_AUTH`: KGA entrega material de clave privada, así que es un límite de confianza independiente del modo de autenticación. |
+  | Field                        | Type           | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+  | ---------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `server_key_gen_enabled`     | boolean        | Enables server-side key generation. Disabled by default: a request with an empty public key is rejected with `notAuthorized`. This switch and the `central_key_generation.enabled` of `ir`/`cr` resolve into a single gate: enabling any of the three is enough, and the resulting value is written back to all three.                                                                                                                                                                                                                                                                                                  |
+  | `ckg_trusted_encryption_cas` | list of CA IDs | CAs the recipient certificate (the certificate the generated key is encrypted to — the requester's own protection certificate) must chain to. Empty by default: in that case the DMS's general trust boundary applies (the `EnrollmentCA` plus the validation CAs of `auth_mode` and of `reenrollment_settings.additional_validation_cas`). An explicit list **replaces** that boundary: the recipient must chain to one of the listed CAs. Recipient validation is unconditional, also with `auth_mode: NO_AUTH`: KGA delivers private key material, so it is a trust boundary independent of the authentication mode. |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El flujo del servidor: genera la clave con el algoritmo implícito en la solicitud (RSA-2048 si el `CertTemplate` no declara algoritmo; ECDSA P-256 si declara ECC), emite el certificado por la vía normal de enrollment y devuelve en la misma respuesta `ip`/`cp` el certificado junto con la clave privada PKCS#8 envuelta en una estructura CMS `EnvelopedData`(`SignedData`(`AsymmetricKeyPackage`)). El destinatario es el certificado de protección del solicitante: con clave RSA se usa transporte de clave (`rsa_key_transport`), que exige `keyEncipherment` en el destinatario; con clave ECC se usa acuerdo de clave ECDH (`ecdh_key_agreement`), que exige `keyAgreement`. Un destinatario fuera del límite de confianza se rechaza con `signerNotTrusted`.
+  The server flow: it generates the key with the algorithm implied by the request (RSA-2048 if the `CertTemplate` declares no algorithm; ECDSA P-256 if it declares ECC), issues the certificate through the normal enrollment path and returns in the same `ip`/`cp` response the certificate together with the PKCS#8 private key wrapped in a CMS `EnvelopedData`(`SignedData`(`AsymmetricKeyPackage`)) structure. The recipient is the requester's protection certificate: with an RSA key it uses key transport (`rsa_key_transport`), which requires `keyEncipherment` on the recipient; with an ECC key it uses ECDH key agreement (`ecdh_key_agreement`), which requires `keyAgreement`. A recipient outside the trust boundary is rejected with `signerNotTrusted`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  <Callout type="warn" title="Aviso de seguridad: KGA usa criptografía software, no el motor de hardware">
-    La clave generada por KGA se produce con el motor criptográfico software del proceso (no con AWS KMS, PKCS#11 ni ningún Crypto Engine de hardware), porque la clave debe poder exportarse cifrada hacia el dispositivo — algo incompatible por diseño con un HSM que nunca expone claves privadas. La clave existe en memoria del proceso únicamente durante la duración de la solicitud y nunca se persiste: si el dispositivo pierde la respuesta, no puede recuperarla con `pollReq` — debe repetir la inscripción con un nuevo `transactionID`. Para el transporte, el DMS emite además certificados auxiliares efímeros (`Lamassu CMP KGA Signer` con EKU `id-kp-cmKGA`, y `Lamassu CMP KARI Originator` para el acuerdo ECDH), con validez de una hora y firmados por la CA de enrolamiento. Prefiera la generación de clave en el propio dispositivo siempre que sea posible; reserve KGA para dispositivos que genuinamente no puedan generar su propia clave.
+  <Callout type="warn" title="Security notice: KGA uses software cryptography, not the hardware engine">
+    The KGA-generated key is produced with the process's software cryptographic engine (not AWS KMS, PKCS#11 or any hardware Crypto Engine), because the key must be exportable in encrypted form to the device — something fundamentally incompatible with an HSM that never exposes private keys. The key exists in process memory only for the duration of the request and is never persisted: if the device loses the response, it cannot recover it with `pollReq` — it must repeat the enrollment with a new `transactionID`. For transport, the DMS also mints ephemeral helper certificates (`Lamassu CMP KGA Signer` with EKU `id-kp-cmKGA`, and `Lamassu CMP KARI Originator` for ECDH agreement), valid for one hour and signed by the enrollment CA. Prefer on-device key generation whenever possible; reserve KGA for devices that genuinely cannot generate their own key.
   </Callout>
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Configuración de re-enrollment [#configuración-de-re-enrollment]
+  Re-enrollment configuration [#re-enrollment-configuration]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  La sección `reenrollment_settings` del bloque CMP gobierna la renovación (`kur`) con los mismos campos que EST:
+  The `reenrollment_settings` section of the CMP block governs renewal (`kur`) with the same fields as EST:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Campo                                 | Efecto en CMP                                                                                                                                                                                             |
-  | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `additional_validation_cas`           | CAs adicionales aceptadas como emisoras del certificado en vigor durante la renovación. Permite migrar a una nueva CA de enrolamiento sin interrumpir la renovación de dispositivos ya enrolados.         |
-  | `revoke_on_reenrollment`              | Revoca el certificado anterior con la razón `superseded` una vez emitido y confirmado el nuevo. En el alta (`ir`/`cr`/`p10cr`) controla si la sustitución de la identidad revoca el certificado anterior. |
-  | `enable_expired_renewal`              | Permite usar un certificado ya caducado como credencial de protección del `kur`.                                                                                                                          |
-  | `reenrollment_delta`                  | **No se aplica a CMP.** La ventana previa a la caducidad que limita el `/simplereenroll` de EST no restringe el `kur` de CMP; la política de cuándo renovar es del dispositivo.                           |
-  | `preventive_delta` / `critical_delta` | Umbrales para las alertas de renovación preventiva y crítica. Se materializan sobre los metadatos del certificado al vincular la identidad, igual que en EST.                                             |
+  | Field                                 | Effect in CMP                                                                                                                                                                                                                  |
+  | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `additional_validation_cas`           | Additional CAs accepted as issuers of the current certificate during renewal. It allows migrating to a new enrollment CA without interrupting the renewal of already-enrolled devices.                                         |
+  | `revoke_on_reenrollment`              | Revokes the previous certificate with the reason `superseded` once the new one is issued and confirmed. In initial enrollment (`ir`/`cr`/`p10cr`) it controls whether replacing the identity revokes the previous certificate. |
+  | `enable_expired_renewal`              | Allows using an already-expired certificate as the protection credential of the `kur`.                                                                                                                                         |
+  | `reenrollment_delta`                  | **Not applied in CMP.** The pre-expiry window that limits EST's `/simplereenroll` does not restrict CMP's `kur`; the policy of when to renew is the device's.                                                                  |
+  | `preventive_delta` / `critical_delta` | Thresholds for preventive and critical renewal alerts. They are materialized on the certificate's metadata when the identity is bound, as in EST.                                                                              |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  La política de clave e identidad del `kur` (qué puede cambiar y si la clave debe rotar) vive en su bloque por operación, descrito en [Ajustes por operación](#ajustes-por-operación).
+  The `kur` key and identity policy (what may change and whether the key must rotate) lives in its per-operation block, described in [Per-operation settings](#per-operation-settings).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Transacciones CMP [#transacciones-cmp]
+  CMP transactions [#cmp-transactions]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Cada `ir`/`cr`/`kur`/`p10cr`/`ccr` recibido por un DMS en CMP queda registrado como una **transacción CMP**, identificada por el `transactionID` hexadecimal del `PKIHeader`. El registro conserva el estado, el certificado emitido (sin el DER en la respuesta de la API), el método de prueba de posesión empleado y el `auth_mode` vigente en el momento del alta. Cuando la integración WFX está activa, cada transición de la transacción se refleja además como un job de workflow con los mensajes del intercambio adjuntos — ver [Integración con WFX](#integración-con-wfx-opcional).
+  Every `ir`/`cr`/`kur`/`p10cr`/`ccr` received by a DMS over CMP is recorded as a **CMP transaction**, identified by the hexadecimal `transactionID` of the `PKIHeader`. The record keeps the state, the issued certificate (without the DER in the API response), the proof-of-possession method used and the `auth_mode` in effect at enrollment time. When the WFX integration is active, each transaction transition is also reflected as a workflow job with the exchange messages attached — see [WFX integration](#wfx-integration-optional).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Estado         | Significado                                                                                                                                        |
+  | State          | Meaning                                                                                                                                            |
   | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `PENDING`      | Solicitud aceptada, pendiente de emisión: flujo `phased` esperando aprobación, o `ir`/`cr` esperando el `popdecr` de una POPO por reto-respuesta.  |
-  | `ISSUED`       | Certificado emitido, a la espera de `certConf` del dispositivo.                                                                                    |
-  | `CONFIRMED`    | El dispositivo confirmó la recepción con `certConf` (o se concedió confirmación implícita). Estado terminal.                                       |
-  | `ISSUE_FAILED` | La CA rechazó la emisión o un administrador rechazó la transacción. El motivo queda disponible para el dispositivo vía `pollReq`. Estado terminal. |
-  | `REVOKED`      | El certificado emitido fue revocado (por expiración del plazo de confirmación o por un `rr` posterior). Estado terminal.                           |
+  | `PENDING`      | Request accepted, awaiting issuance: a `phased` flow waiting for approval, or an `ir`/`cr` waiting for the `popdecr` of a challenge-response POPO. |
+  | `ISSUED`       | Certificate issued, awaiting the device's `certConf`.                                                                                              |
+  | `CONFIRMED`    | The device confirmed receipt with `certConf` (or implicit confirmation was granted). Terminal state.                                               |
+  | `ISSUE_FAILED` | The CA rejected issuance or an administrator rejected the transaction. The reason remains available to the device via `pollReq`. Terminal state.   |
+  | `REVOKED`      | The issued certificate was revoked (by expiry of the confirmation window or by a later `rr`). Terminal state.                                      |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Internamente, el servidor emplea además los estados transitorios `APPROVING` y `REVOKING` como marcas de bloqueo mientras resuelve una aprobación administrativa o una revocación: suelen durar solo instantes y solo podrían observarse si el servicio se interrumpe a mitad de la operación, caso en el que la tarea de monitorización los finaliza automáticamente. Los estados expuestos por la API de listado son solo los cinco anteriores.
+  Internally, the server also uses the transient states `APPROVING` and `REVOKING` as lock markers while it resolves an administrative approval or a revocation: they usually last only instants and could only be observed if the service is interrupted mid-operation, in which case the monitoring job finalizes them automatically. The states exposed by the listing API are only the five above.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Endpoint                                            | Descripción                                                                                                                                                                                                                                                                                                                                                                                                      |
-  | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `GET /v1/dms/{id}/cmp/transactions`                 | Lista paginada de transacciones del DMS (`page_size`, `bookmark`, `sort_by`, `sort_mode` con valores `asc`/`desc`, `filter`). No incluye el DER del certificado; recupérelo desde la API de CAs usando `certificate_serial_number`.                                                                                                                                                                              |
-  | `POST /v1/dms/{id}/cmp/transactions/{txid}/approve` | Aprueba una transacción `PENDING` de un DMS con flujo `phased`, emitiendo el certificado. El dispositivo lo recupera en su siguiente `pollReq`. La aprobación y el rechazo usan una reclamación atómica del registro, así que dos llamadas concurrentes no emiten el certificado dos veces. Tras aprobar, la ventana de confirmación del dispositivo pasa a ser la de `confirmation_timeout` (mínimo 2 minutos). |
-  | `POST /v1/dms/{id}/cmp/transactions/{txid}/reject`  | Rechaza una transacción `PENDING`; pasa a `ISSUE_FAILED` con un motivo opcional (`{"reason": "..."}`; por defecto `transaction rejected by administrator`) que el dispositivo recibe en su siguiente `pollReq`.                                                                                                                                                                                                  |
+  | Endpoint                                            | Description                                                                                                                                                                                                                                                                                                                                                         |
+  | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `GET /v1/dms/{id}/cmp/transactions`                 | Paginated list of the DMS's transactions (`page_size`, `bookmark`, `sort_by`, `sort_mode` with values `asc`/`desc`, `filter`). It does not include the certificate DER; retrieve it from the CAs API using `certificate_serial_number`.                                                                                                                             |
+  | `POST /v1/dms/{id}/cmp/transactions/{txid}/approve` | Approves a `PENDING` transaction of a `phased`-flow DMS, issuing the certificate. The device retrieves it in its next `pollReq`. Approval and rejection use an atomic claim of the record, so two concurrent calls do not issue the certificate twice. After approval, the device's confirmation window becomes that of `confirmation_timeout` (minimum 2 minutes). |
+  | `POST /v1/dms/{id}/cmp/transactions/{txid}/reject`  | Rejects a `PENDING` transaction; it moves to `ISSUE_FAILED` with an optional reason (`{"reason": "..."}`; default `transaction rejected by administrator`) that the device receives in its next `pollReq`.                                                                                                                                                          |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Ambas operaciones requieren el permiso de **lectura** para el listado y de **actualización** para aprobar o rechazar, dentro de las acciones del DMS. Las aprobaciones y rechazos solo tienen efecto sobre transacciones `PENDING`: en `workflow: direct` una transacción nace ya en `ISSUED`.
+  Both operations require the **read** permission for the listing and the **update** permission to approve or reject, within the DMS's actions. Approvals and rejections only affect `PENDING` transactions: in `workflow: direct` a transaction is born already in `ISSUED`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Monitor de confirmación [#monitor-de-confirmación]
+  Confirmation monitor [#confirmation-monitor]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Un certificado `ISSUED` que el dispositivo nunca confirma dentro de `confirmation_timeout` queda, por definición del RFC 4210 §5.2.8, en un estado de confianza indeterminado. Un job periódico de fondo — habilitado y programado mediante la clave de configuración del servicio DMS Manager `cmp_confirmation_monitoring_job` (`enabled`, `frequency`; por defecto cada 5 segundos cuando la monitorización global está activa) — se encarga de:
+  An `ISSUED` certificate that the device never confirms within `confirmation_timeout` is, by RFC 4210 §5.2.8's definition, in a state of indeterminate trust. A periodic background job — enabled and scheduled through the DMS Manager service configuration key `cmp_confirmation_monitoring_job` (`enabled`, `frequency`; every 5 seconds by default when global monitoring is active) — takes care of:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * **Revocar certificados sin confirmar**: transacciones `ISSUED` cuya ventana de confirmación expiró se revocan en la CA con la razón `cessationOfOperation` y pasan a `REVOKED`. La reclamación atómica del registro impide revocar un certificado que un `certConf` legítimo está confirmando en ese mismo instante.
-  * **Cerrar aprobaciones pendientes**: transacciones `PENDING` en flujo `phased` que ningún administrador resolvió dentro de `approval_timeout` pasan a `ISSUE_FAILED` con el motivo `approval window expired`, y se conservan **7 días** para que un `pollReq` tardío pueda ver el motivo del rechazo.
+  * **Revoking unconfirmed certificates**: `ISSUED` transactions whose confirmation window expired are revoked at the CA with the reason `cessationOfOperation` and move to `REVOKED`. The atomic claim of the record prevents revoking a certificate that a legitimate `certConf` is confirming at that exact moment.
+  * **Closing pending approvals**: `PENDING` transactions in `phased` flow that no administrator resolved within `approval_timeout` move to `ISSUE_FAILED` with the reason `approval window expired`, and are kept for **7 days** so a late `pollReq` can still see the rejection reason.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Cada ejecución procesa como máximo **100 transacciones** por lote, para evitar una ráfaga de revocaciones tras una interrupción prolongada del servicio.
+  Each run processes at most **100 transactions** per batch, to avoid a burst of revocations after a prolonged service interruption.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Integración con WFX (opcional) [#integración-con-wfx-opcional]
+  WFX integration (optional) [#wfx-integration-optional]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Si el cliente WFX del servicio está habilitado (`wfx.enabled` en la configuración del DMS Manager), cada transición de una transacción CMP se refleja como un job en WFX (motor de workflows de Siemens), bajo dos plantillas predefinidas según el `workflow` del DMS: `lamassu.cmp.transaction.direct.v1` para el flujo directo y `lamassu.cmp.transaction.phased.v1` para el flujo con aprobación administrativa (que añade el estado `AwaitingApproval`). Los estados del workflow — `Received`, `Validated`, `Responded`, `AwaitingCertConf`, `Confirmed`, `LogicallyComplete` (confirmación implícita) y `Rejected` — permiten seguir el ciclo de vida de cada transacción desde el panel de WFX; el job se identifica por el CN del dispositivo y adjunta los mensajes del intercambio codificados en base64. Esto es puramente observabilidad/orquestación externa: si WFX no está habilitado, o si una llamada a WFX falla, la operación CMP en Lamassu no se ve afectada.
+  If the service's WFX client is enabled (`wfx.enabled` in the DMS Manager configuration), every transition of a CMP transaction is reflected as a job in WFX (Siemens' workflow engine), under two predefined templates depending on the DMS's `workflow`: `lamassu.cmp.transaction.direct.v1` for the direct flow and `lamassu.cmp.transaction.phased.v1` for the flow with administrative approval (which adds the `AwaitingApproval` state). The workflow states — `Received`, `Validated`, `Responded`, `AwaitingCertConf`, `Confirmed`, `LogicallyComplete` (implicit confirmation) and `Rejected` — let you follow the lifecycle of each transaction from the WFX console; the job is identified by the device's CN and attaches the base64-encoded exchange messages. This is purely external observability/orchestration: if WFX is not enabled, or if a call to WFX fails, the CMP operation in Lamassu is unaffected.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Verificar la configuración [#verificar-la-configuración]
+  Verify the configuration [#verify-the-configuration]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * **Desde la consola**: acceda al detalle del DMS y compruebe que la sección CMP muestra el protocolo activo, la CA de enrolamiento, el certificado de protección y las operaciones habilitadas.
-  * **Con el listado de transacciones**: `GET /v1/dms/{id}/cmp/transactions` confirma que el endpoint responde aunque no haya tráfico de dispositivos.
-  * **Con una solicitud de prueba**: use `openssl cmp` con el comando `ir` (si dispone de un firmante válido) o `genm` contra el endpoint del DMS — ver [Ejemplo con openssl cmp](#ejemplo-con-openssl-cmp).
+  * **From the console**: open the DMS detail and check that the CMP section shows the active protocol, the enrollment CA, the protection certificate and the enabled operations.
+  * **With the transaction listing**: `GET /v1/dms/{id}/cmp/transactions` confirms the endpoint responds even without device traffic.
+  * **With a test request**: use `openssl cmp` with the `ir` command (if you have a valid signer) or `genm` against the DMS's endpoint — see [Example with openssl cmp](#example-with-openssl-cmp).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -488,40 +488,40 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Integración de dispositivos [#integración-de-dispositivos]
+  Device integration [#device-integration]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  *Esta sección está dirigida al integrador de dispositivos.*
+  *This section is aimed at the device integrator.*
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Antes de empezar [#antes-de-empezar]
+  Before you begin [#before-you-begin]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El administrador PKI debe haber configurado un DMS con el protocolo `CMP_RFC9483`, una CA de enrolamiento, un certificado de protección y un modo de autenticación. Los detalles de esa configuración se encuentran en la [sección de configuración del DMS](#configuración-del-dms) de esta misma página.
+  The PKI administrator must have configured a DMS with the `CMP_RFC9483` protocol, an enrollment CA, a protection certificate and an authentication mode. The details of that configuration are in the [DMS configuration](#dms-configuration) section of this same page.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Antes de realizar la primera llamada, asegúrese de tener:
+  Before the first call, make sure you have:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Elemento                                     | Descripción                                                                                                                                                                                                                     |
-  | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | **URL del host CMP**                         | Dirección base del servidor, por ejemplo `https://cmp.lamassu.example`. La proporciona el administrador PKI.                                                                                                                    |
-  | **ID del DMS**                               | Identificador del DMS, incluido en la ruta del endpoint (`/.well-known/cmp/p/{id}`).                                                                                                                                            |
-  | **Certificado y clave de firma del mensaje** | Solo para los modos `CLIENT_CERTIFICATE` y `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` (y siempre para `kur`/`rr`). A diferencia de EST, no se usa como credencial mTLS: se incluye como `extraCerts[0]` y firma el `PKIMessage`. |
-  | **Certificado de protección del DMS**        | El certificado con el que el DMS firma sus respuestas. Los clientes que fijen la identidad del respondedor (por ejemplo `openssl cmp -srvcert`) lo necesitan.                                                                   |
+  | Item                                    | Description                                                                                                                                                                                                                        |
+  | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | **CMP host URL**                        | Base address of the server, for example `https://cmp.lamassu.example`. Provided by the PKI administrator.                                                                                                                          |
+  | **DMS ID**                              | Identifier of the DMS, included in the endpoint path (`/.well-known/cmp/p/{id}`).                                                                                                                                                  |
+  | **Message signing certificate and key** | Only for the `CLIENT_CERTIFICATE` and `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` modes (and always for `kur`/`rr`). Unlike EST, it is not used as an mTLS credential: it is included as `extraCerts[0]` and signs the `PKIMessage`. |
+  | **DMS protection certificate**          | The certificate with which the DMS signs its responses. Clients that pin the responder's identity (for example `openssl cmp -srvcert`) need it.                                                                                    |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El endpoint CMP [#el-endpoint-cmp]
+  The CMP endpoint [#the-cmp-endpoint]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  CMP se sirve desde un **único endpoint**:
+  CMP is served from a **single endpoint**:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -531,95 +531,95 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  donde `{id}` es el identificador del DMS. La ruta sigue el formato de URI *well-known* del RFC 9480 §3.3, por lo que clientes CMP estándar la reconocen sin configuración adicional (`openssl cmp -server <host> -path /.well-known/cmp/p/<dms-id>`).
+  where `{id}` is the DMS identifier. The path follows the *well-known* URI format of RFC 9480 §3.3, so standard CMP clients recognize it without additional configuration (`openssl cmp -server <host> -path /.well-known/cmp/p/<dms-id>`).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * **Content-Type**: `application/pkixcmp` tanto en la solicitud como en la respuesta. Una solicitud con otro `Content-Type` se rechaza con `415 Unsupported Media Type`.
-  * **Cuerpo**: un `PKIMessage` en DER binario (no base64, a diferencia de los endpoints EST). La respuesta es igualmente DER binario.
-  * **Despacho por contenido, no por ruta**: el servidor decodifica el `PKIMessage`, valida el sobre (versión de protocolo, `transactionID`, `senderNonce`, `messageTime`) y despacha la operación según la etiqueta (`tag`) del `PKIBody` — `ir`, `cr`, `p10cr`, `kur`, `rr`, `certConf`, `pollReq`, `genm`, `ccr`, `nested`, etc.
-  * **Sin autenticación a nivel de transporte**: el endpoint no exige mTLS ni cabeceras de autorización; toda la autenticación viaja dentro del mensaje, como se describe en [Modelo de autenticación](#modelo-de-autenticación).
-  * **Tamaño máximo de solicitud**: 1 MiB. Una solicitud mayor se rechaza antes de intentar decodificarla.
+  * **Content-Type**: `application/pkixcmp` in both the request and the response. A request with a different `Content-Type` is rejected with `415 Unsupported Media Type`.
+  * **Body**: a `PKIMessage` in binary DER (not base64, unlike the EST endpoints). The response is equally binary DER.
+  * **Dispatch by content, not by path**: the server decodes the `PKIMessage`, validates the envelope (protocol version, `transactionID`, `senderNonce`, `messageTime`) and dispatches the operation according to the `PKIBody` tag — `ir`, `cr`, `p10cr`, `kur`, `rr`, `certConf`, `pollReq`, `genm`, `ccr`, `nested`, etc.
+  * **No transport-layer authentication**: the endpoint requires neither mTLS nor authorization headers; all authentication travels inside the message, as described in [Authentication model](#authentication-model).
+  * **Maximum request size**: 1 MiB. A larger request is rejected before decoding is attempted.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Un rechazo llega con `HTTP 200` en la forma que corresponde a la operación: como un `PKIMessage` de error ante fallos previos al despacho (operación deshabilitada, cabecera inválida, protección fallida), como un cuerpo de rechazo dentro de la respuesta de la propia operación (`ip`/`cp`/`kup` con `status: rejection`) ante fallos de política de emisión, o como un cuerpo `rp` con estado de rechazo en las revocaciones. En todos los casos hay que inspeccionar el cuerpo CMP, no solo el código HTTP. Los códigos HTTP de error (`400`, `415` y, ante fallos internos del servidor, `500`) se reservan para los casos en los que no se puede entregar una respuesta CMP válida — ver [Códigos de error y diagnóstico](#códigos-de-error-y-diagnóstico).
+  A rejection arrives with `HTTP 200` in the form corresponding to the operation: as an error `PKIMessage` for failures before dispatch (operation disabled, invalid header, failed protection), as a rejection body inside the operation's own response (`ip`/`cp`/`kup` with `status: rejection`) for issuance policy failures, or as an `rp` body with a rejection status for revocations. In all cases you must inspect the CMP body, not just the HTTP code. The HTTP error codes (`400`, `415` and, for internal server failures, `500`) are reserved for cases where a valid CMP response cannot be delivered — see [Error codes and diagnostics](#error-codes-and-diagnostics).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Modelo de autenticación [#modelo-de-autenticación]
+  Authentication model [#authentication-model]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  CMP autentica **el mensaje**, no la conexión: no hay handshake mTLS equivalente al de EST. Cuando el `auth_mode` del DMS exige `CLIENT_CERTIFICATE`, el dispositivo debe:
+  CMP authenticates **the message**, not the connection: there is no mTLS handshake equivalent to EST's. When the DMS's `auth_mode` requires `CLIENT_CERTIFICATE`, the device must:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  1. Incluir su certificado en el campo `extraCerts` del `PKIMessage` (primera posición).
-  2. Firmar el `PKIMessage` completo con la clave privada correspondiente a ese certificado (protección basada en firma, RFC 9483 §3.2).
+  1. Include its certificate in the `PKIMessage`'s `extraCerts` field (first position).
+  2. Sign the entire `PKIMessage` with the private key corresponding to that certificate (signature-based protection, RFC 9483 §3.2).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Sobre el mensaje protegido, el servidor exige además dos ataduras del RFC 9483: el campo `sender` de la cabecera debe coincidir con el subject del certificado de protección y el `senderKID` debe ser su `SubjectKeyIdentifier`. Una solicitud protegida que incumpla cualquiera se rechaza con `badMessageCheck`. Si un mensaje trae firma aunque el modo no la exija, la firma igualmente se verifica y esas ataduras aplican.
+  On top of the protected message, the server additionally enforces two RFC 9483 bindings: the header's `sender` field must match the protection certificate's subject, and the `senderKID` must be its `SubjectKeyIdentifier`. A protected request that violates either is rejected with `badMessageCheck`. If a message carries a signature even though the mode does not require one, the signature is still verified and those bindings apply.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El requisito de protección por tipo de mensaje:
+  The protection requirement per message type:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Mensaje                                    | ¿Protección obligatoria?                                                                          |
-  | ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-  | `ir`, `cr`, `p10cr`                        | Solo si el `auth_mode` es `CLIENT_CERTIFICATE` o `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`        |
-  | `kur`                                      | Siempre (la firma es la prueba de posesión de la renovación)                                      |
-  | `rr`                                       | Siempre (la firma es lo que autoriza la revocación)                                               |
-  | `genm`                                     | Según `access_policy`: `public_discovery` admite mensajes sin firma; `require_signed` exige firma |
-  | `certConf`, `pollReq`, `popdecr`, `nested` | Siguen la regla del `auth_mode` del DMS                                                           |
+  | Message                                    | Protection mandatory?                                                                                              |
+  | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+  | `ir`, `cr`, `p10cr`                        | Only if `auth_mode` is `CLIENT_CERTIFICATE` or `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK`                           |
+  | `kur`                                      | Always (the signature is the renewal's proof of possession)                                                        |
+  | `rr`                                       | Always (the signature is what authorizes the revocation)                                                           |
+  | `genm`                                     | Depending on `access_policy`: `public_discovery` admits unprotected messages; `require_signed` demands a signature |
+  | `certConf`, `pollReq`, `popdecr`, `nested` | Follow the DMS's `auth_mode` rule                                                                                  |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  En la capa de servicio, el certificado de protección debe encadenar a una CA declarada en `client_certificate_settings.validation_cas` (o, en `kur`, a la CA de enrolamiento y las CAs adicionales de re-enrollment), con los mismos parámetros de profundidad de cadena y tolerancia a certificados caducados que EST, y se comprueba su estado de revocación igual que en el flujo EST. Además, un certificado que fue identidad de un dispositivo sigue estando sujeto al estado de la identidad: mientras haya una actualización de clave pendiente de confirmar no puede iniciar operaciones nuevas, y una vez confirmada la sustitución deja de ser utilizable como credencial (`certRevoked`). Un certificado que no es identidad de ningún dispositivo (por ejemplo, un firmante bootstrap) pasa sin esas comprobaciones.
+  At the service layer, the protection certificate must chain to a CA declared in `client_certificate_settings.validation_cas` (or, in `kur`, to the enrollment CA and the additional re-enrollment CAs), with the same chain-depth and expired-certificate tolerance parameters as EST, and its revocation status is checked as in the EST flow. In addition, a certificate that was a device's identity remains subject to the identity's state: while a key update is pending confirmation it cannot start new operations, and once the replacement is confirmed it stops being usable as a credential (`certRevoked`). A certificate that is no device's identity (for example, a bootstrap signer) passes without those checks.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Operaciones soportadas [#operaciones-soportadas]
+  Supported operations [#supported-operations]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | Operación     | Uso                                                                                                                                                           | Requiere identidad previa          |
-  | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-  | `ir`          | Alta inicial de un dispositivo nuevo.                                                                                                                         | No                                 |
-  | `cr`          | Emisión adicional o de sustitución para un dispositivo ya identificado.                                                                                       | Sí (si `require_existing_device`)  |
-  | `p10cr`       | Alta con un CSR PKCS#10, sin controles CRMF ni KGA. Debe estar habilitado en el DMS.                                                                          | No                                 |
-  | `kur`         | Renovación de un certificado; el mensaje se firma con el certificado vigente.                                                                                 | Sí (el certificado que se renueva) |
-  | `rr`          | Revocación de un certificado, siempre firmada.                                                                                                                | Sí                                 |
-  | `genm`/`genp` | Consulta de capacidades del DMS (CAs, tipos de clave, CRL vigente, etc.). No emite certificados.                                                              | No                                 |
-  | `ccr`/`ccp`   | Certificación cruzada entre CAs. Solo para operadores de CA, deshabilitada por defecto.                                                                       | El firmante debe ser una CA        |
-  | `nested`      | Envoltorio que añade una capa extra de protección (una RA contrafirmando a un dispositivo) o agrupa varios mensajes en lote. No es una operación en sí misma. | —                                  |
+  | Operation     | Use                                                                                                                                                 | Requires prior identity             |
+  | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+  | `ir`          | Initial enrollment of a new device.                                                                                                                 | No                                  |
+  | `cr`          | Additional or replacement issuance for an already-identified device.                                                                                | Yes (if `require_existing_device`)  |
+  | `p10cr`       | Enrollment with a PKCS#10 CSR, without CRMF controls or KGA. Must be enabled on the DMS.                                                            | No                                  |
+  | `kur`         | Renewal of a certificate; the message is signed with the current certificate.                                                                       | Yes (the certificate being renewed) |
+  | `rr`          | Revocation of a certificate, always signed.                                                                                                         | Yes                                 |
+  | `genm`/`genp` | Query of the DMS's capabilities (CAs, key types, current CRL, etc.). Issues no certificates.                                                        | No                                  |
+  | `ccr`/`ccp`   | Cross-certification between CAs. For CA operators only, disabled by default.                                                                        | The signer must be a CA             |
+  | `nested`      | Wrapper that adds an extra layer of protection (an RA countersigning a device) or groups several messages into a batch. Not an operation in itself. | —                                   |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Los pasos de protocolo `certConf` (confirmación), `pollReq` (sondeo), `popdecc`/`popdecr` (prueba de posesión por reto-respuesta) y `error` forman parte del ciclo de vida de las operaciones anteriores, no son operaciones que el integrador elija por separado.
+  The protocol steps `certConf` (confirmation), `pollReq` (polling), `popdecc`/`popdecr` (challenge-response proof of possession) and `error` are part of the lifecycle of the operations above, not operations the integrator chooses separately.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  ir y cr [#ir-y-cr]
+  ir and cr [#ir-and-cr]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Ambas llevan un cuerpo `CertReqMessages` con la plantilla de certificado (`CertTemplate`), los controles CRMF y la prueba de posesión. El subject puede llegar vacío (NULL-DN) siempre que una extensión `SubjectAltName` porte la identidad; sin subject ni SAN, el `ir` se rechaza. Las respuestas son `ip` para `ir` y `cp` para `cr`.
+  Both carry a `CertReqMessages` body with the certificate template (`CertTemplate`), the CRMF controls and the proof of possession. The subject may arrive empty (NULL-DN) as long as a `SubjectAltName` extension carries the identity; with neither subject nor SAN, the `ir` is rejected. Responses are `ip` for `ir` and `cp` for `cr`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El alta respeta el modo de registro del DMS: con `JITP`, la primera solicitud crea el dispositivo con el perfil de aprovisionamiento; con `PRE_REGISTRATION`, un dispositivo desconocido se rechaza con `device not preregistered`. Reinscribir un dispositivo ya enrolado exige `enable_replaceable_enrollment` en el DMS (`forbiddenNewEnrollment` en caso contrario). Las restricciones de plantilla son las mismas para ambas operaciones: Lamassu nunca emite certificados de CA vía CMP (`BasicConstraints cA=TRUE` → `notAuthorized`), el uso de `keyCertSign` sin ser CA o un `pathLenConstraint` en una plantilla de entidad final son `badCertTemplate`, y el RSA admitido va de 2048 a 8192 bits.
+  Enrollment respects the DMS's registration mode: with `JITP`, the first request creates the device with the provisioning profile; with `PRE_REGISTRATION`, an unknown device is rejected with `device not preregistered`. Re-enrolling an already-enrolled device requires `enable_replaceable_enrollment` on the DMS (`forbiddenNewEnrollment` otherwise). The template restrictions are the same for both operations: Lamassu never issues CA certificates over CMP (`BasicConstraints cA=TRUE` → `notAuthorized`), using `keyCertSign` without being a CA or a `pathLenConstraint` in an end-entity template are `badCertTemplate`, and the accepted RSA range is 2048 to 8192 bits.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Si el perfil de emisión del DMS descarta una extensión **crítica** solicitada por el `CertTemplate`, la respuesta llega con estado `grantedWithMods` (1) en lugar de `accepted` (0): el integrador debe comparar el certificado emitido con lo que pidió, no asumir que la aceptación implica correspondencia exacta.
+  If the DMS's issuance profile drops a **critical** extension requested by the `CertTemplate`, the response arrives with status `grantedWithMods` (1) instead of `accepted` (0): the integrator must compare the issued certificate with what was requested, not assume that acceptance implies an exact match.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Los controles CRMF, cuando el DMS los exige, van en la solicitud: `id-regCtrl-regToken` (RFC 4211 §6.1) si el modo del DMS lo requiere — valor de un solo uso que se consume aunque la emisión falle después — y `id-regCtrl-authenticator` (§6.2) si el DMS configuró una respuesta esperada. Un control presente cuando el DMS lo tiene deshabilitado, o ausente cuando es obligatorio, se rechaza con `badRequest`.
+  The CRMF controls, when the DMS requires them, go in the request: `id-regCtrl-regToken` (RFC 4211 §6.1) if the DMS's mode requires it — a one-use value consumed even if issuance later fails — and `id-regCtrl-authenticator` (§6.2) if the DMS configured an expected answer. A control present when the DMS has it disabled, or absent when it is mandatory, is rejected with `badRequest`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -627,11 +627,11 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El mensaje lleva la plantilla del certificado renovado y se **protege por firma con el certificado que se renueva** — esa firma es la prueba de posesión. Con `key_policy: require_new_key`, la clave pública debe ser distinta a la vigente; con `identity_change_policy: forbid`, el subject y el SAN deben coincidir con el certificado en vigor (`san_only` permite cambiar el SAN; `subject_and_san` permite ambos cambios). La respuesta es `kup`.
+  The message carries the template of the renewed certificate and is **protected by signature with the certificate being renewed** — that signature is the proof of possession. With `key_policy: require_new_key`, the public key must differ from the current one; with `identity_change_policy: forbid`, the subject and the SAN must match the current certificate (`san_only` allows changing the SAN; `subject_and_san` allows both changes). The response is `kup`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El intercambio queda pendiente hasta el `certConf`: hasta que el dispositivo confirma, el certificado anterior sigue siendo la identidad activa del dispositivo y puede seguir usándose; el nuevo se vincula y el anterior se revoca como `superseded` solo al confirmar (o inmediatamente si se negoció confirmación implícita). El control opcional `id-regCtrl-oldCertID` debe referenciar el certificado que se renueva.
+  The exchange stays pending until the `certConf`: until the device confirms, the previous certificate remains the device's active identity and can keep being used; the new one is bound and the previous one is revoked as `superseded` only upon confirmation (or immediately if implicit confirmation was negotiated). The optional `id-regCtrl-oldCertID` control must reference the certificate being renewed.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -639,7 +639,7 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El cuerpo es un CSR PKCS#10 completo. La firma del CSR sobre su propia `CertificationRequestInfo` es la prueba de posesión y se verifica siempre. La política de algoritmos de firma sigue el RFC 9481 §3: RSA, RSA-PSS, ECDSA o Ed25519 con SHA-256/384/512; los firmados con SHA-1, SHA-224, MD5 o DSA se rechazan con `badPOP`, y un algoritmo desconocido se rechaza con `badAlg`. La respuesta es un `cp` con `certReqId` `-1`, y el `certConf` posterior debe llevar ese mismo valor.
+  The body is a complete PKCS#10 CSR. The CSR's signature over its own `CertificationRequestInfo` is the proof of possession and is always verified. The signature algorithm policy follows RFC 9481 §3: RSA, RSA-PSS, ECDSA or Ed25519 with SHA-256/384/512; those signed with SHA-1, SHA-224, MD5 or DSA are rejected with `badPOP`, and an unknown algorithm is rejected with `badAlg`. The response is a `cp` with `certReqId` `-1`, and the subsequent `certConf` must carry that same value.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -647,11 +647,11 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El cuerpo lleva `RevReqContent` con el `CertTemplate` del certificado a revocar y la razón. La firma del mensaje debe ser del propio certificado revocado (revocación propia) o de una entidad RA de confianza (EKU `id-kp-cmcRA`, validada contra las CAs del DMS según `trusted_ra`). Los campos del `CertTemplate` — emisor, número de serie, subject, clave pública y extensiones — deben coincidir con el certificado presentado. La razón `certificateHold` suspende el certificado (y no está sujeta a la lista de razones permitidas); la razón `removeFromCRL` no revoca: solicita reactivar un certificado previamente revocado — solo posible si esa revocación fue una suspensión —, operación que el DMS debe tener habilitada con `allow_revival`.
+  The body carries `RevReqContent` with the `CertTemplate` of the certificate to revoke and the reason. The message signature must be from the revoked certificate itself (self-revocation) or from a trusted RA entity (EKU `id-kp-cmcRA`, validated against the DMS's CAs according to `trusted_ra`). The fields of the `CertTemplate` — issuer, serial number, subject, public key and extensions — must match the presented certificate. The reason `certificateHold` suspends the certificate (and is not subject to the allowed-reasons list); the reason `removeFromCRL` does not revoke: it asks to reactivate a previously revoked certificate — only possible if that revocation was a suspension —, an operation the DMS must have enabled with `allow_revival`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  La respuesta es siempre un `rp` — tanto en éxito (`Certificate revoked` / `Certificate revived`) como en rechazo, con el motivo en su `PKIStatusInfo`.
+  The response is always an `rp` — both on success (`Certificate revoked` / `Certificate revived`) and on rejection, with the reason in its `PKIStatusInfo`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -659,7 +659,7 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El cuerpo es una secuencia de `InfoTypeAndValue`; la respuesta es un `genp` con una entrada por solicitud. Consulte la [tabla de tipos de información](#ajustes-por-operación) para saber qué anuncia cada DMS. Los tipos dependientes de infraestructura (CRL) requieren que el administrador haya configurado un cliente VA en el servicio DMS Manager.
+  The body is a sequence of `InfoTypeAndValue`; the response is a `genp` with one entry per request. See the [information types table](#per-operation-settings) to know what each DMS advertises. The infrastructure-dependent types (CRL) require the administrator to have configured a VA client on the DMS Manager service.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -667,27 +667,27 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Reservado a operadores de CA. El firmante debe ser un certificado de CA y la plantilla debe ir completa. Con `workflow: administrator_approval` (el por defecto), la primera respuesta es un `ccp` de espera y el certificado cruzado se recupera con `pollReq` una vez aprobado. La validez solicitada se respeta hasta el límite de `maximum_validity` del DMS.
+  Reserved for CA operators. The signer must be a CA certificate and the template must be complete. With `workflow: administrator_approval` (the default), the first response is a waiting `ccp` and the cross-certificate is retrieved with `pollReq` once approved. The requested validity is honored up to the DMS's `maximum_validity` limit.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  certConf y pollReq [#certconf-y-pollreq]
+  certConf and pollReq [#certconf-and-pollreq]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  `certConf` cierra el ciclo de una emisión con confirmación explícita. Reglas principales:
+  `certConf` closes the cycle of an issuance with explicit confirmation. Main rules:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * Debe llevar **exactamente un** `CertStatus`, con `certReqId` `0` para `ir`/`cr`/`kur` y `-1` para `p10cr`.
-  * El `certHash` se verifica contra el certificado emitido; sin `hashAlg` se usa el resumen que dicta el RFC 9481 §3.3 según el algoritmo de firma del propio certificado (SHA-256, salvo certificados firmados con SHA-384/512 o Ed25519), y declarar un `hashAlg` exige `pvno` `cmp2021(3)`.
-  * Debe ir protegido con **la credencial de la solicitud original**, no con el certificado recién emitido.
-  * El `recipNonce` debe devolver el `senderNonce` de la respuesta, y su propio `senderNonce` debe ser nuevo (reutilizar el de la solicitud inicial es `badSenderNonce`).
-  * Confirmar dos veces el mismo certificado responde con el error `certConfirmed`, útil tras perder un `pkiConf`.
+  * It must carry **exactly one** `CertStatus`, with `certReqId` `0` for `ir`/`cr`/`kur` and `-1` for `p10cr`.
+  * The `certHash` is verified against the issued certificate; without `hashAlg`, the digest dictated by RFC 9481 §3.3 according to the certificate's own signature algorithm is used (SHA-256, except for certificates signed with SHA-384/512 or Ed25519), and declaring a `hashAlg` requires `pvno` `cmp2021(3)`.
+  * It must be protected with **the credential of the original request**, not with the freshly issued certificate.
+  * The `recipNonce` must return the response's `senderNonce`, and its own `senderNonce` must be new (reusing the one from the initial request is `badSenderNonce`).
+  * Confirming the same certificate twice answers with the error `certConfirmed`, useful after losing a `pkiConf`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  `pollReq` sondea el estado de la transacción y permite dos flujos: la recuperación de respuesta perdida (el certificado `ISSUED` se re-entrega en el `ip`/`cp`/`kup` original, sin consumir la transacción) y el sondeo del flujo `phased` (mientras la transacción está `PENDING`, la respuesta es un `pollRep` con la sugerencia de reintento, 60 segundos por defecto). Una transacción `ISSUE_FAILED` devuelve el motivo del fallo y una `REVOKED` indica que debe repetirse la inscripción. La respuesta de una transacción con generación de claves en servidor **no se puede recuperar**: la clave privada nunca se almacena, así que un `pollReq` sobre ella se rechaza y el dispositivo debe repetir la inscripción con un nuevo `transactionID`.
+  `pollReq` polls the transaction's state and supports two flows: lost-response recovery (the `ISSUED` certificate is re-delivered in the original `ip`/`cp`/`kup`, without consuming the transaction) and polling of the `phased` flow (while the transaction is `PENDING`, the response is a `pollRep` with the retry hint, 60 seconds by default). An `ISSUE_FAILED` transaction returns the failure reason and a `REVOKED` one indicates the enrollment must be repeated. The response of a transaction with server-side key generation **cannot be recovered**: the private key is never stored, so a `pollReq` on it is rejected and the device must repeat the enrollment with a new `transactionID`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -695,34 +695,34 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Un `nested` (RFC 4210 §5.1.3) es un sobre cuyo cuerpo contiene uno o varios `PKIMessage`. Con **un solo** mensaje interior es *added protection* (RFC 9483 §5.2.2.1): una RA envuelve y contrafirma una solicitud ya protegida del dispositivo; la cabecera exterior debe copiar el `transactionID` y el `senderNonce` del interior, la protección interior se verifica y la solicitud se procesa con normalidad. Con **dos o más** mensajes es un lote (§5.2.2.2): la cabecera exterior lleva `transactionID`/`senderNonce` nuevos, la protección de cada mensaje interior se verifica antes de procesar ninguno y las respuestas vuelven envueltas en un `nested`, en el mismo orden. Un `ccr` dentro de un `nested` no se reexpide, y no se admite anidar dentro de un lote.
+  A `nested` (RFC 4210 §5.1.3) is an envelope whose body contains one or more `PKIMessage`. With **a single** inner message it is *added protection* (RFC 9483 §5.2.2.1): an RA wraps and countersigns an already-protected device request; the outer header must copy the inner `transactionID` and `senderNonce`, the inner protection is verified and the request is processed normally. With **two or more** messages it is a batch (§5.2.2.2): the outer header carries new `transactionID`/`senderNonce`, the protection of each inner message is verified before any is processed and the responses come back wrapped in a `nested`, in the same order. A `ccr` inside a `nested` is not re-expedited, and nesting inside a batch is not supported.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Generación de claves en servidor (KGA) [#generación-de-claves-en-servidor-kga]
+  Server-side key generation (KGA) [#server-side-key-generation-kga]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Cuando el DMS tiene `server_key_gen_enabled: true`, un dispositivo puede enviar un `ir`/`cr` con el campo de clave pública del `CertTemplate` vacío para solicitar que el servidor genere el par de claves. El mecanismo y sus límites se describen en la [sección de configuración](#generación-de-claves-en-servidor-central-key-generation); desde el integrador:
+  When the DMS has `server_key_gen_enabled: true`, a device may send an `ir`/`cr` with an empty public key field in the `CertTemplate` to ask the server to generate the key pair. The mechanism and its limits are described in the [configuration section](#server-side-key-generation-central-key-generation); from the integrator's side:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * El certificado de protección del mensaje hace de destinatario: RSA → `rsa_key_transport`, ECC → `ecdh_key_agreement`. La clave y el uso de clave del certificado deben permitir la técnica elegida.
-  * La respuesta (`ip`/`cp`) lleva el certificado emitido y la clave envuelta en el mismo cuerpo; la clave PKCS#8 viaja dentro de `EnvelopedData`(`SignedData`(`AsymmetricKeyPackage`)) y el certificado con el que abrir el sobre está en `extraCerts[0]`.
-  * La clave nunca se guarda en el servidor: si la respuesta se pierde, no hay `pollReq` que la recupere — repita la inscripción con un nuevo `transactionID`.
-  * El `certConf` posterior funciona igual que en una emisión ordinaria.
+  * The message's protection certificate acts as the recipient: RSA → `rsa_key_transport`, ECC → `ecdh_key_agreement`. The certificate's key and key usage must allow the chosen technique.
+  * The response (`ip`/`cp`) carries the issued certificate and the wrapped key in the same body; the PKCS#8 key travels inside `EnvelopedData`(`SignedData`(`AsymmetricKeyPackage`)) and the certificate to open the envelope with is in `extraCerts[0]`.
+  * The key is never stored on the server: if the response is lost, no `pollReq` can recover it — repeat the enrollment with a new `transactionID`.
+  * The subsequent `certConf` works the same as in an ordinary issuance.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Ejemplo con openssl cmp [#ejemplo-con-openssl-cmp]
+  Example with openssl cmp [#example-with-openssl-cmp]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Los siguientes comandos usan el cliente `cmp` de OpenSSL (≥ 3.0) contra un DMS configurado en modo `CLIENT_CERTIFICATE`.
+  The following commands use OpenSSL's `cmp` client (≥ 3.0) against a DMS configured in `CLIENT_CERTIFICATE` mode.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  **Alta inicial (`ir`)**, firmando con un certificado bootstrap (`signer.crt`/`signer.key`) emitido por una de las `validation_cas` del DMS, y generando una clave nueva para el dispositivo:
+  **Initial enrollment (`ir`)**, signing with a bootstrap certificate (`signer.crt`/`signer.key`) issued by one of the DMS's `validation_cas`, and generating a new key for the device:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -741,11 +741,11 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  `-tls_used` es necesario en OpenSSL 3.0.x cuando la URL del servidor usa `https` sin fijar el certificado del servidor (`-srvcert`); las versiones ≥ 3.2 lo infieren automáticamente. `-unprotected_errors` permite aceptar respuestas de error que lleguen sin protección (aquellas cuyo algoritmo de protección es NULL); mientras el DMS no tenga configurado el `protection_certificate`, todas sus respuestas — incluidos los errores — salen sin protección, así que esta opción evita que `openssl cmp` las descarte.
+  `-tls_used` is necessary in OpenSSL 3.0.x when the server URL uses `https` without pinning the server certificate (`-srvcert`); versions ≥ 3.2 infer it automatically. `-unprotected_errors` allows accepting error responses that arrive unprotected (those whose protection algorithm is NULL); while the DMS has no `protection_certificate` configured, all its responses — including errors — go out unprotected, so this option keeps `openssl cmp` from discarding them.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  **Renovación (`kur`)**, autenticando con el certificado vigente del dispositivo:
+  **Renewal (`kur`)**, authenticating with the device's current certificate:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -762,18 +762,18 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  `-srvcert` fija el certificado con el que se espera que el DMS proteja su respuesta (el **Protection Certificate** configurado en el DMS). Sin él, OpenSSL valida la protección de la respuesta contra sus propios anclajes de confianza; `-unprotected_errors` solo cubre los mensajes de error sin protección y no sustituye a `-srvcert` para las respuestas correctas.
+  `-srvcert` pins the certificate the DMS is expected to protect its response with (the **Protection Certificate** configured on the DMS). Without it, OpenSSL validates the response's protection against its own trust anchors; `-unprotected_errors` only covers unprotected error messages and does not replace `-srvcert` for successful responses.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Próximos pasos tras el enrolamiento [#próximos-pasos-tras-el-enrolamiento]
+  Next steps after enrollment [#next-steps-after-enrollment]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * **Confirmar el certificado**: salvo que `accept_implicit` esté activo en el DMS y el dispositivo lo solicite, el flujo no se considera completo hasta que el dispositivo envía `certConf`. `openssl cmp -cmd ir`/`kur` lo hace automáticamente; una integración manual debe implementar este paso.
-  * **Planificar la renovación**: programe el `kur` antes de la caducidad del certificado. A diferencia de EST, la ventana `reenrollment_delta` no restringe el `kur` de CMP, así que la política de cuándo renovar es del dispositivo.
-  * **Flujo `phased`**: si el DMS usa `workflow: phased` en la operación, la primera respuesta a `ir`/`cr`/`kur`/`p10cr` es una espera; el dispositivo debe reintentar con `pollReq` hasta que un administrador apruebe o rechace la transacción.
-  * **Recuperación de respuestas perdidas**: ante una respuesta que no llegó, repita la operación con `pollReq` (el certificado `ISSUED` se re-entrega) salvo en transacciones con generación de claves en servidor, donde hay que repetir la inscripción.
+  * **Confirm the certificate**: unless `accept_implicit` is active on the DMS and the device requests it, the flow is not complete until the device sends `certConf`. `openssl cmp -cmd ir`/`kur` does it automatically; a manual integration must implement this step.
+  * **Plan the renewal**: schedule the `kur` before the certificate expires. Unlike EST, the `reenrollment_delta` window does not restrict CMP's `kur`, so the policy of when to renew is the device's.
+  * **`phased` flow**: if the DMS uses `workflow: phased` on the operation, the first response to `ir`/`cr`/`kur`/`p10cr` is a wait; the device must retry with `pollReq` until an administrator approves or rejects the transaction.
+  * **Recovering lost responses**: if a response did not arrive, repeat the operation with `pollReq` (the `ISSUED` certificate is re-delivered), except for transactions with server-side key generation, where the enrollment must be repeated.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -781,72 +781,72 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Diagnóstico y compatibilidad [#diagnóstico-y-compatibilidad]
+  Diagnostics and compatibility [#diagnostics-and-compatibility]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Códigos de error y diagnóstico [#códigos-de-error-y-diagnóstico]
+  Error codes and diagnostics [#error-codes-and-diagnostics]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  <Callout type="warn" title="La mayoría de los rechazos son mensajes CMP con HTTP 200">
-    Un `PKIMessage` de error devuelto con `HTTP 200` es la respuesta normal ante una solicitud rechazada por política (autenticación fallida, operación deshabilitada, ventana de confirmación expirada, etc.). Va protegido — firmado con el certificado de protección — si el DMS tiene uno configurado; en caso contrario va sin protección, y los clientes estrictos como `openssl cmp` lo descartan salvo que se use `-unprotected_errors`. Los códigos HTTP de error están reservados para fallos donde no se puede construir un `PKIMessage` de respuesta.
+  <Callout type="warn" title="Most rejections are CMP messages with HTTP 200">
+    An error `PKIMessage` returned with `HTTP 200` is the normal answer to a request rejected by policy (failed authentication, disabled operation, expired confirmation window, etc.). It is protected — signed with the protection certificate — if the DMS has one configured; otherwise it goes out unprotected, and strict clients like `openssl cmp` discard it unless `-unprotected_errors` is used. The HTTP error codes are reserved for failures where a response `PKIMessage` cannot be built.
   </Callout>
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  | HTTP                                          | Dónde está el fallo         | Causa típica                                                                                                                                                                                                                                                     | Acción del integrador                                                                                  |
-  | --------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-  | 415                                           | Cuerpo JSON de error        | `Content-Type` distinto de `application/pkixcmp`.                                                                                                                                                                                                                | Fijar la cabecera correcta.                                                                            |
-  | 400                                           | Sin cuerpo                  | El cuerpo no se puede decodificar como `PKIMessage` ASN.1 (no hay cabecera válida con la que construir una respuesta CMP).                                                                                                                                       | Verificar que el cuerpo es DER binario, no base64 ni PEM.                                              |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `unsupportedVersion`: pvno distinto de `cmp2000(2)`/`cmp2021(3)`.                                                                                                                                                                                                | Usar una versión soportada.                                                                            |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `badDataFormat`: `transactionID`/`senderNonce` ausentes o menores de 128 bits; `PKIHeader` malformado; `error` desde el EE.                                                                                                                                      | Revisar la implementación del cliente CMP.                                                             |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `badTime`: `messageTime` ausente o con más de 5 minutos de deriva.                                                                                                                                                                                               | Sincronizar el reloj del dispositivo.                                                                  |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `badSenderNonce`/`badRecipientNonce`: `senderNonce` reutilizado, `recipNonce` presente en una solicitud inicial o desajustado.                                                                                                                                   | Seguir las reglas de nonces del RFC 9483 §3.1.                                                         |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `badMessageCheck`: firma inválida, `sender`/`senderKID` no coinciden con el certificado de protección, o protección fallida en un mensaje anidado.                                                                                                               | Revisar el certificado con el que se firmó.                                                            |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `transactionIdInUse`: `transactionID` ya registrado (repetición de un `rr`).                                                                                                                                                                                     | Generar un `transactionID` nuevo.                                                                      |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `notAuthorized`: operación deshabilitada para el DMS, o revocación de un certificado de otro DMS.                                                                                                                                                                | Confirmar con el administrador PKI que la operación está habilitada.                                   |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `signerNotTrusted`: el firmante no encadena a las CAs de validación del DMS, o el destinatario de KGA está fuera del límite de confianza.                                                                                                                        | Revisar el certificado con el que se firmó y las CAs configuradas.                                     |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `certRevoked`: el certificado de protección fue sustituido por una renovación confirmada, o el certificado objetivo ya está revocado.                                                                                                                            | Repetir el enrolamiento o revisar el estado de la identidad.                                           |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `certConfirmed`: `certConf` duplicado (la confirmación ya se recibió).                                                                                                                                                                                           | No repetir la confirmación salvo que se haya perdido el `pkiConf`.                                     |
-  | 200 (`error`)                                 | `PKIFailureInfo` del cuerpo | `badRequest`: transacción desconocida o expirada, sin certificado que confirmar, segunda renovación pendiente, o destinatario de KGA sin el uso de clave necesario.                                                                                              | Inspeccionar el motivo exacto (`statusString`) y corregir el flujo.                                    |
-  | 200 (`ip`/`cp`/`kup` con `status: rejection`) | `PKIFailureInfo` del cuerpo | Política de emisión: POPO ausente o fallida (`badPOP`), solicitud de certificado de CA o RSA fuera de 2048–8192 bits (`badCertTemplate`), `notAuthorized` para POPO/destinatario de KGA no permitidos, `certReqId` inválido.                                     | Inspeccionar el `PKIFailureInfo` del cuerpo y contrastarlo con la configuración por operación del DMS. |
-  | 200 (`rp` con `status: rejection`)            | `PKIStatusInfo` del cuerpo  | Revocación: motivo no permitido (`badRequest`), `transactionID` repetido, certificado no encontrado (`badCertId`), ya revocado (`certRevoked`) o no revivible (`badCertId`), o firmante sin autoridad sobre el certificado (`signerNotTrusted`/`notAuthorized`). | Contrastar con la política `rr` del DMS.                                                               |
+  | HTTP                                           | Where the failure is    | Typical cause                                                                                                                                                                                                                                                        | Integrator action                                                                               |
+  | ---------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+  | 415                                            | JSON error body         | `Content-Type` other than `application/pkixcmp`.                                                                                                                                                                                                                     | Set the correct header.                                                                         |
+  | 400                                            | No body                 | The body cannot be decoded as an ASN.1 `PKIMessage` (no valid header to build a CMP response from).                                                                                                                                                                  | Check the body is binary DER, not base64 or PEM.                                                |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `unsupportedVersion`: pvno other than `cmp2000(2)`/`cmp2021(3)`.                                                                                                                                                                                                     | Use a supported version.                                                                        |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `badDataFormat`: missing or under-128-bit `transactionID`/`senderNonce`; malformed `PKIHeader`; `error` from the EE.                                                                                                                                                 | Review the CMP client implementation.                                                           |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `badTime`: `messageTime` absent or drifting more than 5 minutes.                                                                                                                                                                                                     | Synchronize the device's clock.                                                                 |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `badSenderNonce`/`badRecipientNonce`: reused `senderNonce`, `recipNonce` present in an initial request or mismatched.                                                                                                                                                | Follow the nonce rules of RFC 9483 §3.1.                                                        |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `badMessageCheck`: invalid signature, `sender`/`senderKID` not matching the protection certificate, or failed protection in a nested message.                                                                                                                        | Review the certificate used to sign.                                                            |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `transactionIdInUse`: `transactionID` already registered (replay of an `rr`).                                                                                                                                                                                        | Generate a new `transactionID`.                                                                 |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `notAuthorized`: operation disabled for the DMS, or revocation of another DMS's certificate.                                                                                                                                                                         | Confirm with the PKI administrator that the operation is enabled.                               |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `signerNotTrusted`: the signer does not chain to the DMS's validation CAs, or the KGA recipient is outside the trust boundary.                                                                                                                                       | Review the signing certificate and the configured CAs.                                          |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `certRevoked`: the protection certificate was replaced by a confirmed renewal, or the target certificate is already revoked.                                                                                                                                         | Repeat the enrollment or review the identity's state.                                           |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `certConfirmed`: duplicate `certConf` (the confirmation was already received).                                                                                                                                                                                       | Do not repeat the confirmation unless the `pkiConf` was lost.                                   |
+  | 200 (`error`)                                  | Body's `PKIFailureInfo` | `badRequest`: unknown or expired transaction, no certificate to confirm, second pending renewal, or KGA recipient without the necessary key usage.                                                                                                                   | Inspect the exact reason (`statusString`) and fix the flow.                                     |
+  | 200 (`ip`/`cp`/`kup` with `status: rejection`) | Body's `PKIFailureInfo` | Issuance policy: missing or failed POPO (`badPOP`), CA certificate request or RSA outside 2048–8192 bits (`badCertTemplate`), `notAuthorized` for POPO/KGA recipients not allowed, invalid `certReqId`.                                                              | Inspect the body's `PKIFailureInfo` and check it against the DMS's per-operation configuration. |
+  | 200 (`rp` with `status: rejection`)            | Body's `PKIStatusInfo`  | Revocation: reason not allowed (`badRequest`), repeated `transactionID`, certificate not found (`badCertId`), already revoked (`certRevoked`) or not revivable (`badCertId`), or signer without authority over the certificate (`signerNotTrusted`/`notAuthorized`). | Check against the DMS's `rr` policy.                                                            |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Para interpretar el motivo exacto de un rechazo CMP, inspeccione el campo `PKIFailureInfo`/`statusString` del `PKIMessage` de respuesta (por ejemplo con `openssl cmp ... -rspout response.der` y `openssl asn1parse -inform DER -in response.der`). En los logs del servidor Lamassu, cada rechazo genera un evento estructurado `CMP operation rejected` con los campos `dms`, `pkiStatus`, `pkiFailureInfo`, `reason` y `txid`; los fallos de cliente se registran como `WARN` y los internos (`systemFailure`) como `ERROR`.
+  To interpret the exact reason of a CMP rejection, inspect the response `PKIMessage`'s `PKIFailureInfo`/`statusString` field (for example with `openssl cmp ... -rspout response.der` and `openssl asn1parse -inform DER -in response.der`). In the Lamassu server logs, every rejection generates a structured `CMP operation rejected` event with the fields `dms`, `pkiStatus`, `pkiFailureInfo`, `reason` and `txid`; client failures are logged as `WARN` and internal ones (`systemFailure`) as `ERROR`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Notas de compatibilidad [#notas-de-compatibilidad]
+  Compatibility notes [#compatibility-notes]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  La implementación de Lamassu sigue el perfil Lightweight CMP con las siguientes particularidades que afectan a clientes CMP estrictos:
+  Lamassu's implementation follows the Lightweight CMP profile with the following quirks that affect strict CMP clients:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  * CMP se sirve en un único endpoint multiplexado (`/.well-known/cmp/p/{id}`); no existen rutas separadas por operación como en EST.
-  * Se aceptan y responden las versiones `cmp2000(2)` y `cmp2021(3)`; la respuesta devuelve el mismo `pvno` que la solicitud.
-  * `messageTime` es obligatorio en **todos** los mensajes (no solo en los protegidos), con una tolerancia de deriva de 5 minutos (`badTime`).
-  * `transactionID` y `senderNonce` deben tener al menos 128 bits de entropía, y el `senderNonce` debe ser nuevo en cada mensaje.
-  * Las operaciones `ir`, `cr` y `p10cr` no admiten `recipNonce` en la solicitud inicial (RFC 9483 §3.1); un cliente que lo incluya recibe `badRecipientNonce`. Las reglas de `generalInfo` se imponen igualmente: `implicitConfirm` y `confirmWaitTime` son mutuamente excluyentes, el valor de `implicitConfirm` debe ser `NULL` y el de `confirmWaitTime` un `GeneralizedTime`.
-  * Con protección por firma, el `sender` de la cabecera debe coincidir con el subject del certificado de protección y el `senderKID` con su `SubjectKeyIdentifier` (`badMessageCheck` en caso contrario). Los `genm` quedan exentos de esta comprobación de identidad.
-  * El subject puede ser NULL-DN solo si el SAN porta la identidad; para la identidad interna del dispositivo el SAN se usa como reserva, pero el certificado emitido conserva el subject vacío.
-  * Lamassu nunca emite certificados de CA vía CMP; la única operación que produce certificados de CA es `ccr`.
-  * El tipo `id-it-revPassphrase` del `genm` está deshabilitado de forma permanente.
-  * Los estados internos `APPROVING` y `REVOKING` de una transacción son transitorios y no se exponen en la API de listado; solo aparecen `PENDING`, `ISSUED`, `ISSUE_FAILED`, `CONFIRMED` y `REVOKED`.
-  * Los registros de transacción en estado terminal (`CONFIRMED`, `REVOKED`) se conservan para auditoría y no se borran por expiración; un `transactionID` completado puede reutilizarse en una operación nueva, salvo en `rr`, donde la protección contra repetición también mira los registros terminales.
-  * El certificado de protección debe renovarse manualmente antes de caducar: el DMS no lo renueva automáticamente, y mientras no haya uno configurado, todas las respuestas salen sin protección.
+  * CMP is served from a single multiplexed endpoint (`/.well-known/cmp/p/{id}`); there are no per-operation routes as in EST.
+  * Both versions `cmp2000(2)` and `cmp2021(3)` are accepted and answered; the response returns the same `pvno` as the request.
+  * `messageTime` is mandatory in **all** messages (not only protected ones), with a 5-minute drift tolerance (`badTime`).
+  * `transactionID` and `senderNonce` must carry at least 128 bits of entropy, and the `senderNonce` must be new in every message.
+  * The `ir`, `cr` and `p10cr` operations do not admit `recipNonce` in the initial request (RFC 9483 §3.1); a client that includes it receives `badRecipientNonce`. The `generalInfo` rules are enforced equally: `implicitConfirm` and `confirmWaitTime` are mutually exclusive, the value of `implicitConfirm` must be `NULL` and that of `confirmWaitTime` a `GeneralizedTime`.
+  * With signature-based protection, the header's `sender` must match the protection certificate's subject and the `senderKID` its `SubjectKeyIdentifier` (`badMessageCheck` otherwise). `genm` messages are exempt from this identity check.
+  * The subject may be NULL-DN only if the SAN carries the identity; for the device's internal identity the SAN is used as a fallback, but the issued certificate keeps the empty subject.
+  * Lamassu never issues CA certificates over CMP; the only operation that produces CA certificates is `ccr`.
+  * The `id-it-revPassphrase` type of the `genm` is permanently disabled.
+  * The internal `APPROVING` and `REVOKING` states of a transaction are transient and are not exposed by the listing API; only `PENDING`, `ISSUED`, `ISSUE_FAILED`, `CONFIRMED` and `REVOKED` appear.
+  * Transaction records in terminal states (`CONFIRMED`, `REVOKED`) are kept for audit and are not purged by expiration; a completed `transactionID` may be reused in a new operation, except in `rr`, where replay protection also looks at terminal records.
+  * The protection certificate must be renewed manually before it expires: the DMS does not renew it automatically, and while none is configured, all responses go out unprotected.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
   <Cards>
-    <Card title="Visión general del DMS" href="/docs/platform/pki/device-enrollment" />
+    <Card title="DMS overview" href="/docs/platform/pki/device-enrollment" />
 
     <Card title="EST (RFC 7030)" href="/docs/platform/pki/est-enrollment" />
 
-    <Card title="Gestionar dispositivos" href="/docs/platform/pki/device-management" />
+    <Card title="Manage devices" href="/docs/platform/pki/device-management" />
   </Cards>
 </div>

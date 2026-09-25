@@ -2,235 +2,79 @@
 
 
 
-Despliegue self-managed con Kubernetes [#despliegue-self-managed-con-kubernetes]
+Self-managed Kubernetes deployment [#self-managed-kubernetes-deployment]
 
-Lamassu IoT puede desplegarse en infraestructura propia mediante **Kubernetes**, tanto en clústeres gestionados internamente como en entornos self-managed.
+Run Lamassu in a Kubernetes cluster operated by your team. The Helm chart deploys the Lamassu services and their routing resources; you provide the cluster, persistent storage, identity provider, PostgreSQL, RabbitMQ and the network path used by clients.
 
-La referencia principal para este despliegue es el repositorio `lamassu-helm`, que incluye:
+Choose an installation workflow [#choose-an-installation-workflow]
 
-* el chart principal de Lamassu
-* un chart auxiliar de SoftHSM
-* el script de despliegue automatizado `scripts/lamassu-fast-lane.sh`
+| Workflow                                          | Use it for                                   | What it installs                                          |
+| ------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------- |
+| [Helm](/docs/deployment/self-hosted/helm)         | Production and controlled environments       | Lamassu services and Gateway API resources                |
+| [Fastlane](/docs/deployment/self-hosted/fastlane) | Evaluation, demos, CI and small lab clusters | PostgreSQL, Keycloak, RabbitMQ, Envoy Gateway and Lamassu |
 
-Quickstart [#quickstart]
+What the Lamassu chart provides [#what-the-lamassu-chart-provides]
 
-Si lo que necesitas es levantar un entorno funcional lo antes posible, la vía más rápida es usar Fastlane desde el repositorio `lamassu-helm`:
+The Lamassu chart is an **application chart**, not a cluster bootstrap chart. It creates the Kubernetes resources that run and configure Lamassu, but it expects the platform services those resources depend on to exist.
 
-```bash
-git clone https://github.com/lamassuiot/lamassu-helm.git
-cd lamassu-helm
-./scripts/lamassu-fast-lane.sh -n -ns lamassu-dev -d dev.lamassu.io -l ./charts/lamassu
-```
+| Area                        | The Lamassu chart provides                                                                                                              | You provide                                                                                                                              |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Lamassu applications        | Deployments and StatefulSets for the UI and APIs, internal Services, ConfigMaps, a ServiceAccount, and optional HPAs and PDBs           | A working Kubernetes cluster, compute capacity and access to the container images                                                        |
+| PostgreSQL data             | A pre-install/pre-upgrade job that creates the required databases and schemas, runs migrations and applies the authorization bootstrap  | A reachable PostgreSQL server, credentials allowed to create databases and schemas, and backup/HA operations                             |
+| Messaging                   | RabbitMQ connection configuration for the Lamassu services                                                                              | A reachable RabbitMQ broker, credentials and its lifecycle                                                                               |
+| Identity                    | OIDC/JWT and external-authorization configuration, plus initial Lamassu authorization principals                                        | An OIDC provider, realm/tenant, client, users, groups and roles                                                                          |
+| External routing            | One `Gateway`, `HTTPRoute` resources, an `EnvoyProxy` configuration and Envoy security policies                                         | Gateway API and Envoy CRDs, the Envoy Gateway controller, a `GatewayClass`, a load-balancer implementation and the external network path |
+| TLS                         | cert-manager `Issuer` and CA `Certificate` resources; either a chart-managed downstream `Certificate` or a reference to your TLS Secret | cert-manager itself; for trusted TLS, a trusted issuer or a populated TLS Secret                                                         |
+| Persistent application data | PersistentVolumeClaims required by the default local KMS and VA storage                                                                 | A StorageClass, physical storage, backups and a shared/external backend when scaling requires one                                        |
+| Optional integrations       | Configuration hooks for observability, AWS connectors and PKCS#11/HSM connectivity                                                      | The observability backends, cloud credentials and production HSM or external key service                                                 |
 
-Ese flujo:
-
-* crea o reutiliza el namespace indicado
-* instala PostgreSQL, Keycloak y RabbitMQ
-* despliega el chart de Lamassu
-* deja la UI expuesta en `https://<dominio>`
-
-Si buscas un despliegue productivo o más controlado, sigue con la instalación manual mediante Helm que se describe más abajo.
-
-Qué se despliega [#qué-se-despliega]
-
-El chart principal `charts/lamassu`, actualmente en la serie `3.7.x`, despliega estos componentes:
-
-* `ui`
-* `ca`
-* `va`
-* `kms`
-* `device-manager`
-* `dms-manager`
-* `alerts`
-* recursos de Gateway API y políticas de Envoy Gateway
-* job de migraciones de base de datos
-
-Requisitos previos [#requisitos-previos]
-
-* Clúster Kubernetes `1.19+`
-* `kubectl` configurado con acceso al clúster
-* Helm `3.2.0+`
-* `cert-manager 1.14+` para la gestión de certificados cuando se usa `tls.type=certManager`
-* `Envoy Gateway 1.3.0+`, ya que el chart publica servicios mediante Gateway API y no mediante Ingress
-* Acceso a un registro de contenedores o imágenes previamente importadas si se trabaja en modo offline
-* Almacenamiento persistente disponible para PostgreSQL, RabbitMQ, VA y KMS
-
-Opciones de despliegue [#opciones-de-despliegue]
-
-Hay dos formas de desplegar Lamassu on-prem:
-
-1. Despliegue manual con Helm [#1-despliegue-manual-con-helm]
-
-Es la opción recomendada para entornos productivos o controlados, donde PostgreSQL, RabbitMQ, Keycloak, certificados y direccionamiento del Gateway ya están definidos por el equipo de plataforma.
-
-2. Despliegue automatizado con Fastlane [#2-despliegue-automatizado-con-fastlane]
-
-Es la opción más útil para pruebas, demos, CI o bootstrap rápido de un entorno. Fastlane levanta PostgreSQL, Keycloak, RabbitMQ y Lamassu en un único flujo. Su comportamiento está documentado en la página siguiente.
-
-Arquitectura [#arquitectura]
-
-Lamassu IoT se despliega como un conjunto de microservicios Kubernetes independientes. El chart principal crea `Deployment`, `StatefulSet`, `Service`, `ConfigMap`, `HTTPRoute`, `Gateway`, certificados y recursos auxiliares según los valores definidos.
-
-Dependencias externas requeridas por el chart principal:
-
-* PostgreSQL
-* RabbitMQ
-* proveedor OIDC, típicamente Keycloak
-
-El chart no instala estas dependencias por sí solo. Para un despliegue manual hay que provisionarlas antes. Si se busca un entorno funcional rápido para laboratorio o validación, el script Fastlane sí instala PostgreSQL, RabbitMQ y Keycloak además del chart de Lamassu.
-
-Instalación manual con Helm [#instalación-manual-con-helm]
-
-Agregar el repositorio Helm:
-
-```bash
-helm repo add lamassu https://lamassuiot.github.io/lamassu-helm
-helm repo update
-```
-
-O instalar desde una copia local del repositorio:
-
-```bash
-helm install lamassu ./charts/lamassu -n lamassu --create-namespace -f values.yaml
-```
-
-Valores mínimos que deben definirse [#valores-mínimos-que-deben-definirse]
-
-Los valores por defecto del chart son deliberadamente incompletos para dependencias externas. Como mínimo, un despliegue manual debe definir:
-
-* `postgres.hostname`, `postgres.username`, `postgres.password`
-* `amqp.hostname`, `amqp.username`, `amqp.password`
-* `auth.oidc.frontend.authority`
-* `auth.oidc.apiGateway.jwks`
-* `services.authz.jwkUrl` y un principal de bootstrap que coincida con un administrador real
-* `services.ca.domains`
-* `gateway.addresses` o una estrategia equivalente de publicación según el clúster
-* `tls.*` según se use `certManager` o certificado externo
-
-Ejemplo base:
-
-```yaml
-postgres:
-  hostname: postgresql
-  port: 5432
-  username: lamassu
-  password: change-me
-
-amqp:
-  hostname: rabbitmq
-  port: 5672
-  username: lamassu
-  password: change-me
-  tls: false
-
-tls:
-  type: certManager
-  certManagerOptions:
-    issuer: downstream-ca-selfsigned-issuer
-    certSpec:
-      commonName: pki.example.internal
-      hostnames:
-        - pki.example.internal
-      addresses:
-        - 10.0.0.20
-
-gateway:
-  addresses:
-    - 10.0.0.20
-  ports:
-    http: 80
-    https: 443
-  extraRouting:
-    - path: /auth
-      name: auth
-      target:
-        host: auth-keycloak
-        port: 8080
-
-auth:
-  oidc:
-    frontend:
-      clientId: frontend
-      authority: https://pki.example.internal/auth/realms/lamassu
-    apiGateway:
-      jwks:
-        - name: oidc-authn
-          uri: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
-  authorization:
-    rolesClaim: realm_access.roles
-    roles:
-      admin: pki-admin
-
-services:
-  ca:
-    domains:
-      - pki.example.internal
-  authz:
-    jwkUrl: http://auth-keycloak.lamassu/auth/realms/lamassu/protocol/openid-connect/certs
-    bootstrap:
-      - principal_id: "oidc:pki-admin"
-        principal_name: "PKI Admin"
-        principal_type: "oidc"
-        policy_ids:
-          - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
-        auth_config:
-          claims:
-            - claim: realm_access.roles
-              operator: contains
-              value: pki-admin
-```
-
-Provisiona el primer administrador [#provisiona-el-primer-administrador]
-
-No hay un superusuario implícito. Antes de instalar, crea el rol `pki-admin` en el proveedor OIDC y asígnalo al grupo que administrará Lamassu. El principal del ejemplo concede la política `SUPER ADMIN` a cualquier token que contenga ese rol.
-
-El Job `pre-install` y `pre-upgrade` prepara las bases de datos, ejecuta las migraciones de authz, precarga las políticas y aplica `services.authz.bootstrap` antes de que arranquen los Deployments. El bootstrap es idempotente: conserva los principales existentes y añade únicamente los grants que falten.
-
-<Callout type="warn" title="Valida el acceso antes de exponer la plataforma">
-  Si ningún token coincide con un principal activo, nadie podrá administrar la PKI. Prueba una identidad autorizada y otra denegada, y conserva un procedimiento de recuperación.
+<Callout type="warn" title="A Gateway resource is not a load balancer">
+  The chart creates Lamassu's `Gateway` and routes. It does not install the Envoy Gateway controller or make the generated `LoadBalancer` Service reachable from your network.
 </Callout>
 
-Consulta [Control de acceso](/docs/platform/pki/access-control) para diseñar principales y políticas.
+<Callout type="info" title="Recommended for a small single-node VM">
+  Use one Lamassu Gateway on ports 80 and 443 and let its HTTPRoutes dispatch traffic to every Lamassu service. Give that Gateway one externally reachable endpoint through the cluster load balancer, or forward traffic to it from an external proxy or NAT device. You do not need one Gateway per service.
+</Callout>
 
-Áreas de configuración más relevantes [#áreas-de-configuración-más-relevantes]
+How the deployment fits together [#how-the-deployment-fits-together]
 
-* **TLS:** `tls.type`, `tls.certManagerOptions.*` y `tls.externalOptions.secretName` controlan el certificado *downstream* del Gateway.
-* **Gateway:** `gateway.addresses`, `gateway.ports.*` y `gateway.extraRouting` publican la UI y las APIs mediante Envoy Gateway.
-* **Persistencia:** `postgres.*` define la conexión a PostgreSQL.
-* **Mensajería:** `amqp.*` configura la conexión a RabbitMQ.
-* **Identidad y autorización:** `auth.oidc.*`, `services.authz.jwkUrl` y `services.authz.bootstrap` configuran login, validación JWT y permisos iniciales.
-* **Autoridades:** `services.ca.domains` establece los dominios autorizados para CA y certificados.
-* **Claves:** `services.kms.cryptoEngines.*` configura los motores criptográficos y su almacenamiento.
-* **Alertas:** `services.alerts.smtp_server.*` prepara el envío de correo.
-
-Verificación del despliegue [#verificación-del-despliegue]
-
-El chart incluye una prueba Helm en `charts/lamassu/templates/tests/test-connections.yml`. Tras instalarlo, puede validarse con:
-
-```bash
-helm test lamassu -n lamassu
+```text
+Clients
+  |
+  | DNS name or reachable IP
+  v
+LoadBalancer, node port, or external proxy/NAT
+  |
+  v
+One Envoy Gateway (TLS terminates here)
+  |
+  +-- HTTPRoutes --> UI
+  +-- HTTPRoutes --> CA, VA, KMS and device APIs
+  +-- HTTPRoutes --> authorization and workflow services
+  +-- optional route --> your OIDC provider
 ```
 
-La prueba comprueba al menos:
+The chart creates one shared `Gateway` per Helm release. All chart-managed `HTTPRoute` resources attach to it. Envoy Gateway provisions the proxy data plane and a Kubernetes `LoadBalancer` Service for that Gateway.
 
-* salud de `ca`
-* salud de `dms-manager`
-* salud de `device-manager`
-* salud de `va`
-* respuesta HTML esperada del servicio `ui`
+The `gateway.addresses` value is only an address request to the Gateway controller. It does not make an IP routable, open a firewall, configure DNS or create NAT. See [Expose the Gateway](/docs/deployment/self-hosted/networking) before setting it.
 
-Repositorio Helm [#repositorio-helm]
+Platform requirements [#platform-requirements]
 
-El repositorio `lamassu-helm` está organizado en tres bloques principales:
+* Kubernetes 1.24 or newer
+* Helm 3.2 or newer
+* Envoy Gateway 1.8 or newer and a `GatewayClass`
+* cert-manager 1.14 or newer; the current chart renders cert-manager issuer and certificate resources
+* persistent storage suitable for the selected PostgreSQL, RabbitMQ, VA and KMS configuration
+* a load-balancer implementation or another deliberate path from clients to the Gateway
 
-* `charts/lamassu`: chart principal de Lamassu
-* `charts/softhsm`: chart opcional para laboratorios o escenarios de integración con PKCS#11 emulado
-* `scripts/lamassu-fast-lane.sh`: automatización para levantar dependencias y desplegar Lamassu con intervención mínima
+KMS deployments using the native PKCS#11 sidecar require Kubernetes 1.29 or newer.
 
-SoftHSM como complemento opcional [#softhsm-como-complemento-opcional]
+Choose the next page [#choose-the-next-page]
 
-El chart `charts/softhsm` no forma parte del despliegue estándar, pero resulta útil en entornos de laboratorio cuando se necesita simular un HSM compatible con PKCS#11. No sustituye al backend KMS principal; sirve como soporte para pruebas o integraciones concretas.
+<Cards>
+  <Card title="Install with Helm" description="Prepare dependencies, configure values, install and verify a controlled deployment." href="/docs/deployment/self-hosted/helm" />
 
-Versionado y migraciones [#versionado-y-migraciones]
+  <Card title="Expose the Gateway" description="Choose an external traffic design, understand gateway.addresses and handle multiple Gateways." href="/docs/deployment/self-hosted/networking" />
 
-La versión actual del chart en el repositorio es `3.8.0`. Para upgrades entre versiones, consulta las guías de `charts/lamassu/CHANGELOG/` y revisa especialmente las migraciones de base de datos y el bootstrap de authz.
+  <Card title="Use Fastlane" description="Bootstrap a complete evaluation or lab environment with one script." href="/docs/deployment/self-hosted/fastlane" />
+</Cards>

@@ -1,86 +1,86 @@
-# Ciclo de vida de un certificado (/docs/pr-preview/pr-24/platform/pki/concepts/certificate-lifecycle)
+# Certificate lifecycle (/docs/pr-preview/pr-24/platform/pki/concepts/certificate-lifecycle)
 
 
 
-Emitir un certificado es solo el comienzo. Durante su vida útil debes comprobar su vigencia, renovarlo antes de que caduque y retirarlo cuando deje de ser fiable. Lamassu conserva el certificado, su CA emisora, su estado y, cuando pertenece a un dispositivo, la identidad a la que está vinculado.
+Issuing a certificate is only the beginning. During its useful life you must check its validity, renew it before it expires and retire it when it stops being trustworthy. Lamassu keeps the certificate, its issuing CA, its status and, when it belongs to a device, the identity it is linked to.
 
-El recorrido completo [#el-recorrido-completo]
+The full journey [#the-full-journey]
 
 <Steps>
   <Step>
-    Solicitud [#solicitud]
+    Request [#request]
 
-    El solicitante genera una clave y una CSR. En los flujos recomendados, la clave privada permanece en el dispositivo, navegador o motor criptográfico que la creó.
+    The requester generates a key and a CSR. In the recommended flows, the private key stays in the device, browser or cryptographic engine that created it.
   </Step>
 
   <Step>
-    Emisión [#emisión]
+    Issuance [#issuance]
 
-    La CA firma la CSR. El [perfil de emisión](/docs/platform/pki/certificate-profiles) determina la validez, los usos, el sujeto, las extensiones admitidas y las restricciones criptográficas.
+    The CA signs the CSR. The [issuance profile](/docs/platform/pki/certificate-profiles) determines the validity, uses, subject, allowed extensions and cryptographic constraints.
   </Step>
 
   <Step>
-    Uso y supervisión [#uso-y-supervisión]
+    Use and monitoring [#use-and-monitoring]
 
-    El certificado queda en estado `ACTIVE`. Lamassu monitoriza su fecha `Not After`; el trabajo de monitorización criptográfica marca como `EXPIRED` los certificados que han vencido.
+    The certificate enters the `ACTIVE` state. Lamassu monitors its `Not After` date; the cryptographic monitoring job marks certificates that have expired as `EXPIRED`.
   </Step>
 
   <Step>
-    Renovación o re-enrolamiento [#renovación-o-re-enrolamiento]
+    Renewal or re-enrollment [#renewal-or-re-enrollment]
 
-    Se emite un certificado nuevo antes de que caduque el anterior. En un DMS puedes abrir ventanas preventiva y crítica para que el dispositivo se re-enrole mediante EST.
+    A new certificate is issued before the previous one expires. In a DMS you can open preventive and critical windows so the device re-enrolls through EST.
   </Step>
 
   <Step>
-    Revocación o retirada [#revocación-o-retirada]
+    Revocation or retirement [#revocation-or-retirement]
 
-    Si la identidad deja de ser fiable, Lamassu registra la razón y la hora de revocación. OCSP y las CRLs permiten que los consumidores conozcan ese estado.
+    If the identity stops being trustworthy, Lamassu records the reason and time of revocation. OCSP and CRLs let consumers learn that status.
   </Step>
 </Steps>
 
-Estados del certificado [#estados-del-certificado]
+Certificate states [#certificate-states]
 
-Lamassu persiste cuatro estados X.509:
+Lamassu persists four X.509 states:
 
-* **`ACTIVE`**: el certificado está habilitado y dentro de su periodo de validez.
-* **`EXPIRED`**: ha superado su fecha de expiración. El monitor lo detecta de forma periódica; no es un estado que deba asignarse manualmente.
-* **`REVOKED`**: fue invalidado antes de expirar, con una razón y una marca temporal.
-* **`INACTIVE`**: está deshabilitado sin representar una revocación definitiva.
+* **`ACTIVE`**: the certificate is enabled and within its validity period.
+* **`EXPIRED`**: it has passed its expiration date. The monitor detects this periodically; it is not a state that should be assigned manually.
+* **`REVOKED`**: it was invalidated before expiring, with a reason and a timestamp.
+* **`INACTIVE`**: it is disabled without representing a definitive revocation.
 
-La vista del dispositivo puede añadir estados operativos como ausencia de identidad, renovación pendiente, expiración próxima o baja. Son una interpretación del estado del dispositivo y de sus certificados, no nuevos estados X.509.
+The device view may add operational states such as missing identity, pending renewal, expiring soon or decommissioned. These are an interpretation of the device's status and its certificates, not new X.509 states.
 
-Renovación y revocación no son equivalentes [#renovación-y-revocación-no-son-equivalentes]
+Renewal and revocation are not equivalent [#renewal-and-revocation-are-not-equivalent]
 
-La **renovación** crea un certificado sucesor para una identidad que continúa siendo válida. La **revocación** comunica que el certificado actual ya no debe aceptarse. Renueva para mantener continuidad; revoca ante compromiso, retirada o un cambio que invalide la identidad.
+**Renewal** creates a successor certificate for an identity that remains valid. **Revocation** communicates that the current certificate must no longer be accepted. Renew to maintain continuity; revoke in response to compromise, retirement or a change that invalidates the identity.
 
-Solo una revocación con razón `CertificateHold` puede revertirse. Una revocación con cualquier otra razón es definitiva en Lamassu.
+Only a revocation with the reason `CertificateHold` can be undone. A revocation with any other reason is final in Lamassu.
 
-<Callout type="info" title="La reemisión de una CA reutiliza su clave">
-  La operación **Reissue CA** genera otro certificado para la misma clave y enlaza ambos números de serie mediante metadatos. No equivale a una rotación de clave. Para cambiar la clave, crea una CA sucesora y realiza una migración con periodo de solapamiento.
+<Callout type="info" title="Reissuing a CA reuses its key">
+  The **Reissue CA** operation generates another certificate for the same key and links both serial numbers through metadata. It is not a key rotation. To change the key, create a successor CA and perform a migration with an overlapping period.
 </Callout>
 
-Efecto de revocar una CA [#efecto-de-revocar-una-ca]
+Effect of revoking a CA [#effect-of-revoking-a-ca]
 
-Revocar una CA es una operación en cascada. Lamassu revoca sus CAs hijas y los certificados que ha emitido con la razón `CessationOfOperation`. La propagación continúa por la jerarquía.
+Revoking a CA is a cascading operation. Lamassu revokes its child CAs and the certificates it issued, with the reason `CessationOfOperation`. The propagation continues down the hierarchy.
 
-Antes de confirmar:
+Before confirming:
 
-1. Identifica DMS, dispositivos y servicios que confían en esa cadena.
-2. Distribuye la nueva cadena de confianza.
-3. Reemite las identidades necesarias.
-4. Comprueba OCSP y CRL desde un consumidor real.
-5. Revoca la CA antigua cuando ya no exista tráfico legítimo.
+1. Identify DMSs, devices and services that trust that chain.
+2. Distribute the new chain of trust.
+3. Reissue the necessary identities.
+4. Check OCSP and CRL from a real consumer.
+5. Revoke the old CA once no legitimate traffic remains.
 
-<Callout type="warn" title="Decommission es irreversible">
-  Dar de baja un dispositivo revoca sus certificados y le impide obtener nuevas identidades. Utiliza esta acción únicamente cuando el dispositivo se retire de forma permanente.
+<Callout type="warn" title="Decommission is irreversible">
+  Decommissioning a device revokes its certificates and prevents it from obtaining new identities. Use this action only when the device is being retired permanently.
 </Callout>
 
-Qué debes observar [#qué-debes-observar]
+What you should watch [#what-you-should-watch]
 
-* Certificados que entran en la ventana preventiva o crítica de renovación.
-* Errores repetidos de enrolamiento o re-enrolamiento.
-* Cambios de estado y razones de revocación.
-* Publicación y vigencia de OCSP y CRLs.
-* Dependencias que todavía presentan un certificado sustituido.
+* Certificates entering the preventive or critical renewal window.
+* Repeated enrollment or re-enrollment failures.
+* Status changes and revocation reasons.
+* OCSP and CRL publication and validity.
+* Dependencies still presenting a replaced certificate.
 
-El historial del dispositivo relaciona sus identidades anteriores y actuales. Para cambios administrativos y errores de mutación, consulta [Registros de auditoría](/docs/platform/pki/audit-logs).
+The device history relates its previous and current identities. For administrative changes and mutation errors, see [Audit logs](/docs/platform/pki/audit-logs).

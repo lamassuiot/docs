@@ -8,7 +8,7 @@ sidebar:
 
 # EST: Enrollment over Secure Transport
 
-Lamassu IoT implementa el protocolo **EST (Enrollment over Secure Transport)** descrito en el RFC 7030 como su único mecanismo de inscripción de certificados para dispositivos. Cada DMS expone los endpoints EST, valida al dispositivo y aplica sus propias políticas de autenticación, registro y renovación. Así, actúa como autoridad de registro (RA) frente al cliente.
+Lamassu IoT implementa el protocolo **EST (Enrollment over Secure Transport)** descrito en el RFC 7030 como uno de sus mecanismos de inscripción de certificados para dispositivos — el otro es [CMP (RFC 9483)](/docs/platform/pki/cmp). Cada DMS expone uno de los dos protocolos, nunca ambos a la vez; el que expone EST valida al dispositivo y aplica sus propias políticas de autenticación, registro y renovación — actuando como autoridad de registro (RA) frente al cliente.
 
 La entidad que emite y firma criptográficamente el certificado es siempre la **CA asociada al DMS**, no el DMS. El DMS coordina el proceso: recibe el CSR, autentica al dispositivo y aplica la política de emisión. Esta distinción es relevante para el administrador PKI al seleccionar la `EnrollmentCA` y para el integrador al interpretar la cadena de confianza recibida de `/cacerts`.
 
@@ -493,6 +493,7 @@ La implementación de Lamassu se ajusta al RFC 7030 en lo esencial pero introduc
 
 <Cards>
   <Card title="Visión general del DMS" href="/docs/platform/pki/device-enrollment" />
+  <Card title="Enrolamiento CMP" href="/docs/platform/pki/cmp" />
   <Card title="Validación OCSP" href="/docs/platform/pki/ocsp" />
   <Card title="Gestionar dispositivos" href="/docs/platform/pki/device-management" />
 </Cards>

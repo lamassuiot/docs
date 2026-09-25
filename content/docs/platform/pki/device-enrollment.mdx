@@ -10,6 +10,8 @@ A **Device Management Service (DMS)** acts as the registration authority facing 
 
 Each DMS is an independent operational boundary: it can represent a product line, an environment or a device type with its own CA, authentication rules, distributed trust and renewal window.
 
+Each DMS exposes a single enrollment protocol, selected when it is created or edited: **EST (RFC 7030)** or **CMP (RFC 9483 Lightweight CMP Profile / RFC 4210)**. The two protocols are mutually exclusive: changing the protocol of an existing DMS replaces its enrollment configuration entirely, without automatic migration of settings. Each protocol's configuration and the device integration guide are documented in the [EST](/docs/platform/pki/est-enrollment) and [CMP](/docs/platform/pki/cmp) pages.
+
 ## Before you begin
 
 - Create or import at least one active CA.
@@ -33,15 +35,15 @@ Each DMS is an independent operational boundary: it can represent a product line
   </Step>
 
   <Step>
-    ### Configure EST
+    ### Configure the enrollment protocol
 
-    Define the authentication of `enroll`, the `reenroll` policy, the renewal window and, if needed, `serverkeygen`.
+    Select EST (RFC 7030) or CMP (RFC 9483) and define the authentication of `enroll`, the `reenroll` policy, the renewal window and, if needed, server-side key generation.
   </Step>
 
   <Step>
     ### Distribute trust
 
-    Configure **CA Distribution** to control the response of the `cacerts` endpoint.
+    Configure **CA Distribution** to control which authorities the device receives as anchors of trust, regardless of the enrollment protocol.
   </Step>
 
   <Step>
@@ -69,5 +71,6 @@ Each DMS is an independent operational boundary: it can represent a product line
 
 <Cards>
   <Card title="EST enrollment" description="Configure authentication, endpoints and flows for firmware." href="/docs/platform/pki/est-enrollment" />
+  <Card title="CMP enrollment" description="Configure authentication, operations and transactions for firmware." href="/docs/platform/pki/cmp" />
   <Card title="Devices and identities" description="Review statuses, history and operational actions." href="/docs/platform/pki/device-management" />
 </Cards>

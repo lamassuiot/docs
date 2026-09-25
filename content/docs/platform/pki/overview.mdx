@@ -12,6 +12,12 @@ Lamassu IoT centralizes the issuance, distribution, renewal and revocation of X.
   <Card title="How Lamassu works" description="Build the mental model of authorities, keys, identities and validation." href="/docs/platform/pki/concepts/overview" />
 </Cards>
 
+## Architecture at a glance
+
+<ArchitectureDiagram level="medium" view="3d" lock />
+
+Lamassu runs as a set of services on Kubernetes, backed by PostgreSQL, RabbitMQ and an OIDC provider. Hover a component to trace its connections, or see the [platform architecture](/docs/platform/pki/concepts/architecture) chapter for the low-level, per-service view.
+
 ## Core capabilities
 
 ### Build your trust hierarchy

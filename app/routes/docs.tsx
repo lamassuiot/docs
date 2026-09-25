@@ -26,6 +26,7 @@ import {
 import type { ReactNode } from "react";
 import { redirect } from "react-router";
 import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions";
+import { ArchitectureDiagram } from "@/components/architecture-diagram";
 import {
   type AffectedPages,
   DiffText,
@@ -494,6 +495,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               Card: MdxCard,
               Step,
               Steps,
+              ArchitectureDiagram,
             }}
           />
         </DocsBody>

@@ -54,12 +54,29 @@ The decision is made **before forwarding the request to the service**:
 4. It separately loads the policies granted to each principal.
 5. The HTTP schema translates the method and route combination into a logical action, such as `nbi-job-read` or `nbi-workflow-create`.
 6. `authz` looks for an HTTP rule granting that action.
-7. If the route declares constraints, it compares request data with the normalized attributes of the same principal contributing the policy.
+7. If the route declares constraints, it compares request data with the normalized attributes of the same principal contributing the policy; the policy's own `param_constraints` also pin the granted action to literal request values.
 8. A satisfying result lets Envoy forward the request; any other response blocks it at the Gateway.
 
 When it allows access, `authz` returns the selected principal in `x-current-user`. The Gateway can propagate that header to the service to preserve the identity context.
 
 HTTP rules primarily answer **"can this identity call this API operation?"**. On their own they do not produce filters over the external service's database. To limit a route to a specific device, tenant or client, the schema must declare a constraint relating a request value to a normalized attribute of the principal.
+
+### Authentication-only routes and unmapped paths
+
+Two schema-level settings cover endpoints that policies do not mention:
+
+- **`skip_authz: true` on a route** allows any authenticated identity to reach it without a policy grant. Use it for paths such as `/openapi.json` or `/health` that every authenticated caller should be able to access. The request still has to authenticate successfully: a failed credential is rejected before this setting is considered. A `skip_authz` route cannot declare constraints, and it wins over any other schema's route or default action for the same request.
+- **`default_action` with `base_paths`** decides what happens when a request falls under a path prefix the schema owns but no explicit route matches. `deny` — the value the Job Manager schema ships with — turns the implicit denial of unmapped paths into an explicit, auditable statement; `allow` opens unmapped endpoints under that prefix to any authenticated identity.
+
+These are decisions of the schema, not of a policy: they never replace the grant a mapped route requires, they only fill the gap left by endpoints the schema does not enumerate. Keep three rules in mind:
+
+- `default_action` requires at least one `base_paths` entry, and base paths are absolute paths such as `/api/wfx/nbi/v1`.
+- An explicit route in any schema takes precedence: the fallback only decides requests that no schema's routes cover. When the prefixes of two schemas overlap, the longest matching prefix decides.
+- Two schemas cannot claim the same base path with different default actions; the conflicting schema fails to load.
+
+<Callout type="warn" title="These settings bypass policies">
+  A `skip_authz` route and a `default_action: "allow"` prefix grant access without consulting any policy. Every authenticated identity can reach what they open, including identities with no granted policies. Review these settings whenever you add or upgrade an integrated service.
+</Callout>
 
 ### Services developed by Lamassu
 
@@ -229,6 +246,34 @@ Some routes also compare a request value — taken from the path, query, header 
 
 Normalized attributes decouple the policy from the authentication mechanism. `subject_attribute_mappings` can derive, for example, `device_id` from `oidc.claim.device_id` or from `x509.subject.cn`. The rule consumes `device_id` in both cases.
 
+An HTTP rule can also pin a granted action to a literal value carried by the request itself through `param_constraints`. It extracts the value with the same sources as route constraints — `path_regex_group`, `query`, `header` or `json_body` — but compares it against an `equals` literal written into the policy rather than against a subject attribute. The grant then depends only on the request, not on who holds the policy:
+
+```json title="Action pinned to a path segment"
+{
+  "http_rules": [
+    {
+      "http_schema_name": "mysvc",
+      "actions": ["system-info-read"],
+      "param_constraints": [
+        {
+          "action": "system-info-read",
+          "request": { "source": "path_regex_group", "index": 1 },
+          "equals": "1"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Combined with a schema route such as `^/api/mysvc/system/([^/]+)/info$`, this grants `GET /api/mysvc/system/1/info` and denies the same call for system `2`, regardless of the principal's attributes. The same mechanism pins query parameters, headers or JSON body fields, for example `{ "source": "query", "name": "tenant_id" }` with `"equals": "1"` to accept only requests carrying `?tenant_id=1`.
+
+Note that:
+
+- `action` must be one of the actions granted by the rule; `equals` is required; `path_regex_group` needs an `index` greater than zero, `query` and `header` need a `name`, and `json_body` needs a `path` such as `$.tenant_id`.
+- `param_constraints` are not cross-checked against the schema when the policy is loaded. A reference the route cannot satisfy — for instance a `path_regex_group` on a route without capture groups — simply never matches, and the request is denied.
+- Several `param_constraints` for the same action combine with AND. A rule without them keeps the usual behavior: the action is granted wherever the route matches and the subject constraints pass.
+
 ## Included policies
 
 The `authz` preload installs reusable policies for the main domains. Among them are:
@@ -353,6 +398,7 @@ When you edit a shared policy, remember the change affects all its principals. T
 - Keep at least two recovery administrators and test their access periodically.
 - Review active principals, their matches and their grants after IdP changes.
 - Search for wildcards in policies before upgrading Lamassu.
+- Review `skip_authz` routes and `default_action` settings in HTTP schemas when integrating or upgrading a service.
 - Always test one allowed and one denied operation for each role.
 - Correlate changes to principals, policies and grants with the [audit logs](/docs/platform/pki/audit-logs).
 
@@ -373,11 +419,15 @@ The credential could be processed but did not produce a positive authorization. 
 5. that the policy includes the action and the requested resource type or route;
 6. that the identifier, relation, column filter or HTTP constraint includes the real resource.
 
-In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure.
+In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure. With OpenTelemetry instrumentation enabled, each decision also produces a span — `engine.CheckHTTP` on the Gateway path — whose attributes record `authz.allowed`, the matched policy and the matched principal, so you can correlate the denial with the Gateway trace.
 
 ### Everything returns 403
 
 Check that the bootstrap principal was created and that the policies were preloaded by the migration Job. Also verify that `services.authz.jwkUrl` is reachable from the `authz` pod; do not assume that a URL accessible from the browser also works inside the cluster.
+
+### Access appears without a policy grant
+
+The path may be covered by a schema-level decision rather than by a policy: routes marked `skip_authz` allow any authenticated identity, and a request under a `base_paths` prefix whose schema sets `default_action: allow` is likewise allowed without consulting policies. Confirm which of the two applies before looking for missing or misassigned grants.
 
 ### Everything fails when authz is unavailable
 

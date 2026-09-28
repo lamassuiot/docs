@@ -54,12 +54,29 @@ La decisión se toma **antes de reenviar la petición al servicio**:
 4. Carga por separado las políticas concedidas a cada principal.
 5. El esquema HTTP traduce la combinación de método y ruta a una acción lógica, como `nbi-job-read` o `nbi-workflow-create`.
 6. `authz` busca una regla HTTP que conceda esa acción.
-7. Si la ruta declara restricciones, compara datos de la petición con los atributos normalizados del mismo principal que aporta la política.
+7. Si la ruta declara restricciones, compara datos de la petición con los atributos normalizados del mismo principal que aporta la política; los `param_constraints` de la propia política también fijan la acción concedida a valores literales de la petición.
 8. Un resultado satisfactorio permite a Envoy reenviar la petición; cualquier otra respuesta la bloquea en el Gateway.
 
 Cuando permite el acceso, `authz` devuelve el principal seleccionado en `x-current-user`. El Gateway puede propagar esa cabecera al servicio para conservar el contexto de identidad.
 
 Las reglas HTTP responden principalmente a **“¿puede esta identidad llamar a esta operación de la API?”**. Por sí solas no generan filtros sobre la base de datos del servicio externo. Para limitar una ruta a un dispositivo, tenant o cliente concreto, el esquema debe declarar una restricción que relacione un valor de la petición con un atributo normalizado del principal.
+
+### Rutas solo de autenticación y rutas no mapeadas
+
+Dos ajustes del propio esquema cubren endpoints que las políticas no mencionan:
+
+- **`skip_authz: true` en una ruta** permite alcanzarla a cualquier identidad autenticada sin una política que la conceda. Úsalo para rutas como `/openapi.json` o `/health` que todo cliente autenticado debería poder consultar. La petición sigue necesitando una autenticación válida: una credencial incorrecta se rechaza antes de considerar este ajuste. Una ruta con `skip_authz` no puede declarar restricciones, y prevalece sobre la ruta o la acción por defecto de cualquier otro esquema para la misma petición.
+- **`default_action` con `base_paths`** decide qué ocurre cuando una petición cae bajo un prefijo de ruta que el esquema posee pero ninguna ruta explícita coincide. `deny` — el valor con el que se entrega el esquema del Job Manager — convierte la denegación implícita de las rutas no mapeadas en una declaración explícita y auditable; `allow` abre los endpoints no mapeados bajo ese prefijo a cualquier identidad autenticada.
+
+Son decisiones del esquema, no de una política: nunca sustituyen el grant que exige una ruta mapeada, solo cubren el hueco de los endpoints que el esquema no enumera. Ten en cuenta tres reglas:
+
+- `default_action` exige al menos una entrada en `base_paths`, y las rutas base son rutas absolutas como `/api/wfx/nbi/v1`.
+- Una ruta explícita de cualquier esquema tiene prioridad: la acción por defecto solo decide peticiones que ninguna ruta de ningún esquema cubre. Cuando los prefijos de dos esquemas se solapan, decide el prefijo coincidente más largo.
+- Dos esquemas no pueden reclamar la misma ruta base con acciones por defecto distintas; el esquema en conflicto no llega a cargar.
+
+<Callout type="warn" title="Estos ajustes eluden las políticas">
+  Una ruta con `skip_authz` y un prefijo con `default_action: "allow"` conceden acceso sin consultar ninguna política. Cualquier identidad autenticada puede alcanzar lo que abran, incluidas las identidades sin políticas concedidas. Revisa estos ajustes cada vez que integres o actualices un servicio.
+</Callout>
 
 ### Servicios desarrollados por Lamassu
 
@@ -229,6 +246,34 @@ Algunas rutas también comparan un valor de la petición —extraído de la ruta
 
 Los atributos normalizados desacoplan la política del mecanismo de autenticación. `subject_attribute_mappings` puede derivar, por ejemplo, `device_id` desde `oidc.claim.device_id` o desde `x509.subject.cn`. La regla consume `device_id` en ambos casos.
 
+Una regla HTTP también puede fijar una acción concedida a un valor literal que la propia petición transporte, mediante `param_constraints`. Extrae el valor con las mismas fuentes que las restricciones de ruta —`path_regex_group`, `query`, `header` o `json_body`— pero lo compara con un literal `equals` escrito en la política, no con un atributo del principal. El grant depende entonces solo de la petición, no de quién posea la política:
+
+```json title="Acción fijada a un segmento de la ruta"
+{
+  "http_rules": [
+    {
+      "http_schema_name": "mysvc",
+      "actions": ["system-info-read"],
+      "param_constraints": [
+        {
+          "action": "system-info-read",
+          "request": { "source": "path_regex_group", "index": 1 },
+          "equals": "1"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Combinada con una ruta del esquema como `^/api/mysvc/system/([^/]+)/info$`, concede `GET /api/mysvc/system/1/info` y deniega la misma llamada para el sistema `2`, con independencia de los atributos del principal. El mismo mecanismo fija parámetros de query, cabeceras o campos del cuerpo JSON, por ejemplo `{ "source": "query", "name": "tenant_id" }` con `"equals": "1"` para aceptar solo peticiones que lleven `?tenant_id=1`.
+
+Ten en cuenta que:
+
+- `action` debe estar entre las acciones concedidas por la regla; `equals` es obligatorio; `path_regex_group` necesita un `index` mayor que cero, `query` y `header` un `name`, y `json_body` un `path` como `$.tenant_id`.
+- `param_constraints` no se coteja con el esquema al cargar la política. Una referencia que la ruta no puede satisfacer —por ejemplo, un `path_regex_group` sobre una ruta sin grupos de captura— simplemente nunca coincide y la petición se deniega.
+- Varios `param_constraints` para la misma acción se combinan con AND. Una regla sin ellos conserva el comportamiento habitual: la acción se concede donde la ruta coincida y las restricciones del principal se cumplan.
+
 ## Políticas incluidas
 
 La precarga de `authz` instala políticas reutilizables para los dominios principales. Entre ellas se encuentran:
@@ -353,6 +398,7 @@ Cuando edites una política compartida, recuerda que el cambio afecta a todos su
 - Conserva al menos dos administradores de recuperación y prueba su acceso periódicamente.
 - Revisa los principales activos, sus coincidencias y sus grants después de cambios en el IdP.
 - Busca comodines en políticas antes de actualizar Lamassu.
+- Revisa las rutas `skip_authz` y los ajustes de `default_action` de los esquemas HTTP al integrar o actualizar un servicio.
 - Prueba siempre una operación permitida y otra denegada para cada rol.
 - Correlaciona los cambios de principales, políticas y grants con los [registros de auditoría](/docs/platform/pki/audit-logs).
 
@@ -373,11 +419,15 @@ La credencial pudo procesarse, pero no produjo una autorización positiva. Revis
 5. que la política incluya la acción y el tipo de recurso o ruta solicitados;
 6. que el identificador, relación, filtro de columna o restricción HTTP incluya el recurso real.
 
-En los logs de `authz`, una decisión del endpoint externo incluye `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` y el código de estado. Estos campos permiten separar un fallo de coincidencia de un fallo de permisos.
+En los logs de `authz`, una decisión del endpoint externo incluye `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` y el código de estado. Estos campos permiten separar un fallo de coincidencia de un fallo de permisos. Con la instrumentación OpenTelemetry habilitada, cada decisión genera además un span —`engine.CheckHTTP` en el camino del Gateway— cuyos atributos registran `authz.allowed`, la política coincidente y el principal coincidente, de forma que puedas correlacionar la denegación con la traza del Gateway.
 
 ### Todo devuelve 403
 
 Comprueba que el principal de bootstrap fue creado y que las políticas fueron precargadas por el Job de migración. Verifica también que `services.authz.jwkUrl` sea alcanzable desde el pod de `authz`; no asumas que una URL pública accesible desde el navegador también funciona dentro del clúster.
+
+### Aparece acceso sin política concedida
+
+La ruta puede estar cubierta por una decisión del esquema y no por una política: las rutas marcadas con `skip_authz` permiten el paso a cualquier identidad autenticada, y una petición bajo un prefijo de `base_paths` cuyo esquema fija `default_action: allow` también se concede sin consultar políticas. Comprueba cuál de las dos situaciones aplica antes de buscar grants ausentes o mal asignados.
 
 ### Todo falla cuando authz no está disponible
 

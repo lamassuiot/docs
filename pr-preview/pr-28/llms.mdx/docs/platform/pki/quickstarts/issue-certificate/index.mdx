@@ -1,0 +1,59 @@
+# Issue your first certificate (/docs/pr-preview/pr-28/platform/pki/quickstarts/issue-certificate)
+
+
+
+In this quickstart Lamassu will generate the key and the CSR in the browser, and the CA will issue the certificate. When you finish you will download the certificate and its private key.
+
+Before you begin [#before-you-begin]
+
+* An active CA with permission to issue certificates.
+* A name for the identity, for example `device-001.example.internal`.
+* A safe place to keep the downloaded private key.
+
+<Callout type="warn" title="The private key is delivered only once">
+  In this flow the key is generated in the browser and Lamassu does not store it. Download it and protect it before closing the operation result.
+</Callout>
+
+<Steps>
+  <Step>
+    Start the issuance [#start-the-issuance]
+
+    Open the CA created in the previous quickstart, go to **Issued Certificates** and select **Issue New**.
+  </Step>
+
+  <Step>
+    Choose the method [#choose-the-method]
+
+    Select **Generate Key & CSR in Browser**. Use **Upload Existing CSR** when the private key must be generated and kept on the target system.
+  </Step>
+
+  <Step>
+    Identify the certificate [#identify-the-certificate]
+
+    Enter the `Common Name` and, if applicable, the organization, organizational unit and location. Add SANs for each DNS name, IP address, email or URI the identity will be validated with.
+  </Step>
+
+  <Step>
+    Configure key and uses [#configure-key-and-uses]
+
+    Choose RSA or ECDSA, define the validity and select the key usages. For a device identity that uses mTLS, enable **Digital Signature** and **Client Authentication**.
+
+    The validity cannot exceed the expiration date of the issuing CA.
+  </Step>
+
+  <Step>
+    Issue and download [#issue-and-download]
+
+    Confirm the issuance and immediately download the certificate and the private key in PEM format.
+  </Step>
+
+  <Step>
+    Verify the result [#verify-the-result]
+
+    The certificate should appear in **Issued Certificates** with an active status. Check its subject, SANs, issuer, usages and validity period.
+  </Step>
+</Steps>
+
+Next step [#next-step]
+
+[Register your first device](/docs/platform/pki/quickstarts/register-device) to associate the identity with a managed entity, or see [certificate management](/docs/platform/pki/certificates).

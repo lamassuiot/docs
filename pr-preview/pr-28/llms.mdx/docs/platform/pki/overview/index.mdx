@@ -1,0 +1,69 @@
+# Lamassu IoT Platform (/docs/pr-preview/pr-28/platform/pki/overview)
+
+
+
+Lamassu IoT centralizes the issuance, distribution, renewal and revocation of X.509 identities for connected devices. You can build a private PKI, protect its keys and automate the enrollment of a fleet without losing visibility into every certificate.
+
+Start here [#start-here]
+
+<Cards>
+  <Card title="Get started" description="Create a CA, issue a certificate and register your first device." href="/docs/platform/pki/quickstarts/overview" />
+
+  <Card title="How Lamassu works" description="Build the mental model of authorities, keys, identities and validation." href="/docs/platform/pki/concepts/overview" />
+</Cards>
+
+Architecture at a glance [#architecture-at-a-glance]
+
+<ArchitectureDiagram level="medium" view="3d" lock />
+
+Lamassu runs as a set of services on Kubernetes, backed by PostgreSQL, RabbitMQ and an OIDC provider. Hover a component to trace its connections, or see the [platform architecture](/docs/platform/pki/concepts/architecture) chapter for the low-level, per-service view.
+
+Core capabilities [#core-capabilities]
+
+Build your trust hierarchy [#build-your-trust-hierarchy]
+
+Create root and intermediate authorities or import an existing PKI. Define which authority can issue each identity and keep the full chain of trust.
+
+Protect cryptographic keys [#protect-cryptographic-keys]
+
+Generate and safeguard keys using software engines, PKCS#11 HSMs or cloud services. Lamassu decouples operations from the physical location of the key.
+
+Issue and control certificates [#issue-and-control-certificates]
+
+Issue certificates from the console or from a CSR, check their status and revoke them when they stop being trustworthy.
+
+Automate device identities [#automate-device-identities]
+
+Define enrollment policies with a Device Management Service (DMS) and let devices request or renew their identity through EST.
+
+Publish validation status [#publish-validation-status]
+
+Offer online validation through OCSP and distribute CRLs for consumers that need to check certificates offline.
+
+React to events [#react-to-events]
+
+Subscribe to lifecycle changes and send notifications by email, Microsoft Teams or webhooks.
+
+Choose your path [#choose-your-path]
+
+<Cards>
+  <Card title="I administer the PKI" description="Configure engines, authorities, issuance and validation." href="/docs/platform/pki/key-management" />
+
+  <Card title="I integrate a device" description="Configure the DMS and use EST to obtain an identity." href="/docs/platform/pki/device-enrollment" />
+
+  <Card title="I operate the platform" description="Deploy Lamassu and prepare its dependencies." href="/docs/deployment/overview" />
+
+  <Card title="I integrate another system" description="Connect Lamassu with AWS IoT Core and other destinations." href="/docs/platform/pki/integrations/aws-iot-core" />
+</Cards>
+
+Operational reference [#operational-reference]
+
+<Cards>
+  <Card title="Certificate profiles" description="Turn issuance policy into reusable constraints." href="/docs/platform/pki/certificate-profiles" />
+
+  <Card title="Hierarchy and rotation" description="Replace CA certificates or keys without breaking trust." href="/docs/platform/pki/ca-hierarchy-and-rotation" />
+
+  <Card title="Access control" description="Configure principals, policies and the first administrator." href="/docs/platform/pki/access-control" />
+
+  <Card title="Troubleshooting" description="Diagnose the Gateway, services, issuance and enrollment." href="/docs/platform/pki/troubleshooting" />
+</Cards>

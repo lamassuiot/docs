@@ -1,0 +1,36 @@
+# Documentation
+
+- [Deploy from AWS Marketplace](/docs/pr-preview/pr-28/deployment/aws-marketplace): Run a preconfigured Lamassu IoT instance on Amazon EC2.
+- [Deploy Lamassu](/docs/pr-preview/pr-28/deployment/overview): Choose the operating model that fits your infrastructure and control requirements.
+- [Use Lamassu as SaaS](/docs/pr-preview/pr-28/deployment/saas): Consume Lamassu as a managed service without operating your own infrastructure.
+- [Fastlane](/docs/pr-preview/pr-28/deployment/self-hosted/fastlane): Bootstrap a complete Lamassu evaluation or lab environment on an existing Kubernetes cluster.
+- [Install with Helm](/docs/pr-preview/pr-28/deployment/self-hosted/helm): Prepare dependencies, configure the Lamassu chart and verify a controlled Kubernetes deployment.
+- [Expose the Gateway](/docs/pr-preview/pr-28/deployment/self-hosted/networking): Choose how clients reach Lamassu, when to set gateway.addresses and how to design multiple Gateways.
+- [Kubernetes self-managed](/docs/pr-preview/pr-28/deployment/self-hosted/overview): Choose an installation workflow and network architecture for Lamassu on your Kubernetes cluster.
+- [Access control](/docs/pr-preview/pr-28/platform/pki/access-control): Design who can access Lamassu through principals, policies, resource permissions and HTTP route authorization.
+- [Alerts and subscriptions](/docs/pr-preview/pr-28/platform/pki/alerts): Send PKI events to people and external systems.
+- [Audit logs](/docs/pr-preview/pr-28/platform/pki/audit-logs): Understand which audit events Lamassu generates and how to turn them into a durable trail.
+- [CA hierarchy and rotation](/docs/pr-preview/pr-28/platform/pki/ca-hierarchy-and-rotation): Design root and intermediate authorities and replace certificates or keys without breaking trust.
+- [Certification authorities](/docs/pr-preview/pr-28/platform/pki/certificate-authorities): Create, import and operate the authorities that establish your PKI's trust.
+- [Certificate profiles](/docs/pr-preview/pr-28/platform/pki/certificate-profiles): Define reusable policies to issue consistent certificates and constrain accepted keys.
+- [Certificate validation](/docs/pr-preview/pr-28/platform/pki/certificate-validation): Publish the status of identities through OCSP and CRL.
+- [Certificates](/docs/pr-preview/pr-28/platform/pki/certificates): Inspect, download and revoke the certificates issued by Lamassu.
+- [Platform architecture](/docs/pr-preview/pr-28/platform/pki/concepts/architecture): Lamassu components and how control, keys, issuance and devices relate.
+- [Certificate lifecycle](/docs/pr-preview/pr-28/platform/pki/concepts/certificate-lifecycle): Issuance, use, renewal, revocation and retirement of certificates in Lamassu.
+- [Glossary](/docs/pr-preview/pr-28/platform/pki/concepts/glossary): PKI, certificate and identity management terms used in Lamassu.
+- [How Lamassu works](/docs/pr-preview/pr-28/platform/pki/concepts/overview): The mental model of trust, keys, certificates and devices.
+- [Trust model](/docs/pr-preview/pr-28/platform/pki/concepts/trust-model): Understand where trust originates, how it is distributed and what each component validates.
+- [Revocation lists (CRL)](/docs/pr-preview/pr-28/platform/pki/crl): Generate and distribute signed lists to validate certificates offline.
+- [Device Management Service](/docs/pr-preview/pr-28/platform/pki/device-enrollment): Define how a fleet receives, renews and uses its identities.
+- [Devices and identities](/docs/pr-preview/pr-28/platform/pki/device-management): Register devices and control their identities throughout the lifecycle.
+- [Device enrollment with EST](/docs/pr-preview/pr-28/platform/pki/est-enrollment): EST protocol guide for Lamassu IoT, with DMS configuration for the PKI administrator and the endpoint reference for device integrators.
+- [AWS IoT Core](/docs/pr-preview/pr-28/platform/pki/integrations/aws-iot-core): Lamassu's connector for AWS IoT Core syncs device identities with the AWS platform, handling CA registration, Thing provisioning and certificate lifecycle automatically and event-driven.
+- [Keys and cryptographic engines](/docs/pr-preview/pr-28/platform/pki/key-management): Generate, import and operate keys without coupling the PKI to a specific provider.
+- [Online validation with OCSP](/docs/pr-preview/pr-28/platform/pki/ocsp): Check in real time whether a certificate is still valid or has been revoked.
+- [Lamassu IoT Platform](/docs/pr-preview/pr-28/platform/pki/overview): Manage PKI and digital identities for your devices from a single platform.
+- [Create your first CA](/docs/pr-preview/pr-28/platform/pki/quickstarts/create-certificate-authority): Create a root authority and check that it is ready to issue certificates.
+- [Issue your first certificate](/docs/pr-preview/pr-28/platform/pki/quickstarts/issue-certificate): Issue an X.509 identity from the console and verify the result.
+- [Get started](/docs/pr-preview/pr-28/platform/pki/quickstarts/overview): Get a first result with Lamassu and continue from a working base.
+- [Register your first device](/docs/pr-preview/pr-28/platform/pki/quickstarts/register-device): Add a device to Lamassu and assign it an active identity.
+- [Troubleshooting](/docs/pr-preview/pr-28/platform/pki/troubleshooting): Diagnose access, health, issuance, enrollment and dependencies in a Lamassu deployment.
+- [Test](/docs/pr-preview/pr-28/test): A document to test Fumadocs

@@ -1,0 +1,58 @@
+# Online validation with OCSP (/docs/pr-preview/pr-28/platform/pki/ocsp)
+
+
+
+OCSP service [#ocsp-service]
+
+OCSP (Online Certificate Status Protocol) is the mechanism that lets a relying party check, in real time, whether a specific certificate is valid or has been revoked. Instead of downloading a full list of revoked certificates, the client sends a query with the certificate's serial number and receives a signed response with the current status.
+
+Lamassu integrates its own OCSP responder that serves these queries by consulting the internal certificate database directly. No external component is required.
+
+How the responder works in Lamassu [#how-the-responder-works-in-lamassu]
+
+When a client requests the status of a certificate, the responder locates the certificate by its serial number and determines its status from the internal record:
+
+* If the certificate is active, the response indicates `Good`.
+* If the certificate has been revoked, the response indicates `Revoked` and includes the revocation timestamp and the RFC 5280 reason code.
+* If the serial number is not found or the status is not recognizable, the response indicates `Unknown`.
+
+The OCSP response is signed by the issuing CA of the queried certificate, using the cryptographic engine associated with that CA. Lamassu does not use a delegated OCSP signing certificate: the CA acts directly as the responder.
+
+Each response has a validity window of 24 hours, reflected in the response's `thisUpdate` and `nextUpdate` fields. Clients that cache responses must take this window into account when determining how long a response remains valid.
+
+Embedding in issued certificates [#embedding-in-issued-certificates]
+
+The OCSP responder URL is automatically embedded in the AIA (*Authority Information Access*) extension of every certificate issued by Lamassu. Clients that verify certificates can read this URL directly from the certificate without additional configuration.
+
+HTTP endpoints [#http-endpoints]
+
+The responder accepts both formats defined in RFC 6960:
+
+* `GET /ocsp/{ocsp_request}` includes the OCSP request Base64url-encoded within the URL itself.
+* `POST /ocsp` sends the request in the body with `Content-Type: application/ocsp-request`.
+
+Example query with `curl` using POST:
+
+```bash
+curl -X POST https://<LAMASSU_HOST>/ocsp \
+  -H "Content-Type: application/ocsp-request" \
+  --data-binary @request.der \
+  -o response.der
+```
+
+The response has `Content-Type: application/ocsp-response` and contains the OCSP response in DER format.
+
+Check from the interface [#check-from-the-interface]
+
+From the certificates screen of Lamassu you can launch an OCSP request directly against the selected certificate with the **OCSP Check** action. This action shows the status returned by the responder without needing external tools.
+
+References [#references]
+
+* RFC 6960 - *X.509 Internet Public Key Infrastructure Online Certificate Status Protocol – OCSP*
+* RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile* (revocation reasons, section 5.3.1)
+
+<Cards>
+  <Card title="CRL service" href="/docs/platform/pki/crl" />
+
+  <Card title="Certificate validation" href="/docs/platform/pki/certificate-validation" />
+</Cards>

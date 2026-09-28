@@ -1,0 +1,111 @@
+# Certificate profiles (/docs/pr-preview/pr-28/platform/pki/certificate-profiles)
+
+
+
+An issuance profile turns a certificate policy into reusable configuration. Instead of deciding validity, subject, extensions and algorithms on every request, you define once what is allowed and attach the profile to a CA, a DMS or a specific issuance.
+
+What a profile controls [#what-a-profile-controls]
+
+Validity [#validity]
+
+You can express the lifetime as a duration from the moment of issuance or as a fixed end date. A duration works well for recurring identities; a common date is useful to make a whole batch end before a migration or retirement.
+
+The end date must never outlive the issuing CA.
+
+CA certificate or end-entity certificate [#ca-certificate-or-end-entity-certificate]
+
+`Sign as CA` sets `IsCA` and the basic constraints needed for an authority. Enable it only in profiles intended to create or reissue subordinate CAs.
+
+Key Usage and Extended Key Usage [#key-usage-and-extended-key-usage]
+
+The profile can enforce usages such as `DigitalSignature`, `KeyEncipherment`, `CertSign`, `CRLSign`, `ClientAuth`, `ServerAuth` or `OCSPSigning`.
+
+If you enable **Honor Key Usage** or **Honor Extended Key Usages**, Lamassu keeps the values requested by the CSR. If you disable them, it replaces them with the ones defined in the profile.
+
+<Callout type="warn" title="Honor means delegating part of the policy">
+  Do not enable the `Honor…` options for untrusted requests unless another component validates those fields. Otherwise, the requester may choose broader capabilities than intended.
+</Callout>
+
+Subject [#subject]
+
+With **Honor Subject**, the certificate keeps the subject of the CSR. Without that option, Lamassu applies the profile's `CN`, `O`, `OU`, `C`, `ST` and `L`. If the profile does not define a `Common Name`, the requested CN is kept.
+
+CSR extensions [#csr-extensions]
+
+With **Honor Extensions**, Lamassu filters the additional requested extensions and keeps only SAN. Without that option, it discards the CSR's additional extensions.
+
+This behavior allows accepting DNS, IP, email or URI as alternative identities without accepting arbitrary extensions.
+
+Cryptographic constraints [#cryptographic-constraints]
+
+The cryptographic enforcement can:
+
+* allow or block RSA keys;
+* limit the supported RSA sizes;
+* allow or block ECDSA keys;
+* limit the supported ECDSA sizes or curves.
+
+When it is enabled, Lamassu checks the public key before creating a CA or signing a CSR. A key whose type or size is not listed in the profile is rejected.
+
+Profile precedence [#profile-precedence]
+
+In operations that accept multiple sources, Lamassu resolves the profile in this order:
+
+1. The profile sent within the operation.
+2. The profile identifier sent in the operation.
+3. The default profile associated with the CA.
+
+A DMS can also reference its own issuance profile. This way, several fleets can use the same CA with different policies.
+
+Create a profile [#create-a-profile]
+
+<Steps>
+  <Step>
+    Define a single purpose [#define-a-single-purpose]
+
+    Separate, for example, mTLS devices, servers and intermediate CAs. A small, specific profile is easier to review than one that allows every use.
+  </Step>
+
+  <Step>
+    Choose the validity [#choose-the-validity]
+
+    Align the duration with the fleet's real renewal capacity. Leave margin against the CA's expiration.
+  </Step>
+
+  <Step>
+    Fix usages and subject [#fix-usages-and-subject]
+
+    For a device that authenticates as a client, the usual starting point is `DigitalSignature` and `ClientAuth`. Add `ServerAuth` or `KeyEncipherment` only if the protocol needs it.
+  </Step>
+
+  <Step>
+    Constrain the keys [#constrain-the-keys]
+
+    Enable cryptographic enforcement and list only algorithms and sizes compatible with your policy and your devices.
+  </Step>
+
+  <Step>
+    Attach it and test [#attach-it-and-test]
+
+    Attach the profile to a CA or DMS. Issue a test certificate and check subject, SAN, KU, EKU, basic constraints and dates with an independent X.509 tool.
+  </Step>
+</Steps>
+
+Design examples [#design-examples]
+
+**mTLS device**\
+End-entity certificate, short validity, `DigitalSignature`, `ClientAuth`, subject controlled by the DMS and SAN allowed when it identifies the device.
+
+**TLS server**\
+End-entity certificate, `DigitalSignature`, `ServerAuth` and mandatory SAN with the names clients will use.
+
+**Intermediate CA**\
+`Sign as CA`, `CertSign` and `CRLSign`, validity longer than its end-entity certificates and stricter cryptographic constraints.
+
+These are starting patterns, not a universal policy. Always verify the requirements of the protocol, the consumer and the applicable regulatory framework.
+
+Changes and deletion [#changes-and-deletion]
+
+Updating a profile affects future issuances; it does not modify already-signed certificates. Test changes before applying them to a CA in production and keep the operational justification.
+
+Before deleting a profile, check that no CA or DMS depends on it. If you want to replace it, create the new version, update the references and perform a test issuance before retiring the old one.

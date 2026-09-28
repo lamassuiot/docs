@@ -1,0 +1,174 @@
+# Certification authorities (/docs/pr-preview/pr-28/platform/pki/certificate-authorities)
+
+
+
+A certification authority (CA) binds identities to public keys through signed certificates. In Lamassu you can create a new hierarchy, use a key already in the KMS or incorporate an external CA.
+
+To design a full chain or replace an authority in production, see [CA hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation). If you need to standardize what each authority can sign, use [Certificate profiles](/docs/platform/pki/certificate-profiles).
+
+Choose a flow [#choose-a-flow]
+
+* **New CA with a new key:** create a root of trust from scratch. Lamassu generates and keeps the key pair.
+* **New CA from the KMS:** reuse a key already registered in the platform.
+* **Import a CA with its private key:** incorporate an external authority that Lamassu can issue with.
+* **Import only the certificate:** add an authority for building chains and validating, but not for issuing.
+
+First time here? Follow [Create your first CA](/docs/platform/pki/quickstarts/create-certificate-authority) to complete the minimal journey.
+
+Create a new authority [#create-a-new-authority]
+
+Before you begin [#before-you-begin]
+
+* Decide whether the CA will be a root or an intermediate.
+* Choose the engine that will keep the key.
+* Define a validity longer than that of the certificates it will issue.
+* For an intermediate CA, make sure the parent CA is active.
+
+<Steps>
+  <Step>
+    Open the wizard [#open-the-wizard]
+
+    In **Certification Authorities**, select **Create New CA** and choose to generate a new key pair.
+  </Step>
+
+  <Step>
+    Configure the key [#configure-the-key]
+
+    Select the cryptographic engine, the algorithm and the size or curve. Lamassu supports RSA and EC keys according to the engine's capabilities.
+
+    For RSA you can choose 1024, 2048, 3072 or 4096 bits. For EC, the P-256, P-384 and P-521 curves are available.
+  </Step>
+
+  <Step>
+    Choose the CA type [#choose-the-ca-type]
+
+    Select **Root CA** for a self-signed authority or **Intermediate CA** for an authority signed by another CA. In the latter case, choose the issuing CA.
+  </Step>
+
+  <Step>
+    Define the identity [#define-the-identity]
+
+    Enter a unique **CA Name**. This name becomes the certificate's `Common Name`. Complete the Distinguished Name fields your policy requires:
+
+    * `C`: two-letter ISO 3166-1 country code.
+    * `ST`: state or province.
+    * `L`: locality.
+    * `O`: organization.
+    * `OU`: organizational unit.
+
+    The CA's internal identifier is generated automatically and cannot be changed.
+  </Step>
+
+  <Step>
+    Configure validity and uses [#configure-validity-and-uses]
+
+    Define **CA Certificate Expiration** and **Default End-Entity Certificate Issuance Expiration**. You can express a duration (`5y 8w 4d`), pick a date or use the maximum allowed date.
+
+    Select an existing issuance profile or configure the `Key Usage` and `Extended Key Usage` in the form. If you don't choose a profile, Lamassu applies the default basic usages.
+  </Step>
+
+  <Step>
+    Create and verify [#create-and-verify]
+
+    Confirm the form. The CA should appear in the inventory with its PEM certificate, status, expiration date and list of issued certificates.
+  </Step>
+</Steps>
+
+<Callout type="warn" title="Plan validity as a hierarchy">
+  A CA cannot issue certificates that outlive its own expiration date. Leave enough margin to renew or replace the authority without interrupting consumers.
+</Callout>
+
+Use a key from the KMS [#use-a-key-from-the-kms]
+
+Select **Create New CA (Existing Key)** when the key is already registered in Lamassu. The wizard first asks for the backing key and then shows the same configuration of type, identity, validity and profile.
+
+This flow is useful when the key was previously created in an HSM, imported through BYOK or must be reused under a specific custody policy.
+
+Import an external CA [#import-an-external-ca]
+
+Importing preserves an authority created outside Lamassu.
+
+<Steps>
+  <Step>
+    Select the engine [#select-the-engine]
+
+    Choose the engine that will keep the imported key.
+  </Step>
+
+  <Step>
+    Load the material [#load-the-material]
+
+    Provide the CA certificate and the private key in PEM format. For a subordinate CA, optionally add the validation chain.
+  </Step>
+
+  <Step>
+    Define the default issuance [#define-the-default-issuance]
+
+    Configure the validity that end-entity certificates will receive when a request does not specify another duration.
+  </Step>
+
+  <Step>
+    Verify the import [#verify-the-import]
+
+    Lamassu checks that the certificate belongs to a CA and that the material is coherent before registering it.
+  </Step>
+</Steps>
+
+If you don't have the private key, import only the certificate. The authority can take part in chains of trust and validation processes, but it cannot issue certificates from Lamassu.
+
+Inspect an authority [#inspect-an-authority]
+
+Open a CA from the inventory to review:
+
+* Status and validity period.
+* Certificate and chain in PEM format.
+* Number of active, expired and revoked certificates.
+* Certificates issued in **Issued Certificates**.
+* The CRL linked to the authority.
+* Metadata and the associated cryptographic engine.
+
+You can filter the inventory by name, status and CA type.
+
+Issue certificates [#issue-certificates]
+
+You can start an issuance from **Issued Certificates**, from a CA's action menu or from the global certificate inventory.
+
+**Generate Key & CSR in Browser** is useful for a manual operation or a quick test. The browser generates the key and you must download it at the end.
+
+**Upload Existing CSR** is the right option when the key must remain on the target system. Lamassu receives the request but never the private key.
+
+Follow [Issue your first certificate](/docs/platform/pki/quickstarts/issue-certificate) for the guided flow. [Certificate management](/docs/platform/pki/certificates) explains the inventory, inspection and revocation.
+
+Revoke a CA [#revoke-a-ca]
+
+<Callout type="warn" title="Revocation affects the entire dependent chain">
+  Revoking a CA invalidates trust in the certificates it issued and can interrupt devices and services. The action is irreversible.
+</Callout>
+
+<Steps>
+  <Step>
+    Assess the impact [#assess-the-impact]
+
+    Identify the certificates, devices and consumers that depend on the CA. Prepare a replacement authority and chain when necessary.
+  </Step>
+
+  <Step>
+    Start the revocation [#start-the-revocation]
+
+    Open the authority and select **Revoke CA**. Choose the reason that describes the incident, for example `KeyCompromise`, `CACompromise`, `Superseded` or `CessationOfOperation`.
+  </Step>
+
+  <Step>
+    Confirm the identity [#confirm-the-identity]
+
+    Type the CA's name exactly to enable **Confirm Revocation**.
+  </Step>
+
+  <Step>
+    Check the publication [#check-the-publication]
+
+    The status should change to **REVOKED** and the CRL should reflect the new information. The CA can no longer issue certificates.
+  </Step>
+</Steps>
+
+Permanent deletion is only available after revoking. Delete the record only when your retention and audit policy allows it.

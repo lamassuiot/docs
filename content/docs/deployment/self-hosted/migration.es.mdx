@@ -1,0 +1,228 @@
+---
+title: Actualiza el chart de Helm
+description: Actualiza un despliegue de Lamassu gestionado con Helm, incluida la migración del chart de 3.8.0 a 4.0.0 y los pasos de datos persistentes de KMS y VA.
+---
+
+# Actualiza el chart de Helm
+
+Usa esta guía para actualizar un despliegue gestionado con Helm. Recorre la migración del chart de 3.8.0 a 4.0.0 por completo: los valores que debes revisar, los cambios de base de datos que el chart aplica automáticamente y los pasos manuales para las instalaciones que mantienen claves KMS o CRL de VA en volúmenes locales. Las notas específicas de otras versiones están en el directorio [`charts/lamassu/CHANGELOG/`](https://github.com/lamassuiot/lamassu-helm/tree/main/charts/lamassu/CHANGELOG) del repositorio `lamassu-helm`.
+
+<Callout type="info" title="Las instalaciones nuevas no tienen nada que migrar">
+  Si no actualizas un release existente, ve directamente a [Instala con Helm](/docs/deployment/self-hosted/helm). Los pasos manuales de datos de esta página solo aplican a despliegues actualizados desde 3.8.x que usan almacenamiento local de KMS o VA.
+</Callout>
+
+## Qué cambia en la 4.0.0
+
+La versión 4.0.0 es un release de hardening de seguridad. Tres cambios afectan a las actualizaciones:
+
+- **Nombres de recursos dependientes del release.** Todos los recursos gestionados por el chart se llaman ahora `<release>-lamassu-<componente>`, por ejemplo `lamassu-kms`, en lugar de los nombres fijos sin ámbito usados en 3.8.0 (`kms`, `va`, `ca`, ...). Con un release llamado `prod`, los StatefulSets pasan a ser `prod-lamassu-kms` y `prod-lamassu-va`, no `prod-kms`. Los valores `nameOverride` y `fullnameOverride` cambian el prefijo.
+- **Contenedores sin root.** Todas las cargas de trabajo se ejecutan como el usuario numérico `65532:65532` con perfil seccomp `RuntimeDefault` y capacidades eliminadas. Los pods no montan el token del service account por defecto y el chart crea una ServiceAccount dedicada.
+- **Validación estricta de valores.** `values.schema.json` rechaza claves de nivel superior desconocidas, por lo que los bloques heredados de 3.8.0 fallan en `helm lint` y `helm upgrade` en lugar de ignorarse en silencio.
+
+`services.connectors` pasa además a ser un mapa indexado por el ID del conector, y el chart ya no inyecta anti-afinidad de pods ni reglas de topology spread.
+
+<Callout type="warn" title="El renombrado no es cosmético para KMS y VA">
+  Kubernetes deriva el nombre del PVC del nombre del pod del StatefulSet (`<volumeClaimTemplate>-<nombre-del-pod>`). Renombrar los StatefulSets `kms` y `va` hace que `helm upgrade` enlace PVC nuevos y vacíos en lugar de los existentes. Tu material de claves de KMS y las CRL de VA no se eliminan — los PVC antiguos quedan huérfanos, no destruidos — pero los pods actualizados no los encuentran y fallan con `no such file or directory` (KMS) o `code=NotFound` (VA) hasta que muevas los datos manualmente. Todos los demás recursos renombrados son sin estado y se recrean sin riesgo de pérdida de datos.
+</Callout>
+
+## Qué hace automáticamente el job de upgrade
+
+Antes de que arranque cualquier servicio, el job de pre-install/pre-upgrade del chart prepara PostgreSQL:
+
+1. Crea las bases de datos `pki`, `authz` y `wfx` si no existen.
+2. Garantiza un schema por base de datos de servicio (`alerts`, `ca`, `va`, `devicemanager`, `dmsmanager`, `kms`) dentro de la base de datos compartida `pki` y consolida en ella las bases de datos separadas por servicio de 3.8.0, importando sus datos.
+3. Ejecuta las migraciones de base de datos de cada schema.
+4. Migra authz, precarga sus políticas y provisiona los principales de `services.authz.bootstrap`.
+
+El job es idempotente, por lo que un upgrade fallido puede reintentarse. Requiere un rol de PostgreSQL autorizado para crear bases de datos y schemas, como se describe en [Instala con Helm](/docs/deployment/self-hosted/helm#antes-de-comenzar).
+
+## Antes de actualizar
+
+1. Anota los nombres de tus PVC existentes de almacenamiento local:
+
+```bash
+export NAMESPACE=lamassu   # namespace de tu instalación 3.8.0
+export RELEASE=lamassu     # nombre de tu release de Helm
+
+kubectl get pvc -n $NAMESPACE -l app.kubernetes.io/instance=$RELEASE
+# en una instalación 3.8.0 también puedes listar los nombres fijos directamente:
+kubectl get pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0
+```
+
+`helm upgrade` no toca ni elimina los PVC antiguos, pero tras el upgrade nada los referencia. Necesitas sus nombres para copiar los datos y limpiar después; no los elimines hasta verificar los volúmenes nuevos.
+
+2. Elimina los valores que el schema estricto ahora rechaza, por ejemplo el bloque antiguo `toolbox:`. [Actualiza el archivo de valores](#actualiza-el-archivo-de-valores) recoge cada renombrado.
+
+## Actualiza el archivo de valores
+
+**Añade `services.authz` (obligatorio).** La 3.8.0 no tenía servicio de autorización: toda ruta aceptaba cualquier token válido. La 4.0.0 añade autorización fina a nivel de entidad, y un archivo de valores de 3.8.0 no tiene nada que migrar — debes añadir la configuración:
+
+```yaml
+services:
+  authz:
+    credentials:
+      pki:
+        database: pki
+      authz:
+        database: authz
+```
+
+- `authz` es el almacenamiento propio del servicio de autorización para principales, grants y políticas (`services.authz.database`, `authz` por defecto).
+- `pki` es la base de datos que el motor de autorización consulta al evaluar políticas contra entidades como CA, certificados, dispositivos, DMS, claves KMS y roles de VA.
+- De cada entrada de credentials solo se lee el campo `database`. Los parámetros de conexión siempre provienen de los valores globales `postgres.hostname`, `postgres.port`, `postgres.username` y `postgres.password`.
+- Comprueba que `services.authz.bootstrap` (presente por defecto en el chart) coincide con cómo tu proveedor OIDC asigna el rol de realm `pki-admin`. Sin un principal que coincida con la regla de bootstrap, nadie podrá administrar la PKI — no existe un superusuario implícito.
+
+**Renombra `toolbox` a `connectivityTest`.** El hook de conectividad de `helm test` usa ahora la imagen `curlimages/curl`, mantenida upstream y fijada por digest, en lugar de la imagen de toolbox propia del chart:
+
+```yaml
+# ANTIGUO (3.8.0)
+toolbox:
+  image: ghcr.io/lamassuiot/toolbox:2.2.0
+
+# NUEVO (4.0.0)
+connectivityTest:
+  image: curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+```
+
+**Elimina las sobrecargas de identidad por servicio.** `services.kms.securityContext.runAsGroup: 0` y `services.authz.securityContext.runAsUser`/`runAsGroup: 999` ya no existen. Todos los servicios se ejecutan con el `65532:65532` global del chart, y el acceso de grupo a los volúmenes de KMS y al socket PKCS#11 se gestiona automáticamente mediante el `fsGroup: 65532` del pod.
+
+**Convierte `services.connectors` en un mapa.** Cada entrada se indexa por su ID estable de conector y declara `type` e `image`:
+
+```yaml
+services:
+  connectors:
+    aws.myconnector:
+      type: awsiot
+      image: ghcr.io/lamassuiot/lamassu-aws-connector:dev-v4
+```
+
+**Revisa los valores del emisor TLS.** Con `tls.certManagerOptions.issuer` vacío (el valor por defecto), el chart crea un emisor self-signed dependiente del release — por ejemplo `lamassu-downstream-ca-selfsigned-issuer` con el release `lamassu`. El valor legado literal `downstream-ca-selfsigned-issuer` de los values de la era 3.8.0 sigue aceptándose y resuelve al mismo emisor dependiente del release; apunta `tls.certManagerOptions.clusterIssuer` a tu propio emisor para TLS corporativo.
+
+**Revisa scheduling y puertos.** El chart ya no inyecta anti-afinidad de pods ni restricciones de topology spread — configura `affinity` y `topologySpreadConstraints` explícitamente donde tu clúster las necesite. El valor por defecto de `services.ui.port` es ahora `8085`, el puerto sin privilegios global del chart que usa la imagen sin root, así que actualiza las sobrecargas que fijaban `80`. El bloque compartido `probes:` se sustituye por bloques independientes `livenessProbe`, `readinessProbe` y `startupProbe`.
+
+## Ejecuta el upgrade
+
+```bash
+helm upgrade --install "$RELEASE" lamassu/lamassu \
+  --namespace $NAMESPACE \
+  --values values.yaml \
+  --wait
+```
+
+Helm ejecuta el job de base de datos antes de aplicar cualquier carga de trabajo, por lo que ningún servicio arranca contra una base de datos sin preparar. Si la validación rechaza valores desconocidos, corrige el archivo y vuelve a ejecutarlo.
+
+## Migra los datos de KMS y VA
+
+Omite esta sección en instalaciones nuevas, o si `services.kms.cryptoEngines` nunca usó un motor `filesystem` y `services.va.fileStore.type` nunca fue `local`.
+
+1. **Identifica los nuevos StatefulSets y PVC.** Sus nombres dependen del nombre del release y de cualquier `nameOverride`/`fullnameOverride`; el nombre del PVC es `<volumeClaimTemplate>-<nombre-del-StatefulSet>-0`:
+
+```bash
+KMS_STS=$(kubectl get statefulset -n "$NAMESPACE" \
+  -l "app.kubernetes.io/instance=$RELEASE,app.kubernetes.io/component=kms" \
+  -o jsonpath='{.items[0].metadata.name}')
+VA_STS=$(kubectl get statefulset -n "$NAMESPACE" \
+  -l "app.kubernetes.io/instance=$RELEASE,app.kubernetes.io/component=va" \
+  -o jsonpath='{.items[0].metadata.name}')
+
+KMS_PVC="golang-engine-storage-${KMS_STS}-0"
+VA_PVC="local-crl-file-storage-${VA_STS}-0"
+
+kubectl get pvc -n "$NAMESPACE" \
+  golang-engine-storage-kms-0 "$KMS_PVC" \
+  local-crl-file-storage-va-0 "$VA_PVC"
+```
+
+Con el release `lamassu` y el nombre de chart por defecto, los nuevos PVC son `golang-engine-storage-lamassu-kms-0` y `local-crl-file-storage-lamassu-va-0`; con el release `prod` son `golang-engine-storage-prod-lamassu-kms-0` y `local-crl-file-storage-prod-lamassu-va-0`. Comprueba que existen los PVC antiguos y nuevos antes de continuar.
+
+2. **Reduce a cero los nuevos StatefulSets** para que nada escriba en ninguno de los volúmenes mientras copias:
+
+```bash
+kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" "$VA_STS" --replicas=0
+```
+
+3. **Arranca un pod auxiliar efímero** que monte las cuatro PVC:
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-migrate-helper
+  namespace: $NAMESPACE
+spec:
+  restartPolicy: Never
+  containers:
+    - name: migrate
+      image: docker.io/library/alpine:3.20
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - {name: old-kms, mountPath: /old/kms}
+        - {name: new-kms, mountPath: /new/kms}
+        - {name: old-va,  mountPath: /old/va}
+        - {name: new-va,  mountPath: /new/va}
+  volumes:
+    - {name: old-kms, persistentVolumeClaim: {claimName: golang-engine-storage-kms-0}}
+    - {name: new-kms, persistentVolumeClaim: {claimName: $KMS_PVC}}
+    - {name: old-va,  persistentVolumeClaim: {claimName: local-crl-file-storage-va-0}}
+    - {name: new-va,  persistentVolumeClaim: {claimName: $VA_PVC}}
+EOF
+
+kubectl wait -n $NAMESPACE --for=condition=Ready pod/pvc-migrate-helper --timeout=60s
+```
+
+4. **Inspecciona antes de escribir** para no machacar datos que los pods nuevos pudieran haber escrito ya:
+
+```bash
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c 'find /new/kms /new/va -type f'
+```
+
+Un resultado vacío es lo habitual: el pod propio de un StatefulSet rara vez llega a escribir nada cuando le faltan sus datos.
+
+5. **Copia los datos y ajusta la propiedad**:
+
+```bash
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
+  cp -a /old/kms/. /new/kms/ &&
+  cp -a /old/va/. /new/va/ &&
+  chown -R 65532:65532 /new/kms /new/va
+'
+```
+
+El `chown` es obligatorio aunque los archivos antiguos ya parezcan ser de un usuario sin root. La 3.8.0 no fijaba la identidad del contenedor, por lo que los archivos podían llevar cualquier UID declarado por la imagen; la 4.0.0 exige exactamente `65532:65532` y no retrocede a lo que declare la imagen.
+
+6. **Vuelve a escalar y elimina el auxiliar**:
+
+```bash
+kubectl delete pod -n $NAMESPACE pvc-migrate-helper
+kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" "$VA_STS" --replicas=1
+```
+
+## Verifica la migración
+
+- Los logs de KMS y VA no muestran errores `no such file or directory` ni `code=NotFound`.
+- Una CRL emitida anteriormente vuelve a servirse: `GET /crl/<ca-ski>` sobre VA.
+- `helm test "$RELEASE" -n $NAMESPACE --logs` pasa; el hook de conectividad comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y la respuesta de la UI.
+- Inicia sesión con una identidad de administrador y confirma que las operaciones están autorizadas.
+
+## Elimina los volúmenes antiguos
+
+Solo cuando todo funcione, elimina los volúmenes huérfanos de 3.8.0 para recuperar almacenamiento:
+
+```bash
+kubectl delete pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0
+```
+
+## Resolución de problemas
+
+- **Los pods de KMS o VA fallan con `no such file or directory` o `code=NotFound` justo después del upgrade.** Los pods nuevos están enlazados a los PVC nuevos y vacíos y la migración de datos todavía no se ha ejecutado, o se copió en el PVC equivocado. Sigue [Migra los datos de KMS y VA](#migra-los-datos-de-kms-y-va) y comprueba que existen las cuatro PVC.
+- **`helm upgrade` falla con un error de validación de clave desconocida.** Elimina o renombra los valores heredados — normalmente el bloque `toolbox:` — porque el schema estricto rechaza claves de nivel superior desconocidas.
+- **El upgrade falla en el job de base de datos.** El rol de PostgreSQL no puede crear bases de datos ni schemas; concede los privilegios necesarios, o crea tú mismo las bases de datos `pki`, `authz` y `wfx`, y vuelve a ejecutar el upgrade.
+- **Nadie puede iniciar sesión tras el upgrade.** Comprueba que `services.authz.bootstrap` coincide con un rol que tu proveedor OIDC asigna realmente (ver [Control de acceso](/docs/platform/pki/access-control)) y que el job de migración terminó correctamente.
+
+## Páginas relacionadas
+
+<Cards>
+  <Card title="Instala con Helm" description="Prepara dependencias, configura valores e instala un despliegue controlado." href="/docs/deployment/self-hosted/helm" />
+  <Card title="Expón el Gateway" description="Elige un diseño de tráfico externo y gestiona el direccionamiento del Gateway." href="/docs/deployment/self-hosted/networking" />
+</Cards>

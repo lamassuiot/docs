@@ -27,6 +27,7 @@ import type { ReactNode } from "react";
 import { redirect } from "react-router";
 import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions";
 import { ArchitectureDiagram } from "@/components/architecture-diagram";
+import { CACreationAnimation } from "@/components/ca-creation-animation";
 import {
   type AffectedPages,
   DiffText,
@@ -496,6 +497,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               Step,
               Steps,
               ArchitectureDiagram,
+              CACreationAnimation,
             }}
           />
         </DocsBody>

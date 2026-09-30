@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f0f8ff">
+  <meta name="robots" content="noindex">
+  <title>Lamassu | CA creation</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: hsl(208 100% 97%);
+      --surface: #ffffff;
+      --surface-muted: hsl(210 40% 92%);
+      --nav: hsl(210 60% 96%);
+      --nav-muted: hsl(210 35% 45%);
+      --ink: hsl(222 84% 5%);
+      --muted: hsl(210 35% 45%);
+      --line: hsl(210 40% 85%);
+      --primary: hsl(217 100% 53%);
+      --primary-hover: hsl(217 100% 46%);
+      --primary-soft: hsl(210 80% 92%);
+      --green: #21775c;
+      --green-soft: #e6f4ed;
+      --blue: var(--primary);
+      --blue-soft: var(--primary-soft);
+      --shadow: 0 12px 30px rgba(16, 65, 140, .12);
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--page);
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: var(--page); }
+    button { font: inherit; }
+    .icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+    .lucide { display: block; width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .icon-20 { width: 20px; height: 20px; }
+    .icon-24 { width: 24px; height: 24px; }
+    .demo { width: min(1180px, 100%); margin: 0 auto; padding: 24px; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .fake-action:focus-visible, .back-button:focus-visible { outline: 3px solid #80aefc; outline-offset: 3px; }
+
+    .product-window { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: var(--shadow); }
+    .demo-cursor { position: absolute; z-index: 10; top: 0; left: 0; width: 12px; height: 12px; border: 2px solid #fff; border-radius: 50%; opacity: 0; pointer-events: none; background: var(--primary); box-shadow: 0 1px 5px rgba(24,24,27,.45), 0 0 0 1px rgba(15,103,255,.8); transform: translate3d(-40px, -40px, 0); transition: opacity .2s ease, transform .65s cubic-bezier(.22, 1, .36, 1); }
+    .demo-cursor.visible { opacity: 1; }
+    .demo-cursor::after { position: absolute; top: -6px; left: -6px; width: 22px; height: 22px; border: 1.5px solid var(--primary); border-radius: 50%; content: ""; opacity: 0; pointer-events: none; }
+    .demo-cursor.is-clicking::after { animation: cursor-click .42s ease-out; }
+    @keyframes cursor-click { 0% { opacity: .75; transform: scale(.3); } 100% { opacity: 0; transform: scale(1.35); } }
+    .product-topbar { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 16px; border-bottom: 1px solid hsl(217 100% 43%); color: #fff; background: var(--primary); }
+    .brand, .brand-left, .topbar-right, .account-button { display: inline-flex; align-items: center; }
+    .brand { gap: 12px; color: #fff; font-size: 13px; font-weight: 700; }
+    .brand-left { gap: 12px; }
+    .brand-mark { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid rgba(255,255,255,.55); border-radius: 5px; color: white; background: rgba(255,255,255,.08); font-size: 11px; font-weight: 750; }
+    .lamassu-logo { display: block; width: 156px; max-height: 29px; object-fit: contain; }
+    .topbar-right { gap: 13px; color: rgba(255,255,255,.9); font-size: 12px; }
+    .sidebar-toggle, .theme-symbol { display: grid; width: 29px; height: 29px; flex: none; place-items: center; border: 0; border-radius: 5px; color: #fff; background: transparent; }
+    .theme-symbol { cursor: pointer; }
+    .theme-symbol:hover { background: rgba(255,255,255,.12); }
+    .theme-symbol:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .account-button { gap: 8px; padding: 3px 0; border: 0; border-radius: 0; color: white; background: transparent; font-size: 11px; }
+    .avatar { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 50%; color: #fff; background: rgba(255,255,255,.2); }
+    .product-grid { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 590px; }
+    .sidebar { padding: 18px 12px; color: #18181b; background: var(--nav); border-right: 1px solid var(--line); }
+    .workspace-label { margin: 15px 9px 5px; color: var(--nav-muted); font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+    .workspace-label:first-child { margin-top: 0; }
+    .nav-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+    .nav-item { display: flex; align-items: center; gap: 11px; min-height: 34px; padding: 0 10px; border-radius: 5px; color: #27272a; font-size: 11px; }
+    .nav-item.active { color: #fff; background: var(--primary); box-shadow: inset 2px 0 hsl(217 100% 43%); }
+    .nav-symbol { width: 16px; height: 16px; flex: none; color: #71717a; }
+    .nav-item.active .nav-symbol { color: currentColor; }
+    .app-main { min-width: 0; padding: 24px 28px 30px; background: var(--page); }
+    .scene[hidden] { display: none; }
+    .scene.enter { animation: reveal .32s ease both; }
+    @keyframes reveal { from { opacity: .35; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+    .breadcrumb { margin: 0 0 18px; color: var(--muted); font-size: 11px; }
+    .page-title-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 19px; }
+    .ca-heading { display: flex; align-items: center; gap: 12px; }
+    .ca-heading-icon { color: var(--primary); }
+    .filters-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(120px, .55fr) minmax(120px, .55fr) auto; gap: 10px; align-items: end; margin: 20px 0 22px; }
+    .filter-field label { display: block; margin-bottom: 5px; color: #52525b; font-size: 10px; }
+    .filter-input { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; color: #52525b; background: white; font-size: 10px; }
+    .filter-input.select { gap: 5px; }
+    .filter-input.select .lucide { width: 14px; height: 14px; }
+    .filter-input.select .lucide-chevron-right { margin-left: auto; transform: rotate(90deg); }
+    .view-switch { display: flex; gap: 2px; padding: 3px; border-radius: 5px; background: #f4f4f5; }
+    .view-switch span { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 4px; color: #71717a; }
+    .view-switch .selected { color: #18181b; background: white; box-shadow: 0 1px 2px #0002; }
+    .ca-tree, .ca-children { margin: 0; padding: 0; list-style: none; }
+    .ca-entry { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px; border-radius: 5px; }
+    .ca-entry:hover { background: #f4f4f5; }
+    .ca-entry.newly-created { background: var(--primary-soft); box-shadow: inset 3px 0 var(--primary); }
+    .ca-entry-copy strong .new-badge { display: inline-block; margin: 0 0 0 6px; padding: 2px 5px; border: 1px solid #bfd8ff; border-radius: 3px; color: var(--primary); background: var(--primary-soft); font-size: 8px; font-weight: 700; line-height: 1.3; vertical-align: 1px; }
+    .ca-expand, .ca-engine { display: grid; width: 20px; height: 20px; flex: none; place-items: center; color: var(--primary); }
+    .ca-expand .lucide { opacity: 0; transition: opacity .18s ease; }
+    .ca-expand.open .lucide { opacity: 1; transform: rotate(90deg); }
+    .ca-entry-copy { flex: 1; min-width: 0; }
+    .ca-entry-copy strong { display: block; overflow: hidden; color: #18181b; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+    .ca-entry-copy span { display: block; margin-top: 2px; overflow: hidden; color: #71717a; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+    .ca-entry-actions { display: flex; flex: none; gap: 3px; }
+    .ca-entry-actions span { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 4px; color: #52525b; }
+    .ca-entry-actions span:hover { color: var(--ink); background: #e4e4e7; }
+    .ca-children { margin: 2px 0 4px 18px; padding-left: 14px; border-left: 1px dashed #d4d4d8; }
+    .page-title-row h2 { margin: 0; font-size: 20px; line-height: 1.3; font-weight: 650; }
+    .page-description { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .fake-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 0 12px; border: 1px solid var(--primary-hover); border-radius: 5px; color: #fff; background: var(--primary); font-size: 11px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+    .fake-action:hover { background: var(--primary-hover); }
+    .summary-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 17px; }
+    .summary-box { padding: 11px 13px; border: 1px solid var(--line); border-radius: 6px; background: white; }
+    .summary-box span { display: block; color: var(--muted); font-size: 10px; }
+    .summary-box strong { display: block; margin-top: 4px; font-size: 16px; font-weight: 650; }
+    .table-wrap { overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: white; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 10px 12px; color: #5a6d73; background: #f5f8f8; font-size: 10px; font-weight: 650; }
+    td { padding: 12px; border-top: 1px solid #e8edef; color: #51646a; font-size: 11px; }
+    td:first-child { color: #293f46; font-weight: 600; }
+    .status { display: inline-flex; align-items: center; gap: 6px; color: var(--green); font-size: 10px; font-weight: 650; }
+    .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #3b9c74; }
+    .fake-action.pulse, .method-row.pulse, .focus-card.pulse, .ca-entry.pulse { animation: pulse 1.1s ease-out; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(15,103,255,.28); } 100% { box-shadow: 0 0 0 9px rgba(15,103,255,0); } }
+
+    .method-list { overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: white; }
+    .method-row { display: flex; align-items: flex-start; gap: 13px; padding: 15px; border-bottom: 1px solid var(--line); }
+    .method-row:last-child { border-bottom: 0; }
+    .method-row.selected { background: var(--primary-soft); box-shadow: inset 3px 0 var(--primary); }
+    .method-icon { display: grid; width: 40px; height: 40px; flex: none; place-items: center; border: 1px solid #bfd8ff; border-radius: 6px; color: var(--primary); background: var(--primary-soft); }
+    .method-row strong { display: block; margin: 1px 0 4px; font-size: 12px; }
+    .method-row p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .method-tag { margin-left: auto; padding: 4px 7px; border: 1px solid #cbdcf3; border-radius: 4px; color: #355b8b; background: #f3f7ff; font-size: 9px; font-weight: 650; white-space: nowrap; }
+    .method-tag { display: inline-block; margin-left: 5px; border-color: #bfd8ff; color: #084bb8; background: #eaf2ff; vertical-align: 1px; }
+    .method-chevron { margin: 3px 0 0 auto; color: #71717a; }
+    .chooser-heading { margin: 22px auto 24px; text-align: center; }
+    .chooser-heading h2 { margin: 0; font-size: 20px; font-weight: 650; }
+    .chooser-heading p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+    .back-button { display: inline-flex; align-items: center; gap: 7px; min-height: 31px; margin: 0 0 16px; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; color: #3f3f46; background: white; font-size: 10px; cursor: pointer; }
+    .back-button:disabled { opacity: .65; cursor: progress; }
+    .field-label { margin: 12px 0 7px; color: #52525b; font-size: 10px; }
+
+    .form-layout { display: block; }
+    .form-stack { display: grid; gap: 14px; }
+    .focus-card { padding: 14px; border: 1px solid var(--line); border-radius: 6px; background: white; transition: border-color .2s, box-shadow .2s; }
+    .focus-card.is-current { border-color: #80aefc; box-shadow: 0 0 0 3px var(--primary-soft); }
+    .card-heading { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 12px; font-weight: 650; }
+    .card-heading .mini-symbol { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 4px; color: var(--blue); background: var(--blue-soft); font-size: 9px; font-weight: 750; }
+    .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .field { min-width: 0; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { display: block; margin-bottom: 4px; color: #596b71; font-size: 9px; font-weight: 600; }
+    .input-look { display: flex; align-items: center; min-height: 31px; overflow: hidden; padding: 0 9px; border: 1px solid #d8e1e4; border-radius: 4px; color: #30464c; background: #fff; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .input-look.readonly { color: #60747a; background: #f4f7f8; }
+    .input-look.select .lucide-chevron-right { margin-left: auto; transform: rotate(90deg); }
+    .input-look.control-large { min-height: 38px; padding-inline: 10px; border-radius: 5px; font-size: 10px; }
+    .engine-selector { display: flex; align-items: center; gap: 9px; min-height: 46px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 5px; background: #fff; }
+    .engine-selector-icon { display: grid; width: 36px; height: 36px; flex: none; place-items: center; padding: 6px; }
+    .engine-selector-logo { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .engine-selector-copy { flex: 1; min-width: 0; }
+    .engine-selector-name, .engine-selector-id { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .engine-selector-name { color: var(--ink); font-size: 10px; font-weight: 600; }
+    .engine-selector-id { margin-top: 2px; color: var(--muted); font-family: monospace; font-size: 9px; }
+    .engine-selector > .lucide-chevron-right { color: #71717a; }
+    .expiration-controls { display: grid; grid-template-columns: minmax(120px, .45fr) minmax(0, 1fr); gap: 8px; align-items: start; }
+    .duration-control { min-width: 0; }
+    .form-aside { display: grid; gap: 10px; }
+    .aside-card { padding: 13px; border: 1px solid var(--line); border-radius: 6px; background: white; }
+    .aside-card h3 { margin: 0 0 9px; font-size: 11px; font-weight: 650; }
+    .aside-row { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid #edf1f2; color: var(--muted); font-size: 9px; }
+    .aside-row strong { color: #334a51; font-size: 9px; font-weight: 600; text-align: right; }
+    .trust-tree { display: grid; justify-items: center; gap: 6px; padding: 3px 0; }
+    .tree-node { width: 100%; padding: 7px 8px; border: 1px solid #dce5e7; border-radius: 4px; background: #f8fafb; font-size: 9px; text-align: center; }
+    .tree-node.current { border-color: #80aefc; color: #084bb8; background: var(--primary-soft); }
+    .tree-connector { width: 1px; height: 9px; background: #91a4a9; }
+    .create-row { display: flex; justify-content: flex-end; padding-top: 4px; }
+    .form-page-heading { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 22px; }
+    .form-page-heading .ca-heading-icon { padding-top: 2px; }
+    .form-page-heading h2 { margin: 0; font-size: 20px; font-weight: 650; line-height: 1.35; }
+    .form-page-heading p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .section-heading { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; padding-bottom: 11px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 650; }
+    .section-heading span { display: inline-flex; color: var(--primary); }
+    .choice-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .choice { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 5px; color: #52525b; background: white; font-size: 10px; }
+    .choice.selected { border-color: #80aefc; background: var(--primary-soft); color: #084bb8; }
+    .choice small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.4; }
+    .profile-mode-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .profile-mode-option { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 5px; padding: 10px; border: 1px solid var(--line); border-radius: 5px; color: #3f3f46; background: white; text-align: left; }
+    .profile-mode-option.selected { padding: 9px; border: 2px solid #80aefc; color: #084bb8; background: var(--primary-soft); }
+    .profile-mode-option-title { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 650; }
+    .profile-mode-option-title .lucide { width: 16px; height: 16px; color: var(--muted); }
+    .profile-mode-option.selected .profile-mode-option-title .lucide { color: var(--primary); }
+    .profile-mode-option small { color: var(--muted); font-size: 9px; line-height: 1.4; }
+    .profile-select-field { width: 50%; margin-top: 12px; }
+    .profile-detail-card { overflow: hidden; margin-top: 12px; border: 1px solid var(--line); border-radius: 6px; background: white; }
+    .profile-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 12px; border-bottom: 1px solid var(--line); }
+    .profile-detail-identity { display: flex; min-width: 0; align-items: flex-start; gap: 8px; }
+    .profile-detail-icon { display: grid; width: 24px; height: 24px; flex: none; place-items: center; border-radius: 4px; color: var(--primary); background: var(--primary-soft); }
+    .profile-detail-icon .lucide { width: 14px; height: 14px; }
+    .profile-detail-title { margin: 0; font-size: 11px; font-weight: 650; }
+    .profile-detail-description { margin: 3px 0 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+    .profile-badges, .profile-policy-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+    .profile-badge { padding: 3px 6px; border: 1px solid #d4d4d8; border-radius: 4px; color: #52525b; background: white; font-size: 8px; font-weight: 600; line-height: 1.3; white-space: nowrap; }
+    .profile-detail-content { display: grid; gap: 12px; padding: 12px; }
+    .profile-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .profile-summary-item { min-width: 0; }
+    .profile-summary-label { margin: 0; color: var(--muted); font-size: 9px; font-weight: 600; }
+    .profile-summary-value { margin: 3px 0 0; color: var(--ink); font-size: 10px; }
+    .profile-policy-row { padding-top: 9px; border-top: 1px solid var(--line); }
+    .profile-policy-label { margin: 0; color: var(--ink); font-size: 9px; font-weight: 600; }
+    .profile-policy-value { margin: 3px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+    .profile-policy-badges { margin-top: 6px; }
+    .inline-fields { display: flex; flex-wrap: wrap; gap: 7px; }
+    .inline-fields .input-look { flex: 1 1 140px; }
+    .field-note { margin: 5px 0 0; color: #a43f28; font-size: 9px; }
+    .field-hint { margin: 8px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .create-row .fake-action { min-height: 34px; }
+    .create-row .fake-action[aria-busy="true"] { opacity: .78; }
+    .spinner { display: inline-block; width: 11px; height: 11px; margin-right: 7px; border: 2px solid rgba(255,255,255,.45); border-top-color: white; border-radius: 50%; vertical-align: -2px; animation: spin .75s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .success-panel { max-width: 680px; margin: 4px auto; padding: 24px; border: 1px solid #e4e4e7; border-radius: 7px; background: white; }
+    .success-heading { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 17px; border-bottom: 1px solid #e5ece8; }
+    .success-check { display: grid; width: 34px; height: 34px; flex: none; place-items: center; border-radius: 50%; color: white; background: var(--green); font-size: 17px; font-weight: 700; }
+    .success-heading h3 { margin: 0 0 4px; font-size: 16px; }
+    .success-heading p { margin: 0; color: var(--muted); font-size: 11px; }
+    .result-title { margin: 18px 0 12px; font-size: 14px; font-weight: 650; }
+    .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 20px; }
+    .result-item { padding: 8px 0; border-bottom: 1px solid #edf1f2; }
+    .result-item span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 9px; }
+    .result-item strong { color: #334a51; font-size: 11px; font-weight: 600; overflow-wrap: anywhere; }
+    .result-tree { display: flex; align-items: center; gap: 9px; margin-top: 16px; padding: 11px; border: 1px solid #e0e9e5; border-radius: 5px; background: #f8fbf9; }
+    .result-tree span { color: var(--muted); font-size: 9px; }
+    .result-tree strong { color: #34564a; font-size: 10px; font-weight: 650; }
+    .result-arrow { color: #86a398; font-size: 12px; }
+    .toast { position: absolute; top: 62px; right: 18px; z-index: 3; display: flex; width: min(340px, calc(100% - 36px)); align-items: flex-start; gap: 10px; padding: 13px 14px; border: 1px solid #303036; border-radius: 7px; color: #fff; background: #18181b; box-shadow: 0 8px 20px rgba(0,0,0,.22); animation: toast-in .35s ease both; }
+    .toast-icon { display: grid; width: 25px; height: 25px; flex: none; place-items: center; border-radius: 50%; color: #86efac; background: rgba(134,239,172,.14); }
+    .toast-icon .lucide { width: 14px; height: 14px; }
+    .toast-copy { min-width: 0; }
+    .toast-title { display: block; font-size: 11px; font-weight: 650; line-height: 1.35; }
+    .toast-description { display: block; margin-top: 4px; color: rgba(255,255,255,.75); font-size: 10px; font-weight: 400; line-height: 1.45; overflow-wrap: anywhere; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: none; } }
+
+    @media (max-width: 960px) {
+      .demo { padding: 18px 14px; }
+      .product-grid { grid-template-columns: 58px minmax(0, 1fr); }
+      .sidebar { padding-inline: 7px; }
+      .nav-symbol { color: #526b85; }
+      .workspace-label, .nav-item > span:last-child { display: none; }
+      .nav-item { justify-content: center; padding: 0; }
+      .nav-symbol { width: 16px; height: 16px; }
+      .app-main { padding: 20px 18px 24px; }
+      .filters-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      .demo { padding: 14px 10px; }
+      .play-button { min-height: 38px; }
+      .expiration-controls { grid-template-columns: 1fr; }
+      .profile-select-field { width: 100%; }
+      .profile-summary-grid { grid-template-columns: 1fr; }
+      .profile-detail-header { flex-direction: column; }
+      .product-topbar { min-height: 48px; padding: 0 12px; }
+      .account-name, .secondary-brand { display: none; }
+      .product-grid { grid-template-columns: 44px minmax(0, 1fr); min-height: 620px; }
+      .sidebar { padding: 13px 4px; }
+      .app-main { padding: 17px 12px 22px; }
+      .page-title-row { align-items: flex-start; flex-direction: column; }
+      .page-title-row h2 { font-size: 17px; }
+      .summary-strip { gap: 5px; }
+      .summary-box { padding: 8px; }
+      .summary-box span { font-size: 8px; }
+      .summary-box strong { font-size: 14px; }
+      .table-wrap { overflow-x: auto; }
+      table { min-width: 480px; }
+      .field-grid, .result-grid { grid-template-columns: 1fr; }
+      .choice-strip { grid-template-columns: 1fr; }
+      .filters-row { gap: 7px; }
+      .view-switch { justify-self: start; }
+      .lamassu-logo { width: 110px; }
+      .chooser-heading h2 { font-size: 17px; }
+      .field.full { grid-column: auto; }
+      .success-panel { padding: 17px; }
+      .result-tree { align-items: flex-start; flex-direction: column; }
+      .result-arrow { transform: rotate(90deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --page: hsl(222 34% 9%);
+      --surface: hsl(222 29% 13%);
+      --surface-muted: hsl(218 25% 19%);
+      --nav: hsl(220 34% 12%);
+      --nav-muted: hsl(214 18% 70%);
+      --ink: hsl(214 32% 94%);
+      --muted: hsl(214 18% 72%);
+      --line: hsl(216 22% 28%);
+      --primary: hsl(217 91% 62%);
+      --primary-hover: hsl(217 91% 69%);
+      --primary-soft: hsl(217 45% 22%);
+      --green: hsl(153 48% 63%);
+      --green-soft: hsl(153 30% 18%);
+      --shadow: 0 12px 30px rgba(0, 0, 0, .36);
+    }
+    :root[data-theme="dark"] .product-window,
+    :root[data-theme="dark"] .sidebar { color: var(--ink); background: var(--surface); border-color: var(--line); }
+    :root[data-theme="dark"] .sidebar { background: var(--nav); }
+    :root[data-theme="dark"] .nav-item,
+    :root[data-theme="dark"] .ca-entry-copy strong,
+    :root[data-theme="dark"] td:first-child,
+    :root[data-theme="dark"] .aside-row strong,
+    :root[data-theme="dark"] .result-item strong { color: var(--ink); }
+    :root[data-theme="dark"] .workspace-label,
+    :root[data-theme="dark"] .nav-symbol,
+    :root[data-theme="dark"] .ca-entry-copy span,
+    :root[data-theme="dark"] .ca-entry-actions span,
+    :root[data-theme="dark"] .filter-field label,
+    :root[data-theme="dark"] .field label,
+    :root[data-theme="dark"] .field-label,
+    :root[data-theme="dark"] .method-chevron,
+    :root[data-theme="dark"] .engine-selector > .lucide-chevron-right { color: var(--muted); }
+    :root[data-theme="dark"] .filter-input,
+    :root[data-theme="dark"] .summary-box,
+    :root[data-theme="dark"] .table-wrap,
+    :root[data-theme="dark"] .method-list,
+    :root[data-theme="dark"] .back-button,
+    :root[data-theme="dark"] .focus-card,
+    :root[data-theme="dark"] .aside-card,
+    :root[data-theme="dark"] .choice:not(.selected),
+    :root[data-theme="dark"] .profile-mode-option:not(.selected),
+    :root[data-theme="dark"] .profile-detail-card,
+    :root[data-theme="dark"] .profile-badge,
+    :root[data-theme="dark"] .success-panel { color: var(--ink); background: var(--surface); border-color: var(--line); }
+    :root[data-theme="dark"] .view-switch,
+    :root[data-theme="dark"] .input-look.readonly,
+    :root[data-theme="dark"] .tree-node,
+    :root[data-theme="dark"] .result-tree { color: var(--ink); background: var(--surface-muted); border-color: var(--line); }
+    :root[data-theme="dark"] .view-switch .selected { color: var(--ink); background: var(--surface); }
+    :root[data-theme="dark"] .filter-input,
+    :root[data-theme="dark"] .input-look,
+    :root[data-theme="dark"] .engine-selector { color: var(--ink); background: var(--surface); border-color: var(--line); }
+    :root[data-theme="dark"] .input-look.readonly { background: var(--surface-muted); }
+    :root[data-theme="dark"] .ca-entry:hover,
+    :root[data-theme="dark"] .ca-entry-actions span:hover { color: var(--ink); background: var(--surface-muted); }
+    :root[data-theme="dark"] .ca-children,
+    :root[data-theme="dark"] th,
+    :root[data-theme="dark"] td,
+    :root[data-theme="dark"] .method-row,
+    :root[data-theme="dark"] .aside-row,
+    :root[data-theme="dark"] .success-heading,
+    :root[data-theme="dark"] .result-item { border-color: var(--line); }
+    :root[data-theme="dark"] th { color: var(--muted); background: var(--surface-muted); }
+    :root[data-theme="dark"] td,
+    :root[data-theme="dark"] .profile-mode-option,
+    :root[data-theme="dark"] .choice { color: var(--ink); }
+    :root[data-theme="dark"] .method-icon,
+    :root[data-theme="dark"] .profile-detail-icon { border-color: var(--line); color: var(--primary); background: var(--primary-soft); }
+    :root[data-theme="dark"] .method-tag,
+    :root[data-theme="dark"] .new-badge,
+    :root[data-theme="dark"] .simulation-tag { border-color: var(--line); color: #bfdbfe; background: var(--primary-soft); }
+    :root[data-theme="dark"] .focus-card.is-current,
+    :root[data-theme="dark"] .choice.selected,
+    :root[data-theme="dark"] .profile-mode-option.selected,
+    :root[data-theme="dark"] .tree-node.current { border-color: var(--primary); color: #dbeafe; background: var(--primary-soft); }
+    :root[data-theme="dark"] .field-note { color: #fca5a5; }
+    :root[data-theme="dark"] .result-tree strong,
+    :root[data-theme="dark"] .status { color: var(--green); }
+    :root[data-theme="dark"] .success-heading,
+    :root[data-theme="dark"] .result-item { border-color: var(--line); }
+    :root[data-theme="dark"] .toast { border-color: #e4e4e7; color: #18181b; background: #fafafa; box-shadow: 0 8px 20px rgba(0,0,0,.3); }
+    :root[data-theme="dark"] .toast-description { color: rgba(24,24,27,.7); }
+    :root[data-theme="dark"] .caption,
+    :root[data-theme="dark"] .intro,
+    :root[data-theme="dark"] .eyebrow { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="demo">
+    <p id="caption" class="visually-hidden" role="status" aria-live="polite">Preparing the demo...</p>
+
+    <section class="product-window" aria-label="Simulated Lamassu console">
+      <div class="demo-cursor" id="demoCursor" aria-hidden="true"></div>
+      <div class="product-topbar">
+        <div class="brand">
+          <div class="brand-left">
+            <span class="sidebar-toggle" aria-hidden="true"><svg class="lucide"><use href="#icon-panel-left"></use></svg></span>
+            <img class="lamassu-logo" src="lamassu_full_white.svg" alt="Lamassu IoT">
+          </div>
+        </div>
+        <div class="topbar-right">
+          <button class="theme-symbol" id="themeToggle" type="button" aria-label="Switch to dark theme" aria-pressed="false"><svg class="lucide" aria-hidden="true"><use href="#icon-sun"></use></svg></button>
+          <span class="account-button"><span class="account-name">lamassu@lksnext.com</span><span class="avatar" aria-hidden="true"><svg class="lucide"><use href="#icon-user"></use></svg></span></span>
+        </div>
+      </div>
+      <div class="product-grid">
+        <aside class="sidebar" aria-label="Simulated navigation">
+          <ul class="nav-list">
+            <li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-home"></use></svg><span>Home</span></li>
+          </ul>
+          <p class="workspace-label">KMS</p>
+          <ul class="nav-list">
+            <li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-key-round"></use></svg><span>Keys</span></li>
+            <li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-cpu"></use></svg><span>Crypto Engines</span></li>
+          </ul>
+          <p class="workspace-label">PKI</p>
+          <ul class="nav-list">
+            <li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-file-text"></use></svg><span>Certificates</span></li>
+            <li class="nav-item active" aria-current="page"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-landmark"></use></svg><span>Certification Authorities</span></li>
+            <li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-scroll-text"></use></svg><span>Issuance Profiles</span></li>
+            <li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-clipboard-check"></use></svg><span>Registration Authorities</span></li>
+          </ul>
+          <p class="workspace-label">IoT</p>
+          <ul class="nav-list">
+            <li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-router"></use></svg><span>Devices</span></li>
+            <li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-layers"></use></svg><span>Device Groups</span></li>
+            <li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-blocks"></use></svg><span>Platform Integrations</span></li>
+          </ul>
+          <p class="workspace-label">Notifications</p>
+          <ul class="nav-list"><li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-info"></use></svg><span>Alerts</span></li></ul>
+          <p class="workspace-label">Tools</p>
+          <ul class="nav-list"><li class="nav-item"><svg class="nav-symbol" aria-hidden="true"><use href="#icon-binary"></use></svg><span>Certificate Viewer</span></li></ul>
+        </aside>
+
+        <div class="app-main" id="appMain">
+          <section class="scene enter" data-scene="list" aria-label="Certification authority list">
+            <div class="page-title-row">
+              <div class="ca-heading"><span class="ca-heading-icon" aria-hidden="true"><svg class="lucide icon-24"><use href="#icon-landmark"></use></svg></span><div><h2>Certification Authorities</h2></div></div>
+              <button class="fake-action" type="button" data-start aria-label="Start CA creation demo"><svg class="lucide"><use href="#icon-plus-circle"></use></svg>Create New CA</button>
+            </div>
+            <p class="page-description">Manage your Certification Authority configurations and trust stores.</p>
+            <div class="filters-row">
+              <div class="filter-field"><label>Search</label><div class="filter-input"><svg class="lucide"><use href="#icon-search"></use></svg><span>Search certification authorities...</span></div></div>
+              <div class="filter-field"><label>Status</label><div class="filter-input select">All Statuses<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+              <div class="filter-field"><label>Type</label><div class="filter-input select">All Types<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+              <div class="view-switch" role="group" aria-label="View mode"><span class="selected" aria-label="List view"><svg class="lucide"><use href="#icon-list"></use></svg></span><span aria-label="Hierarchy view"><svg class="lucide"><use href="#icon-network"></use></svg></span><span aria-label="Graph view"><svg class="lucide"><use href="#icon-git-fork"></use></svg></span></div>
+            </div>
+            <ul class="ca-tree">
+              <li><div class="ca-entry"><span class="ca-expand" id="rootExpand" aria-hidden="true"><svg class="lucide"><use href="#icon-chevron-right"></use></svg></span><span class="ca-engine" aria-hidden="true"><svg class="lucide"><use href="#icon-key-round"></use></svg></span><div class="ca-entry-copy"><strong>Lamassu Demo Root CA</strong><span>ACTIVE · Expires in 10 years</span></div><div class="ca-entry-actions" aria-label="Certification authority actions"><span title="Details"><svg class="lucide"><use href="#icon-file-search"></use></svg></span><span title="Issue certificate"><svg class="lucide"><use href="#icon-file-plus-2"></use></svg></span></div></div>
+                <ul class="ca-children" id="createdCAList" hidden>
+                  <li><div class="ca-entry newly-created" data-new-ca><span class="ca-expand" aria-hidden="true"></span><span class="ca-engine" aria-hidden="true"><svg class="lucide"><use href="#icon-key-round"></use></svg></span><div class="ca-entry-copy"><strong>Lamassu Demo Intermediate CA <span class="new-badge">NEW</span></strong><span>ACTIVE · Expires in 5 years</span></div><div class="ca-entry-actions"><span title="Details"><svg class="lucide"><use href="#icon-file-search"></use></svg></span><span title="Issue certificate"><svg class="lucide"><use href="#icon-file-plus-2"></use></svg></span></div></div></li>
+                </ul>
+              </li>
+            </ul>
+          </section>
+
+          <section class="scene" data-scene="method" aria-label="Creation method" hidden>
+            <button class="back-button" type="button" data-back><svg class="lucide"><use href="#icon-arrow-left"></use></svg>Back to Certification Authorities</button>
+            <div class="chooser-heading"><h2>Choose Certification Authority Creation Method</h2><p>Select how you want to create or import your Certification Authority.</p></div>
+            <div class="method-list">
+              <div class="method-row selected" id="newKeyMethod"><span class="method-icon" aria-hidden="true"><svg class="lucide icon-20"><use href="#icon-key-round"></use></svg></span><div><strong>Create New CA <span class="method-tag">New Key Pair</span></strong><p>Provision a new Root or Intermediate Certification Authority directly. A new key is generated and managed by the KMS.</p></div><span class="method-chevron" aria-hidden="true"><svg class="lucide"><use href="#icon-chevron-right"></use></svg></span></div>
+              <div class="method-row"><span class="method-icon" aria-hidden="true"><svg class="lucide icon-20"><use href="#icon-key-round"></use></svg></span><div><strong>Create New CA <span class="method-tag">Reuse Existing Key</span></strong><p>Provision a new Root or Intermediate CA using an existing KMS key. Reuse a previously generated key pair.</p></div><span class="method-chevron" aria-hidden="true"><svg class="lucide"><use href="#icon-chevron-right"></use></svg></span></div>
+              <div class="method-row"><span class="method-icon" aria-hidden="true"><svg class="lucide icon-20"><use href="#icon-upload-cloud"></use></svg></span><div><strong>Import CA <span class="method-tag">With Private Key</span></strong><p>Import an existing Certification Authority certificate along with its private key. This CA will be fully managed.</p></div><span class="method-chevron" aria-hidden="true"><svg class="lucide"><use href="#icon-chevron-right"></use></svg></span></div>
+              <div class="method-row"><span class="method-icon" aria-hidden="true"><svg class="lucide icon-20"><use href="#icon-file-text"></use></svg></span><div><strong>Import Public CA <span class="method-tag">Certificate Only</span></strong><p>Import a public CA certificate (no private key) for trust anchor or reference purposes.</p></div><span class="method-chevron" aria-hidden="true"><svg class="lucide"><use href="#icon-chevron-right"></use></svg></span></div>
+            </div>
+          </section>
+
+          <section class="scene" data-scene="form" aria-label="New CA details" hidden>
+            <p class="breadcrumb">Home <span aria-hidden="true">/</span> Certification Authorities <span aria-hidden="true">/</span> New <span aria-hidden="true">/</span> Generate</p>
+            <button class="back-button" type="button" data-back><svg class="lucide"><use href="#icon-arrow-left"></use></svg>Back to Creation Methods</button>
+            <div class="form-page-heading"><span class="ca-heading-icon" aria-hidden="true"><svg class="lucide icon-24"><use href="#icon-key-round"></use></svg></span><div><h2>Create New Certification Authority (New Key Pair)</h2><p>Provision a new Root or Intermediate Certification Authority. A new cryptographic key pair will be generated and managed by LamassuIoT.</p></div></div>
+            <div class="form-layout">
+              <div class="form-stack">
+                <section class="focus-card" data-focus="key">
+                  <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-key-round"></use></svg></span>KMS: New Key Pair Generation settings</h3>
+                  <div class="field-grid">
+                    <div class="field full"><label>Crypto Engine</label><div class="engine-selector"><span class="engine-selector-icon" aria-hidden="true"><img class="engine-selector-logo" src="aws-kms.png" alt=""></span><span class="engine-selector-copy"><span class="engine-selector-name">AWS KMS</span><span class="engine-selector-id">aws-kms-demo</span></span><svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+                    <div class="field"><label>Key Type</label><div class="input-look select">RSA<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+                    <div class="field"><label>RSA Key Size</label><div class="input-look select">2048 bit<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+                  </div>
+                </section>
+                <section class="focus-card" data-focus="profile">
+                  <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-shield"></use></svg></span>CA Certificate Profile</h3>
+                  <p class="page-description">Optionally specify an issuance profile for the CA's own certificate. This is different from the default issuance profile used when issuing certificates.</p>
+                  <div class="field-label">Profile Mode</div>
+                  <div class="choice-strip"><div class="choice selected"><svg class="lucide"><use href="#icon-settings"></use></svg><span>No Profile<small>Use default settings</small></span></div><div class="choice"><svg class="lucide"><use href="#icon-book-text"></use></svg><span>Reuse Profile<small>Select existing profile</small></span></div><div class="choice"><svg class="lucide"><use href="#icon-settings"></use></svg><span>Define Inline<small>One-time profile definition</small></span></div></div>
+                </section>
+                <section class="focus-card" data-focus="settings">
+                  <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-settings"></use></svg></span>CA Settings</h3>
+                  <div class="field full"><label>CA Type</label><div class="choice-strip"><div class="choice"><svg class="lucide"><use href="#icon-shield"></use></svg><span>Root CA<small>Self-signed trust anchor. Top of the certificate chain.</small></span></div><div class="choice selected"><svg class="lucide"><use href="#icon-book-text"></use></svg><span>Intermediate CA<small>Signed by a parent CA. Issues end-entity certificates.</small></span></div></div></div>
+                  <div class="field-grid">
+                    <div class="field full"><label>Parent Certification Authority</label><div class="input-look select">Lamassu Demo Root CA<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+                    <div class="field full"><label>Certification Authority ID (generated)</label><div class="input-look readonly">60471eaf-331c-4b59-9343-fef302ff1863</div></div>
+                    <div class="field full"><label>Certification Authority Name (Subject Common Name)</label><div class="input-look" id="caNameField"></div><p class="field-note">Certification Authority Name (Common Name) cannot be empty.</p></div>
+                  </div>
+                </section>
+                <section class="focus-card" data-focus="dn">
+                  <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-info"></use></svg></span>Subject Distinguished Name (DN)</h3>
+                  <div class="field-grid">
+                    <div class="field"><label>Country (C)</label><div class="input-look" id="subjectCountryField"></div></div>
+                    <div class="field"><label>State / Province (ST)</label><div class="input-look" id="subjectStateField"></div></div>
+                    <div class="field"><label>Locality (L)</label><div class="input-look" id="subjectLocalityField"></div></div>
+                    <div class="field"><label>Organization (O)</label><div class="input-look" id="subjectOrganizationField"></div></div>
+                    <div class="field full"><label>Organizational Unit (OU)</label><div class="input-look"></div></div>
+                  </div>
+                  <p class="field-hint">The "Certification Authority Name" entered in CA Settings will be used as the Common Name (CN) for the subject.</p>
+                </section>
+                <section class="focus-card" data-focus="validity">
+                  <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-calendar-days"></use></svg></span>Expiration Settings</h3>
+                  <div class="field full"><label>CA Certificate Expiration</label><div class="expiration-controls"><div class="input-look select control-large">Duration<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div><div class="duration-control"><div class="input-look control-large">5y</div><p class="field-hint">Valid units: y, w, d, h, m, s.</p></div></div></div>
+                </section>
+                <section class="focus-card" data-focus="issuance">
+                  <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-shield"></use></svg></span>Default Issuance Profile</h3>
+                  <div class="field-label">Profile Mode</div>
+                  <div class="profile-mode-grid" aria-label="Profile Mode">
+                    <div class="profile-mode-option selected"><span class="profile-mode-option-title"><svg class="lucide"><use href="#icon-book-text"></use></svg>Reuse Existing</span><small>Use predefined issuance templates</small></div>
+                    <div class="profile-mode-option"><span class="profile-mode-option-title"><svg class="lucide"><use href="#icon-plus-circle"></use></svg>Create New</span><small>Create a new reusable profile</small></div>
+                  </div>
+                  <div class="field profile-select-field"><label>Issuance Profile</label><div class="input-look select">Demo · Device Certificates<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+                  <article class="profile-detail-card" aria-label="Selected issuance profile details">
+                    <header class="profile-detail-header">
+                      <div class="profile-detail-identity"><span class="profile-detail-icon" aria-hidden="true"><svg class="lucide"><use href="#icon-book-text"></use></svg></span><div><h4 class="profile-detail-title">Demo · Device Certificates</h4><p class="profile-detail-description">Standard policy for device certificate issuance.</p></div></div>
+                      <div class="profile-badges"><span class="profile-badge">Crypto enforcement</span></div>
+                    </header>
+                    <div class="profile-detail-content">
+                      <div class="profile-summary-grid">
+                        <div class="profile-summary-item"><p class="profile-summary-label">Validity</p><p class="profile-summary-value">1y</p></div>
+                        <div class="profile-summary-item"><p class="profile-summary-label">Signs</p><p class="profile-summary-value">End-entity certificates</p></div>
+                        <div class="profile-summary-item"><p class="profile-summary-label">Subject source</p><p class="profile-summary-value">CSR subject</p></div>
+                        <div class="profile-summary-item"><p class="profile-summary-label">Allowed key types</p><p class="profile-summary-value">RSA, ECDSA</p></div>
+                      </div>
+                      <div class="profile-policy-row"><p class="profile-policy-label">Subject policy</p><p class="profile-policy-value">Uses the subject DN requested in the CSR.</p></div>
+                      <div class="profile-policy-row"><p class="profile-policy-label">Extensions policy</p><p class="profile-policy-value">Key usage follows the CSR. Extended key usage follows the CSR.</p></div>
+                      <div class="profile-policy-row"><p class="profile-policy-label">Crypto rules</p><p class="profile-policy-value">Allowed algorithms: RSA (2048, 3072 bits) and ECDSA (P-256, P-384).</p><div class="profile-policy-badges"><span class="profile-badge">RSA</span><span class="profile-badge">ECDSA</span><span class="profile-badge">Leaf certificates only</span><span class="profile-badge">1y</span></div></div>
+                    </div>
+                  </article>
+                </section>
+                <div class="create-row"><button class="fake-action" id="createButton" type="button"><svg class="lucide"><use href="#icon-plus-circle"></use></svg>Create Certification Authority</button></div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <svg class="icon-sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="icon-panel-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+    <symbol id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></symbol>
+    <symbol id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6.5 6.5 0 0 0 8.268 8.268c.344-.215.825-.003.803.401"></path></symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"></path></symbol>
+    <symbol id="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></symbol>
+    <symbol id="icon-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></symbol>
+    <symbol id="icon-key-round" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"></path><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"></circle></symbol>
+    <symbol id="icon-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"></rect><rect width="6" height="6" x="9" y="9" rx="1"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></symbol>
+    <symbol id="icon-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></symbol>
+    <symbol id="icon-landmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"></line><line x1="6" x2="6" y1="18" y2="11"></line><line x1="10" x2="10" y1="18" y2="11"></line><line x1="14" x2="14" y1="18" y2="11"></line><line x1="18" x2="18" y1="18" y2="11"></line><polygon points="12 2 20 7 4 7"></polygon></symbol>
+    <symbol id="icon-scroll-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12h-5"></path><path d="M15 8h-5"></path><path d="M19 17V5a2 2 0 0 0-2-2H4"></path><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"></path></symbol>
+    <symbol id="icon-clipboard-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="m9 14 2 2 4-4"></path></symbol>
+    <symbol id="icon-router" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="14" rx="2"></rect><path d="M6.01 18H6"></path><path d="M10.01 18H10"></path><path d="M15 10v4"></path><path d="M17.84 7.17a4 4 0 0 0-5.66 0"></path><path d="M20.66 4.34a8 8 0 0 0-11.31 0"></path></symbol>
+    <symbol id="icon-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"></path><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"></path><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"></path></symbol>
+    <symbol id="icon-blocks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="14" y="3" rx="1"></rect><path d="M10 21V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H3"></path></symbol>
+    <symbol id="icon-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></symbol>
+    <symbol id="icon-binary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="14" width="4" height="6" rx="2"></rect><rect x="6" y="4" width="4" height="6" rx="2"></rect><path d="M6 20h4"></path><path d="M14 10h4"></path><path d="M6 14h2v6"></path><path d="M14 4h2v6"></path></symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+    <symbol id="icon-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h.01"></path><path d="M3 18h.01"></path><path d="M3 6h.01"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M8 6h13"></path></symbol>
+    <symbol id="icon-network" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path></symbol>
+    <symbol id="icon-git-fork" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"></path><path d="M12 12v3"></path></symbol>
+    <symbol id="icon-plus-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 12h8"></path><path d="M12 8v8"></path></symbol>
+    <symbol id="icon-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></symbol>
+    <symbol id="icon-file-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M4.268 21a2 2 0 0 0 1.727 1H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"></path><path d="m9 18-1.5-1.5"></path><circle cx="5" cy="14" r="3"></circle></symbol>
+    <symbol id="icon-file-plus-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M3 15h6"></path><path d="M6 12v6"></path></symbol>
+    <symbol id="icon-upload-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"></path><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="m8 17 4-4 4 4"></path></symbol>
+    <symbol id="icon-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+    <symbol id="icon-calendar-days" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path><path d="M8 18h.01"></path><path d="M12 18h.01"></path><path d="M16 18h.01"></path></symbol>
+    <symbol id="icon-book-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"></path><path d="M8 11h8"></path><path d="M8 7h6"></path></symbol>
+  </svg>
+
+  <script>
+    (() => {
+      document.querySelectorAll('svg.lucide').forEach((icon) => icon.setAttribute('viewBox', '0 0 24 24'));
+      const caption = document.getElementById('caption');
+      const themeToggle = document.getElementById('themeToggle');
+      const themeIcon = themeToggle.querySelector('use');
+      const themeColor = document.querySelector('meta[name="theme-color"]');
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+      let parentDocument;
+      try {
+        if (window.parent !== window) parentDocument = window.parent.document;
+      } catch {}
+
+      function applyTheme(theme, persist = false) {
+        document.documentElement.dataset.theme = theme;
+        themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+        themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
+        themeIcon.setAttribute('href', theme === 'dark' ? '#icon-moon' : '#icon-sun');
+        themeColor.content = theme === 'dark' ? '#101827' : '#f0f8ff';
+        if (persist) {
+          try { localStorage.setItem('lamassu-ca-creation-theme', theme); } catch {}
+        }
+      }
+
+      function getSavedTheme() {
+        try {
+          const localTheme = localStorage.getItem('lamassu-ca-creation-theme');
+          if (localTheme === 'light' || localTheme === 'dark') return localTheme;
+        } catch {}
+        const cookieTheme = document.cookie.match(/(?:^|;\s*)theme=(light|dark)(?:;|$)/)?.[1];
+        return cookieTheme || null;
+      }
+
+      if (parentDocument) {
+        const syncParentTheme = () => applyTheme(parentDocument.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        syncParentTheme();
+        new MutationObserver(syncParentTheme).observe(parentDocument.documentElement, { attributes: true, attributeFilter: ['class'] });
+      } else {
+        applyTheme(getSavedTheme() || (systemTheme.matches ? 'dark' : 'light'));
+        systemTheme.addEventListener('change', (event) => {
+          if (!getSavedTheme()) applyTheme(event.matches ? 'dark' : 'light');
+        });
+      }
+      themeToggle.addEventListener('click', () => {
+        applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true);
+      });
+      const scenes = [...document.querySelectorAll('[data-scene]')];
+      const progressSegments = [...document.querySelectorAll('.progress-segment span')];
+      const nameField = document.getElementById('caNameField');
+      const createButton = document.getElementById('createButton');
+      const createButtonContent = createButton.innerHTML;
+      const appMain = document.getElementById('appMain');
+      const productWindow = document.querySelector('.product-window');
+      const demoCursor = document.getElementById('demoCursor');
+      const caName = 'Lamassu Demo Intermediate CA';
+      const locale = new URLSearchParams(window.location.search).get('lang') === 'es' ? 'es' : 'en';
+      const copy = locale === 'es' ? {
+        title: 'Lamassu | Creación de una CA',
+        preparing: 'Preparando la demostración...',
+        console: 'Simulación interactiva de la consola Lamassu',
+        navigation: 'Navegación simulada',
+        list: 'Lista de autoridades de certificación',
+        start: 'Iniciar demo de creación de CA',
+        method: 'Método de creación',
+        form: 'Datos de la nueva CA',
+        successTitle: 'Creación de la autoridad de certificación completada',
+        successDescription: 'Se ha creado la autoridad de certificación "{name}".',
+        narration: {
+          start: 'Desde Certification Authorities, inicia la creación de una nueva CA.',
+          method: 'Selecciona Create New CA con un nuevo par de claves.',
+          key: 'Selecciona el motor criptográfico y configura el nuevo par de claves.',
+          profile: 'Revisa el perfil opcional para el certificado de la propia CA.',
+          settings: 'Elige Intermediate CA y selecciona la autoridad raíz emisora.',
+          name: 'Escribe el nombre de la CA en CA Settings.',
+          dn: 'Completa los atributos del Distinguished Name de la CA.',
+          validity: 'Configura la expiración del certificado de la CA.',
+          issuance: 'Mantén seleccionada la opción Reuse Existing y revisa los detalles del perfil de emisión elegido.',
+          create: 'Crea la autoridad con la configuración revisada.',
+          generating: 'Lamassu genera la clave, crea el certificado y guarda la autoridad.',
+          created: 'La CA intermedia aparece vinculada a su autoridad raíz.',
+          completed: 'CA intermedia creada y vinculada a su autoridad raíz.',
+        },
+      } : {
+        title: 'Lamassu | CA creation',
+        preparing: 'Preparing the demo...',
+        console: 'Simulated Lamassu console',
+        navigation: 'Simulated navigation',
+        list: 'Certification authority list',
+        start: 'Start CA creation demo',
+        method: 'Creation method',
+        form: 'New CA details',
+        successTitle: 'Certification Authority Creation Successful',
+        successDescription: 'Certification Authority "{name}" has been created.',
+        narration: {
+          start: 'From Certification Authorities, start creating a new CA.',
+          method: 'Select Create New CA with a new key pair.',
+          key: 'Select a cryptographic engine and configure the new key pair.',
+          profile: "Review the optional profile for the CA's own certificate.",
+          settings: 'Choose Intermediate CA and select the issuing root CA.',
+          name: 'Enter the CA name in CA Settings.',
+          dn: 'Complete the subject Distinguished Name attributes.',
+          validity: 'Configure the CA certificate expiration.',
+          issuance: 'Keep Reuse Existing selected and review the details of the chosen issuance profile.',
+          create: 'Create the CA with the reviewed settings.',
+          generating: 'Lamassu is generating the key, creating the certificate, and saving the CA.',
+          created: 'The intermediate CA now appears under its root authority.',
+          completed: 'The intermediate CA was created and linked to its root authority.',
+        },
+      };
+      document.documentElement.lang = locale;
+      document.title = copy.title;
+      document.querySelector('.product-window').setAttribute('aria-label', copy.console);
+      document.querySelector('.sidebar').setAttribute('aria-label', copy.navigation);
+      document.querySelector('[data-scene="list"]').setAttribute('aria-label', copy.list);
+      document.querySelector('[data-scene="list"] [data-start]').setAttribute('aria-label', copy.start);
+      document.querySelector('[data-scene="method"]').setAttribute('aria-label', copy.method);
+      document.querySelector('[data-scene="form"]').setAttribute('aria-label', copy.form);
+      const subjectFields = [
+        { element: document.getElementById('subjectCountryField'), value: 'ES' },
+        { element: document.getElementById('subjectStateField'), value: 'Gipuzkoa' },
+        { element: document.getElementById('subjectLocalityField'), value: 'Arrasate' },
+        { element: document.getElementById('subjectOrganizationField'), value: 'LKS Next' },
+      ];
+      const timers = [];
+      let typingTimer;
+      let cursorTarget;
+
+      function schedule(delay, callback) {
+        timers.push(window.setTimeout(callback, delay));
+      }
+
+      function placeCursor(target, clicking = false) {
+        if (!target) return;
+        cursorTarget = target;
+        const windowRect = productWindow.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const targetX = targetRect.left + Math.min(18, targetRect.width * .25);
+        const targetY = targetRect.top + targetRect.height / 2;
+        demoCursor.style.transform = `translate3d(${targetX - windowRect.left - 6}px, ${targetY - windowRect.top - 6}px, 0)`;
+        demoCursor.classList.add('visible');
+        demoCursor.classList.toggle('is-clicking', clicking);
+        if (clicking) window.setTimeout(() => demoCursor.classList.remove('is-clicking'), 450);
+      }
+
+      function moveCursorTo(target, clicking = false) {
+        const element = typeof target === 'string' ? document.querySelector(target) : target;
+        if (!element) return;
+        const targetRect = element.getBoundingClientRect();
+        let scrollDelta = 0;
+        if (targetRect.top < 18) scrollDelta = targetRect.top - 18;
+        else if (targetRect.bottom > window.innerHeight - 18) scrollDelta = targetRect.bottom - window.innerHeight + 18;
+        if (scrollDelta) {
+          window.scrollBy({ top: scrollDelta, behavior: 'smooth' });
+          schedule(450, () => placeCursor(element, clicking));
+          return;
+        }
+        placeCursor(element, clicking);
+      }
+
+      function hideCursor() {
+        demoCursor.classList.remove('visible', 'is-clicking');
+        cursorTarget = null;
+      }
+
+      function clearPlayback() {
+        timers.forEach(window.clearTimeout);
+        timers.length = 0;
+        window.clearInterval(typingTimer);
+      }
+
+      function setScene(name) {
+        scenes.forEach((scene) => {
+          const isActive = scene.dataset.scene === name;
+          scene.hidden = !isActive;
+          scene.classList.toggle('enter', isActive);
+        });
+      }
+
+      function setProgress(index) {
+        progressSegments.forEach((segment, segmentIndex) => {
+          segment.style.width = segmentIndex < index ? '100%' : segmentIndex === index ? '54%' : '0%';
+        });
+      }
+
+      function setCreatingState() {
+        createButton.disabled = true;
+        createButton.setAttribute('aria-busy', 'true');
+        createButton.innerHTML = '<span class="spinner" aria-hidden="true"></span>Creating...';
+      }
+
+      function setFocus(name) {
+        document.querySelectorAll('[data-focus]').forEach((section) => {
+          section.classList.toggle('is-current', section.dataset.focus === name);
+        });
+      }
+
+      function pulse(element) {
+        element.classList.remove('pulse');
+        void element.offsetWidth;
+        element.classList.add('pulse');
+        window.setTimeout(() => element.classList.remove('pulse'), 1200);
+      }
+
+      function typeFields(fields) {
+        fields.forEach(({ element }) => { element.textContent = ''; });
+        let characterIndex = 0;
+        const maxLength = Math.max(...fields.map(({ value }) => value.length));
+        typingTimer = window.setInterval(() => {
+          characterIndex += 1;
+          fields.forEach(({ element, value }) => {
+            element.textContent = value.slice(0, characterIndex);
+          });
+          if (characterIndex >= maxLength) window.clearInterval(typingTimer);
+        }, 34);
+      }
+
+      function typeName() {
+        typeFields([{ element: nameField, value: caName }]);
+      }
+
+      function reset() {
+        clearPlayback();
+        setScene('list');
+        setFocus('');
+        window.scrollTo(0, 0);
+        document.getElementById('createdCAList').hidden = true;
+        document.getElementById('rootExpand').classList.remove('open');
+        document.querySelector('[data-new-ca]').classList.remove('pulse');
+        hideCursor();
+        nameField.textContent = '';
+        subjectFields.forEach(({ element }) => { element.textContent = ''; });
+        createButton.removeAttribute('aria-busy');
+        createButton.disabled = false;
+        createButton.innerHTML = createButtonContent;
+        appMain.querySelectorAll('.toast').forEach((toast) => toast.remove());
+        caption.textContent = copy.preparing;
+        setProgress(0);
+      }
+
+      function finish() {
+        caption.textContent = copy.narration.completed;
+        setProgress(4);
+        hideCursor();
+        schedule(2200, playDemo);
+      }
+
+      function showCreatedCA() {
+        document.getElementById('createdCAList').hidden = false;
+        document.getElementById('rootExpand').classList.add('open');
+        setScene('list');
+        setFocus('');
+        window.scrollTo(0, 0);
+        setProgress(4);
+        caption.textContent = copy.narration.created;
+        pulse(document.querySelector('[data-new-ca]'));
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.setAttribute('role', 'status');
+        const toastIcon = document.createElement('span');
+        toastIcon.className = 'toast-icon';
+        toastIcon.setAttribute('aria-hidden', 'true');
+        toastIcon.innerHTML = '<svg class="lucide"><use href="#icon-check"></use></svg>';
+        const toastCopy = document.createElement('span');
+        toastCopy.className = 'toast-copy';
+        const toastTitle = document.createElement('strong');
+        toastTitle.className = 'toast-title';
+        toastTitle.textContent = copy.successTitle;
+        const toastDescription = document.createElement('span');
+        toastDescription.className = 'toast-description';
+        toastDescription.textContent = copy.successDescription.replace('{name}', caName);
+        toastCopy.append(toastTitle, toastDescription);
+        toast.append(toastIcon, toastCopy);
+        appMain.append(toast);
+      }
+
+      function playDemo() {
+        reset();
+
+        schedule(250, () => {
+          setProgress(0);
+          caption.textContent = copy.narration.start;
+          const target = document.querySelector('[data-scene="list"] [data-start]');
+          moveCursorTo(target, true);
+          pulse(target);
+        });
+        schedule(2200, () => {
+          setScene('method');
+          setProgress(1);
+          caption.textContent = copy.narration.method;
+          moveCursorTo(document.getElementById('newKeyMethod'), true);
+          pulse(document.getElementById('newKeyMethod'));
+        });
+        schedule(4300, () => {
+          setScene('form');
+          appMain.scrollTop = 0;
+          setProgress(2);
+          setFocus('key');
+          caption.textContent = copy.narration.key;
+          moveCursorTo('[data-focus="key"] .input-look', true);
+          pulse(document.querySelector('[data-focus="key"]'));
+        });
+        schedule(5900, () => {
+          setFocus('profile');
+          caption.textContent = copy.narration.profile;
+          moveCursorTo('[data-focus="profile"] .choice.selected', true);
+          pulse(document.querySelector('[data-focus="profile"]'));
+        });
+        schedule(7500, () => {
+          setFocus('settings');
+          caption.textContent = copy.narration.settings;
+          moveCursorTo('[data-focus="settings"] .choice.selected', true);
+          pulse(document.querySelector('[data-focus="settings"]'));
+        });
+        schedule(9300, () => {
+          setFocus('settings');
+          typeName();
+          caption.textContent = copy.narration.name;
+          moveCursorTo('#caNameField', true);
+          pulse(document.querySelector('[data-focus="settings"]'));
+        });
+        schedule(10300, () => {
+          setFocus('dn');
+          typeFields(subjectFields);
+          caption.textContent = copy.narration.dn;
+          moveCursorTo('[data-focus="dn"] .input-look', true);
+          pulse(document.querySelector('[data-focus="dn"]'));
+        });
+        schedule(11100, () => {
+          setFocus('validity');
+          caption.textContent = copy.narration.validity;
+          moveCursorTo('[data-focus="validity"] .input-look', true);
+          pulse(document.querySelector('[data-focus="validity"]'));
+        });
+        schedule(12300, () => {
+          setFocus('issuance');
+          caption.textContent = copy.narration.issuance;
+          moveCursorTo('[data-focus="issuance"] .profile-mode-option.selected', true);
+          pulse(document.querySelector('[data-focus="issuance"] .profile-mode-option.selected'));
+        });
+        schedule(13300, () => {
+          caption.textContent = copy.narration.create;
+          moveCursorTo('[data-scene="form"] .create-row .fake-action', true);
+        });
+        schedule(14800, () => {
+          hideCursor();
+          setCreatingState();
+          setProgress(3);
+          caption.textContent = copy.narration.generating;
+        });
+        schedule(16800, showCreatedCA);
+        schedule(18900, finish);
+      }
+
+      document.querySelectorAll('[data-start]').forEach((button) => button.addEventListener('click', playDemo));
+      document.querySelectorAll('[data-back]').forEach((button) => button.addEventListener('click', () => {
+        const scene = button.closest('[data-scene]');
+        setScene(scene.dataset.scene === 'method' ? 'list' : 'method');
+      }));
+      createButton.addEventListener('click', () => {
+        if (document.querySelector('[data-scene="form"]').hidden) return;
+        clearPlayback();
+        hideCursor();
+        setCreatingState();
+        setProgress(3);
+        caption.textContent = copy.narration.generating;
+        schedule(1500, () => {
+          showCreatedCA();
+          schedule(1900, finish);
+        });
+      });
+
+      window.addEventListener('resize', () => {
+        if (cursorTarget) placeCursor(cursorTarget);
+      });
+      playDemo();
+    })();
+  </script>
+</body>
+</html>

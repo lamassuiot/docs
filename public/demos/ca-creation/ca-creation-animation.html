@@ -160,6 +160,36 @@
     .engine-selector-name { color: var(--ink); font-size: 10px; font-weight: 600; }
     .engine-selector-id { margin-top: 2px; color: var(--muted); font-family: monospace; font-size: 9px; }
     .engine-selector > .lucide-chevron-right { color: #71717a; }
+    .input-look:empty::before { color: #9ca3af; content: attr(data-placeholder); }
+    .parent-select { width: 100%; text-align: left; cursor: pointer; }
+    .parent-summary { display: flex; align-items: center; gap: 9px; margin-top: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 5px; background: #f8fafb; }
+    .parent-summary[hidden] { display: none; }
+    .parent-summary-icon { display: grid; width: 30px; height: 30px; flex: none; place-items: center; border-radius: 4px; color: var(--primary); background: var(--primary-soft); }
+    .parent-summary-copy { flex: 1; min-width: 0; }
+    .parent-summary-copy strong, .parent-summary-copy span { display: block; }
+    .parent-summary-copy strong { font-size: 10px; }
+    .parent-summary-copy span { margin-top: 2px; color: var(--muted); font-size: 9px; }
+    .parent-picker-overlay[hidden] { display: none; }
+    .parent-picker-overlay { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .42); }
+    .parent-picker { width: min(500px, 100%); overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: 0 18px 48px rgba(15, 23, 42, .24); }
+    .parent-picker > header { padding: 18px 18px 13px; }
+    .parent-picker h2 { margin: 0; font-size: 15px; font-weight: 650; }
+    .parent-picker header p { margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .parent-picker-search { padding: 0 18px 12px; }
+    .parent-picker-search label, .parent-picker-status > span:first-child { display: block; margin-bottom: 5px; color: var(--muted); font-size: 9px; }
+    .parent-picker-status { display: flex; align-items: center; justify-content: space-between; padding: 0 18px 11px; border-bottom: 1px solid var(--line); }
+    .parent-picker-status > span:last-child { display: flex; align-items: center; gap: 8px; min-width: 110px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); font-size: 9px; }
+    .parent-picker-status .lucide { width: 13px; height: 13px; margin-left: auto; }
+    .parent-option { display: flex; width: calc(100% - 24px); align-items: center; gap: 9px; margin: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); background: var(--surface); text-align: left; cursor: pointer; }
+    .parent-option:hover { background: var(--primary-soft); }
+    .parent-option > span:nth-child(2) { flex: 1; min-width: 0; }
+    .parent-option strong, .parent-option small { display: block; }
+    .parent-option strong { font-size: 10px; }
+    .parent-option small { margin-top: 3px; color: var(--muted); font-size: 9px; }
+    .parent-picker footer { display: flex; justify-content: space-between; padding: 0 12px 12px; }
+    :root[data-theme="dark"] .parent-summary,
+    :root[data-theme="dark"] .parent-option { color: var(--ink); background: var(--surface-muted); border-color: var(--line); }
+    :root[data-theme="dark"] .parent-option:hover { background: var(--primary-soft); }
     .expiration-controls { display: grid; grid-template-columns: minmax(120px, .45fr) minmax(0, 1fr); gap: 8px; align-items: start; }
     .duration-control { min-width: 0; }
     .form-aside { display: grid; gap: 10px; }
@@ -388,7 +418,7 @@
         </div>
         <div class="topbar-right">
           <button class="theme-symbol" id="themeToggle" type="button" aria-label="Switch to dark theme" aria-pressed="false"><svg class="lucide" aria-hidden="true"><use href="#icon-sun"></use></svg></button>
-          <span class="account-button"><span class="account-name">lamassu@lksnext.com</span><span class="avatar" aria-hidden="true"><svg class="lucide"><use href="#icon-user"></use></svg></span></span>
+          <span class="account-button"><span class="account-name">Lamassu IoT</span><span class="avatar" aria-hidden="true"><svg class="lucide"><use href="#icon-user"></use></svg></span></span>
         </div>
       </div>
       <div class="product-grid">
@@ -436,7 +466,7 @@
             <ul class="ca-tree">
               <li><div class="ca-entry"><span class="ca-expand" id="rootExpand" aria-hidden="true"><svg class="lucide"><use href="#icon-chevron-right"></use></svg></span><span class="ca-engine" aria-hidden="true"><svg class="lucide"><use href="#icon-key-round"></use></svg></span><div class="ca-entry-copy"><strong>Lamassu Demo Root CA</strong><span>ACTIVE · Expires in 10 years</span></div><div class="ca-entry-actions" aria-label="Certification authority actions"><span title="Details"><svg class="lucide"><use href="#icon-file-search"></use></svg></span><span title="Issue certificate"><svg class="lucide"><use href="#icon-file-plus-2"></use></svg></span></div></div>
                 <ul class="ca-children" id="createdCAList" hidden>
-                  <li><div class="ca-entry newly-created" data-new-ca><span class="ca-expand" aria-hidden="true"></span><span class="ca-engine" aria-hidden="true"><svg class="lucide"><use href="#icon-key-round"></use></svg></span><div class="ca-entry-copy"><strong>Lamassu Demo Intermediate CA <span class="new-badge">NEW</span></strong><span>ACTIVE · Expires in 5 years</span></div><div class="ca-entry-actions"><span title="Details"><svg class="lucide"><use href="#icon-file-search"></use></svg></span><span title="Issue certificate"><svg class="lucide"><use href="#icon-file-plus-2"></use></svg></span></div></div></li>
+                  <li><div class="ca-entry newly-created" data-new-ca><span class="ca-expand" aria-hidden="true"></span><span class="ca-engine" aria-hidden="true"><svg class="lucide"><use href="#icon-key-round"></use></svg></span><div class="ca-entry-copy"><strong>Lamassu Demo Intermediate CA <span class="new-badge">NEW</span></strong><span>ACTIVE · Expires in 10 years</span></div><div class="ca-entry-actions"><span title="Details"><svg class="lucide"><use href="#icon-file-search"></use></svg></span><span title="Issue certificate"><svg class="lucide"><use href="#icon-file-plus-2"></use></svg></span></div></div></li>
                 </ul>
               </li>
             </ul>
@@ -462,7 +492,7 @@
                 <section class="focus-card" data-focus="key">
                   <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-key-round"></use></svg></span>KMS: New Key Pair Generation settings</h3>
                   <div class="field-grid">
-                    <div class="field full"><label>Crypto Engine</label><div class="engine-selector"><span class="engine-selector-icon" aria-hidden="true"><img class="engine-selector-logo" src="aws-kms.png" alt=""></span><span class="engine-selector-copy"><span class="engine-selector-name">AWS KMS</span><span class="engine-selector-id">aws-kms-demo</span></span><svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+                    <div class="field full"><label>Crypto Engine</label><div class="engine-selector"><span class="engine-selector-icon" aria-hidden="true"><svg class="lucide icon-20"><use href="#icon-key-round"></use></svg></span><span class="engine-selector-copy"><span class="engine-selector-name">go1.26.2</span><span class="engine-selector-id">filesystem-1</span></span><svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
                     <div class="field"><label>Key Type</label><div class="input-look select">RSA<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
                     <div class="field"><label>RSA Key Size</label><div class="input-look select">2048 bit<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
                   </div>
@@ -475,27 +505,27 @@
                 </section>
                 <section class="focus-card" data-focus="settings">
                   <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-settings"></use></svg></span>CA Settings</h3>
-                  <div class="field full"><label>CA Type</label><div class="choice-strip"><div class="choice"><svg class="lucide"><use href="#icon-shield"></use></svg><span>Root CA<small>Self-signed trust anchor. Top of the certificate chain.</small></span></div><div class="choice selected"><svg class="lucide"><use href="#icon-book-text"></use></svg><span>Intermediate CA<small>Signed by a parent CA. Issues end-entity certificates.</small></span></div></div></div>
+                  <div class="field full"><label>CA Type</label><div class="choice-strip"><div class="choice selected" data-ca-type="root"><svg class="lucide"><use href="#icon-shield"></use></svg><span>Root CA<small>Self-signed trust anchor. Top of the certificate chain.</small></span></div><div class="choice" data-ca-type="intermediate"><svg class="lucide"><use href="#icon-book-text"></use></svg><span>Intermediate CA<small>Signed by a parent CA. Issues end-entity certificates.</small></span></div></div></div>
                   <div class="field-grid">
-                    <div class="field full"><label>Parent Certification Authority</label><div class="input-look select">Lamassu Demo Root CA<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+                    <div class="field full" id="parentField" hidden><label>Parent Certification Authority</label><button class="input-look select parent-select" id="parentSelector" type="button">Select Parent Certification Authority...<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></button><div class="parent-summary" id="parentSummary" hidden><span class="parent-summary-icon"><svg class="lucide"><use href="#icon-landmark"></use></svg></span><span class="parent-summary-copy"><strong>Lamassu Demo Root CA</strong><span>Expires in 10 years</span></span><span class="status">Active</span></div></div>
                     <div class="field full"><label>Certification Authority ID (generated)</label><div class="input-look readonly">60471eaf-331c-4b59-9343-fef302ff1863</div></div>
-                    <div class="field full"><label>Certification Authority Name (Subject Common Name)</label><div class="input-look" id="caNameField"></div><p class="field-note">Certification Authority Name (Common Name) cannot be empty.</p></div>
+                    <div class="field full"><label>Certification Authority Name (Subject Common Name)</label><div class="input-look" id="caNameField" data-placeholder="e.g., LamassuIoT Secure Services CA"></div><p class="field-note" id="caNameError">Certification Authority Name (Common Name) cannot be empty.</p></div>
                   </div>
                 </section>
                 <section class="focus-card" data-focus="dn">
                   <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-info"></use></svg></span>Subject Distinguished Name (DN)</h3>
                   <div class="field-grid">
-                    <div class="field"><label>Country (C)</label><div class="input-look" id="subjectCountryField"></div></div>
-                    <div class="field"><label>State / Province (ST)</label><div class="input-look" id="subjectStateField"></div></div>
-                    <div class="field"><label>Locality (L)</label><div class="input-look" id="subjectLocalityField"></div></div>
-                    <div class="field"><label>Organization (O)</label><div class="input-look" id="subjectOrganizationField"></div></div>
-                    <div class="field full"><label>Organizational Unit (OU)</label><div class="input-look"></div></div>
+                    <div class="field"><label>Country (C)</label><div class="input-look" id="subjectCountryField" data-placeholder="e.g., US (2-letter code)"></div></div>
+                    <div class="field"><label>State / Province (ST)</label><div class="input-look" id="subjectStateField" data-placeholder="e.g., California"></div></div>
+                    <div class="field"><label>Locality (L)</label><div class="input-look" id="subjectLocalityField" data-placeholder="e.g., San Francisco"></div></div>
+                    <div class="field"><label>Organization (O)</label><div class="input-look" id="subjectOrganizationField" data-placeholder="e.g., LamassuIoT Corp"></div></div>
+                    <div class="field full"><label>Organizational Unit (OU)</label><div class="input-look" data-placeholder="e.g., Secure Devices Division"></div></div>
                   </div>
                   <p class="field-hint">The "Certification Authority Name" entered in CA Settings will be used as the Common Name (CN) for the subject.</p>
                 </section>
                 <section class="focus-card" data-focus="validity">
                   <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-calendar-days"></use></svg></span>Expiration Settings</h3>
-                  <div class="field full"><label>CA Certificate Expiration</label><div class="expiration-controls"><div class="input-look select control-large">Duration<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div><div class="duration-control"><div class="input-look control-large">5y</div><p class="field-hint">Valid units: y, w, d, h, m, s.</p></div></div></div>
+                  <div class="field full"><label>CA Certificate Expiration</label><div class="expiration-controls"><div class="input-look select control-large">Duration<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div><div class="duration-control"><div class="input-look control-large">10y</div><p class="field-hint">Valid units: y, w, d, h, m, s.</p></div></div></div>
                 </section>
                 <section class="focus-card" data-focus="issuance">
                   <h3 class="section-heading"><span aria-hidden="true"><svg class="lucide"><use href="#icon-shield"></use></svg></span>Default Issuance Profile</h3>
@@ -504,22 +534,22 @@
                     <div class="profile-mode-option selected"><span class="profile-mode-option-title"><svg class="lucide"><use href="#icon-book-text"></use></svg>Reuse Existing</span><small>Use predefined issuance templates</small></div>
                     <div class="profile-mode-option"><span class="profile-mode-option-title"><svg class="lucide"><use href="#icon-plus-circle"></use></svg>Create New</span><small>Create a new reusable profile</small></div>
                   </div>
-                  <div class="field profile-select-field"><label>Issuance Profile</label><div class="input-look select">Demo · Device Certificates<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
+                  <div class="field profile-select-field"><label>Issuance Profile</label><div class="input-look select">IoT Device Authentication Profile<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></div></div>
                   <article class="profile-detail-card" aria-label="Selected issuance profile details">
                     <header class="profile-detail-header">
-                      <div class="profile-detail-identity"><span class="profile-detail-icon" aria-hidden="true"><svg class="lucide"><use href="#icon-book-text"></use></svg></span><div><h4 class="profile-detail-title">Demo · Device Certificates</h4><p class="profile-detail-description">Standard policy for device certificate issuance.</p></div></div>
+                      <div class="profile-detail-identity"><span class="profile-detail-icon" aria-hidden="true"><svg class="lucide"><use href="#icon-book-text"></use></svg></span><div><h4 class="profile-detail-title">IoT Device Authentication Profile</h4><p class="profile-detail-description">For authenticating IoT devices. Includes client and server authentication.</p></div></div>
                       <div class="profile-badges"><span class="profile-badge">Crypto enforcement</span></div>
                     </header>
                     <div class="profile-detail-content">
                       <div class="profile-summary-grid">
-                        <div class="profile-summary-item"><p class="profile-summary-label">Validity</p><p class="profile-summary-value">1y</p></div>
+                        <div class="profile-summary-item"><p class="profile-summary-label">Validity</p><p class="profile-summary-value">5y</p></div>
                         <div class="profile-summary-item"><p class="profile-summary-label">Signs</p><p class="profile-summary-value">End-entity certificates</p></div>
                         <div class="profile-summary-item"><p class="profile-summary-label">Subject source</p><p class="profile-summary-value">CSR subject</p></div>
                         <div class="profile-summary-item"><p class="profile-summary-label">Allowed key types</p><p class="profile-summary-value">RSA, ECDSA</p></div>
                       </div>
                       <div class="profile-policy-row"><p class="profile-policy-label">Subject policy</p><p class="profile-policy-value">Uses the subject DN requested in the CSR.</p></div>
-                      <div class="profile-policy-row"><p class="profile-policy-label">Extensions policy</p><p class="profile-policy-value">Key usage follows the CSR. Extended key usage follows the CSR.</p></div>
-                      <div class="profile-policy-row"><p class="profile-policy-label">Crypto rules</p><p class="profile-policy-value">Allowed algorithms: RSA (2048, 3072 bits) and ECDSA (P-256, P-384).</p><div class="profile-policy-badges"><span class="profile-badge">RSA</span><span class="profile-badge">ECDSA</span><span class="profile-badge">Leaf certificates only</span><span class="profile-badge">1y</span></div></div>
+                      <div class="profile-policy-row"><p class="profile-policy-label">Extensions policy</p><p class="profile-policy-value">Key usage enforced: DigitalSignature, KeyEncipherment. Extended key usage enforced: ClientAuth, ServerAuth.</p></div>
+                      <div class="profile-policy-row"><p class="profile-policy-label">Crypto rules</p><p class="profile-policy-value">Allowed algorithms: RSA (2048, 3072, 4096 bits) and ECDSA (256, 384, 521).</p><div class="profile-policy-badges"><span class="profile-badge">RSA</span><span class="profile-badge">ECDSA</span><span class="profile-badge">Leaf certificates only</span><span class="profile-badge">5y</span></div></div>
                     </div>
                   </article>
                 </section>
@@ -527,6 +557,16 @@
               </div>
             </div>
           </section>
+
+          <div class="parent-picker-overlay" id="parentPicker" hidden>
+            <section class="parent-picker" role="dialog" aria-modal="true" aria-labelledby="parentPickerTitle">
+              <header><h2 id="parentPickerTitle">Select Parent Certification Authority</h2><p>Choose an existing Certification Authority to be the issuer for this new intermediate CA. Only active, non-external CAs can be selected.</p></header>
+              <div class="parent-picker-search"><label for="parentSearch">Search</label><div class="filter-input"><svg class="lucide"><use href="#icon-search"></use></svg><span id="parentSearch">Search certification authorities...</span></div></div>
+              <div class="parent-picker-status"><span>Status</span><span>All Statuses<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg></span></div>
+              <button class="parent-option" type="button" data-parent-option><span class="ca-engine"><svg class="lucide"><use href="#icon-key-round"></use></svg></span><span><strong>Lamassu Demo Root CA</strong><small>ID: 97d1ced8... · Expires in 10 years</small></span><svg class="lucide"><use href="#icon-chevron-right"></use></svg></button>
+              <footer><span></span><button class="back-button" type="button" id="parentCancel">Cancel</button></footer>
+            </section>
+          </div>
 
         </div>
       </div>
@@ -621,6 +661,12 @@
       const appMain = document.getElementById('appMain');
       const productWindow = document.querySelector('.product-window');
       const demoCursor = document.getElementById('demoCursor');
+      const parentPicker = document.getElementById('parentPicker');
+      const parentField = document.getElementById('parentField');
+      const parentSummary = document.getElementById('parentSummary');
+      const parentSelector = document.getElementById('parentSelector');
+      const parentOption = document.querySelector('[data-parent-option]');
+      const caNameError = document.getElementById('caNameError');
       const caName = 'Lamassu Demo Intermediate CA';
       const locale = new URLSearchParams(window.location.search).get('lang') === 'es' ? 'es' : 'en';
       const copy = locale === 'es' ? {
@@ -639,7 +685,8 @@
           method: 'Selecciona Create New CA con un nuevo par de claves.',
           key: 'Selecciona el motor criptográfico y configura el nuevo par de claves.',
           profile: 'Revisa el perfil opcional para el certificado de la propia CA.',
-          settings: 'Elige Intermediate CA y selecciona la autoridad raíz emisora.',
+          settings: 'Elige Intermediate CA.',
+          parent: 'Selecciona "Lamassu Demo Root CA" como autoridad de certificación emisora.',
           name: 'Escribe el nombre de la CA en CA Settings.',
           dn: 'Completa los atributos del Distinguished Name de la CA.',
           validity: 'Configura la expiración del certificado de la CA.',
@@ -665,7 +712,8 @@
           method: 'Select Create New CA with a new key pair.',
           key: 'Select a cryptographic engine and configure the new key pair.',
           profile: "Review the optional profile for the CA's own certificate.",
-          settings: 'Choose Intermediate CA and select the issuing root CA.',
+          settings: 'Choose Intermediate CA.',
+          parent: 'Select "Lamassu Demo Root CA" as the issuing Certification Authority.',
           name: 'Enter the CA name in CA Settings.',
           dn: 'Complete the subject Distinguished Name attributes.',
           validity: 'Configure the CA certificate expiration.',
@@ -763,6 +811,23 @@
         });
       }
 
+      function setCAType(type) {
+        document.querySelectorAll('[data-ca-type]').forEach((option) => {
+          option.classList.toggle('selected', option.dataset.caType === type);
+        });
+        parentField.hidden = type !== 'intermediate';
+      }
+
+      function openParentPicker() {
+        parentPicker.hidden = false;
+      }
+
+      function selectParentCA() {
+        parentPicker.hidden = true;
+        parentSummary.hidden = false;
+        parentSelector.innerHTML = 'Selected: Lamassu Demo Root CA<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg>';
+      }
+
       function pulse(element) {
         element.classList.remove('pulse');
         void element.offsetWidth;
@@ -785,6 +850,7 @@
 
       function typeName() {
         typeFields([{ element: nameField, value: caName }]);
+        caNameError.hidden = true;
       }
 
       function reset() {
@@ -795,6 +861,11 @@
         document.getElementById('createdCAList').hidden = true;
         document.getElementById('rootExpand').classList.remove('open');
         document.querySelector('[data-new-ca]').classList.remove('pulse');
+        parentPicker.hidden = true;
+        parentSummary.hidden = true;
+        parentSelector.innerHTML = 'Select Parent Certification Authority...<svg class="lucide lucide-chevron-right"><use href="#icon-chevron-right"></use></svg>';
+        caNameError.hidden = false;
+        setCAType('root');
         hideCursor();
         nameField.textContent = '';
         subjectFields.forEach(({ element }) => { element.textContent = ''; });
@@ -877,50 +948,62 @@
         schedule(7500, () => {
           setFocus('settings');
           caption.textContent = copy.narration.settings;
-          moveCursorTo('[data-focus="settings"] .choice.selected', true);
+          setCAType('intermediate');
+          moveCursorTo('[data-ca-type="intermediate"]', true);
           pulse(document.querySelector('[data-focus="settings"]'));
         });
         schedule(9300, () => {
+          caption.textContent = copy.narration.parent;
+          openParentPicker();
+          moveCursorTo('[data-parent-option]', true);
+          pulse(parentOption);
+        });
+        schedule(11300, () => {
+          selectParentCA();
           setFocus('settings');
           typeName();
           caption.textContent = copy.narration.name;
           moveCursorTo('#caNameField', true);
           pulse(document.querySelector('[data-focus="settings"]'));
         });
-        schedule(10300, () => {
+        schedule(12800, () => {
           setFocus('dn');
           typeFields(subjectFields);
           caption.textContent = copy.narration.dn;
           moveCursorTo('[data-focus="dn"] .input-look', true);
           pulse(document.querySelector('[data-focus="dn"]'));
         });
-        schedule(11100, () => {
+        schedule(14400, () => {
           setFocus('validity');
           caption.textContent = copy.narration.validity;
           moveCursorTo('[data-focus="validity"] .input-look', true);
           pulse(document.querySelector('[data-focus="validity"]'));
         });
-        schedule(12300, () => {
+        schedule(15900, () => {
           setFocus('issuance');
           caption.textContent = copy.narration.issuance;
           moveCursorTo('[data-focus="issuance"] .profile-mode-option.selected', true);
           pulse(document.querySelector('[data-focus="issuance"] .profile-mode-option.selected'));
         });
-        schedule(13300, () => {
+        schedule(17100, () => {
           caption.textContent = copy.narration.create;
           moveCursorTo('[data-scene="form"] .create-row .fake-action', true);
         });
-        schedule(14800, () => {
+        schedule(18600, () => {
           hideCursor();
           setCreatingState();
           setProgress(3);
           caption.textContent = copy.narration.generating;
         });
-        schedule(16800, showCreatedCA);
-        schedule(18900, finish);
+        schedule(20600, showCreatedCA);
+        schedule(22700, finish);
       }
 
       document.querySelectorAll('[data-start]').forEach((button) => button.addEventListener('click', playDemo));
+      document.querySelectorAll('[data-ca-type]').forEach((option) => option.addEventListener('click', () => setCAType(option.dataset.caType)));
+      parentSelector.addEventListener('click', openParentPicker);
+      parentOption.addEventListener('click', selectParentCA);
+      document.getElementById('parentCancel').addEventListener('click', () => { parentPicker.hidden = true; });
       document.querySelectorAll('[data-back]').forEach((button) => button.addEventListener('click', () => {
         const scene = button.closest('[data-scene]');
         setScene(scene.dataset.scene === 'method' ? 'list' : 'method');

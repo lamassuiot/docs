@@ -1,59 +1,95 @@
 ---
 title: Online validation with OCSP
-description: Check in real time whether a certificate is still valid or has been revoked.
+description: Query signed status and verify the responder’s response.
 sidebar:
-  group: VA
   label: OCSP
 ---
 
-# OCSP service
+<span id="ocsp-service" />
 
-OCSP (Online Certificate Status Protocol) is the mechanism that lets a relying party check, in real time, whether a specific certificate is valid or has been revoked. Instead of downloading a full list of revoked certificates, the client sends a query with the certificate's serial number and receives a signed response with the current status.
-
-Lamassu integrates its own OCSP responder that serves these queries by consulting the internal certificate database directly. No external component is required.
+OCSP queries a certificate’s status and returns a signed response. This guide is for an integrator checking what Lamassu publishes and how the consumer must verify it. For complete identity validation, follow [Certificate validation](/docs/platform/pki/certificate-validation).
 
 ## How the responder works in Lamassu
 
-When a client requests the status of a certificate, the responder locates the certificate by its serial number and determines its status from the internal record:
+The responder retrieves the certificate by serial number and locates its issuing CA in the inventory. It translates persisted status as follows:
 
-- If the certificate is active, the response indicates `Good`.
-- If the certificate has been revoked, the response indicates `Revoked` and includes the revocation timestamp and the RFC 5280 reason code.
-- If the serial number is not found or the status is not recognizable, the response indicates `Unknown`.
+| Record status | Signed response |
+|---|---|
+| `ACTIVE` | `Good`. |
+| `REVOKED` | `Revoked`, with revocation reason and timestamp. |
+| Other states, including `INACTIVE` and `EXPIRED` | `Unknown` if the certificate and issuer can be retrieved. |
 
-The OCSP response is signed by the issuing CA of the queried certificate, using the cryptographic engine associated with that CA. Lamassu does not use a delegated OCSP signing certificate: the CA acts directly as the responder.
+An absent serial number causes a lookup error; it does not guarantee a signed `Unknown` response. Lookup or signing errors produce an HTTP failure. Treat that as unavailable evidence according to consumer policy.
 
-Each response has a validity window of 24 hours, reflected in the response's `thisUpdate` and `nextUpdate` fields. Clients that cache responses must take this window into account when determining how long a response remains valid.
+The issuing CA itself signs the response through its KMS-associated key. A delegated OCSP signing certificate is not used. An imported CA without a usable key cannot sign responses.
+
+The implementation sets `thisUpdate` approximately one day before response generation and `nextUpdate` one day after: the declared window is about 48 hours. Inspect received values and apply your freshness policy. The response reflects stored status when queried; a previously cached copy does not change upon revocation.
 
 ## Embedding in issued certificates
 
-The OCSP responder URL is automatically embedded in the AIA (*Authority Information Access*) extension of every certificate issued by Lamassu. Clients that verify certificates can read this URL directly from the certificate without additional configuration.
+The signer constructs OCSP URLs from configured VA domains and adds them to AIA. Without domains, there is no URL to add; an imported certificate retains its original extensions. Inspect the actual certificate:
+
+```bash
+openssl x509 -in device.crt -noout -ocsp_uri
+```
+
+Check that the consumer can reach this URL. DNS, endpoint exposure and domain configuration belong to [Deployment](/docs/deployment/self-hosted/networking). Changing configuration does not modify already signed certificates.
 
 ## HTTP endpoints
 
-The responder accepts both formats defined in RFC 6960:
+The service accepts:
 
-- `GET /ocsp/{ocsp_request}` includes the OCSP request Base64url-encoded within the URL itself.
-- `POST /ocsp` sends the request in the body with `Content-Type: application/ocsp-request`.
+| Method | VA service path | Format |
+|---|---|---|
+| `POST` | `/ocsp` | DER request, `Content-Type: application/ocsp-request`. |
+| `GET` | `/ocsp/{ocsp_request}` | DER request encoded using padded URL Base64. |
 
-Example query with `curl` using POST:
+Use POST to avoid client encoding differences. A successful response has `Content-Type: application/ocsp-response` and a DER body. The public prefix depends on the Gateway; use the URL published in the certificate and checked by the operator.
+
+### Generate and verify a query
+
+You need OpenSSL 3.x, `device.crt`, its direct issuer’s certificate `issuer.pem` and the consumer’s trusted roots in `roots.pem`. For an intermediate issuer, also prepare `intermediates.pem` containing the intermediate CAs.
+
+Generate the request:
 
 ```bash
-curl -X POST https://<LAMASSU_HOST>/ocsp \
-  -H "Content-Type: application/ocsp-request" \
-  --data-binary @request.der \
+openssl ocsp -issuer issuer.pem -cert device.crt \
+  -no_nonce -reqout request.der
+```
+
+This example omits the nonce because the responder does not echo it. Verification relies on signature, response correspondence and timestamps; it does not demonstrate freshness through a nonce.
+
+Replace the example URL with the inspected endpoint:
+
+```bash
+OCSP_URL='http://pki.example.com/ocsp'
+
+curl --fail --show-error --silent --max-time 15 \
+  -H 'Content-Type: application/ocsp-request' \
+  --data-binary @request.der "$OCSP_URL" \
   -o response.der
 ```
 
-The response has `Content-Type: application/ocsp-response` and contains the OCSP response in DER format.
+Verify the returned DER:
+
+```bash
+openssl ocsp -respin response.der \
+  -issuer issuer.pem -cert device.crt \
+  -CAfile roots.pem -no_nonce -resp_text
+```
+
+For intermediates, add `-verify_other intermediates.pem`. Require successful response verification and inspect the status corresponding to `device.crt`, issuer, serial, `thisUpdate` and `nextUpdate`. `Response verify OK` validates the response only: also observe `good`, `revoked` or `unknown`. Do not accept an identity based only on the command’s exit code.
 
 ## Check from the interface
 
-From the certificates screen of Lamassu you can launch an OCSP request directly against the selected certificate with the **OCSP Check** action. This action shows the status returned by the responder without needing external tools.
+**OCSP Check** shows what Lamassu returns for a selected certificate. Complete the check from the consumer’s network and trust store: a console query does not establish its validation configuration.
+
+To check a change, save an earlier response, revoke a test certificate and request another response. The new query should reflect persisted status; compare timestamps to rule out reuse of an earlier response. If it fails, follow [PKI troubleshooting](/docs/platform/pki/troubleshooting).
 
 ## References
 
-- RFC 6960 - *X.509 Internet Public Key Infrastructure Online Certificate Status Protocol – OCSP*
-- RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile* (revocation reasons, section 5.3.1)
+- [RFC 6960: OCSP](https://www.rfc-editor.org/rfc/rfc6960).
+- [OpenSSL: openssl-ocsp](https://docs.openssl.org/3.6/man1/openssl-ocsp/).
 
 <Cards>
   <Card title="CRL service" href="/docs/platform/pki/crl" />

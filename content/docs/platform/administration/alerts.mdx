@@ -1,0 +1,72 @@
+---
+title: Alerts and subscriptions
+description: Send PKI events to people and external systems.
+---
+
+Subscriptions turn Lamassu events into actionable notifications. You can alert a team, feed an incident system or trigger an automation when a CA, certificate or device changes.
+
+## How it works
+
+1. A service publishes a domain event.
+2. Lamassu evaluates the subscriptions associated with that event type.
+3. Each subscription's filter decides whether it should be notified.
+4. Lamassu delivers the event to the configured channel.
+
+The event inventory shows when each type was last observed, how many times it has occurred and how many subscriptions it has. You can expand an event to inspect an example of its JSON payload before creating the filter.
+
+## Available channels
+
+- **Email** sends alerts to a person or an operational list. It only requires the destination address.
+- **Microsoft Teams** posts the notification to a channel through its webhook URL.
+- **Webhook** delivers the event to an automation, SIEM or incident system via `POST` or `PUT`.
+
+## Create a subscription
+
+<Steps>
+  <Step>
+    ### Choose the event
+
+    Open **Alerts**, locate the event type and select **Subscribe**. Review the latest JSON example to identify the fields you will need to filter on.
+  </Step>
+
+  <Step>
+    ### Configure the destination
+
+    Select Email, Microsoft Teams or Webhook and enter the channel details.
+  </Step>
+
+  <Step>
+    ### Limit the notifications
+
+    Add a filter if you don't want to receive every instance of the event.
+
+    - **None** notifies all instances of the event.
+    - **JSON Path** evaluates one or more specific fields.
+    - **JSON Schema** accepts only payloads with a particular structure.
+    - **JavaScript** lets you express custom logic.
+
+    For example, `function (event) { return event.data.status == "NO_IDENTITY"; }` limits a subscription to devices without an identity.
+  </Step>
+
+  <Step>
+    ### Review and activate
+
+    Check the event, channel and filter in the summary. Select **Confirm Subscription** to start delivery.
+  </Step>
+</Steps>
+
+## Manage a subscription
+
+Open an existing subscription to review its destination and filter, modify the configuration or select **Unsubscribe**. Remove subscriptions that no longer have an operational owner to avoid ignored deliveries or stale endpoints.
+
+## Event families
+
+- **Authorities:** `ca.create`, `ca.import`, `ca.reissue` and `ca.delete`.
+- **Certificates:** `ca.sign.certificate` and `certificate.delete`.
+- **Profiles:** `profile.create`, `profile.update` and `profile.delete`.
+- **Enrollment:** `dms.create`, `dms.update`, `dms.enroll` and `dms.reenroll`.
+- **Devices:** `device.create`, `device.identity.update` and `device.status.update`.
+- **Validation:** `va.role.crl.create`.
+- **Keys:** `kms.create`, `kms.import`, `kms.sign.message` and `kms.delete`.
+
+Use the catalog shown in the console as the source for the types available in your deployed version.

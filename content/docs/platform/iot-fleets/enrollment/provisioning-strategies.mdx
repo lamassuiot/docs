@@ -1,0 +1,51 @@
+---
+title: Provisioning strategies
+description: Choose device registration, identity authorization and key generation.
+---
+
+This guide helps the provisioning administrator choose a path before configuring the DMS. Separate three decisions: when the device exists, how its request is authorized and who generates its key. None grants destination access by itself.
+
+## Choose registration
+
+| Path | When the device exists | What to check |
+|---|---|---|
+| Manual assignment | An operator creates it before associating a certificate. | ID, owning DMS, certificate CN and bound serial. |
+| EST with `JITP` | Created for an unknown CN during `/simpleenroll`. | Authorized credential, unused ID, profile, resulting registration and identity. |
+| EST with `PRE_REGISTRATION` | Must exist before `/simpleenroll`. | Approved record, same DMS and replacement conditions for your version. |
+
+Lamassu `JITP` creates inventory and identity in Lamassu. [AWS JITP](/docs/platform/iot-fleets/integrations/aws-iot-core) provisions a destination in AWS; these are separate decisions.
+
+For an initial client test, use [Enroll and connect a device](/docs/platform/iot-fleets/quickstarts/enroll-device). To prepare inventory without EST, follow [Manual registration](/docs/platform/iot-fleets/quickstarts/register-device).
+
+## Preregistration and replacement
+
+In the inspected code, finding any device owned by the same DMS triggers the `enable_replaceable_enrollment` check before PRE_REGISTRATION. With the flag disabled, a preregistered device can receive `forbiddenNewEnrollment` even in **No Identity**. Selecting PRE_REGISTRATION alone therefore does not establish a working path.
+
+Enabling the flag permits repeated `/simpleenroll` for an existing ID. The backend schedules a deferred attempt to revoke the previous certificate with `Superseded`; it can also run if later issuance or binding fails. Without an identity, that attempt can fail because no serial exists. The flag does not provide a replacement transaction or guarantee restoration of previous state.
+
+Test the exact case on your version before enabling it for a population. For an operational identity with authorized renewal, use `/simplereenroll`; for recovery, follow [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) and check persisted state before retrying.
+
+## Choose authentication
+
+Decide initial enrollment and re-enrollment separately:
+
+- **Client certificate:** useful when each device has an initial credential whose key it controls.
+- **Webhook:** useful when another authority knows inventory, credentials or entitlement to a requested ID.
+- **Certificate and webhook:** requires both controls in the configured operation.
+- **NO_AUTH:** does not establish requester identity; appropriate only when admission is deliberately controlled outside that DMS.
+
+Authenticating an initial certificate does not itself establish entitlement to choose any CSR CN. Define that authorization in [Bootstrap identity and authentication](/docs/platform/iot-fleets/enrollment/bootstrap-identity).
+
+## Choose custody
+
+| Option | Material crossing EST |
+|---|---|
+| Device-generated key | Public CSR and certificate; the key stays on the client. |
+| Existing device key | CSR signed with that key and a new certificate. |
+| ServerKeyGen | Private PKCS#8 key and certificate in a TLS-protected multipart response. |
+
+ServerKeyGen does not automatically use the CA’s HSM or KMS for the device key. Review its [contract and extraction](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen) and the device’s ability to install the material.
+
+## Check the decision
+
+Before expanding the flow, test allowed registration, incorrect credentials, an ID owned by another DMS, repeated requests and recovery after failure. Keep ID, serial, active version and error. Also test consumer acceptance and rejection; issuance does not imply destination registration or permission to operate.

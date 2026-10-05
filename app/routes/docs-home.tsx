@@ -165,19 +165,13 @@ const sections = [
 ];
 
 const sectionHrefs: Record<Locale, string[]> = {
-  en: [docsPath("platform/pki/overview"), docsPath("deployment/overview")],
-  es: [
-    docsPath("es/platform/pki/overview"),
-    docsPath("es/deployment/overview"),
-  ],
+  en: [docsPath("platform/overview"), docsPath("deployment/overview")],
+  es: [docsPath("es/platform/overview"), docsPath("es/deployment/overview")],
 };
 
 const navHrefs: Record<Locale, string[]> = {
-  en: [docsPath("platform/pki/overview"), docsPath("deployment/overview")],
-  es: [
-    docsPath("es/platform/pki/overview"),
-    docsPath("es/deployment/overview"),
-  ],
+  en: [docsPath("platform/overview"), docsPath("deployment/overview")],
+  es: [docsPath("es/platform/overview"), docsPath("es/deployment/overview")],
 };
 
 function navLinksFor(locale: Locale) {
@@ -319,7 +313,10 @@ export default function DocsHome() {
                   </span>
                 </Link>
               ))}
-              <Link to={docsPath("api-reference/ca")} className="lm-wave lm-wave--api">
+              <Link
+                to={docsPath("api-reference/ca")}
+                className="lm-wave lm-wave--api"
+              >
                 <span className="lm-wave-mark lm-wave-mark--svg" aria-hidden>
                   <ScalarIcon />
                 </span>

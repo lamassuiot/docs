@@ -1,5 +1,6 @@
 import { splitLocaleSlugs } from "@/lib/locales";
 import { getLLMText, source } from "@/lib/source";
+import { canonicalDocPath } from "../../lib/docs-redirects/redirects";
 import type { Route } from "./+types/mdx";
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -7,7 +8,10 @@ export async function loader({ params }: Route.LoaderArgs) {
   // remove the appended "index.mdx" that's added to avoid React Router issues
   slugs.pop();
   const { locale, content } = splitLocaleSlugs(slugs);
-  const page = source.getPage(content, locale);
+  const page = source.getPage(
+    canonicalDocPath(content.join("/")).split("/"),
+    locale,
+  );
   if (!page) {
     return new Response("not found", { status: 404 });
   }

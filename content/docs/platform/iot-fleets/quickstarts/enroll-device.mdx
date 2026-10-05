@@ -1,0 +1,161 @@
+---
+title: Enroll and connect your first device
+description: Obtain an identity through EST, verify its association and use it in an mTLS connection.
+---
+
+Prepare an evaluation DMS, enroll `est-device-001` from the client and use its identity with a local consumer that requires a certificate. The path connects administrator policy to the material the device actually installs.
+
+## Before you begin
+
+- A Lamassu instance accessible through HTTPS and permissions for CAs, profiles, DMSs and reading devices/certificates.
+- Bash, OpenSSL 3.x, curl with `--fail-with-body` and two terminals on your computer. Work in a new directory with restricted access.
+- An active root CA that issues directly, with an available key and sufficient validity. Follow [Create your first CA](/docs/platform/pki/quickstarts/create-certificate-authority). Save its verified public certificate as `device-root.pem`.
+- Available global identifier `est-device-001`. This path uses automatic registration: do not create the device in the console first.
+- The approved root for Lamassu HTTPS in `est-trust.pem`, obtained through an independent channel. It can differ from the device CA; prepare networking/TLS in [Deployment](/docs/deployment/self-hosted/networking).
+
+### Prepare the bootstrap credential
+
+Issue a bootstrap leaf certificate with `CN=est-device-001`, its own key and Client Authentication use. Follow [Issue and verify a certificate](/docs/platform/pki/quickstarts/issue-certificate), changing its CN and saving the result as `bootstrap.crt` and `bootstrap.key`. Choose validity that covers this test and check the pair and chain.
+
+The same root CA can issue it for this isolated evaluation. The operational identity will have a different key and certificate. The matching CN makes the example easier to read; initial certificate authentication does not itself bind the bootstrap CN to the requested ID. Review [admission](/docs/platform/iot-fleets/enrollment/bootstrap-identity) before applying the policy to a population.
+
+## Configure the evaluation DMS
+
+Create an explicit leaf profile compatible with EC P-256, with **Honor Subject**, CN from the CSR, **Digital Signature**, **Client Authentication** and **1 hour** validity within the root's validity. Do not enable CA signing. Rules and precedence are explained in [Profiles](/docs/platform/pki/certificate-profiles).
+
+Create the `Acme EST Evaluation` DMS with this configuration:
+
+| Setting | Evaluation value |
+|---|---|
+| Enrollment CA | Issuing root from `device-root.pem`. |
+| Issuance profile | The 1-hour leaf profile you just prepared. |
+| Protocol / Registration Mode | `EST_RFC7030` / `JITP`. |
+| Verify CSR Signature | Enabled. |
+| Enable Replaceable Enrollment | Disabled; the ID must be new. |
+| Initial authentication | `CLIENT_CERTIFICATE`; Validation CAs includes the direct bootstrap issuer; no expired certificates. |
+| Renewal authentication | `CLIENT_CERTIFICATE`, configured in the independent re-enrollment block. |
+| Additional Validation CAs / Enable Expired Renewal | Empty list for this direct issuance / disabled. |
+| Re-enrollment Delta | 1 hour. |
+| Preventive / Critical Delta | 30 minutes / 10 minutes. |
+| Revoke on Re-enrollment | Disabled to test the successor before retiring the previous identity. |
+| ServerKeyGen | Disabled; the operational key is generated in the client. |
+| CA Distribution | Include Enrollment CA enabled; Include Lamassu System CA disabled. |
+
+Equal duration and window allow immediate renewal testing. These are evaluation values; size production settings according to connectivity and recovery times. Save, reread both authentication blocks and retain the DMS ID. If your console does not expose the independent block, configure and check the resource through the [DMS API](/docs/api-reference/dms-manager) and [DMS guide](/docs/platform/iot-fleets/enrollment/dms).
+
+## Prepare the client and check cacerts
+
+Place the four trust and bootstrap files in the new directory. Replace the URL with your installation's URL:
+
+```bash
+set -euo pipefail
+umask 077
+EST_BASE='https://lamassu.example.com/.well-known/est/REPLACE_DMS_ID'
+```
+```bash
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem \
+  --dump-header cacerts.headers --output cacerts.b64 \
+  "$EST_BASE/cacerts"
+openssl base64 -d -in cacerts.b64 -out cacerts.p7b
+openssl pkcs7 -inform DER -in cacerts.p7b -print_certs -quiet -out cacerts.pem
+openssl crl2pkcs7 -nocrl -certfile cacerts.pem | openssl pkcs7 -print_certs -noout
+```
+
+The download must succeed and contain the expected enrollment root. Compare its fingerprint with `device-root.pem`. This check does not turn the response into initial trust or prove that you can issue.
+
+## Enroll the device
+
+Generate a new key and CSR with the selected identifier:
+
+```bash
+test ! -e device.key
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out device.key
+openssl req -new -sha256 -key device.key -subj '/CN=est-device-001' -out device.csr
+openssl req -in device.csr -verify -noout
+openssl req -in device.csr -outform DER -out device.csr.der
+openssl base64 -A -in device.csr.der -out device.csr.b64
+```
+
+Request the identity with the bootstrap credential and extract the certificate from the default response:
+
+```bash
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem --cert bootstrap.crt --key bootstrap.key \
+  --header 'Content-Type: application/pkcs10' \
+  --data-binary @device.csr.b64 \
+  --dump-header enroll.headers --output enroll.b64 \
+  "$EST_BASE/simpleenroll"
+openssl base64 -d -in enroll.b64 -out enroll.p7b
+openssl pkcs7 -inform DER -in enroll.p7b -print_certs -quiet -out device.crt
+```
+
+If curl fails, use [Troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting) with the saved body. Do not convert it or repeat the request without querying inventory: a timeout or error can follow persisted issuance.
+
+## Verify the obtained identity
+
+```bash
+openssl verify -CAfile device-root.pem -purpose sslclient device.crt
+openssl x509 -in device.crt -noout -subject -issuer -serial -dates -text
+openssl x509 -in device.crt -pubkey -noout > certificate-public.pem
+openssl pkey -pubin -in certificate-public.pem -outform DER -out certificate-public.der
+openssl pkey -in device.key -pubout -outform DER -out key-public.der
+cmp certificate-public.der key-public.der
+```
+
+Expect `device.crt: OK` and exit code 0 from `cmp`. Check the CN, serial, dates, Digital Signature and Client Authentication. The certificate must be a leaf: it must not declare `CA:TRUE` or Certificate Sign use. Check that its validity matches the one-hour profile.
+
+In Lamassu, open `est-device-001`. It must be created with the intended owning DMS, a current identity and the received certificate in its history. Compare the local serial with the slot; thresholds can show a renewal state rather than simply Active.
+
+## Demonstrate an mTLS connection
+
+In a second terminal, enter the same directory and run `umask 077`. Create a local server certificate and start a test consumer. This server trusts `device-root.pem` and requires a valid client identity:
+
+```bash
+test ! -e consumer.key
+openssl req -new -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
+  -noenc -days 1 -subj '/CN=localhost' \
+  -addext 'subjectAltName=DNS:localhost' \
+  -addext 'basicConstraints=critical,CA:FALSE' \
+  -addext 'keyUsage=critical,digitalSignature' \
+  -addext 'extendedKeyUsage=serverAuth' \
+  -keyout consumer.key -out consumer.crt
+openssl s_server -accept 127.0.0.1:8443 -cert consumer.crt -key consumer.key \
+  -CAfile device-root.pem -Verify 2 -verify_return_error -purpose sslclient -www
+```
+
+Leave it running. In the first terminal, connect using the obtained identity:
+
+```bash
+curl --fail --show-error --silent --max-time 10 \
+  --cacert consumer.crt --cert device.crt --key device.key \
+  --output mtls-result.html --write-out '%{http_code}\n' \
+  https://localhost:8443/
+```
+
+Expect HTTP `200`. The client's trust in this local server is its self-signed `consumer.crt`; the server verifies the device against `device-root.pem`. The HTML file displays OpenSSL diagnostic information.
+
+With the same server still running, test that a request without a client certificate is rejected:
+
+```bash
+if curl --fail --show-error --silent --max-time 10 \
+  --cacert consumer.crt --output /dev/null https://localhost:8443/; then
+  printf '%s\n' 'ERROR: consumer accepted a request without a client certificate' >&2
+  exit 1
+fi
+```
+
+Rejection must correspond to a missing certificate at the server, not a stopped server. Stop the consumer with Ctrl+C after the test. This exercise demonstrates TLS authentication and key possession; your application must also define authorization and revocation consumption. Server options are described in [openssl-s_server](https://docs.openssl.org/3.6/man1/openssl-s_server/).
+
+## Result and continuity
+
+| Check | Expected result |
+|---|---|
+| Registration | ID created automatically and correct DMS. |
+| Certificate | CN, profile, serial and key verified. |
+| Inventory | Received serial visible as the current identity and in history. |
+| Consumer | mTLS responds 200 with the identity and rejects a missing certificate. |
+
+Continue with [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) to request a successor pair within the window, install it and repeat the mTLS check. The consumer must use the new files in that test. After checking the successor, retire the previous certificate according to PKI policy; the example does not revoke it automatically.
+
+[Devices and identities](/docs/platform/iot-fleets/device-management) explains retirement and the limits of historical revocation. For a real destination, prepare consumer trust, validation and permissions; [AWS IoT Core](/docs/platform/iot-fleets/integrations/aws-iot-core) is an available integration.

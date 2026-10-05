@@ -1,170 +1,40 @@
 ---
-title: Troubleshooting
-description: Diagnose access, health, issuance, enrollment and dependencies in a Lamassu deployment.
+title: PKI troubleshooting
+description: Diagnose certificate issuance, OCSP and CRL.
 ---
 
-Start by locating the failing layer. A Gateway response, an unready pod and a rejected issuance can look like the same problem from the console, but they require different evidence.
+This guide helps a PKI operator locate issuance and status publication failures. Keep the Lamassu version, operation, CA, issuer, serial, time and returned error. Do not include private keys or tokens in diagnostics.
 
-## Diagnostic sequence
-
-<Steps>
-  <Step>
-    ### Reproduce a single operation
-
-    Note the time in UTC, user or principal, resource, endpoint and result. Avoid repeating a destructive action such as revocation or deletion.
-  </Step>
-
-  <Step>
-    ### Separate client, Gateway and service
-
-    Check the HTTP status. A 401 points to authentication; a 403, to authorization; a 404, to route or resource; a 5xx, to the service or a dependency.
-  </Step>
-
-  <Step>
-    ### Review Kubernetes status
-
-    Locate unready pods, restarts, recent events and the state of the release.
-  </Step>
-
-  <Step>
-    ### Query the affected service
-
-    Review its /health endpoint and its logs in the same time window. Then follow the indicated dependency: PostgreSQL, RabbitMQ, the OIDC provider or the cryptographic engine.
-  </Step>
-
-  <Step>
-    ### Validate the result from outside
-
-    For PKI, check the certificate, the chain, OCSP or CRL with the same type of client production uses.
-  </Step>
-</Steps>
-
-## Minimal evidence collection
-
-Replace the placeholders with your real release, namespace and deployment.
-
-~~~bash
-helm status <release> -n <namespace>
-kubectl get pods -n <namespace> -o wide
-kubectl get deployments,statefulsets,jobs -n <namespace>
-kubectl get events -n <namespace> --sort-by=.lastTimestamp
-kubectl describe pod <pod> -n <namespace>
-kubectl logs <pod> -n <namespace> --all-containers --since=30m
-~~~
-
-Also run the chart's connectivity test:
-
-~~~bash
-helm test <release> -n <namespace>
-~~~
-
-The test checks the health of CA, DMS Manager, Device Manager and VA, and verifies that the UI returns HTML. A passing test confirms basic connectivity, not a full issuance flow.
-
-<Callout type="info" title="Probes use /health">
-  The chart's services expose startup, readiness and liveness probes over <code>/health</code>. A pod can be running but receive no traffic if the readiness probe fails.
-</Callout>
-
-## I cannot sign in
-
-If you receive a 401:
-
-- check that the UI's OIDC authority is reachable from the browser;
-- verify issuer, audience and expiration of the token;
-- confirm the Gateway can fetch the keys from the JWKS URI;
-- check that the provider's public and internal routes point to the same realm.
-
-If login succeeds but the APIs return 403:
-
-- inspect the token's real claims;
-- confirm they match an active principal;
-- review the policies granted to that principal;
-- verify that authz reaches PostgreSQL and its JWKS.
-
-On a fresh installation, confirm the migration Job finished. That Job creates schemas, migrates authz, preloads policies and provisions the principals defined in <code>services.authz.bootstrap</code>.
-
-## Everything returns 403 or 5xx
-
-External authorization fails closed by default. If authz is unavailable, protected routes are blocked.
-
-1. Locate the authz pod and Service.
-2. Check /health, logs and its database connection.
-3. Verify the DNS and port configured in externalAuthorization.
-4. Check the check route is /v1/ext_authz/check.
-5. Do not switch to <code>failOpen: true</code> as a permanent workaround: it would allow traffic without authorization during the outage.
-
-## A pod is not Ready
-
-Review <code>kubectl describe pod</code> first. Common causes are:
-
-- wrong credentials or DNS for PostgreSQL or RabbitMQ;
-- unbound persistent volume;
-- inaccessible image or incorrect pull policy;
-- invalid cryptographic engine configuration;
-- CPU or memory limits set too low;
-- an incomplete prior migration.
-
-Generic values request 100 mCPU and 128 MiB and limit to 500 mCPU and 512 MiB. Tune per service when you see OOMKills, throttling or slow startups.
-
-Filesystem-based KMS engines and VA local storage use exclusive-access volumes. Keep a single replica or migrate to shared backends before enabling autoscaling.
+For Gateway, sign-in, pods, dependencies and messaging, see [Deployment troubleshooting](/docs/deployment/troubleshooting). For device enrollment, see [EST diagnostics](/docs/platform/iot-fleets/enrollment/troubleshooting#diagnostics-and-compatibility).
 
 ## Issuance fails
 
-Narrow the error following this order:
+| Check | What to inspect | Next step |
+|---|---|---|
+| CA | Exists, is active and has usable dates. | [Authorities](/docs/platform/pki/certificate-authorities). |
+| Key | The record has a usable private key and the engine can sign. | Try **Sign / Verify** in [KMS](/docs/platform/pki/key-management); check provider permissions and availability. |
+| CSR | Correct PEM and verifiable signature. | `openssl req -in request.csr -noout -verify -text`. |
+| Profile | Selected source, existing ID, allowed algorithm and size. | Check [Profiles](/docs/platform/pki/certificate-profiles) precedence; CA and DMS resolve differently. |
+| Result | Appropriate subject, SAN, usages and dates. | Compare CSR, profile and certificate; successful issuance does not establish consumer acceptance. |
 
-1. The CA exists, is active and has not expired.
-2. The CA has a usable private key and the engine is available.
-3. The CSR has a valid signature.
-4. The profile allows the key type and size.
-5. The requested validity fits within the CA's lifetime.
-6. KU, EKU, subject and extensions comply with the profile.
+For unexpected certificate fields, review `Honor Subject`, `Honor Key Usage`, `Honor Extended Key Usages` and `Honor Extensions`. The latter preserves SAN only, without validating entitlement to those names. Validity is not automatically clamped to CA expiration.
 
-If the reissuance of a CA fails, remember it is not supported for a revoked or already-expired CA. To change its key, follow [CA hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation).
-
-## EST enrollment fails
-
-Check:
-
-- the DMS identifier in the EST path;
-- the configured authentication method;
-- the chain presented by the client;
-- the validation CAs and the level limit;
-- the revocation status of the client certificate;
-- the CSR signature;
-- the CA and profile used for issuance;
-- the re-enrollment window.
-
-During re-enrollment, Lamassu first tries to validate with the enrollment CA and then with the additional CAs. During a migration, keep the old CA in that second set until the overlap ends.
+For CA reissuance failures, check revocation and date: reissuance is not supported for a revoked or already expired CA. To change its key, use [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation).
 
 ## OCSP or CRL do not reflect a change
 
-- Confirm the revocation was persisted and has reason and timestamp.
-- Review VA configuration and logs.
-- Check the CRL's periodicity and next update.
-- Rule out intermediate caches in proxy and client.
-- Verify the certificate points to the endpoint you are querying.
-- Query by the correct serial number and issuer.
+Check each boundary independently:
 
-## Events are not arriving
+1. **Record:** read the correct certificate again by serial and issuer. Confirm status, reason and time; expired or permanently revoked records reject further transitions.
+2. **Endpoint:** inspect AIA and CDP. Query those URLs from the consumer’s network; an old route or incorrect issuer can explain a discrepancy.
+3. **OCSP:** save a fresh response, verify signature and timestamps, and observe status. An HTTP error for an absent serial does not mean `Good` or guarantee a signed `Unknown`.
+4. **CRL:** compare `latest_crl`, number and timestamps with the downloaded list. Check the serial in its contents. If unchanged, review `regenerate_on_revoke`, event delivery, jobs, signing and storage with the deployment operator.
+5. **Client:** check cache, policy for expired or unavailable evidence, critical IDP extension and rejection of a new connection.
 
-Domain and audit events depend on the bus publisher:
+Reactivation from `CertificateHold` needs a new CRL for the client to stop seeing the hold. Reactivating a CA does not restore its descendant cascade; inspect every status and individual operation failure.
 
-- verify it is enabled in the emitting service;
-- check AMQP connectivity and credentials;
-- review exchange, routing key, queues and consumers;
-- inspect dead-letter queues;
-- alert on orphan durable queues and backlog growth.
+## The chain validates but the connection fails
 
-A consumer outage does not always prevent the main operation from completing. That is why you must monitor RabbitMQ and independently verify the persistence of [audit logs](/docs/platform/pki/audit-logs).
+Check expected identity, SAN, KU/EKU, matching key, presented intermediates and consumer permissions. Distinguish server TLS trust, client authentication and action authorization. Follow [Validation](/docs/platform/pki/certificate-validation) for positive and rejection tests.
 
-## Observability
-
-The chart can enable OpenTelemetry instrumentation. Traces are exported over OTLP HTTP and logs can be directed to a compatible endpoint, such as VictoriaLogs. Use a correlation identifier and the same time window to join Gateway, authz, service and dependency.
-
-Before closing an incident, record:
-
-- the confirmed cause;
-- the time scope and affected resources;
-- the commands or queries used;
-- the applied change and how to revert it;
-- validation from a consumer;
-- the preventive action and its owner.
+When escalating a problem, provide identifiers, error and relevant public evidence, including query timestamps and version. This distinguishes issuance, publication and consumer application failures.

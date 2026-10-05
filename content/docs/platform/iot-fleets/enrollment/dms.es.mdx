@@ -1,0 +1,129 @@
+---
+title: Configura y opera el DMS
+description: Define registro, autenticación por operación, emisión, renovación y confianza distribuida.
+---
+
+Un **Device Management Service (DMS)** configura la admisión y el ciclo de identidad de sus dispositivos. Actúa como autoridad de registro; la CA indicada en `Enrollment CA` firma los certificados. Esta guía se dirige a quien administra esa política.
+
+## Antes de empezar
+
+Necesitas permisos para gestionar DMS, una CA activa con clave utilizable y un [perfil de emisión](/docs/platform/pki/certificate-profiles) probado. Acuerda con el integrador ID del dispositivo, credencial inicial, consumidor y ventana de renovación. Revisa la [estrategia de aprovisionamiento](/docs/platform/iot-fleets/enrollment/provisioning-strategies) antes de elegir registro y sustitución.
+
+Prepara confianza del servidor EST y acceso desde el dispositivo con [Despliegue](/docs/deployment/self-hosted/networking). La autenticación administrativa de tu operador no sustituye la autenticación EST del dispositivo.
+
+## Configura un DMS
+
+<Steps>
+  <Step>
+    ### Identifica la flota
+
+    Crea el DMS con un nombre reconocible y conserva su ID. Las URLs EST utilizan ese identificador, no el nombre visible. Cada dispositivo conserva un DMS propietario.
+  </Step>
+  <Step>
+    ### Selecciona la CA de enrolamiento
+
+    Elige **Enrollment CA** y un perfil explícito apropiado para la identidad final. Mantén CN compatible con `Device ID`. El certificado de prueba debe permitir el uso previsto y terminar dentro de la vigencia del emisor.
+  </Step>
+  <Step>
+    ### Configura EST
+
+    Selecciona registro y autenticación del primer enrolamiento. Configura por separado la autenticación de reenrolamiento, sus umbrales y la retirada del certificado anterior. Deja ServerKeyGen deshabilitado si el cliente genera su clave.
+  </Step>
+  <Step>
+    ### Distribuye la confianza
+
+    Selecciona los certificados que devolverá `/cacerts`. Incluye explícitamente las intermedias y raíces necesarias, sin confundir distribución con instalación automática de confianza.
+  </Step>
+  <Step>
+    ### Verifica los endpoints
+
+    Guarda y vuelve a leer la configuración. Consulta `/cacerts`, realiza un enrolamiento permitido y otro rechazado, y comprueba dispositivo, serie e historial. Crear el DMS o descargar cacerts no demuestra que autenticación y emisión funcionen.
+  </Step>
+</Steps>
+
+## Configuración de enrollment
+
+### Enrollment Device Registration
+
+`settings.enrollment_settings.registration_mode` permite `JITP` o `PRE_REGISTRATION`. En JITP se crea el dispositivo desconocido con el CN de la CSR como ID y el DMS como propietario. El `device_provisioning_profile` aporta etiquetas, metadatos e icono a ese alta.
+
+En PRE_REGISTRATION, el ID debe existir previamente. En el código examinado, un dispositivo existente pasa antes por el control de sustitución, incluso si no tiene identidad. Consulta las [condiciones de prerregistro](/docs/platform/iot-fleets/enrollment/provisioning-strategies#prerregistro-y-sustitución) antes de utilizar este modo.
+
+### Enrollment Settings
+
+| Campo de `settings.enrollment_settings` | Decisión |
+|---|---|
+| `protocol` | `EST_RFC7030` para estas operaciones. |
+| `enrollment_ca` | ID de la CA que firmará. |
+| `verify_csr_signature` | Mantén `true` para comprobar posesión de la clave de la CSR. |
+| `enable_replaceable_enrollment` | Permite `/simpleenroll` para un ID existente del mismo DMS. Puede intentar revocar el anterior incluso si falla una fase posterior; no es un cambio atómico. |
+| `est_rfc7030_settings.auth_mode` | Uno de los cuatro modos de autenticación. |
+
+Si el ID pertenece a otro DMS, el enrolamiento inicial se rechaza. No actives sustitución como respuesta automática a un error; el [diagnóstico](/docs/platform/iot-fleets/enrollment/troubleshooting) distingue ID repetido, propiedad y cambios parciales.
+
+## Autenticación por operación
+
+Los bloques son independientes:
+
+- `settings.enrollment_settings.est_rfc7030_settings` para `/simpleenroll` y `/serverkeygen`.
+- `settings.reenrollment_settings.est_rfc7030_settings` para `/simplereenroll`.
+
+| `auth_mode` | Control aplicado en la operación configurada |
+|---|---|
+| `CLIENT_CERTIFICATE` | Validación del certificado presentado. |
+| `EXTERNAL_WEBHOOK` | Autorización del webhook configurado. |
+| `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | Validación del certificado y, después, aprobación del webhook. |
+| `NO_AUTH` | Sin autenticación del solicitante por el DMS. |
+
+Webhook y modo combinado también se ejecutan en reenrolamiento si se configuran en su bloque. No hay una degradación implícita a NO_AUTH en esos casos. Un modo ausente o no reconocido falla.
+
+Para mTLS inicial, `client_certificate_settings` contiene `validation_cas`, `allow_expired` y `chain_level_validation`. El flujo examinado recibe una credencial de certificado, no garantiza transportar todas las intermedias del handshake al validador. Para el caso directo, configura como CA de validación el emisor directo del bootstrap y prueba la ruta real del Gateway.
+
+En reenrolamiento con certificado, el validador utiliza la CA de enrolamiento, después `additional_validation_cas`, y la opción `enable_expired_renewal`. No presupongas que copiar `validation_cas` del bloque inicial cambia esos emisores.
+
+Para el webhook, configura destino, autenticación de Lamassu hacia ese servicio, método y timeout. El [contrato de autenticación](/docs/platform/iot-fleets/enrollment/bootstrap-identity) explica la credencial del dispositivo y el cuerpo de la llamada. `NO_AUTH` no acredita propiedad del ID solicitado.
+
+La migración `20260604110000` copia la autenticación inicial al bloque de renovación si este falta y existe la estructura necesaria. No sustituye una configuración ya presente. Después de actualizar, lee ambos bloques; si la consola de tu versión no expone la configuración independiente, utiliza la [API DMS](/docs/api-reference/dms-manager).
+
+## Perfil de emisión
+
+`settings.issuance_profile_id` tiene precedencia sobre `settings.issuance_profile`; si ninguno existe, se utiliza el perfil predeterminado de la CA. Las reglas se documentan una sola vez en [Perfiles](/docs/platform/pki/certificate-profiles). Cambiar un DMS afecta a solicitudes futuras; no modifica certificados ya firmados ni instala confianza en clientes.
+
+## Configuración de re-enrollment
+
+| Campo de `settings.reenrollment_settings` | Función |
+|---|---|
+| `reenrollment_delta` | La ventana abre en `NotAfter` del certificado activo menos este delta. |
+| `preventive_delta` | Umbral operativo preventivo de monitorización. |
+| `critical_delta` | Umbral operativo crítico de monitorización. |
+| `enable_expired_renewal` | Aceptación de un certificado presentado vencido en el validador mTLS de renovación. No autoriza por sí solo otro modo ni elimina restricciones del Gateway. |
+| `additional_validation_cas` | Emisores adicionales para la credencial mTLS durante una migración. |
+| `revoke_on_reenrollment` | Si el certificado anterior está ACTIVE, intenta revocarlo con Superseded antes de vincular el sucesor. |
+
+Monitorizar no renueva: el cliente debe programar la solicitud y la instalación. En modos webhook o NO_AUTH, la política de credencial vencida no pasa por el mismo validador mTLS; el webhook debe autorizar explícitamente la recuperación que admita. Revisa [Renovación y recuperación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) para orden de operaciones y fallos parciales.
+
+## ServerKeyGen
+
+`settings.server_keygen_settings.enabled` habilita generación software en el servidor. Algoritmo y tamaño proceden de su campo `key`; el perfil de emisión debe permitirlos. La respuesta contiene una clave PKCS#8 sin cifrar dentro de TLS, además del certificado. Consulta formato y extracción en [Referencia EST](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen).
+
+## Distribución de confianza
+
+| Opción | Qué publica |
+|---|---|
+| **Include Lamassu System CA** | Certificado TLS downstream disponible; puede ser una hoja, no una CA de emisión. |
+| **Include Enrollment CA** | Certificado de la CA emisora seleccionada. |
+| **Managed CAs** | Certificados de las CAs elegidas explícitamente. |
+
+No se añaden todos los ascendientes automáticamente. La [distribución de confianza](/docs/platform/iot-fleets/enrollment/trust-distribution) distingue raíces confiables, intermedias y confianza inicial del servidor.
+
+## Opera el inventario de DMS
+
+**Edit** cambia nombre, ajustes y metadatos. La actualización del backend sustituye esos bloques completos; al usar la API, lee el DMS antes de enviar una edición para no perder campos.
+
+**Go to DMS owned devices** limita el inventario al propietario. **Show/Edit Metadata** contiene datos operativos y de integraciones; consulta su guía antes de alterarlos. **EST (RFC-7030)** ayuda a localizar las URLs.
+
+**Delete** elimina el registro y la configuración del DMS; no realiza por sí solo una cascada de revocación sobre todos sus dispositivos y certificados. Migra dependencias y conserva las referencias de auditoría antes de retirarlo.
+
+## Integra los dispositivos
+
+Continúa con [Cliente EST](/docs/platform/iot-fleets/enrollment/est-client) o el [tutorial de enrolamiento y mTLS](/docs/platform/iot-fleets/quickstarts/enroll-device). La [Referencia EST](/docs/platform/iot-fleets/enrollment/est-reference) recoge formatos; [Diagnóstico](/docs/platform/iot-fleets/enrollment/troubleshooting) recoge fallos.

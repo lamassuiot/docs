@@ -1,13 +1,15 @@
 import { glob } from "node:fs/promises";
+import { join } from "node:path";
 import type { Config } from "@react-router/dev/config";
 import { getSlugs } from "fumadocs-core/source";
+import { API_SERVICES } from "./app/lib/api-services";
 import {
   docsUrl,
   i18nConfig,
   LOCALES,
   parseLocaleFile,
 } from "./app/lib/locales";
-import { API_SERVICES } from "./app/lib/api-services";
+import { writeStaticDocRedirects } from "./lib/docs-redirects/static";
 
 // Mount point for this build — see app/lib/base-path.ts. Read from process.env
 // because this config is loaded in Node, not bundled.
@@ -20,6 +22,12 @@ export default {
   ssr: false,
   future: {
     v8_middleware: true,
+  },
+  async buildEnd({ reactRouterConfig }) {
+    await writeStaticDocRedirects(
+      join(reactRouterConfig.buildDirectory, "client"),
+      basePath,
+    );
   },
   async prerender({ getStaticPaths }) {
     const paths = new Set<string>();

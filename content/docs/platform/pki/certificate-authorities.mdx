@@ -2,7 +2,6 @@
 title: Certification authorities
 description: Create, import and operate the authorities that establish your PKI's trust.
 sidebar:
-  group: CA
   label: Authorities
 ---
 
@@ -10,12 +9,14 @@ A certification authority (CA) binds identities to public keys through signed ce
 
 To design a full chain or replace an authority in production, see [CA hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation). If you need to standardize what each authority can sign, use [Certificate profiles](/docs/platform/pki/certificate-profiles).
 
+To administer CAs, you need authority and key permissions, a reachable engine and a reviewed profile. An external consumer does not trust a CA merely because it appears in this inventory: agree root and chain distribution separately.
+
 ## Choose a flow
 
 - **New CA with a new key:** create a root of trust from scratch. Lamassu generates and keeps the key pair.
 - **New CA from the KMS:** reuse a key already registered in the platform.
 - **Import a CA with its private key:** incorporate an external authority that Lamassu can issue with.
-- **Import only the certificate:** add an authority for building chains and validating, but not for issuing.
+- **Import only the certificate:** register public material. If Lamassu finds its key in the KMS, it can associate it; otherwise, the CA has no usable key for issuance.
 
 First time here? Follow [Create your first CA](/docs/platform/pki/quickstarts/create-certificate-authority) to complete the minimal journey.
 
@@ -40,7 +41,7 @@ First time here? Follow [Create your first CA](/docs/platform/pki/quickstarts/cr
 
     Select the cryptographic engine, the algorithm and the size or curve. Lamassu supports RSA and EC keys according to the engine's capabilities.
 
-    For RSA you can choose 1024, 2048, 3072 or 4096 bits. For EC, the P-256, P-384 and P-521 curves are available.
+    Use only sizes and curves supported by the engine and the profile’s cryptographic policy. Read [Keys and engines](/docs/platform/pki/key-management) before reusing external material.
   </Step>
 
   <Step>
@@ -68,18 +69,18 @@ First time here? Follow [Create your first CA](/docs/platform/pki/quickstarts/cr
 
     Define **CA Certificate Expiration** and **Default End-Entity Certificate Issuance Expiration**. You can express a duration (`5y 8w 4d`), pick a date or use the maximum allowed date.
 
-    Select an existing issuance profile or configure the `Key Usage` and `Extended Key Usage` in the form. If you don't choose a profile, Lamassu applies the default basic usages.
+    Review the CA’s own certificate separately from the default profile for certificates it will issue later. Choose an explicit [issuance policy](/docs/platform/pki/certificate-profiles); do not assume the form’s initial values suit your consumers.
   </Step>
 
   <Step>
     ### Create and verify
 
-    Confirm the form. The CA should appear in the inventory with its PEM certificate, status, expiration date and list of issued certificates.
+    Confirm the form and open the CA. Check status, issuer, dates, associated engine and key. Download the certificate: it should contain `CA:TRUE` and a usage permitting certificate signing. Verify the self-signature for a root or the chain to your root for an intermediate. Complete a test issuance to check that the key can actually sign.
   </Step>
 </Steps>
 
 <Callout type="warn" title="Plan validity as a hierarchy">
-  A CA cannot issue certificates that outlive its own expiration date. Leave enough margin to renew or replace the authority without interrupting consumers.
+  Plan and verify expiration using the [Profiles](/docs/platform/pki/certificate-profiles) rules. Issuance does not automatically clamp validity to the issuer’s expiration; leave time to replace the authority and renew identities.
 </Callout>
 
 ## Use a key from the KMS
@@ -90,35 +91,32 @@ This flow is useful when the key was previously created in an HSM, imported thro
 
 ## Import an external CA
 
-Importing preserves an authority created outside Lamassu.
+You need the CA certificate in PEM, its chain to a known root and, when importing it, an exportable private key. Before uploading material, verify signature, dates, `CA:TRUE`, signing usages and public-key correspondence. The [key verification procedure](/docs/platform/pki/quickstarts/issue-certificate) also compares a CA key and certificate.
 
 <Steps>
   <Step>
     ### Select the engine
 
-    Choose the engine that will keep the imported key.
+    Check the installation’s default engine before importing a CA with a key. CA import delegates key import to that engine; it does not guarantee arbitrary provider selection from the form. To select an engine while importing the key separately, use the [KMS](/docs/platform/pki/key-management).
   </Step>
-
   <Step>
     ### Load the material
 
-    Provide the CA certificate and the private key in PEM format. For a subordinate CA, optionally add the validation chain.
+    Import the certificate and, when applicable, its PEM key. Register the CAs needed to identify the issuer. Registering a CA does not install it in external trust stores.
   </Step>
-
   <Step>
     ### Define the default issuance
 
-    Configure the validity that end-entity certificates will receive when a request does not specify another duration.
+    Associate an explicit issuance profile if the CA will sign. Check usages and dates using [Profiles](/docs/platform/pki/certificate-profiles).
   </Step>
-
   <Step>
     ### Verify the import
 
-    Lamassu checks that the certificate belongs to a CA and that the material is coherent before registering it.
+    Review the registered type, associated key and engine, and issuer relationship. Certificate-only import may associate an existing KMS key using the certificate’s key identifier. Without a usable key, the CA is public material and cannot sign.
+
+    For an issuing CA, complete a test issuance and check OCSP and CRL. Creating the record alone does not establish key availability, complete chain consistency or status publication.
   </Step>
 </Steps>
-
-If you don't have the private key, import only the certificate. The authority can take part in chains of trust and validation processes, but it cannot issue certificates from Lamassu.
 
 ## Inspect an authority
 
@@ -146,7 +144,7 @@ Follow [Issue your first certificate](/docs/platform/pki/quickstarts/issue-certi
 ## Revoke a CA
 
 <Callout type="warn" title="Revocation affects the entire dependent chain">
-  Revoking a CA invalidates trust in the certificates it issued and can interrupt devices and services. The action is irreversible.
+  Revoking a CA prevents issuance and may interrupt its entire branch. Only `CertificateHold` allows reactivating the CA itself if it is not expired. Descendant revocation is attempted with `CessationOfOperation`; reactivating the parent does not restore those descendants. Follow the [cascading revocation](/docs/platform/pki/ca-hierarchy-and-rotation) conditions.
 </Callout>
 
 <Steps>
@@ -171,7 +169,7 @@ Follow [Issue your first certificate](/docs/platform/pki/quickstarts/issue-certi
   <Step>
     ### Check the publication
 
-    The status should change to **REVOKED** and the CRL should reflect the new information. The CA can no longer issue certificates.
+    Check **REVOKED** on the CA and review descendants individually; propagation permits partial failures. Independently verify [OCSP and CRL](/docs/platform/pki/certificate-validation) publication and consumer rejection. A revoked record does not guarantee that an existing session closes.
   </Step>
 </Steps>
 

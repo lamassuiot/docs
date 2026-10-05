@@ -1,0 +1,40 @@
+---
+title: Enrolamiento con PKI
+description: Elige la política de admisión y conecta DMS, confianza inicial y cliente EST.
+---
+
+Enrollment with PKI reúne el recorrido desde la admisión del dispositivo hasta la instalación y renovación de su identidad. El DMS actúa como autoridad de registro: autentica la solicitud, aplica la política de registro y pide a la CA que firme. El cliente conserva o recibe la clave, instala el resultado y lo presenta al consumidor.
+
+## El recorrido
+
+1. El administrador prepara CA, [perfil de emisión](/docs/platform/pki/certificate-profiles) y DMS.
+2. El integrador instala confianza inicial en el servidor EST y una credencial de admisión.
+3. El cliente solicita una identidad para su `Device ID` mediante EST.
+4. Se comprueban certificado, vinculación al dispositivo e instalación de la pareja clave/certificado.
+5. El consumidor valida y autoriza la identidad; el cliente programa renovación y recuperación.
+
+EST utiliza `/.well-known/est/{DMS_ID}`. Las APIs administrativas y la asignación manual siguen siendo recorridos distintos. [Enrola y conecta un dispositivo](/docs/platform/iot-fleets/quickstarts/enroll-device) completa una primera prueba con mTLS.
+
+## Para el administrador
+
+<Cards>
+  <Card title="Estrategias de aprovisionamiento" description="Elige registro automático, prerregistro o asignación manual." href="/docs/platform/iot-fleets/enrollment/provisioning-strategies" />
+  <Card title="Configura el DMS" description="Separa admisión, autenticación por operación, perfil y distribución." href="/docs/platform/iot-fleets/enrollment/dms" />
+  <Card title="Identidad inicial y autenticación" description="Decide qué prueba permite solicitar la primera identidad." href="/docs/platform/iot-fleets/enrollment/bootstrap-identity" />
+  <Card title="Distribución de confianza" description="Actualiza raíces y cadenas con un solapamiento comprobado." href="/docs/platform/iot-fleets/enrollment/trust-distribution" />
+</Cards>
+
+## Para el integrador
+
+<Cards>
+  <Card title="Cliente EST" description="Prepara la solicitud, verifica la respuesta e instala la identidad." href="/docs/platform/iot-fleets/enrollment/est-client" />
+  <Card title="Renovación y recuperación" description="Genera el sucesor y trata credenciales vencidas o perdidas." href="/docs/platform/iot-fleets/enrollment/renewal-and-recovery" />
+  <Card title="Referencia EST" description="Consulta rutas, formatos, autenticación y ServerKeyGen." href="/docs/platform/iot-fleets/enrollment/est-reference" />
+  <Card title="Diagnóstico" description="Distingue fallos de transporte, política, emisión e instalación." href="/docs/platform/iot-fleets/enrollment/troubleshooting" />
+</Cards>
+
+## Versión del contrato
+
+Este bloque describe el código de `main` examinado en el commit `8f42c47157f9a36bac3ed5caa3692aebebe19c4b`. El catálogo del sitio publica `main (unstable)`; no se atribuye este comportamiento a una release estable. Antes de utilizar otra versión, comprueba su contrato y migraciones, especialmente la autenticación independiente de reenrolamiento. Las comprobaciones de cliente y las pruebas contra una instancia se distinguen en el plan de revisión.
+
+La configuración del Gateway, TLS, proveedores y servicios pertenece a [Despliegue](/docs/deployment/overview). El uso de la identidad en AWS u otros destinos corresponde a [Integraciones](/docs/platform/iot-fleets/overview#integraciones).

@@ -1,22 +1,49 @@
 ---
 title: Validación de certificados
-description: Publica el estado de las identidades mediante OCSP y CRL.
-sidebar:
-  group: VA
-  label: Visión general
+description: Comprueba cadena, identidad, usos y revocación desde el consumidor.
 ---
 
-La emisión demuestra quién firmó un certificado; la validación permite saber si todavía debe aceptarse. Lamassu publica el estado mediante dos mecanismos complementarios.
+Esta guía reúne las comprobaciones que necesita quien integra un consumidor de certificados. Necesitas el certificado presentado, las intermedias y las raíces que tu aplicación ha decidido confiar. Lamassu publica estado; el consumidor aplica la política de aceptación.
+
+## Antes de consultar el estado
+
+Verifica estos criterios juntos:
+
+| Comprobación | Resultado necesario |
+|---|---|
+| Cadena y firma | Cadena válida hasta una raíz instalada deliberadamente en el consumidor. |
+| Fechas | Fecha actual entre `Not Before` y `Not After`, también para las CAs de la cadena. |
+| Identidad | Nombre, SAN o identificador corresponden al interlocutor esperado. |
+| Uso | KU, EKU y restricciones permiten la operación concreta. |
+| Revocación | Evidencia firmada, vigente y correspondiente al emisor y certificado consultados. |
+| Autorización | La aplicación permite la acción a esa identidad. |
+
+El [recorrido de emisión](/docs/platform/pki/quickstarts/issue-certificate) comprueba cadena y uso con OpenSSL. Esa comprobación no consulta automáticamente OCSP ni descarga una CRL. Un certificado presente en el inventario o una respuesta OCSP `Good` no sustituyen los demás criterios.
 
 ## Elige un mecanismo
 
-Usa **OCSP** cuando el consumidor esté conectado y necesite consultar el estado más reciente de un certificado concreto.
+| Mecanismo | Cuándo utilizarlo | Qué debes mantener |
+|---|---|---|
+| OCSP | Consulta del estado de un certificado concreto. | Acceso al respondedor, verificación de la firma y política de caché/vigencia. |
+| CRL | Consulta local de muchos certificados o funcionamiento offline. | Descarga periódica de una lista firmada por el emisor y rechazo de listas vencidas. |
 
-Usa una **CRL** cuando la validación deba realizarse localmente, sin conexión o sobre un volumen elevado de certificados. El consumidor descarga periódicamente una lista firmada y la conserva hasta la siguiente actualización.
+OCSP también puede devolver una respuesta reutilizable hasta `nextUpdate`; una CRL cambia al publicarse una versión nueva. Ninguno garantiza por sí solo que un consumidor conozca una revocación en el momento de guardarla.
 
-Muchos entornos utilizan ambos: OCSP como comprobación primaria y CRL como mecanismo local o de respaldo.
+Si utilizas ambos, define cuándo se permite el mecanismo alternativo y qué hace el cliente si falla la descarga, la firma, la vigencia o devuelve `Unknown`. Aceptar una identidad cuando no puedes comprobar su estado debe ser una decisión explícita de tu aplicación.
+
+## Comprueba el comportamiento del consumidor
+
+1. Acepta un certificado vigente, autorizado y con cadena conocida.
+2. Rechaza otro con raíz desconocida o uso incompatible.
+3. Revoca un certificado de prueba y verifica la respuesta OCSP o la nueva CRL.
+4. Comprueba que una conexión nueva con esa identidad se rechaza.
+5. Simula un endpoint inaccesible y evidencia vencida; observa si el resultado coincide con tu política.
+
+Conserva número de serie, emisor, razón de revocación, hora de consulta y tiempos de la evidencia. Una sesión ya abierta puede necesitar cierre o reautenticación explícita en el servicio consumidor; publicar revocación no la cierra automáticamente.
+
+Para una cadena con intermedias, valida también su estado según la política del consumidor. La CRL del emisor de una identidad final no reemplaza las comprobaciones de todas las CAs de la cadena.
 
 <Cards>
-  <Card title="Validación online con OCSP" description="Consulta estados Good, Revoked y Unknown en tiempo real." href="/docs/platform/pki/ocsp" />
-  <Card title="Listas de revocación" description="Genera, publica y distribuye CRLs por autoridad." href="/docs/platform/pki/crl" />
+  <Card title="Validación online con OCSP" description="Genera una consulta y verifica firma, estado y tiempos." href="/docs/platform/pki/ocsp" />
+  <Card title="Listas de revocación" description="Descarga, inspecciona y utiliza una CRL del emisor." href="/docs/platform/pki/crl" />
 </Cards>

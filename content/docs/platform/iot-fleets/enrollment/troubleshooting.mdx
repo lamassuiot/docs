@@ -1,0 +1,47 @@
+---
+title: Enrollment troubleshooting
+description: Locate transport, authentication, registration, issuance and installation failures.
+---
+
+Diagnose one operation and device at a time. Record the DMS/APS, endpoint, time, HTTP code, presented serial and CSR CN. Retain the response without including private keys or webhook credentials in the report.
+
+## Diagnostics and compatibility
+
+### Error codes and diagnostics
+
+The EST controller normally returns 400 when rejecting input and 500 when the service rejects or fails the operation. A 500 can also represent a policy denial; it does not mean retrying is safe. Gateway can produce its own codes and bodies. Examine the actual body and persisted result.
+
+| Symptom or message | What to check |
+|---|---|
+| curl rejects TLS, name or issuer | URL, clock, server SAN and approved root in `est-trust.pem`. Resolve trust in [Deployment](/docs/deployment/troubleshooting); do not skip verification. |
+| 404 or missing APS | Public route `/.well-known/est/{DMS_ID}/{operation}` and existing DMS. APS is not the service name. |
+| 400, CSR or format error | `Content-Type: application/pkcs10`, Base64 of DER, valid signature and a body preserved without double encoding. |
+| Missing credential or invalid certificate | Operation mode, validating CA, dates, revocation and credential delivery by Gateway. Do not confuse server TLS trust with the bootstrap CA. |
+| Webhook denies, times out or responds without authorization | Configuration, connectivity and JSON response with `authorized: true`. There is no automatic fallback to `NO_AUTH`. |
+| `device not preregistered` | PRE_REGISTRATION requires an existing inventory entry. |
+| `forbiddenNewEnrollment` | An existing device requires replacement to be enabled, even in No Identity. Investigate before enabling the flag. |
+| Different owning DMS | CN/ID, global inventory and owning DMS; do not reuse an ID from another context. |
+| `invalid RawSubject bytes` | CSR subject versus the current certificate. Preserve its attributes as well as its CN. |
+| `invalid reenroll window` | Current identity's NotAfter and reenrollment_delta. Alert thresholds do not change that window. |
+| Current certificate revoked | Renewal rejected; prepare authorized recovery according to the cause. |
+| CA, profile or signing error | Active CA, available key, selected profile and restrictions. Successful cacerts does not prove issuance. |
+| HTTP 200 without a device connection | Installed pair, chain, uses, consumer trust and permissions. Also check the slot and history. |
+| Timeout or error after issuance | New certificates, current slot and previous identity's state before retrying. |
+
+### Compatibility notes
+
+The examples use the contract of the [examined backend](/docs/platform/iot-fleets/enrollment/overview#contract-version). Do not automatically attribute that behavior to another release. Check the saved renewal mode after migration and Gateway behavior with expired certificates and the bootstrap CA.
+
+The default response is Base64-encoded DER PKCS#7; PEM through `Accept: application/x-pem-file` is a Lamassu extension. ServerKeyGen returns multipart and requires handling each part separately. See the [EST reference](/docs/platform/iot-fleets/enrollment/est-reference).
+
+## EST enrollment fails
+
+1. Check HTTPS with the approved root and query cacerts for the correct APS.
+2. Review the saved DMS: protocol, registration, authentication for that operation, CA, profile and window.
+3. Verify the CSR locally and relate its CN to the inventory.
+4. Make one request, save headers/body and query the device and certificates.
+5. If you receive an identity, check the key, subject, use and connection with the consumer.
+
+External bootstrap revocation checks have limitations: absence of evidence can be accepted, and OCSP Unknown does not cause the same rejection as Revoked. Do not assume a policy that rejects every uncertainty. An intermediate CA in the TLS chain does not prove that the entire chain reached the DMS validator either.
+
+For logs, networking, pods or Gateway headers, continue in [Deployment troubleshooting](/docs/deployment/troubleshooting). For identities issued, revoked or bound partially, use [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) and [Devices and identities](/docs/platform/iot-fleets/device-management).

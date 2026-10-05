@@ -1,0 +1,62 @@
+---
+title: Bootstrap identity and authentication
+description: Prepare server trust and admission proofs for enroll and reenroll.
+---
+
+This guide connects the DMS administrator with device manufacturing and integration. Before requesting an operational identity, the client must authenticate the EST server and establish entitlement to request the intended ID.
+
+## Initial server trust
+
+Install a previously verified root, chain or pin through a trusted channel: manufacturing, approved configuration or authenticated distribution. It enables TLS and server-name verification before downloading `/cacerts`.
+
+Your only trust proof cannot come from the same unauthenticated server. The EST server TLS certificate, bootstrap certificate and operational identity issuer may belong to different hierarchies.
+
+## Bootstrap credential
+
+With `CLIENT_CERTIFICATE`, the device presents its initial certificate and proves key possession through TLS. The DMS validates it against admission CAs. In the inspected flow, the validator receives one leaf credential: configure and test the direct issuer for the simple case; sending more intermediates does not establish delivery to the service.
+
+Check dates, matching certificate/key and revocation before provisioning. A credential shared across equipment identifies that shared credential, not an individual device.
+
+Initial mTLS validation does not by itself compare bootstrap CN with the requested CSR CN. If a requester should only request its own `Device ID`, add a control binding credential to ID, such as the combined webhook, and test a request with another CN. Certificate re-enrollment does compare its CN to the CSR; subsequent checks use the registered active identity.
+
+## Modes per operation
+
+Select the four modes independently for enrollment and re-enrollment in [DMS](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation). Renewal credentials depend on that block; do not assume the bootstrap is always used or the webhook disappears.
+
+An administrative OIDC token is not a native EST mode. A webhook may interpret an agreed credential header; that service then performs authorization. In NO_AUTH, sending a token does not add DMS authentication.
+
+## Webhook contract
+
+The DMS sends operation context to the configured service. Method comes from configuration; agree the contract before selecting POST or PUT. Authorization wait defaults to 10 seconds, replaced by a configured positive timeout.
+
+Example body:
+
+```json
+{
+  "csr": "BASE64_OF_PEM_CSR",
+  "aps": "DMS_ID",
+  "device_cn": "est-device-001",
+  "http_request": {
+    "headers": { "X-Enrollment-Credential": "REDACTED" },
+    "url": "/.well-known/est/DMS_ID/simpleenroll"
+  }
+}
+```
+
+`csr` is **base64 of PEM**, unlike the EST body, which is base64 of DER. `http_request` contains URL and first header entries from available HTTP context. This body does not include an `operation` field; distinguish enroll and reenroll through the path and configured policy.
+
+The webhook should verify credential, its relationship to `device_cn`, DMS, operation and admission policy. Forwarded headers are not themselves trusted evidence. **Lamassu-to-webhook authentication** is a separate relationship configured in the server’s HTTP client.
+
+Continuation requires a successful HTTP response and JSON:
+
+```json
+{ "authorized": true }
+```
+
+A bodyless `204` does not satisfy the contract. Denial, transport error, uninterpretable response or timeout abort authorization. Combined mode validates the certificate first, then queries the webhook. See the [webhook specification](/docs/api-reference/enroll-reenroll-webhook).
+
+## Revocation and checks
+
+The DMS first looks up the certificate in Lamassu; for external certificates it attempts OCSP and CRL. If revocation cannot be checked, validators can continue treating it as not revoked. The code also does not establish rejection of every external status other than Good. Test required behavior with your actual credential and endpoint; do not present this as guaranteed strict enforcement across every source.
+
+Test an allowed certificate, an incorrect one, another CN, webhook denial, timeout and re-enrollment under its own policy. Keep results and schedule bootstrap credential retirement where appropriate. Continue with [EST client](/docs/platform/iot-fleets/enrollment/est-client).

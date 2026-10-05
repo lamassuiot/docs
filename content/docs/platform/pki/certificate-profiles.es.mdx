@@ -2,11 +2,12 @@
 title: Perfiles de certificado
 description: Define políticas reutilizables para emitir certificados coherentes y limitar las claves aceptadas.
 sidebar:
-  group: CA
   label: Perfiles de certificado
 ---
 
 Un perfil de emisión convierte una política de certificados en configuración reutilizable. En lugar de decidir validez, sujeto, extensiones y algoritmos en cada solicitud, defines una vez qué está permitido y asocias el perfil a una CA, un DMS o una emisión concreta.
+
+Esta guía se dirige al administrador PKI que define la política de emisión. Necesitas permisos para gestionar perfiles y asociarlos a la CA o DMS previstos, además de un consumidor de prueba con requisitos de identidad y uso conocidos.
 
 ## Qué controla un perfil
 
@@ -14,7 +15,7 @@ Un perfil de emisión convierte una política de certificados en configuración 
 
 Puedes expresar la vigencia como una duración desde el momento de emisión o como una fecha final fija. Una duración funciona bien para identidades recurrentes; una fecha común sirve para hacer que todo un lote termine antes de una migración o retirada.
 
-La fecha final nunca debe superar la de la CA emisora.
+Planifica la fecha final dentro de la vigencia de la CA emisora y deja margen para renovar. El firmador calcula la fecha desde el perfil; no recorta automáticamente la validez al vencimiento del emisor. Comprueba ambas fechas en el certificado resultante. Una fecha fija ya pasada tampoco representa una identidad utilizable.
 
 ### Certificado de CA o certificado final
 
@@ -38,7 +39,7 @@ Con **Honor Subject**, el certificado conserva el sujeto de la CSR. Sin esa opci
 
 Con **Honor Extensions**, Lamassu filtra las extensiones adicionales solicitadas y conserva únicamente SAN. Sin esa opción, descarta las extensiones adicionales de la CSR.
 
-Este comportamiento permite aceptar DNS, IP, correo o URI como identidades alternativas sin aceptar extensiones arbitrarias.
+Esto conserva SAN, pero no comprueba que el solicitante tenga derecho a utilizar esos DNS, IP, correos o URI. Valida esa autorización antes de emitir. Los puntos OCSP y CRL proceden de la configuración del servicio de emisión; `Honor Extensions` no copia los puntos de distribución de la CSR.
 
 ### Restricciones criptográficas
 
@@ -53,13 +54,16 @@ Cuando está habilitada, Lamassu comprueba la clave pública antes de crear una 
 
 ## Precedencia del perfil
 
-En operaciones que admiten varias fuentes, Lamassu resuelve el perfil en este orden:
+La resolución depende del punto de entrada. Se selecciona un perfil completo; sus campos no se fusionan con los del perfil de la CA.
 
-1. Perfil enviado dentro de la operación.
-2. Identificador de perfil enviado en la operación.
-3. Perfil predeterminado asociado a la CA.
+| Operación | Primera opción | Segunda opción | Si no hay ninguna |
+|---|---|---|---|
+| Firma directa con una CA | `issuance_profile` incluido en la solicitud | `issuance_profile_id` de la solicitud | Perfil predeterminado de la CA (`profile_id`). |
+| Emisión mediante DMS | `settings.issuance_profile_id` | `settings.issuance_profile` incluido en el DMS | Perfil predeterminado de la CA de enrolamiento. |
 
-Un DMS también puede referenciar su propio perfil de emisión. De este modo, varias flotas pueden usar la misma CA con políticas distintas.
+Si el identificador seleccionado no puede resolverse, la operación falla; no se sustituye silenciosamente por el perfil de la CA. Evita definir las dos opciones a la vez. Registrar qué perfil se seleccionó facilita explicar por qué el resultado difiere de la CSR.
+
+Varias flotas pueden compartir CA y mantener perfiles distintos mediante sus DMS. La autenticación del solicitante y la política de registro del dispositivo se configuran aparte en [DMS](/docs/platform/iot-fleets/enrollment/dms).
 
 ## Crea un perfil
 
@@ -91,7 +95,9 @@ Un DMS también puede referenciar su propio perfil de emisión. De este modo, va
   <Step>
     ### Asócialo y prueba
 
-    Asocia el perfil a una CA o DMS. Emite un certificado de prueba y comprueba sujeto, SAN, KU, EKU, restricciones básicas y fechas con una herramienta X.509 independiente.
+    Asocia el perfil a una CA o DMS y verifica la precedencia anterior. Emite una CSR con usos y SAN conocidos; inspecciona el resultado con `openssl x509 -in device.crt -noout -text`. Comprueba sujeto, SAN, KU, EKU y fechas. Para una identidad final, `Sign as CA` debe estar desactivado, no debe aparecer `CA:TRUE` ni `Certificate Sign`; si existe Basic Constraints, debe indicar `CA:FALSE`.
+
+    Prueba también una clave excluida por la política: la emisión debe rechazarse. Sigue la [verificación del certificado](/docs/platform/pki/quickstarts/issue-certificate) y prueba su aceptación en el consumidor previsto.
   </Step>
 </Steps>
 
@@ -106,7 +112,7 @@ Certificado final, `DigitalSignature`, `ServerAuth` y SAN obligatorio con los no
 **CA intermedia**  
 `Sign as CA`, `CertSign` y `CRLSign`, validez superior a sus certificados finales y restricciones criptográficas más exigentes.
 
-Son patrones de partida, no una política universal. Verifica siempre los requisitos del protocolo, del consumidor y del marco regulatorio aplicable.
+Estos patrones expresan decisiones de diseño. Activar `Honor Extensions` no exige que la CSR incluya SAN ni valida sus nombres; debes hacer esa comprobación en el flujo de solicitud. El perfil tampoco instala confianza ni concede permisos en el consumidor.
 
 ## Cambios y eliminación
 

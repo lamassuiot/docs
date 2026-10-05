@@ -1,0 +1,57 @@
+# IoT Fleets (/docs/platform/iot-fleets/overview)
+
+
+
+IoT Fleets applies PKI to the device lifecycle: registration, obtaining an identity, renewal and retirement. It is intended for those who administer a device population and those who integrate its enrollment client or the system that accepts it.
+
+Start here [#start-here]
+
+Follow [Enroll and connect your first device](/docs/platform/iot-fleets/quickstarts/enroll-device) to prepare a DMS, obtain the identity from the client and demonstrate an mTLS connection. The automatic path includes initial trust, a CSR and result checks.
+
+To start with an existing certificate, use [Register a device manually](/docs/platform/iot-fleets/quickstarts/register-device). You can then prepare enrollment and renewal for the next device.
+
+Devices and identities [#devices-and-identities]
+
+| Resource     | What it represents                                                                 |
+| ------------ | ---------------------------------------------------------------------------------- |
+| **Device**   | An inventory entry with an identifier, owning DMS and classification.              |
+| **Identity** | The device's association with its certificates: an active version and a history.   |
+| **DMS**      | The service that configures admission, enrollment, renewal and trust distribution. |
+| **Fleet**    | The population you operate, represented through devices, DMSs, tags and metadata.  |
+
+Each device has an owning DMS. You can organize a population through several DMSs when it needs different policies, and use tags to classify it. “Fleet” describes that operational context; the resources you create and query are DMSs and devices.
+
+[Device management](/docs/platform/iot-fleets/device-management) covers states, certificate history and identity actions. During renewal, retain the relationship with the device and check which certificate becomes the current identity.
+
+Enrollment with PKI [#enrollment-with-pki]
+
+This section connects PKI rules to the device client. Preparation follows this order:
+
+1. **CA and profile:** prepare the issuer and certificate rules in [PKI](/docs/platform/pki/overview).
+2. **DMS policy:** define how the device is admitted, how requests authenticate and which trust is distributed.
+3. **Client:** prepare the initial credential, server trust, and key generation or custody.
+4. **Result:** request the certificate, install it and check its association with the device.
+5. **Continuity:** configure renewal, successor installation and recovery according to DMS policy.
+
+<Cards>
+  <Card title="Configure the DMS" description="Prepare the CA, admission, authentication and renewal rules." href="/docs/platform/iot-fleets/enrollment/dms" />
+
+  <Card title="Integrate the EST client" description="Review the device endpoints, formats and checks." href="/docs/platform/iot-fleets/enrollment/est-client" />
+</Cards>
+
+Integrations [#integrations]
+
+An issued identity needs a consumer that trusts its issuer, validates the certificate and grants the device permissions. Prepare both the device's trust in the server and the server's trust in the device.
+
+The [AWS IoT Core guide](/docs/platform/iot-fleets/integrations/aws-iot-core) explains how to use the identity in that destination. Provisioning in Lamassu and provisioning in the destination are separate decisions; review the conditions of the chosen mode before expecting state synchronization.
+
+Who prepares each part [#who-prepares-each-part]
+
+| Participant                | Responsibility                                                           |
+| -------------------------- | ------------------------------------------------------------------------ |
+| PKI administrator          | CA, issuance profile, chain and revocation publication.                  |
+| Provisioning administrator | DMS, admission, authentication per operation and inventory.              |
+| Device integrator          | Initial credential, key, EST client, trust and certificate installation. |
+| Consumer integrator        | Trusted issuers, validation and device permissions in the destination.   |
+
+[Permissions](/docs/platform/administration/access-control) and [audit](/docs/platform/administration/audit-logs) are shared with the rest of Platform. Prepare installation and instance connectivity in [Deployment](/docs/deployment/overview).

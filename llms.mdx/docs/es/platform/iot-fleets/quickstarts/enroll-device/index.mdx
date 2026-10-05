@@ -1,0 +1,161 @@
+# Enrola y conecta tu primer dispositivo (/docs/es/platform/iot-fleets/quickstarts/enroll-device)
+
+
+
+Prepararás un DMS de evaluación, enrolarás `est-device-001` desde el cliente y usarás su identidad frente a un consumidor local que exige certificado. El recorrido conecta la política del administrador con el material que realmente instala el dispositivo.
+
+Antes de empezar [#antes-de-empezar]
+
+* Instancia Lamassu accesible por HTTPS y permisos para CAs, perfiles, DMS y lectura de dispositivos/certificados.
+* Bash, OpenSSL 3.x, curl con `--fail-with-body` y dos terminales en tu equipo. Trabaja en un directorio nuevo con acceso restringido.
+* Una CA raíz activa que emita directamente, con clave disponible y vigencia suficiente. Sigue [Crea tu primera CA](/docs/platform/pki/quickstarts/create-certificate-authority). Guarda su certificado público verificado como `device-root.pem`.
+* El identificador global `est-device-001` libre. Este recorrido utiliza registro automático: no crees primero el dispositivo desde la consola.
+* La raíz aprobada para el HTTPS de Lamassu en `est-trust.pem`, obtenida por un canal independiente. Puede ser distinta de la CA de dispositivos; prepara red/TLS en [Despliegue](/docs/deployment/self-hosted/networking).
+
+Prepara la credencial inicial [#prepara-la-credencial-inicial]
+
+Emite un certificado final bootstrap con `CN=est-device-001`, clave propia y uso Client Authentication. Puedes seguir [Emite y verifica un certificado](/docs/platform/pki/quickstarts/issue-certificate), sustituyendo su CN y guardando el resultado como `bootstrap.crt` y `bootstrap.key`. Elige una validez que cubra esta prueba y comprueba la pareja y la cadena.
+
+Para esta evaluación aislada puede emitirlo la misma CA raíz. La identidad operativa tendrá una clave y un certificado distintos. El CN igual facilita la lectura del ejemplo; la autenticación inicial por certificado no vincula por sí sola el CN del bootstrap con el ID pedido. Revisa la [admisión](/docs/platform/iot-fleets/enrollment/bootstrap-identity) antes de aplicar la política a una población.
+
+Configura el DMS de evaluación [#configura-el-dms-de-evaluación]
+
+Crea un perfil final explícito, compatible con EC P-256, con **Honor Subject**, CN de la CSR, **Digital Signature**, **Client Authentication** y una validez de **1 hora** dentro de la vigencia de la raíz. No habilites firma como CA. Las reglas y precedencia se explican en [Perfiles](/docs/platform/pki/certificate-profiles).
+
+Crea el DMS `Acme EST Evaluation` con esta configuración:
+
+| Ajuste                                             | Valor de evaluación                                                                                |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Enrollment CA                                      | Raíz emisora de `device-root.pem`.                                                                 |
+| Perfil de emisión                                  | Perfil final de 1 hora que acabas de preparar.                                                     |
+| Protocol / Registration Mode                       | `EST_RFC7030` / `JITP`.                                                                            |
+| Verify CSR Signature                               | Habilitado.                                                                                        |
+| Enable Replaceable Enrollment                      | Deshabilitado; el ID debe ser nuevo.                                                               |
+| Autenticación inicial                              | `CLIENT_CERTIFICATE`; Validation CAs incluye el emisor directo del bootstrap; no aceptar vencidos. |
+| Autenticación de renovación                        | `CLIENT_CERTIFICATE`, configurada en el bloque independiente de re-enrollment.                     |
+| Additional Validation CAs / Enable Expired Renewal | Lista vacía para esta emisión directa / deshabilitado.                                             |
+| Re-enrollment Delta                                | 1 hora.                                                                                            |
+| Preventive / Critical Delta                        | 30 minutos / 10 minutos.                                                                           |
+| Revoke on Re-enrollment                            | Deshabilitado para probar el sucesor antes de retirar el anterior.                                 |
+| ServerKeyGen                                       | Deshabilitado; la clave operativa se genera en el cliente.                                         |
+| CA Distribution                                    | Include Enrollment CA habilitado; Include Lamassu System CA deshabilitado.                         |
+
+La duración y ventana iguales permiten probar renovación inmediatamente. Son valores de evaluación; dimensiona producción según conectividad y tiempos de recuperación. Guarda, vuelve a leer los dos bloques de autenticación y conserva el ID del DMS. Si tu consola no expone el bloque independiente, configura y comprueba el recurso mediante la [API DMS](/docs/api-reference/dms-manager) y la [guía DMS](/docs/platform/iot-fleets/enrollment/dms).
+
+Prepara el cliente y comprueba cacerts [#prepara-el-cliente-y-comprueba-cacerts]
+
+En el directorio nuevo, coloca los cuatro archivos de confianza y bootstrap. Sustituye el URL por el de tu instalación:
+
+```bash
+set -euo pipefail
+umask 077
+EST_BASE='https://lamassu.example.com/.well-known/est/REPLACE_DMS_ID'
+```
+
+```bash
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem \
+  --dump-header cacerts.headers --output cacerts.b64 \
+  "$EST_BASE/cacerts"
+openssl base64 -d -in cacerts.b64 -out cacerts.p7b
+openssl pkcs7 -inform DER -in cacerts.p7b -print_certs -quiet -out cacerts.pem
+openssl crl2pkcs7 -nocrl -certfile cacerts.pem | openssl pkcs7 -print_certs -noout
+```
+
+La descarga debe ser satisfactoria y contener la raíz de enrolamiento prevista. Compara su huella con `device-root.pem`. Esta comprobación no convierte la respuesta en confianza inicial ni demuestra que puedas emitir.
+
+Enrola el dispositivo [#enrola-el-dispositivo]
+
+Genera una clave nueva y una CSR con el identificador elegido:
+
+```bash
+test ! -e device.key
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out device.key
+openssl req -new -sha256 -key device.key -subj '/CN=est-device-001' -out device.csr
+openssl req -in device.csr -verify -noout
+openssl req -in device.csr -outform DER -out device.csr.der
+openssl base64 -A -in device.csr.der -out device.csr.b64
+```
+
+Solicita la identidad con la credencial inicial y extrae el certificado de la respuesta predeterminada:
+
+```bash
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem --cert bootstrap.crt --key bootstrap.key \
+  --header 'Content-Type: application/pkcs10' \
+  --data-binary @device.csr.b64 \
+  --dump-header enroll.headers --output enroll.b64 \
+  "$EST_BASE/simpleenroll"
+openssl base64 -d -in enroll.b64 -out enroll.p7b
+openssl pkcs7 -inform DER -in enroll.p7b -print_certs -quiet -out device.crt
+```
+
+Si curl falla, consulta [Diagnóstico](/docs/platform/iot-fleets/enrollment/troubleshooting) con el cuerpo guardado. No ejecutes la conversión ni repitas la solicitud sin consultar el inventario: un timeout o error puede seguir a una emisión persistida.
+
+Verifica la identidad obtenida [#verifica-la-identidad-obtenida]
+
+```bash
+openssl verify -CAfile device-root.pem -purpose sslclient device.crt
+openssl x509 -in device.crt -noout -subject -issuer -serial -dates -text
+openssl x509 -in device.crt -pubkey -noout > certificate-public.pem
+openssl pkey -pubin -in certificate-public.pem -outform DER -out certificate-public.der
+openssl pkey -in device.key -pubout -outform DER -out key-public.der
+cmp certificate-public.der key-public.der
+```
+
+Espera `device.crt: OK` y código 0 de `cmp`. Comprueba CN, serie, fechas, Digital Signature y Client Authentication. El certificado debe ser final: no declarar `CA:TRUE` ni uso Certificate Sign. Revisa que su validez corresponda al perfil de una hora.
+
+En Lamassu, abre `est-device-001`. Debe estar creado con el DMS propietario previsto, una identidad actual y el certificado recibido en su historial. Compara la serie local con la del slot; los umbrales pueden mostrar un estado de renovación en vez de un simple Active.
+
+Demuestra una conexión mTLS [#demuestra-una-conexión-mtls]
+
+En una segunda terminal, entra en el mismo directorio y ejecuta `umask 077`. Crea un certificado local de servidor y arranca un consumidor de prueba. Este servidor confía en `device-root.pem` y exige una identidad cliente válida:
+
+```bash
+test ! -e consumer.key
+openssl req -new -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
+  -noenc -days 1 -subj '/CN=localhost' \
+  -addext 'subjectAltName=DNS:localhost' \
+  -addext 'basicConstraints=critical,CA:FALSE' \
+  -addext 'keyUsage=critical,digitalSignature' \
+  -addext 'extendedKeyUsage=serverAuth' \
+  -keyout consumer.key -out consumer.crt
+openssl s_server -accept 127.0.0.1:8443 -cert consumer.crt -key consumer.key \
+  -CAfile device-root.pem -Verify 2 -verify_return_error -purpose sslclient -www
+```
+
+Déjalo funcionando. En la primera terminal, realiza la conexión con la identidad obtenida:
+
+```bash
+curl --fail --show-error --silent --max-time 10 \
+  --cacert consumer.crt --cert device.crt --key device.key \
+  --output mtls-result.html --write-out '%{http_code}\n' \
+  https://localhost:8443/
+```
+
+Espera HTTP `200`. La confianza del cliente en este servidor local es su certificado autofirmado `consumer.crt`; el servidor verifica al dispositivo contra `device-root.pem`. El archivo HTML muestra información de diagnóstico de OpenSSL.
+
+Con el mismo servidor todavía funcionando, prueba que una solicitud sin certificado cliente se rechaza:
+
+```bash
+if curl --fail --show-error --silent --max-time 10 \
+  --cacert consumer.crt --output /dev/null https://localhost:8443/; then
+  printf '%s\n' 'ERROR: consumer accepted a request without a client certificate' >&2
+  exit 1
+fi
+```
+
+El rechazo debe corresponder a la falta de certificado en el servidor, no a un servidor detenido. Termina el consumidor con Ctrl+C después de la prueba. Este ejercicio demuestra autenticación TLS y posesión de la clave; tu aplicación debe definir además autorización y consumo de revocación. Las opciones del servidor se describen en [openssl-s\_server](https://docs.openssl.org/3.6/man1/openssl-s_server/).
+
+Resultado y continuidad [#resultado-y-continuidad]
+
+| Comprobación | Resultado esperado                                                 |
+| ------------ | ------------------------------------------------------------------ |
+| Registro     | ID creado automáticamente y DMS correcto.                          |
+| Certificado  | CN, perfil, serie y clave verificados.                             |
+| Inventario   | Serie recibida visible como identidad actual y en el historial.    |
+| Consumidor   | mTLS responde 200 con la identidad y rechaza falta de certificado. |
+
+Continúa con [Renovación y recuperación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) para solicitar una pareja sucesora dentro de la ventana, instalarla y repetir la comprobación mTLS. El consumidor debe utilizar los archivos nuevos en esa prueba. Después de comprobar el sucesor, retira el certificado anterior según la política PKI; el ejemplo no lo revoca automáticamente.
+
+[Dispositivos e identidades](/docs/platform/iot-fleets/device-management) explica la retirada y los límites de revocación del historial. Para un destino real, prepara confianza, validación y permisos del consumidor; [AWS IoT Core](/docs/platform/iot-fleets/integrations/aws-iot-core) es una integración disponible.

@@ -1,0 +1,46 @@
+# Diagnóstico de enrolamiento (/docs/es/platform/iot-fleets/enrollment/troubleshooting)
+
+
+
+Diagnostica una operación y un dispositivo cada vez. Anota DMS/APS, endpoint, hora, código HTTP, serie presentada y CN de la CSR. Conserva la respuesta sin incluir claves privadas ni credenciales de webhook en el informe.
+
+Diagnóstico y compatibilidad [#diagnóstico-y-compatibilidad]
+
+Códigos de error y diagnóstico [#códigos-de-error-y-diagnóstico]
+
+El controlador EST devuelve normalmente 400 al rechazar entrada y 500 cuando el servicio rechaza o falla la operación. Un 500 también puede representar una denegación de política; no implica que reintentar sea seguro. Gateway puede generar sus propios códigos y cuerpos. Revisa el cuerpo real y el resultado persistido.
+
+| Síntoma o mensaje                                   | Qué revisar                                                                                                                                                          |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| curl rechaza TLS, nombre o emisor                   | URL, reloj, SAN del servidor y raíz aprobada en `est-trust.pem`. Resolver la confianza en [Despliegue](/docs/deployment/troubleshooting); no omitir la verificación. |
+| 404 o APS ausente                                   | Ruta pública `/.well-known/est/{DMS_ID}/{operation}` y DMS existente. El APS no es el nombre del servicio.                                                           |
+| 400, error de CSR o formato                         | `Content-Type: application/pkcs10`, Base64 de DER, firma válida y cuerpo conservado sin doble codificación.                                                          |
+| Credencial ausente o certificado no válido          | Modo de la operación, CA validante, fechas, revocación y entrega de la credencial por Gateway. No confundir confianza TLS del servidor con CA de bootstrap.          |
+| Webhook deniega, expira o responde sin autorización | Configuración, conectividad y respuesta JSON con `authorized: true`. No hay degradación automática a `NO_AUTH`.                                                      |
+| `device not preregistered`                          | PRE\_REGISTRATION requiere la entrada de inventario previa.                                                                                                          |
+| `forbiddenNewEnrollment`                            | Un dispositivo ya existente exige sustitución habilitada, incluso en No Identity. Investiga antes de activar el flag.                                                |
+| DMS propietario distinto                            | CN/ID, inventario global y DMS dueño; no reutilices un ID de otro contexto.                                                                                          |
+| `invalid RawSubject bytes`                          | Sujeto de la CSR frente al certificado actual. Conserva sus atributos, además del CN.                                                                                |
+| `invalid reenroll window`                           | NotAfter de la identidad actual y reenrollment\_delta. Los umbrales de alerta no cambian esa ventana.                                                                |
+| Certificado actual revocado                         | Renovación rechazada; prepara recuperación autorizada según la causa.                                                                                                |
+| Error de CA, perfil o firma                         | CA activa, clave disponible, perfil seleccionado y restricciones. Un cacerts correcto no prueba emisión.                                                             |
+| HTTP 200 sin conexión del dispositivo               | Pareja instalada, cadena, usos, confianza y permisos del consumidor. Comprueba también el slot e historial.                                                          |
+| Timeout o error después de emitir                   | Certificados nuevos, slot actual y estado de la identidad anterior antes de repetir.                                                                                 |
+
+Notas de compatibilidad [#notas-de-compatibilidad]
+
+Los ejemplos usan el contrato del [backend examinado](/docs/platform/iot-fleets/enrollment/overview#versión-del-contrato). No atribuyas automáticamente ese comportamiento a otra release. Verifica el modo de renovación guardado tras una migración y el comportamiento del Gateway con certificados vencidos y con la CA inicial.
+
+La respuesta predeterminada es PKCS#7 DER en Base64; el PEM por `Accept: application/x-pem-file` es una extensión de Lamassu. ServerKeyGen devuelve multipart y requiere tratar cada parte por separado. Consulta la [referencia EST](/docs/platform/iot-fleets/enrollment/est-reference).
+
+El enrolamiento EST falla [#el-enrolamiento-est-falla]
+
+1. Comprueba HTTPS con la raíz aprobada y consulta cacerts para el APS correcto.
+2. Revisa el DMS guardado: protocolo, registro, autenticación de esa operación, CA, perfil y ventana.
+3. Verifica la CSR localmente y relaciona su CN con el inventario.
+4. Ejecuta una solicitud, guarda cabeceras/cuerpo y consulta el dispositivo y los certificados.
+5. Si recibes identidad, comprueba clave, sujeto, uso y conexión con el consumidor.
+
+Las comprobaciones externas de revocación del bootstrap tienen límites: ausencia de evidencia puede aceptarse, y OCSP Unknown no produce el mismo rechazo que Revoked. No presupongas una política de rechazo ante cualquier incertidumbre. Una CA intermedia en la cadena TLS tampoco demuestra que toda la cadena haya llegado al validador DMS.
+
+Para logs, red, pods o cabeceras de Gateway, continúa en [Diagnóstico de Despliegue](/docs/deployment/troubleshooting). Para identidades emitidas, revocadas o vinculadas parcialmente, utiliza [Renovación y recuperación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) y [Dispositivos e identidades](/docs/platform/iot-fleets/device-management).

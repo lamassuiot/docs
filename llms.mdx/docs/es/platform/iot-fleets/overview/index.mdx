@@ -1,0 +1,57 @@
+# IoT Fleets (/docs/es/platform/iot-fleets/overview)
+
+
+
+IoT Fleets aplica la PKI al ciclo de vida de dispositivos: registro, obtención de identidad, renovación y retirada. Está dirigido a quien administra una población de dispositivos y a quien integra su cliente de enrolamiento o el sistema que los acepta.
+
+Empieza aquí [#empieza-aquí]
+
+Sigue [Enrola y conecta tu primer dispositivo](/docs/platform/iot-fleets/quickstarts/enroll-device) para preparar un DMS, obtener la identidad desde el cliente y demostrar una conexión mTLS. El recorrido automático incluye confianza inicial, CSR y comprobación del resultado.
+
+Si necesitas comenzar con un certificado existente, utiliza [Registra un dispositivo manualmente](/docs/platform/iot-fleets/quickstarts/register-device). Después podrás preparar el enrolamiento y la renovación del siguiente dispositivo.
+
+Dispositivos e identidades [#dispositivos-e-identidades]
+
+| Recurso         | Qué representa                                                                            |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| **Dispositivo** | Una entrada de inventario con identificador, DMS propietario y clasificación.             |
+| **Identidad**   | La asociación del dispositivo con sus certificados: una versión activa y un historial.    |
+| **DMS**         | El servicio que configura admisión, enrolamiento, renovación y distribución de confianza. |
+| **Flota**       | La población que operas, representada mediante dispositivos, DMS, etiquetas y metadatos.  |
+
+Cada dispositivo tiene un DMS propietario. Puedes organizar una población mediante varios DMS cuando necesita políticas distintas, y utilizar etiquetas para clasificarla. «Flota» describe ese contexto operativo; los recursos que creas y consultas son DMS y dispositivos.
+
+La [gestión de dispositivos](/docs/platform/iot-fleets/device-management) reúne estados, historial de certificados y acciones sobre la identidad. Al renovar, debes conservar la relación con el dispositivo y comprobar qué certificado pasa a ser la identidad actual.
+
+Enrolamiento con PKI [#enrolamiento-con-pki]
+
+Este bloque conecta las reglas PKI con el cliente del dispositivo. La preparación sigue este orden:
+
+1. **CA y perfil:** prepara el emisor y las reglas del certificado en [PKI](/docs/platform/pki/overview).
+2. **Política DMS:** define cómo se admite el dispositivo, cómo se autentican sus solicitudes y qué confianza se distribuye.
+3. **Cliente:** prepara la credencial inicial, la confianza del servidor y la generación o custodia de la clave.
+4. **Resultado:** solicita el certificado, instálalo y comprueba su asociación con el dispositivo.
+5. **Continuidad:** configura renovación, instalación del sucesor y recuperación según la política del DMS.
+
+<Cards>
+  <Card title="Configura el DMS" description="Prepara la CA, la admisión, la autenticación y las reglas de renovación." href="/docs/platform/iot-fleets/enrollment/dms" />
+
+  <Card title="Integra el cliente EST" description="Consulta los endpoints, formatos y comprobaciones del dispositivo." href="/docs/platform/iot-fleets/enrollment/est-client" />
+</Cards>
+
+Integraciones [#integraciones]
+
+Una identidad emitida necesita un consumidor que confíe en su emisor, valide el certificado y conceda permisos al dispositivo. Prepara tanto la confianza del dispositivo en el servidor como la del servidor en el dispositivo.
+
+La guía de [AWS IoT Core](/docs/platform/iot-fleets/integrations/aws-iot-core) explica cómo utilizar la identidad en ese destino. El aprovisionamiento en Lamassu y el aprovisionamiento en el destino son decisiones distintas; revisa las condiciones del modo elegido antes de esperar sincronización de estados.
+
+Quién prepara cada parte [#quién-prepara-cada-parte]
+
+| Participante                        | Responsabilidad                                                                  |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| Administrador PKI                   | CA, perfil de emisión, cadena y publicación de revocación.                       |
+| Administrador del aprovisionamiento | DMS, admisión, autenticación por operación e inventario.                         |
+| Integrador del dispositivo          | Credencial inicial, clave, cliente EST, confianza e instalación de certificados. |
+| Integrador del consumidor           | Emisores confiables, validación y permisos del dispositivo en el destino.        |
+
+Los [permisos](/docs/platform/administration/access-control) y la [auditoría](/docs/platform/administration/audit-logs) son compartidos con el resto de Plataforma. La instalación y la conectividad de la instancia se preparan en [Despliegue](/docs/deployment/overview).

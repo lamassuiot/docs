@@ -7,30 +7,39 @@
 - [Install with Helm](/docs/deployment/self-hosted/helm): Prepare dependencies, configure the Lamassu chart and verify a controlled Kubernetes deployment.
 - [Expose the Gateway](/docs/deployment/self-hosted/networking): Choose how clients reach Lamassu, when to set gateway.addresses and how to design multiple Gateways.
 - [Kubernetes self-managed](/docs/deployment/self-hosted/overview): Choose an installation workflow and network architecture for Lamassu on your Kubernetes cluster.
-- [Access control](/docs/platform/pki/access-control): Design who can access Lamassu through principals, policies, resource permissions and HTTP route authorization.
-- [Alerts and subscriptions](/docs/platform/pki/alerts): Send PKI events to people and external systems.
-- [Audit logs](/docs/platform/pki/audit-logs): Understand which audit events Lamassu generates and how to turn them into a durable trail.
+- [Deployment troubleshooting](/docs/deployment/troubleshooting): Diagnose access, service health and infrastructure dependencies.
+- [Access control](/docs/platform/administration/access-control): Design who can access Lamassu through principals, policies, resource permissions and HTTP route authorization.
+- [Alerts and subscriptions](/docs/platform/administration/alerts): Send PKI events to people and external systems.
+- [Audit logs](/docs/platform/administration/audit-logs): Understand which audit events Lamassu generates and how to turn them into a durable trail.
+- [Platform architecture](/docs/platform/concepts/architecture): Lamassu components and how control, keys, issuance and devices relate.
+- [How Lamassu works](/docs/platform/concepts/overview): The mental model of trust, keys, certificates and devices.
+- [Devices and identities](/docs/platform/iot-fleets/device-management): Register, inspect and retire devices while checking their current identity and history.
+- [Bootstrap identity and authentication](/docs/platform/iot-fleets/enrollment/bootstrap-identity): Prepare server trust and admission proofs for enroll and reenroll.
+- [Configure and operate the DMS](/docs/platform/iot-fleets/enrollment/dms): Define registration, authentication per operation, issuance, renewal and distributed trust.
+- [Integrate the EST client](/docs/platform/iot-fleets/enrollment/est-client): Prepare trust, send a CSR and check the identity you receive.
+- [EST reference](/docs/platform/iot-fleets/enrollment/est-reference): Look up Lamassu routes, formats, authentication and multipart responses.
+- [Enrollment with PKI](/docs/platform/iot-fleets/enrollment/overview): Choose admission policy and connect DMS, initial trust and the EST client.
+- [Provisioning strategies](/docs/platform/iot-fleets/enrollment/provisioning-strategies): Choose device registration, identity authorization and key generation.
+- [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery): Renew without losing the identity and recover devices according to their actual state.
+- [Enrollment troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting): Locate transport, authentication, registration, issuance and installation failures.
+- [Trust distribution and updates](/docs/platform/iot-fleets/enrollment/trust-distribution): Separate roots, intermediates and initial TLS trust when distributing or migrating certificates.
+- [AWS IoT Core](/docs/platform/iot-fleets/integrations/aws-iot-core): Lamassu's connector for AWS IoT Core syncs device identities with the AWS platform, handling CA registration, Thing provisioning and certificate lifecycle automatically and event-driven.
+- [IoT Fleets](/docs/platform/iot-fleets/overview): Organize devices and their identities, prepare enrollment and integrate consumers.
+- [Enroll and connect your first device](/docs/platform/iot-fleets/quickstarts/enroll-device): Obtain an identity through EST, verify its association and use it in an mTLS connection.
+- [Register a device manually](/docs/platform/iot-fleets/quickstarts/register-device): Prepare a DMS, register a device and associate a verified certificate with its identity.
+- [Lamassu IoT Platform](/docs/platform/overview): Build a PKI and apply its certificates to your devices' lifecycle.
 - [CA hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation): Design root and intermediate authorities and replace certificates or keys without breaking trust.
 - [Certification authorities](/docs/platform/pki/certificate-authorities): Create, import and operate the authorities that establish your PKI's trust.
 - [Certificate profiles](/docs/platform/pki/certificate-profiles): Define reusable policies to issue consistent certificates and constrain accepted keys.
-- [Certificate validation](/docs/platform/pki/certificate-validation): Publish the status of identities through OCSP and CRL.
+- [Certificate validation](/docs/platform/pki/certificate-validation): Check chain, identity, purpose and revocation from the consumer.
 - [Certificates](/docs/platform/pki/certificates): Inspect, download and revoke the certificates issued by Lamassu.
-- [Platform architecture](/docs/platform/pki/concepts/architecture): Lamassu components and how control, keys, issuance and devices relate.
 - [Certificate lifecycle](/docs/platform/pki/concepts/certificate-lifecycle): Issuance, use, renewal, revocation and retirement of certificates in Lamassu.
-- [Glossary](/docs/platform/pki/concepts/glossary): PKI, certificate and identity management terms used in Lamassu.
-- [How Lamassu works](/docs/platform/pki/concepts/overview): The mental model of trust, keys, certificates and devices.
 - [Trust model](/docs/platform/pki/concepts/trust-model): Understand where trust originates, how it is distributed and what each component validates.
 - [Revocation lists (CRL)](/docs/platform/pki/crl): Generate and distribute signed lists to validate certificates offline.
-- [Device Management Service](/docs/platform/pki/device-enrollment): Define how a fleet receives, renews and uses its identities.
-- [Devices and identities](/docs/platform/pki/device-management): Register devices and control their identities throughout the lifecycle.
-- [Device enrollment with EST](/docs/platform/pki/est-enrollment): EST protocol guide for Lamassu IoT, with DMS configuration for the PKI administrator and the endpoint reference for device integrators.
-- [AWS IoT Core](/docs/platform/pki/integrations/aws-iot-core): Lamassu's connector for AWS IoT Core syncs device identities with the AWS platform, handling CA registration, Thing provisioning and certificate lifecycle automatically and event-driven.
 - [Keys and cryptographic engines](/docs/platform/pki/key-management): Generate, import and operate keys without coupling the PKI to a specific provider.
-- [Online validation with OCSP](/docs/platform/pki/ocsp): Check in real time whether a certificate is still valid or has been revoked.
-- [Lamassu IoT Platform](/docs/platform/pki/overview): Manage PKI and digital identities for your devices from a single platform.
-- [Create your first CA](/docs/platform/pki/quickstarts/create-certificate-authority): Create a root authority and check that it is ready to issue certificates.
-- [Issue your first certificate](/docs/platform/pki/quickstarts/issue-certificate): Issue an X.509 identity from the console and verify the result.
-- [Get started](/docs/platform/pki/quickstarts/overview): Get a first result with Lamassu and continue from a working base.
-- [Register your first device](/docs/platform/pki/quickstarts/register-device): Add a device to Lamassu and assign it an active identity.
-- [Troubleshooting](/docs/platform/pki/troubleshooting): Diagnose access, health, issuance, enrollment and dependencies in a Lamassu deployment.
-- [Test](/docs/test): A document to test Fumadocs
+- [Online validation with OCSP](/docs/platform/pki/ocsp): Query signed status and verify the responder’s response.
+- [PKI](/docs/platform/pki/overview): Administer keys and authorities, define issuance and verify the resulting certificates.
+- [Create your first CA](/docs/platform/pki/quickstarts/create-certificate-authority): Create an evaluation root and check its certificate before issuing.
+- [Issue and verify a certificate](/docs/platform/pki/quickstarts/issue-certificate): Issue a client certificate and check content, chain and key correspondence.
+- [PKI getting started](/docs/platform/pki/quickstarts/overview): Create a CA, issue a client certificate and check its chain and key.
+- [PKI troubleshooting](/docs/platform/pki/troubleshooting): Diagnose certificate issuance, OCSP and CRL.

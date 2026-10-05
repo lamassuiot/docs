@@ -1,0 +1,76 @@
+# Plataforma Lamassu IoT (/docs/es/platform/overview)
+
+
+
+Lamassu IoT permite administrar una PKI privada y utilizarla para emitir, renovar y revocar identidades X.509 de dispositivos. La documentación de Plataforma sigue dos recorridos: **PKI**, para gestionar las autoridades y los certificados, e **IoT Fleets**, para aplicar esas identidades a una población de dispositivos.
+
+Empieza aquí [#empieza-aquí]
+
+Elige el resultado que necesitas obtener:
+
+<Cards>
+  <Card title="Emitir y verificar un certificado" description="Prepara una CA, emite una identidad X.509 y comprueba su cadena y su clave." href="/docs/platform/pki/quickstarts/overview" />
+
+  <Card title="Enrolar y conectar un dispositivo" description="Prepara el DMS, solicita la identidad por EST y comprueba una conexión mTLS." href="/docs/platform/iot-fleets/quickstarts/enroll-device" />
+</Cards>
+
+Si todavía estás preparando la instancia, empieza en [Despliegue](/docs/deployment/overview). Los recorridos de Plataforma parten de una consola accesible y de permisos para realizar las operaciones.
+
+Elige tu recorrido [#elige-tu-recorrido]
+
+| Bloque             | Qué gestionas                                                                          | Punto de entrada                                                   |
+| ------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **PKI**            | Claves, autoridades, perfiles, certificados y publicación del estado de revocación.    | [Visión general de PKI](/docs/platform/pki/overview)               |
+| **IoT Fleets**     | Dispositivos, historial de identidad, políticas DMS, enrolamiento EST e integraciones. | [Visión general de IoT Fleets](/docs/platform/iot-fleets/overview) |
+| **Administración** | Permisos de operadores, auditoría y suscripciones a eventos.                           | [Control de acceso](/docs/platform/administration/access-control)  |
+
+Una CA determina quién firma y un perfil establece qué puede emitirse. El DMS aplica la política de admisión y enrolamiento. El dispositivo conserva la asociación con sus certificados, y el consumidor externo decide qué identidad acepta.
+
+Arquitectura de un vistazo [#arquitectura-de-un-vistazo]
+
+El recorrido de una identidad conecta cuatro responsabilidades:
+
+1. El administrador PKI prepara la autoridad, su clave y las reglas de emisión.
+2. El administrador del aprovisionamiento configura el DMS y la confianza inicial.
+3. El cliente del dispositivo solicita un certificado y lo instala junto con la clave que le corresponde.
+4. El consumidor valida la identidad y aplica sus permisos de acceso.
+
+Consulta [Cómo funciona Lamassu](/docs/platform/concepts/overview) para entender los recursos y la [arquitectura de la plataforma](/docs/platform/concepts/architecture) para conocer los servicios. La instalación, la exposición de red y las dependencias se explican en [Despliegue](/docs/deployment/overview).
+
+Capacidades principales [#capacidades-principales]
+
+Construye tu jerarquía de confianza [#construye-tu-jerarquía-de-confianza]
+
+Crea o incorpora autoridades y organiza sus relaciones en [PKI](/docs/platform/pki/certificate-authorities). La jerarquía y su rotación determinan qué cadenas deberán reconocer los consumidores.
+
+Protege las claves criptográficas [#protege-las-claves-criptográficas]
+
+Elige el motor que custodiará las claves de las autoridades y controla quién puede utilizarlas. Consulta [Claves y motores](/docs/platform/pki/key-management); la preparación del proveedor forma parte del despliegue.
+
+Emite y controla certificados [#emite-y-controla-certificados]
+
+Define [perfiles de emisión](/docs/platform/pki/certificate-profiles), firma solicitudes y consulta el [inventario de certificados](/docs/platform/pki/certificates). El certificado emitido debe comprobarse desde el cliente que lo utilizará.
+
+Automatiza identidades de dispositivos [#automatiza-identidades-de-dispositivos]
+
+Configura un [DMS](/docs/platform/iot-fleets/enrollment/dms) y utiliza [EST](/docs/platform/iot-fleets/enrollment/overview) para solicitar y renovar certificados. La preparación de la credencial inicial y la instalación del resultado pertenecen a la integración del dispositivo.
+
+Publica el estado de validación [#publica-el-estado-de-validación]
+
+Utiliza [OCSP y CRL](/docs/platform/pki/certificate-validation) para publicar el estado de revocación. Cada consumidor debe configurar cómo consulta y aplica esa información.
+
+Reacciona a los eventos [#reacciona-a-los-eventos]
+
+Consulta [auditoría](/docs/platform/administration/audit-logs) para investigar cambios y configura [alertas y suscripciones](/docs/platform/administration/alerts) para reaccionar a eventos del ciclo de vida.
+
+Referencia operativa [#referencia-operativa]
+
+| Responsabilidad             | Qué prepara o comprueba                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------------------------- |
+| Administrador PKI           | Custodia de claves, jerarquía de CAs, perfiles y validación.                                       |
+| Administrador de la flota   | DMS, admisión de dispositivos, política de renovación e inventario.                                |
+| Integrador del dispositivo  | Credencial inicial, confianza en el servidor, cliente EST y almacenamiento de clave y certificado. |
+| Integrador del consumidor   | Confianza en los emisores, validación de certificados y permisos en el destino.                    |
+| Operador de infraestructura | Instalación, red, disponibilidad, dependencias y diagnóstico de despliegue.                        |
+
+La [Referencia API](/docs/api-reference/ca) recoge los contratos para automatizar las operaciones. Para resolver un fallo, empieza en el bloque afectado: [PKI](/docs/platform/pki/troubleshooting), [EST](/docs/platform/iot-fleets/enrollment/troubleshooting#diagnóstico-y-compatibilidad) o [Despliegue](/docs/deployment/troubleshooting).

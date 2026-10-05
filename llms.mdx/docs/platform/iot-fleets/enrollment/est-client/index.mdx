@@ -1,0 +1,88 @@
+# Integrate the EST client (/docs/platform/iot-fleets/enrollment/est-client)
+
+
+
+This guide is for those implementing the device client. The administrator must have prepared the [DMS policy](/docs/platform/iot-fleets/enrollment/dms). For a complete first run, follow [Enroll and connect your first device](/docs/platform/iot-fleets/quickstarts/enroll-device).
+
+Before you begin [#before-you-begin]
+
+You need the public HTTPS DMS URL, server trust obtained through an approved channel, the operation's authentication mode and an admitted identifier. The examples use Bash, OpenSSL 3.x and curl with `--fail-with-body`; use a private working directory and compatible versions of these tools.
+
+Prepare `est-trust.pem` to verify the EST server, `bootstrap.crt` and `bootstrap.key` for initial certificate authentication, and `device-root.pem` as the approved root of the device issuer. The two trust files can contain different roots. For another authentication mode, adapt the credentials according to [Bootstrap identity](/docs/platform/iot-fleets/enrollment/bootstrap-identity).
+
+Replace the host and `REPLACE_DMS_ID` with those of your installation. The URL's APS is the DMS identifier, not its display name.
+
+```bash
+set -euo pipefail
+umask 077
+EST_BASE='https://lamassu.example.com/.well-known/est/REPLACE_DMS_ID'
+```
+
+Download and inspect cacerts [#download-and-inspect-cacerts]
+
+The default content is Base64-encoded DER PKCS#7. It is not a direct PEM file.
+
+```bash
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem \
+  --dump-header cacerts.headers --output cacerts.b64 \
+  "$EST_BASE/cacerts"
+openssl base64 -d -in cacerts.b64 -out cacerts.p7b
+openssl pkcs7 -inform DER -in cacerts.p7b -print_certs -quiet -out cacerts.pem
+openssl crl2pkcs7 -nocrl -certfile cacerts.pem | openssl pkcs7 -print_certs -noout
+```
+
+Check fingerprints, issuers and dates against the [trust distribution](/docs/platform/iot-fleets/enrollment/trust-distribution) policy. The response can contain a selection of CAs and Lamassu's TLS certificate. Do not turn the entire bundle into trusted roots or use it to authenticate its own initial download. HTTP 200 here does not prove that authentication or issuance works.
+
+Prepare the CSR [#prepare-the-csr]
+
+The example generates a new EC P-256 key and uses `est-device-001`, which must be available if the DMS registers automatically. The `Common Name` becomes the device identifier. Check that the profile permits the selected key and subject.
+
+```bash
+test ! -e device.key
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out device.key
+openssl req -new -sha256 -key device.key -subj '/CN=est-device-001' -out device.csr
+openssl req -in device.csr -verify -noout
+openssl req -in device.csr -outform DER -out device.csr.der
+openssl base64 -A -in device.csr.der -out device.csr.b64
+```
+
+An implementation using hardware or its own store must produce the CSR through its resident key. `simpleenroll` sends the request and retains the key in the client. Honor Extensions does not authorize every requested attribute: see [Profiles](/docs/platform/pki/certificate-profiles).
+
+Request the identity [#request-the-identity]
+
+With initial `CLIENT_CERTIFICATE` authentication, send the Base64-encoded DER CSR using `Content-Type: application/pkcs10`:
+
+```bash
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem --cert bootstrap.crt --key bootstrap.key \
+  --header 'Content-Type: application/pkcs10' \
+  --data-binary @device.csr.b64 \
+  --dump-header enroll.headers --output enroll.b64 \
+  "$EST_BASE/simpleenroll"
+openssl base64 -d -in enroll.b64 -out enroll.p7b
+openssl pkcs7 -inform DER -in enroll.p7b -print_certs -quiet -out device.crt
+```
+
+Stop if curl fails. Retain the HTTP code, headers and body for diagnosis; an error response is not decoded as a certificate. The Bash example stops before that conversion. A timeout leaves the operation's result to be checked in Lamassu: do not automatically repeat issuance.
+
+Check and install the result [#check-and-install-the-result]
+
+For a root that issues directly:
+
+```bash
+openssl verify -CAfile device-root.pem -purpose sslclient device.crt
+openssl x509 -in device.crt -noout -subject -issuer -serial -dates -text
+openssl x509 -in device.crt -pubkey -noout > certificate-public.pem
+openssl pkey -pubin -in certificate-public.pem -outform DER -out certificate-public.der
+openssl pkey -in device.key -pubout -outform DER -out key-public.der
+cmp certificate-public.der key-public.der
+```
+
+Also verify that the CN is correct, the certificate is a leaf, its uses permit your application and its dates satisfy the profile. `cmp` must exit with code 0. With intermediates, provide the chain through `-untrusted` as described in [PKI validation](/docs/platform/pki/certificate-validation).
+
+Query the device: the owning DMS, current serial number and history must match the result. Protect the key/certificate pair and install both using the device's mechanism. Association in Lamassu does not install files in the client. Check a real connection before considering the process complete.
+
+Next steps [#next-steps]
+
+Implement [renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) and trust updates. The [EST reference](/docs/platform/iot-fleets/enrollment/est-reference) covers endpoints, formats and ServerKeyGen; [troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting) helps distinguish transport, admission and persistence failures.

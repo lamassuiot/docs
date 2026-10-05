@@ -1,0 +1,150 @@
+# Referencia EST (/docs/es/platform/iot-fleets/enrollment/est-reference)
+
+
+
+Referencia del contrato del [backend examinado](/docs/platform/iot-fleets/enrollment/overview#versión-del-contrato), basada en [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html). Utiliza [Cliente EST](/docs/platform/iot-fleets/enrollment/est-client) para el procedimiento y [DMS](/docs/platform/iot-fleets/enrollment/dms) para configurar la política.
+
+Referencia de endpoints [#referencia-de-endpoints]
+
+Ruta pública de los ejemplos: `/.well-known/est/{APS}/{operation}`. `APS` es el ID del DMS. El router admite rutas sin ese segmento, pero el controlador lo requiere; no las utilices como servicio predeterminado. La configuración del Gateway determina el host y la ruta públicos.
+
+| Operación         | Método | Autenticación y condición                                                                        |
+| ----------------- | ------ | ------------------------------------------------------------------------------------------------ |
+| `/cacerts`        | GET    | La lectura DMS no exige credencial EST; HTTPS y controles de infraestructura siguen aplicándose. |
+| `/simpleenroll`   | POST   | Autenticación inicial y política de registro/sustitución del DMS.                                |
+| `/simplereenroll` | POST   | Autenticación de renovación, identidad existente, sujeto, revocación y ventana.                  |
+| `/serverkeygen`   | POST   | Autenticación y admisión iniciales; generación en servidor habilitada.                           |
+
+Estas rutas no implementan `/csrattrs` ni `/fullcmc`. No hay un modo EST nativo de autenticación JWT; un webhook puede interpretar una credencial de la petición según su propio contrato.
+
+cacerts [#cacerts]
+
+La respuesta predeterminada tiene `Content-Type: application/pkcs7-mime; smime-type=certs-only` y `Content-Transfer-Encoding: base64`. El cuerpo es PKCS#7 DER en Base64 con líneas de hasta 76 caracteres. Incluye los certificados seleccionados por el DMS, no necesariamente todos los ascendientes.
+
+`Accept: application/x-pem-file` solicita el conjunto en PEM mediante una extensión de Lamassu. Su contenido debe inspeccionarse y aprobarse antes de modificar raíces confiables.
+
+simpleenroll [#simpleenroll]
+
+Envía una CSR PKCS#10 DER codificada en Base64, con `Content-Type: application/pkcs10`. El controlador examinado compara ese media type literalmente; evita añadir parámetros como charset. El CN identifica el dispositivo y la firma de la CSR debe verificarse mediante la política DMS.
+
+La respuesta predeterminada usa el formato PKCS#7/Base64 descrito para cacerts, pero contiene el certificado emitido; no presupongas que incluye toda su cadena. `Accept: application/x-pem-file` devuelve ese certificado en PEM. El cliente conserva la clave que firmó la CSR.
+
+simplereenroll [#simplereenroll]
+
+Usa el mismo formato de solicitud y de certificado de respuesta. La autenticación se obtiene del bloque independiente `reenrollment_settings.est_rfc7030_settings`. Con certificado cliente, su CN debe coincidir con el CN de la CSR; también se comprueba el sujeto frente al certificado actual.
+
+La CA de enrolamiento o una CA adicional valida la credencial en el modo mTLS. La comprobación de vencimiento por `enable_expired_renewal` corresponde a ese validador. El certificado actual revocado y una solicitud anterior a la ventana se rechazan. Consulta [Renovación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) para instalación y recuperación.
+
+serverkeygen [#serverkeygen]
+
+El servidor genera una clave software, reconstruye la CSR con esa clave y ejecuta el enrolamiento inicial. El flag debe estar habilitado y el algoritmo permitido por el perfil. La clave de esta operación no pasa a ser una clave hardware por utilizar una CA alojada en HSM.
+
+El código admite RSA y ECDSA de 224, 256, 384 o 521 bits. Un tamaño ECDSA no reconocido puede producir fallback a 256; elige explícitamente un tamaño compatible y comprueba la clave resultante. No reutilices un ID enrolado para probar esta operación sin revisar sustitución.
+
+Formato de respuesta [#formato-de-respuesta]
+
+El cuerpo es **MIME multipart/mixed**, con boundary indicado en `Content-Type`. Tiene dos partes:
+
+| Parte                                           | Contenido tras decodificar su Base64   |
+| ----------------------------------------------- | -------------------------------------- |
+| `application/pkcs8`                             | Clave privada PKCS#8 DER sin cifrar.   |
+| `application/pkcs7-mime; smime-type=certs-only` | PKCS#7 DER con el certificado emitido. |
+
+El controlador también añade `Content-Transfer-Encoding: base64` en la cabecera exterior, aunque el cuerpo exterior es texto MIME. **No decodifiques el cuerpo completo como Base64.** Lee el boundary real y decodifica cada parte según sus cabeceras.
+
+Solicitud y extracción [#solicitud-y-extracción]
+
+En una sesión Bash con `set -euo pipefail` y `umask 077`, utiliza `EST_BASE` y los archivos de confianza/bootstrap de [Cliente EST](/docs/platform/iot-fleets/enrollment/est-client). Elige `est-serverkeygen-001` libre y admitido. La clave `server-request.key` solo firma la CSR de entrada; la identidad recibida utilizará la clave generada por el servidor.
+
+```bash
+test ! -e server-request.key
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out server-request.key
+openssl req -new -sha256 -key server-request.key \
+  -subj '/CN=est-serverkeygen-001' -out serverkeygen.csr
+openssl req -in serverkeygen.csr -outform DER -out serverkeygen.csr.der
+openssl base64 -A -in serverkeygen.csr.der -out serverkeygen.csr.b64
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem --cert bootstrap.crt --key bootstrap.key \
+  --header 'Content-Type: application/pkcs10' \
+  --data-binary @serverkeygen.csr.b64 \
+  --dump-header serverkeygen.headers --output serverkeygen.mime \
+  "$EST_BASE/serverkeygen"
+```
+
+Guarda este extractor Python 3. Valida las dos partes antes de escribir y rechaza archivos de salida existentes:
+
+```python
+# Save as extract-serverkeygen.py and run: python3 extract-serverkeygen.py
+import base64
+import os
+from email import policy
+from email.parser import BytesParser
+from pathlib import Path
+
+os.umask(0o077)
+headers = Path("serverkeygen.headers").read_bytes().splitlines()
+content_types = [
+    line.split(b":", 1)[1].strip()
+    for line in headers
+    if line.lower().startswith(b"content-type:")
+]
+if not content_types:
+    raise SystemExit("Missing response Content-Type")
+message = BytesParser(policy=policy.default).parsebytes(
+    b"Content-Type: " + content_types[-1]
+    + b"\r\nMIME-Version: 1.0\r\n\r\n"
+    + Path("serverkeygen.mime").read_bytes()
+)
+if message.get_content_type() != "multipart/mixed" or not message.is_multipart():
+    raise SystemExit("Expected multipart/mixed")
+if message.defects:
+    raise SystemExit("Malformed multipart response")
+expected = {
+    "application/pkcs8": "device.server.key.der",
+    "application/pkcs7-mime": "device.server.p7b",
+}
+outputs = {}
+for part in message.iter_parts():
+    media_type = part.get_content_type()
+    if media_type not in expected or media_type in outputs or part.defects:
+        raise SystemExit("Unexpected, duplicate or malformed part")
+    encoding = str(part.get("Content-Transfer-Encoding", "")).strip().lower()
+    payload = part.get_payload()
+    if encoding != "base64" or not isinstance(payload, str):
+        raise SystemExit("Expected Base64 part")
+    try:
+        decoded = base64.b64decode("".join(payload.split()), validate=True)
+    except (ValueError, UnicodeError) as error:
+        raise SystemExit("Invalid Base64 part") from error
+    if not decoded:
+        raise SystemExit("Empty part")
+    outputs[media_type] = decoded
+if set(outputs) != set(expected):
+    raise SystemExit("Missing key or certificate part")
+if any(Path(name).exists() for name in expected.values()):
+    raise SystemExit("Output already exists; use a fresh directory")
+for media_type, name in expected.items():
+    with open(name, "xb") as output:
+        output.write(outputs[media_type])
+```
+
+Convierte y comprueba el resultado:
+
+```bash
+python3 extract-serverkeygen.py
+openssl pkcs8 -inform DER -in device.server.key.der -nocrypt -out device.server.key
+openssl pkcs7 -inform DER -in device.server.p7b -print_certs -quiet -out device.server.crt
+openssl verify -CAfile device-root.pem -purpose sslclient device.server.crt
+openssl x509 -in device.server.crt -pubkey -noout > server-certificate-public.pem
+openssl pkey -pubin -in server-certificate-public.pem -outform DER -out server-certificate-public.der
+openssl pkey -in device.server.key -pubout -outform DER -out server-key-public.der
+cmp server-certificate-public.der server-key-public.der
+```
+
+Inspecciona CN, serie, fechas y usos; comprueba la asociación en Lamassu antes de instalar. Protege los archivos DER y PEM que contienen la clave y elimina copias temporales según el almacenamiento del dispositivo. Consulta [openssl-pkcs8](https://docs.openssl.org/3.6/man1/openssl-pkcs8/) y el [parser MIME de Python](https://docs.python.org/3/library/email.parser.html).
+
+Notas de compatibilidad [#notas-de-compatibilidad]
+
+No interpretes cualquier 500 como un fallo transitorio. La entrada inválida suele producir 400; rechazos y errores del servicio suelen producir 500 con un cuerpo JSON `err`. Los errores de Gateway y algunos caminos del controlador pueden tener otro formato. Conserva cabeceras y cuerpo antes de decodificar y consulta el [diagnóstico](/docs/platform/iot-fleets/enrollment/troubleshooting).
+
+Los ejemplos utilizan [openssl-pkcs7](https://docs.openssl.org/3.6/man1/openssl-pkcs7/) para extraer certificados y [openssl-x509](https://docs.openssl.org/3.6/man1/openssl-x509/) para preparar renovación. Comprueba capacidades y respuestas de tu versión antes de integrar un cliente EST genérico.

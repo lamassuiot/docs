@@ -1,0 +1,43 @@
+# Distribución y actualización de confianza (/docs/es/platform/iot-fleets/enrollment/trust-distribution)
+
+
+
+Esta guía se dirige a quien administra la confianza de dispositivos y consumidores. Necesitas inventario de emisores, acceso a los almacenes de confianza y un canal autenticado de actualización. Distribuir certificados es distinto de decidir cuáles serán anclas confiables.
+
+Tres relaciones de confianza [#tres-relaciones-de-confianza]
+
+| Relación                   | Material que prepara el responsable                                     |
+| -------------------------- | ----------------------------------------------------------------------- |
+| Dispositivo → servidor EST | Raíz, cadena o pin previamente verificado del servidor y su nombre TLS. |
+| DMS → solicitante          | CAs y reglas que autorizan la credencial inicial o de renovación.       |
+| Consumidor → dispositivo   | Raíces de la identidad operativa, intermedias, validación y permisos.   |
+
+Un dispositivo que obtiene un certificado no configura automáticamente ninguna de esas relaciones en terceros. Revisa el [modelo de confianza](/docs/platform/pki/concepts/trust-model).
+
+Qué devuelve cacerts [#qué-devuelve-cacerts]
+
+El DMS puede incluir el certificado TLS downstream disponible, las Managed CAs elegidas y la CA de enrolamiento. No incorpora todos los ascendientes por seleccionar la emisora. El conjunto puede contener hojas, raíces e intermedias, incluso más de una jerarquía durante una migración.
+
+La posición no define la cadena. Identifica cada certificado por sujeto, emisor, AKI/SKI, firma y restricciones. Descarga e inspecciona con [Cliente EST](/docs/platform/iot-fleets/enrollment/est-client#descarga-e-inspecciona-cacerts).
+
+Instala lo necesario [#instala-lo-necesario]
+
+1. Mantén por separado la confianza inicial del servidor EST y la del consumidor de identidades.
+2. Selecciona raíces que tu política haya aprobado como anclas.
+3. Conserva intermedias para construir o presentar cadenas; no las conviertas automáticamente en raíces.
+4. Presenta hoja e intermedias requeridas en mTLS. Normalmente no necesitas enviar la raíz al interlocutor que ya confía en ella.
+5. Verifica cadena, fechas, nombres, usos y revocación desde el consumidor.
+
+No uses indiscriminadamente todo `cacerts.pem` como `-CAfile`: eso puede ampliar el conjunto de autoridades confiadas, ocultar intermedias faltantes o confiar una hoja TLS que tenía otra finalidad.
+
+Migra la confianza [#migra-la-confianza]
+
+Antes de cambiar Enrollment CA, inventaría equipos desconectados, bootstrap, certificados operativos y consumidores. Distribuye la nueva raíz y las intermedias necesarias; comprueba que una cohorte acepta cadenas antigua y nueva.
+
+En el DMS, separa las CAs distribuidas de `additional_validation_cas`, utilizadas para la credencial de reenrolamiento. El validador examinado prueba la CA de enrolamiento y después esas CAs con la hoja recibida; aceptar una cadena multinivel requiere verificar cómo llega al servicio y qué emisor está configurado.
+
+Cambia emisión, renueva por grupos y compara la serie instalada con el slot activo. Retira la confianza anterior cuando ningún equipo legítimo la necesite y tu política permita cerrar el solapamiento. Sigue [Jerarquía y rotación](/docs/platform/pki/ca-hierarchy-and-rotation) para la operación PKI.
+
+Comprueba la actualización [#comprueba-la-actualización]
+
+Prueba una identidad antigua permitida durante el solapamiento, una nueva, una cadena desconocida y el resultado después de retirar la confianza antigua. Conserva versión del almacén, conjunto aprobado, fecha y resultado. `/cacerts` accesible solo demuestra distribución; no demuestra instalación ni aceptación por todos los dispositivos.

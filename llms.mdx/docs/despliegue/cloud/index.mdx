@@ -1,0 +1,47 @@
+# Deploy from AWS Marketplace (/docs/deployment/aws-marketplace)
+
+
+
+The AWS Marketplace offering reduces initial setup to an EC2 instance inside your account. You keep control of the network, storage and operation of the machine.
+
+Before you begin [#before-you-begin]
+
+* Permissions to subscribe to AWS Marketplace products and launch EC2 instances.
+* A VPC and a subnet from which administrators and devices can reach the instance.
+* A security group allowing the necessary endpoints.
+
+Infrastructure requirements [#infrastructure-requirements]
+
+* **Compute:** a `t3.large` instance at minimum. Use `t3.xlarge` or higher when the load requires it.
+* **Storage:** an EBS `gp3` volume of at least 50 GB, sized to your inventory and retention needs.
+* **Network:** HTTPS access from the necessary consumers, restricted to trusted networks.
+
+<Steps>
+  <Step>
+    Open the offer [#open-the-offer]
+
+    Go to [Lamassu IoT on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-fyfailowg3ewc) and review the terms before subscribing.
+  </Step>
+
+  <Step>
+    Configure the instance [#configure-the-instance]
+
+    Select `t3.large` or higher, assign at least 50 GB of `gp3` storage and choose the target VPC and subnet.
+  </Step>
+
+  <Step>
+    Limit network access [#limit-network-access]
+
+    Configure the security group for ports `443`, `8443` and `9443`. Restrict the origins to the administrative and device networks that really need to connect.
+  </Step>
+
+  <Step>
+    Launch and verify [#launch-and-verify]
+
+    Start the instance and open the console at `https://<public-ip>`. Check you can authenticate before continuing.
+  </Step>
+</Steps>
+
+Next step [#next-step]
+
+Continue with [Create your first CA](/docs/platform/pki/quickstarts/create-certificate-authority) to validate the instance's cryptographic configuration.

@@ -18,6 +18,11 @@ The EST controller normally returns 400 when rejecting input and 500 when the se
 | 400, CSR or format error | `Content-Type: application/pkcs10`, Base64 of DER, valid signature and a body preserved without double encoding. |
 | Missing credential or invalid certificate | Operation mode, validating CA, dates, revocation and credential delivery by Gateway. Do not confuse server TLS trust with the bootstrap CA. |
 | Webhook denies, times out or responds without authorization | Configuration, connectivity and JSON response with `authorized: true`. There is no automatic fallback to `NO_AUTH`. |
+| `unexpected status code: <n>: redirects are not followed` | The webhook answered with a redirect. Configure the final absolute `http` or `https` URL in the webhook config; redirects are never followed. |
+| `webhook response exceeds 1048576 bytes` | The receiver returned more than 1 MiB of JSON. Reduce the response of the authorization webhook. |
+| `webhook config must not reference files` | The webhook config points to files (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`). Enter the PEM as `cert_content` and `key_content`; see the upgrade note in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings). |
+| 400 `struct validation error` creating or updating a DMS | The webhook config of the operation that uses it is invalid. Review `external_webhook_settings` in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings). |
+| HTTP 500 with an `err` body on enroll or reenroll | Service failures reach the EST client as 500 with a body of `err` plus the message; webhook authorization errors are named there. |
 | `device not preregistered` | PRE_REGISTRATION requires an existing inventory entry. |
 | `forbiddenNewEnrollment` | An existing device requires replacement to be enabled, even in No Identity. Investigate before enabling the flag. |
 | Different owning DMS | CN/ID, global inventory and owning DMS; do not reuse an ID from another context. |

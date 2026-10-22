@@ -16,9 +16,17 @@ The event inventory shows when each type was last observed, how many times it ha
 
 ## Available channels
 
-- **Email** sends alerts to a person or an operational list. It only requires the destination address.
+- **Email** sends alerts to a person or an operational list. It only requires the destination address. Event content is rendered as HTML-escaped text, never as markup.
 - **Microsoft Teams** posts the notification to a channel through its webhook URL.
 - **Webhook** delivers the event to an automation, SIEM or incident system via `POST` or `PUT`.
+
+The Microsoft Teams and Webhook channels accept an optional `http_client` block that authenticates the call to the receiver. `auth_mode` selects `noauth` (the default), `apikey`, `jwt` or `mtls`; each mode requires its own options:
+
+- `apikey_options` requires `header` and `key`.
+- `jwt_options` requires `oidc_client_id`, `oidc_client_secret` and an absolute `http` or `https` `oidc_well_known`.
+- `mtls_options` requires the inline PEM `cert_content` and `key_content`; values that reference files on the server are rejected.
+
+The [alerts API reference](/docs/api-reference/alerts) documents the full `http_client` schema.
 
 ## Create a subscription
 
@@ -43,7 +51,7 @@ The event inventory shows when each type was last observed, how many times it ha
     - **None** notifies all instances of the event.
     - **JSON Path** evaluates one or more specific fields.
     - **JSON Schema** accepts only payloads with a particular structure.
-    - **JavaScript** lets you express custom logic.
+    - **JavaScript** lets you express custom logic. Each filter runs for at most 100 milliseconds; a filter that exceeds this limit fails the condition and the notification is skipped with the error `javascript filter execution timed out`.
 
     For example, `function (event) { return event.data.status == "NO_IDENTITY"; }` limits a subscription to devices without an identity.
   </Step>
@@ -55,6 +63,21 @@ The event inventory shows when each type was last observed, how many times it ha
   </Step>
 </Steps>
 
+## Webhook delivery rules
+
+Notifications delivered through the Microsoft Teams and Webhook channels follow a fixed HTTP policy:
+
+- **TLS is always verified.** The receiver certificate is checked against the system trust store. `insecure_skip_verify` is enforced as `false` — including when it is set to `true` — so self-signed or otherwise untrusted receivers fail delivery.
+- **Redirects are not followed.** A `3xx` response fails with `unexpected status code: <n>: redirects are not followed`. Configure `webhook_url` with the final absolute `http` or `https` URL: an `http://` address that an ingress redirects to `https://` stops working.
+- **Calls are bounded.** A call defaults to a 10 second timeout; a configured `call_timeout` is capped at 30 seconds. Values above the cap are clamped, not rejected.
+- **The response body is ignored.** Delivery checks the status code only, so the receiver may answer with any body.
+- **API-key headers are restricted.** A custom `apikey_options.header` may not use names that the platform or receiving services trust — for example `X-Principal-Id`, `X-Request-Id`, `Host`, `Content-Type` or `Forwarded` — and no name may start with `X-Forwarded-`, `X-Envoy-` or `X-Lms-`. Comparisons are case-insensitive.
+- **Invalid configurations are rejected at subscribe time.** A channel configuration that would fail on every delivery returns HTTP 400 with a body that starts with `struct validation error:`, and the subscription is not created.
+
+<Callout type="warn" title="Credentials over http://">
+Credentials are sent regardless of the URL scheme. With an `http://` `webhook_url`, the API key or bearer token travels in cleartext and mTLS has no effect. Prefer `https://` for `webhook_url`, `oidc_well_known` and the token endpoint it advertises.
+</Callout>
+
 ## Manage a subscription
 
 Open an existing subscription to review its destination and filter, modify the configuration or select **Unsubscribe**. Remove subscriptions that no longer have an operational owner to avoid ignored deliveries or stale endpoints.
@@ -63,10 +86,10 @@ Open an existing subscription to review its destination and filter, modify the c
 
 - **Authorities:** `ca.create`, `ca.import`, `ca.reissue` and `ca.delete`.
 - **Certificates:** `ca.sign.certificate` and `certificate.delete`.
-- **Profiles:** `profile.create`, `profile.update` and `profile.delete`.
+- **Profiles:** `profile.issuance.create`, `profile.issuance.update` and `profile.issuance.delete`.
 - **Enrollment:** `dms.create`, `dms.update`, `dms.enroll` and `dms.reenroll`.
 - **Devices:** `device.create`, `device.identity.update` and `device.status.update`.
 - **Validation:** `va.role.crl.create`.
-- **Keys:** `kms.create`, `kms.import`, `kms.sign.message` and `kms.delete`.
+- **Keys:** `kms.create`, `kms.import`, `kms.sign` and `kms.delete`.
 
 Use the catalog shown in the console as the source for the types available in your deployed version.

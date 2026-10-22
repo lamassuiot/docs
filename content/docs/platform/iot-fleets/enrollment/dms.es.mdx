@@ -83,7 +83,37 @@ En reenrolamiento con certificado, el validador utiliza la CA de enrolamiento, d
 
 Para el webhook, configura destino, autenticación de Lamassu hacia ese servicio, método y timeout. El [contrato de autenticación](/docs/platform/iot-fleets/enrollment/bootstrap-identity) explica la credencial del dispositivo y el cuerpo de la llamada. `NO_AUTH` no acredita propiedad del ID solicitado.
 
+### Ajustes del webhook externo
+
+Los modos de autenticación por webhook leen `external_webhook_settings` en el mismo bloque `est_rfc7030_settings`:
+
+| Campo de `external_webhook_settings` | Decisión |
+|---|---|
+| `url` | URL absoluta `http` o `https` del receptor. Debe ser la URL final; no se siguen redirecciones. |
+| `method` | `POST` o `PUT`; `POST` por defecto. |
+| `name` | Etiqueta usada en los logs del servicio. |
+| `config.auth_mode` | `noauth`, `apikey`, `jwt` o `mtls`. Un valor ausente o desconocido se comporta como `noauth`. |
+| `config.apikey_options` | Obligatorios para `apikey`: `header` y `key`. Los nombres de cabecera reservados se rechazan. |
+| `config.jwt_options` | Obligatorios para `jwt`: `oidc_client_id`, `oidc_client_secret` y un `oidc_well_known` absoluto `http` o `https`. |
+| `config.mtls_options` | Obligatorios para `mtls`: `cert_content` y `key_content` como PEM en línea. |
+| `config.insecure_skip_verify` | Con `true`, omite la verificación del certificado del receptor. Por defecto se verifica. A diferencia de los canales de alertas, este ajuste se respeta aquí. |
+| `config.call_timeout` | Duración máxima de la llamada de autorización (por ejemplo `10s`); 10 segundos por defecto. |
+
+Reglas de esa configuración:
+
+- Crear o actualizar un DMS cuyo `auth_mode` de enrolamiento o reenrolamiento use el webhook valida el bloque y devuelve HTTP 400 — el cuerpo empieza por `struct validation error:` y continúa con `invalid enrollment external webhook config` o `invalid reenrollment external webhook config` — cuando la URL, el método o las opciones no son válidos. Las referencias a archivos (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`) siempre son inválidas: el servicio no lee archivos, así que entrega el PEM como `mtls_options.cert_content` y `key_content`.
+- Un `apikey_options.header` propio no puede usar nombres en los que la plataforma o el servicio receptor confían — por ejemplo `X-Principal-Id`, `X-Request-Id`, `Host`, `Content-Type` o `Forwarded` — y ningún nombre puede empezar por `X-Forwarded-`, `X-Envoy-` o `X-Lms-` (sin distinguir mayúsculas). La [referencia de la API DMS](/docs/api-reference/dms-manager) documenta los esquemas `WebhookCall` y `WebhookCallHttpClient` y que las cabeceras API-key reservadas se rechazan.
+- La clave anidada `http_client` existe solo en las configuraciones de canales de alertas; en un cuerpo de DMS se ignora. La clave de DMS es `external_webhook_settings.config`.
+- La API ignora los campos heredados `validate_server_cert`, `apikey`, `oidc` y `mtls`. Un cuerpo con `config.auth_mode` establecido a `apikey`, `jwt` o `mtls` que aún solo contenga los campos de opción heredados (`apikey`, `oidc`, `mtls`) falla la validación con 400; solo se aceptan cuerpos heredados `noauth`, y sus credenciales se descartan.
+- La respuesta de autorización debe ser JSON de como máximo 1 MiB; un cuerpo mayor hace fallar la llamada.
+
+<Callout type="warn" title="Credenciales sobre http://">
+Con credenciales configuradas, se envían sea cual sea el esquema de la URL: un webhook `http://` recibe la API key o el bearer token en texto claro. Prefiere `https://` para `url`, `oidc_well_known` y el token endpoint que anuncia.
+</Callout>
+
 La migración `20260604110000` copia la autenticación inicial al bloque de renovación si este falta y existe la estructura necesaria. No sustituye una configuración ya presente. Después de actualizar, lee ambos bloques; si la consola de tu versión no expone la configuración independiente, utiliza la [API DMS](/docs/api-reference/dms-manager).
+
+La migración `20261021120000` reescribe la configuración de webhook almacenada a este esquema: `validate_server_cert` pasa a ser el `insecure_skip_verify` negado (una configuración con `validate_server_cert` en falso sigue omitiendo la verificación), `oidc` pasa a `jwt_options`, `apikey` pasa a `apikey_options` y `mtls` pasa a `mtls_options`. Los valores PEM se mueven a `mtls_options.cert_content` y `key_content`; los valores heredados que eran rutas de archivo pasan a `mtls_options.cert_file` y `key_file`, que la entrega rechaza. Cada enroll y reenroll cuyo modo de autenticación use el webhook falla hasta que el certificado y la clave se introduzcan de nuevo como contenido PEM. La conversión solo comprueba el valor del certificado buscando el marcado PEM: una configuración heredada mixta (certificado PEM, clave como ruta) se convierte en un par de contenidos inválido y debe introducirse de nuevo íntegramente como PEM. Si la consola de tu versión no expone esos campos, edita el DMS mediante la [API DMS](/docs/api-reference/dms-manager).
 
 ## Perfil de emisión
 

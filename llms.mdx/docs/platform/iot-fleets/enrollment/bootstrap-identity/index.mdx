@@ -26,7 +26,7 @@ An administrative OIDC token is not a native EST mode. A webhook may interpret a
 
 Webhook contract [#webhook-contract]
 
-The DMS sends operation context to the configured service. Method comes from configuration; agree the contract before selecting POST or PUT. Authorization wait defaults to 10 seconds, replaced by a configured positive timeout.
+The DMS sends operation context to the configured service. Method comes from configuration; agree the contract before selecting POST or PUT. Authorization wait defaults to 10 seconds, replaced by a configured positive timeout. The DMS verifies the receiver certificate unless `insecure_skip_verify` is enabled in the webhook config — verification is on by default — and does not follow redirects, so the configured URL must be the final one. The authorization response must be JSON of at most 1 MiB. With Lamassu-to-webhook authentication configured over `http://`, the API key or bearer token travels in cleartext, and mTLS has no effect because no TLS handshake takes place, so the client certificate is never presented; prefer `https://`. Configure those options in the [webhook settings](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings) of the DMS guide.
 
 Example body:
 

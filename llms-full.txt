@@ -1284,9 +1284,17 @@ The event inventory shows when each type was last observed, how many times it ha
 
 Available channels [#available-channels]
 
-* **Email** sends alerts to a person or an operational list. It only requires the destination address.
+* **Email** sends alerts to a person or an operational list. It only requires the destination address. Event content is rendered as HTML-escaped text, never as markup.
 * **Microsoft Teams** posts the notification to a channel through its webhook URL.
 * **Webhook** delivers the event to an automation, SIEM or incident system via `POST` or `PUT`.
+
+The Microsoft Teams and Webhook channels accept an optional `http_client` block that authenticates the call to the receiver. `auth_mode` selects `noauth` (the default), `apikey`, `jwt` or `mtls`; each mode requires its own options:
+
+* `apikey_options` requires `header` and `key`.
+* `jwt_options` requires `oidc_client_id`, `oidc_client_secret` and an absolute `http` or `https` `oidc_well_known`.
+* `mtls_options` requires the inline PEM `cert_content` and `key_content`; values that reference files on the server are rejected.
+
+The [alerts API reference](/docs/api-reference/alerts) documents the full `http_client` schema.
 
 Create a subscription [#create-a-subscription]
 
@@ -1311,7 +1319,7 @@ Create a subscription [#create-a-subscription]
     * **None** notifies all instances of the event.
     * **JSON Path** evaluates one or more specific fields.
     * **JSON Schema** accepts only payloads with a particular structure.
-    * **JavaScript** lets you express custom logic.
+    * **JavaScript** lets you express custom logic. Each filter runs for at most 100 milliseconds; a filter that exceeds this limit fails the condition and the notification is skipped with the error `javascript filter execution timed out`.
 
     For example, `function (event) { return event.data.status == "NO_IDENTITY"; }` limits a subscription to devices without an identity.
   </Step>
@@ -1323,6 +1331,21 @@ Create a subscription [#create-a-subscription]
   </Step>
 </Steps>
 
+Webhook delivery rules [#webhook-delivery-rules]
+
+Notifications delivered through the Microsoft Teams and Webhook channels follow a fixed HTTP policy:
+
+* **TLS is always verified.** The receiver certificate is checked against the system trust store. `insecure_skip_verify` is enforced as `false` — including when it is set to `true` — so self-signed or otherwise untrusted receivers fail delivery.
+* **Redirects are not followed.** A `3xx` response fails with `unexpected status code: <n>: redirects are not followed`. Configure `webhook_url` with the final absolute `http` or `https` URL: an `http://` address that an ingress redirects to `https://` stops working.
+* **Calls are bounded.** A call defaults to a 10 second timeout; a configured `call_timeout` is capped at 30 seconds. Values above the cap are clamped, not rejected.
+* **The response body is ignored.** Delivery checks the status code only, so the receiver may answer with any body.
+* **API-key headers are restricted.** A custom `apikey_options.header` may not use names that the platform or receiving services trust — for example `X-Principal-Id`, `X-Request-Id`, `Host`, `Content-Type` or `Forwarded` — and no name may start with `X-Forwarded-`, `X-Envoy-` or `X-Lms-`. Comparisons are case-insensitive.
+* **Invalid configurations are rejected at subscribe time.** A channel configuration that would fail on every delivery returns HTTP 400 with a body that starts with `struct validation error:`, and the subscription is not created.
+
+<Callout type="warn" title="Credentials over http://">
+  Credentials are sent regardless of the URL scheme. With an `http://` `webhook_url`, the API key or bearer token travels in cleartext and mTLS has no effect. Prefer `https://` for `webhook_url`, `oidc_well_known` and the token endpoint it advertises.
+</Callout>
+
 Manage a subscription [#manage-a-subscription]
 
 Open an existing subscription to review its destination and filter, modify the configuration or select **Unsubscribe**. Remove subscriptions that no longer have an operational owner to avoid ignored deliveries or stale endpoints.
@@ -1331,11 +1354,11 @@ Event families [#event-families]
 
 * **Authorities:** `ca.create`, `ca.import`, `ca.reissue` and `ca.delete`.
 * **Certificates:** `ca.sign.certificate` and `certificate.delete`.
-* **Profiles:** `profile.create`, `profile.update` and `profile.delete`.
+* **Profiles:** `profile.issuance.create`, `profile.issuance.update` and `profile.issuance.delete`.
 * **Enrollment:** `dms.create`, `dms.update`, `dms.enroll` and `dms.reenroll`.
 * **Devices:** `device.create`, `device.identity.update` and `device.status.update`.
 * **Validation:** `va.role.crl.create`.
-* **Keys:** `kms.create`, `kms.import`, `kms.sign.message` and `kms.delete`.
+* **Keys:** `kms.create`, `kms.import`, `kms.sign` and `kms.delete`.
 
 Use the catalog shown in the console as the source for the types available in your deployed version.
 
@@ -1638,7 +1661,7 @@ An administrative OIDC token is not a native EST mode. A webhook may interpret a
 
 Webhook contract [#webhook-contract]
 
-The DMS sends operation context to the configured service. Method comes from configuration; agree the contract before selecting POST or PUT. Authorization wait defaults to 10 seconds, replaced by a configured positive timeout.
+The DMS sends operation context to the configured service. Method comes from configuration; agree the contract before selecting POST or PUT. Authorization wait defaults to 10 seconds, replaced by a configured positive timeout. The DMS verifies the receiver certificate unless `insecure_skip_verify` is enabled in the webhook config — verification is on by default — and does not follow redirects, so the configured URL must be the final one. The authorization response must be JSON of at most 1 MiB. With Lamassu-to-webhook authentication configured over `http://`, the API key or bearer token travels in cleartext, and mTLS has no effect because no TLS handshake takes place, so the client certificate is never presented; prefer `https://`. Configure those options in the [webhook settings](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings) of the DMS guide.
 
 Example body:
 
@@ -1761,7 +1784,37 @@ For certificate re-enrollment, the validator uses the enrollment CA, then `addit
 
 For a webhook, configure destination, Lamassu-to-service authentication, method and timeout. The [authentication contract](/docs/platform/iot-fleets/enrollment/bootstrap-identity) explains the device credential and request body. `NO_AUTH` does not establish ownership of the requested ID.
 
+External webhook settings [#external-webhook-settings]
+
+The webhook authentication modes read `external_webhook_settings` in the same `est_rfc7030_settings` block:
+
+| `external_webhook_settings` field | Decision                                                                                                                                     |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`                             | Absolute `http` or `https` URL of the receiver. It must be the final URL; redirects are not followed.                                        |
+| `method`                          | `POST` or `PUT`; `POST` by default.                                                                                                          |
+| `name`                            | Label used in service logs.                                                                                                                  |
+| `config.auth_mode`                | `noauth`, `apikey`, `jwt` or `mtls`. An absent or unknown value behaves as `noauth`.                                                         |
+| `config.apikey_options`           | Required for `apikey`: `header` and `key`. Reserved header names are rejected.                                                               |
+| `config.jwt_options`              | Required for `jwt`: `oidc_client_id`, `oidc_client_secret` and an absolute `http` or `https` `oidc_well_known`.                              |
+| `config.mtls_options`             | Required for `mtls`: `cert_content` and `key_content` as inline PEM.                                                                         |
+| `config.insecure_skip_verify`     | Skips verification of the receiver certificate when `true`. Verification is on by default. Unlike alert channels, this flag is honored here. |
+| `config.call_timeout`             | Maximum duration of the authorization call (for example `10s`); 10 seconds by default.                                                       |
+
+Rules for that configuration:
+
+* Creating or updating a DMS whose enrollment or reenrollment `auth_mode` uses the webhook validates the block and returns HTTP 400 — the body starts with `struct validation error:` and continues with `invalid enrollment external webhook config` or `invalid reenrollment external webhook config` — when the URL, method or options are invalid. File references (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`) are always invalid: the service does not read files, so supply the PEM as `mtls_options.cert_content` and `key_content`.
+* A custom `apikey_options.header` may not use names that the platform or the receiving service trusts — for example `X-Principal-Id`, `X-Request-Id`, `Host`, `Content-Type` or `Forwarded` — and no name may start with `X-Forwarded-`, `X-Envoy-` or `X-Lms-` (case-insensitive). The [DMS API reference](/docs/api-reference/dms-manager) documents the `WebhookCall` and `WebhookCallHttpClient` schemas and that reserved API-key headers are rejected.
+* The nested `http_client` key exists only in alert channel configurations; in a DMS body it is ignored. The DMS key is `external_webhook_settings.config`.
+* The API ignores the legacy fields `validate_server_cert`, `apikey`, `oidc` and `mtls`. A body with `config.auth_mode` set to `apikey`, `jwt` or `mtls` that still carries only the legacy option fields (`apikey`, `oidc`, `mtls`) fails validation with 400; only legacy `noauth` bodies are accepted, and their credentials are dropped.
+* The authorization response must be JSON of at most 1 MiB; a larger body fails the call.
+
+<Callout type="warn" title="Credentials over http://">
+  With credentials configured, they are sent regardless of the URL scheme: an `http://` webhook receives the API key or bearer token in cleartext, and mTLS has no effect because no TLS handshake takes place, so the client certificate is never presented. Prefer `https://` for `url`, `oidc_well_known` and the token endpoint it advertises.
+</Callout>
+
 Migration `20260604110000` copies initial authentication into renewal settings if missing and the required structure exists. It preserves existing configuration. After upgrading, read both blocks; if your version’s console does not expose independent settings, use the [DMS API](/docs/api-reference/dms-manager).
+
+Migration `20261021120000` rewrites every stored webhook config into this layout: `validate_server_cert` becomes the negated `insecure_skip_verify` (a config where `validate_server_cert` was false keeps skipping verification), `oidc` becomes `jwt_options`, `apikey` becomes `apikey_options` and `mtls` becomes `mtls_options`. When both the legacy certificate and key are PEM, they move into `mtls_options.cert_content` and `key_content` and need no action. Otherwise, including a mixed config (PEM certificate, file-path key), both values become `mtls_options.cert_file` and `key_file`. Delivery rejects any webhook config that references files, whatever its auth mode, so every enroll and reenroll that calls that webhook fails until the certificate and key are re-entered as PEM content, or the leftover file fields are removed if the webhook does not use mTLS. If your version's console does not expose those fields, edit the DMS through the [DMS API](/docs/api-reference/dms-manager).
 
 Issuance profile [#issuance-profile]
 
@@ -2232,22 +2285,27 @@ Error codes and diagnostics [#error-codes-and-diagnostics]
 
 The EST controller normally returns 400 when rejecting input and 500 when the service rejects or fails the operation. A 500 can also represent a policy denial; it does not mean retrying is safe. Gateway can produce its own codes and bodies. Examine the actual body and persisted result.
 
-| Symptom or message                                          | What to check                                                                                                                                           |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| curl rejects TLS, name or issuer                            | URL, clock, server SAN and approved root in `est-trust.pem`. Resolve trust in [Deployment](/docs/deployment/troubleshooting); do not skip verification. |
-| 404 or missing APS                                          | Public route `/.well-known/est/{DMS_ID}/{operation}` and existing DMS. APS is not the service name.                                                     |
-| 400, CSR or format error                                    | `Content-Type: application/pkcs10`, Base64 of DER, valid signature and a body preserved without double encoding.                                        |
-| Missing credential or invalid certificate                   | Operation mode, validating CA, dates, revocation and credential delivery by Gateway. Do not confuse server TLS trust with the bootstrap CA.             |
-| Webhook denies, times out or responds without authorization | Configuration, connectivity and JSON response with `authorized: true`. There is no automatic fallback to `NO_AUTH`.                                     |
-| `device not preregistered`                                  | PRE\_REGISTRATION requires an existing inventory entry.                                                                                                 |
-| `forbiddenNewEnrollment`                                    | An existing device requires replacement to be enabled, even in No Identity. Investigate before enabling the flag.                                       |
-| Different owning DMS                                        | CN/ID, global inventory and owning DMS; do not reuse an ID from another context.                                                                        |
-| `invalid RawSubject bytes`                                  | CSR subject versus the current certificate. Preserve its attributes as well as its CN.                                                                  |
-| `invalid reenroll window`                                   | Current identity's NotAfter and reenrollment\_delta. Alert thresholds do not change that window.                                                        |
-| Current certificate revoked                                 | Renewal rejected; prepare authorized recovery according to the cause.                                                                                   |
-| CA, profile or signing error                                | Active CA, available key, selected profile and restrictions. Successful cacerts does not prove issuance.                                                |
-| HTTP 200 without a device connection                        | Installed pair, chain, uses, consumer trust and permissions. Also check the slot and history.                                                           |
-| Timeout or error after issuance                             | New certificates, current slot and previous identity's state before retrying.                                                                           |
+| Symptom or message                                          | What to check                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| curl rejects TLS, name or issuer                            | URL, clock, server SAN and approved root in `est-trust.pem`. Resolve trust in [Deployment](/docs/deployment/troubleshooting); do not skip verification.                                                                                                                                                                                                                                                                        |
+| 404 or missing APS                                          | Public route `/.well-known/est/{DMS_ID}/{operation}` and existing DMS. APS is not the service name.                                                                                                                                                                                                                                                                                                                            |
+| 400, CSR or format error                                    | `Content-Type: application/pkcs10`, Base64 of DER, valid signature and a body preserved without double encoding.                                                                                                                                                                                                                                                                                                               |
+| Missing credential or invalid certificate                   | Operation mode, validating CA, dates, revocation and credential delivery by Gateway. Do not confuse server TLS trust with the bootstrap CA.                                                                                                                                                                                                                                                                                    |
+| Webhook denies, times out or responds without authorization | Configuration, connectivity and JSON response with `authorized: true`. There is no automatic fallback to `NO_AUTH`.                                                                                                                                                                                                                                                                                                            |
+| `unexpected status code: <n>: redirects are not followed`   | The webhook answered with a redirect. Configure the final absolute `http` or `https` URL in the webhook config; redirects are never followed.                                                                                                                                                                                                                                                                                  |
+| `webhook response exceeds 1048576 bytes`                    | The receiver returned more than 1 MiB of JSON. Reduce the response of the authorization webhook.                                                                                                                                                                                                                                                                                                                               |
+| `webhook config must not reference files`                   | The webhook config points to files (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`). For mTLS, enter the PEM as `cert_content` and `key_content`; remove any other file field, including `ca_cert_file`, which has no inline equivalent (the receiver certificate must chain to the system trust store). See the upgrade note in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings). |
+| 400 `struct validation error` creating or updating a DMS    | The webhook config of the operation that uses it is invalid. Review `external_webhook_settings` in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings).                                                                                                                                                                                                                                                  |
+| HTTP 500 with an `err` body on enroll or reenroll           | Service failures reach the EST client as 500 with a body of `err` plus the message; webhook authorization errors are named there.                                                                                                                                                                                                                                                                                              |
+| `device not preregistered`                                  | PRE\_REGISTRATION requires an existing inventory entry.                                                                                                                                                                                                                                                                                                                                                                        |
+| `forbiddenNewEnrollment`                                    | An existing device requires replacement to be enabled, even in No Identity. Investigate before enabling the flag.                                                                                                                                                                                                                                                                                                              |
+| Different owning DMS                                        | CN/ID, global inventory and owning DMS; do not reuse an ID from another context.                                                                                                                                                                                                                                                                                                                                               |
+| `invalid RawSubject bytes`                                  | CSR subject versus the current certificate. Preserve its attributes as well as its CN.                                                                                                                                                                                                                                                                                                                                         |
+| `invalid reenroll window`                                   | Current identity's NotAfter and reenrollment\_delta. Alert thresholds do not change that window.                                                                                                                                                                                                                                                                                                                               |
+| Current certificate revoked                                 | Renewal rejected; prepare authorized recovery according to the cause.                                                                                                                                                                                                                                                                                                                                                          |
+| CA, profile or signing error                                | Active CA, available key, selected profile and restrictions. Successful cacerts does not prove issuance.                                                                                                                                                                                                                                                                                                                       |
+| HTTP 200 without a device connection                        | Installed pair, chain, uses, consumer trust and permissions. Also check the slot and history.                                                                                                                                                                                                                                                                                                                                  |
+| Timeout or error after issuance                             | New certificates, current slot and previous identity's state before retrying.                                                                                                                                                                                                                                                                                                                                                  |
 
 Compatibility notes [#compatibility-notes]
 

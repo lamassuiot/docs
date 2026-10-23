@@ -26,7 +26,7 @@ Un token OIDC de administración no es un modo EST nativo. Un webhook puede inte
 
 Contrato del webhook [#contrato-del-webhook]
 
-El DMS envía el contexto de la operación al servicio configurado. El método procede de la configuración; acuerda su contrato antes de seleccionar POST o PUT. La espera de autorización tiene un valor inicial de 10 segundos, sustituido por un timeout positivo configurado.
+El DMS envía el contexto de la operación al servicio configurado. El método procede de la configuración; acuerda su contrato antes de seleccionar POST o PUT. La espera de autorización tiene un valor inicial de 10 segundos, sustituido por un timeout positivo configurado. El DMS verifica el certificado del receptor salvo que se active `insecure_skip_verify` en la configuración del webhook — por defecto se verifica — y no sigue redirecciones, así que la URL configurada debe ser la final. La respuesta de autorización debe ser JSON de como máximo 1 MiB. Con la autenticación de Lamassu hacia el webhook configurada sobre `http://`, la API key o el bearer token viajan en texto claro, y mTLS no tiene efecto porque no hay handshake TLS, así que el certificado de cliente nunca se presenta; prefiere `https://`. Configura esas opciones en los [ajustes del webhook externo](/docs/platform/iot-fleets/enrollment/dms#ajustes-del-webhook-externo) de la guía DMS.
 
 Ejemplo de cuerpo:
 

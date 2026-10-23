@@ -1,4 +1,5 @@
 import {
+  ChevronDown,
   ChevronUp,
   FileMinus,
   FilePen,
@@ -29,6 +30,48 @@ export type PageDiff = {
 
 export type TextDiff = { op: "eq" | "del" | "ins"; text: string }[];
 
+const CHANGE = ".lm-diff-ins, .lm-diff-del";
+const FOCUS = "lm-diff-focus";
+/** Text blocks whose inline marks read as one change. */
+const BLOCK = "p, li, tr, h1, h2, h3, h4, h5, h6, dt, dd, figcaption, summary";
+
+/**
+ * The page's visible changes in document order, one element per change:
+ * marks in the same paragraph, item, row or heading, and adjacent marks
+ * (consecutive code lines, rows or blocks) count as one. Marks hidden by
+ * the current mode are skipped.
+ */
+function changeGroups(): HTMLElement[] {
+  const marks = [...document.querySelectorAll<HTMLElement>(CHANGE)].filter(
+    (el) =>
+      !el.parentElement?.closest(CHANGE) && el.getClientRects().length > 0,
+  );
+  const groups: HTMLElement[] = [];
+  marks.forEach((el, index) => {
+    const previous = marks[index - 1];
+    const block = el.parentElement?.closest(BLOCK);
+    const together =
+      previous &&
+      (adjacent(previous, el) ||
+        (block && block === previous.parentElement?.closest(BLOCK)));
+    if (!together) groups.push(el);
+  });
+  return groups;
+}
+
+function adjacent(a: Element, b: Element) {
+  let node = a.nextSibling;
+  while (node?.nodeType === Node.TEXT_NODE && !node.textContent?.trim()) {
+    node = node.nextSibling;
+  }
+  return node === b;
+}
+
+const middle = (el: Element) => {
+  const rect = el.getBoundingClientRect();
+  return rect.top + rect.height / 2;
+};
+
 /** Every page the PR touches, resolved by the docs route loader. */
 export type AffectedPages = {
   pages: { url: string; title: string; isNew: boolean }[];
@@ -58,6 +101,7 @@ export function DiffToggle({
   const [on, setOn] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const shownRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setOn(document.documentElement.hasAttribute(ATTRIBUTE));
@@ -95,6 +139,56 @@ export function DiffToggle({
     }
   };
 
+  // Moves from where the reader is, so it also works after scrolling by hand.
+  const go = (step: 1 | -1) => {
+    const groups = changeGroups();
+    if (!groups.length) return;
+    const center = window.innerHeight / 2;
+    const mids = groups.map(middle);
+    const shown = shownRef.current ? groups.indexOf(shownRef.current) : -1;
+    const inView = shown >= 0 && Math.abs(mids[shown] - center) < center;
+    // Without a jumped-to change in view, "next" starts at the first change
+    // on screen rather than skipping those above the middle.
+    let index =
+      step < 0
+        ? mids.filter((mid) => mid < center - 4).length - 1
+        : inView
+          ? mids.findIndex((mid) => mid > center + 4)
+          : groups.findIndex((el) => el.getBoundingClientRect().bottom > 0);
+    // A change near either end of the page can't be centred, so position
+    // alone would pick it again: step past the last one shown while in view.
+    if (inView) {
+      index =
+        step > 0
+          ? Math.max(index, shown + 1)
+          : index < 0
+            ? shown - 1
+            : Math.min(index, shown - 1);
+    }
+    if (index < 0 || index >= groups.length) {
+      index = step > 0 ? 0 : groups.length - 1;
+    }
+    const target = groups[index];
+    shownRef.current = target;
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    target.scrollIntoView({
+      behavior: reduce ? "auto" : "smooth",
+      block: "center",
+    });
+    target.classList.remove(FOCUS);
+    void target.offsetWidth; // Restart the highlight on a repeated jump.
+    target.classList.add(FOCUS);
+    target.addEventListener(
+      "animationend",
+      () => target.classList.remove(FOCUS),
+      {
+        once: true,
+      },
+    );
+  };
+
   const summary = !diff
     ? "Sin cambios en esta página"
     : diff.isNew
@@ -120,6 +214,33 @@ export function DiffToggle({
         <span className="hidden text-fd-muted-foreground sm:inline">
           {summary}
         </span>
+        {on && diff && !diff.isNew && (
+          <div className="flex items-center">
+            {([-1, 1] as const).map((step) => {
+              const label =
+                step < 0
+                  ? es
+                    ? "Cambio anterior"
+                    : "Previous change"
+                  : es
+                    ? "Siguiente cambio"
+                    : "Next change";
+              const Icon = step < 0 ? ChevronUp : ChevronDown;
+              return (
+                <button
+                  key={step}
+                  type="button"
+                  aria-label={label}
+                  title={label}
+                  onClick={() => go(step)}
+                  className="rounded-full p-1 text-fd-foreground transition-colors hover:bg-fd-accent"
+                >
+                  <Icon className="size-4" />
+                </button>
+              );
+            })}
+          </div>
+        )}
         {total > 0 && (
           <button
             type="button"

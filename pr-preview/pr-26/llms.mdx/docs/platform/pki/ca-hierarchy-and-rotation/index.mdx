@@ -4,6 +4,8 @@
 
 The hierarchy determines the blast radius of any error or compromise. A root signs intermediate CAs; intermediates issue the identities used by devices and services. This separation lets you isolate environments and rotate a branch without replacing all trust.
 
+This procedure is for the PKI operator replacing an authority in use. You need access to CAs, keys and profiles, a dependency inventory and coordination with trust-store and device owners. Before switching issuance, prepare a test cohort and decide the criterion for ending overlap.
+
 Design the hierarchy [#design-the-hierarchy]
 
 For a production installation, use a very restricted root and one or more operational intermediates. Separate intermediates when any of these boundaries change:
@@ -54,7 +56,7 @@ Key rotation procedure [#key-rotation-procedure]
   <Step>
     Distribute the new trust [#distribute-the-new-trust]
 
-    Add the new root or chain to consumers before issuing with it. In a DMS, use the managed CAs of `/cacerts` to temporarily keep both the old and new chains.
+    Add the new root or chain to consumers before issuing with it. If distributing through EST `/cacerts`, explicitly include the required managed CAs and inspect the content; including the issuer does not automatically include every intermediate. Install the new trust in a cohort and verify that it still accepts the previous identity.
   </Step>
 
   <Step>
@@ -78,9 +80,13 @@ Key rotation procedure [#key-rotation-procedure]
 
 Cascading revocation [#cascading-revocation]
 
-When you revoke a CA, Lamassu also updates its child CAs and issued certificates to `REVOKED` with the reason `CessationOfOperation`. The children's revocations propagate the effect to their own branches.
+Lamassu saves the CA’s revocation, then attempts to revoke child CAs and issued certificates with `CessationOfOperation`. Propagation continues recursively through child CAs. This is not a transaction over the whole hierarchy: some resources may have changed while other updates failed.
 
-This protects the coherence of the hierarchy, but it makes revocation a high-impact action. Do not use it as the ordinary mechanism to stop issuing: first complete the migration and remove the CA from operational flows.
+Resources in `EXPIRED` state and resources already revoked for a final reason reject further status transitions. Per-descendant failures are logged; review the inventory and logs even when the parent operation completes.
+
+`CertificateHold` allows reactivating the parent while it is not expired, but does not restore child CAs or certificates permanently revoked during the cascade. Holding a CA therefore does not provide a reversible pause for its entire branch.
+
+Before closing the change, compare the original dependency inventory with final states and verify revocation publication for each issuer. Do not use revocation as the ordinary mechanism to stop issuance: complete migration and remove the CA from operational flows.
 
 Checks after the change [#checks-after-the-change]
 

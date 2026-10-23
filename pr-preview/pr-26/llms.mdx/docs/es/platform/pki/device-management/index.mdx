@@ -1,89 +1,99 @@
-# Dispositivos e identidades (/docs/pr-preview/pr-26/es/platform/pki/device-management)
+# Dispositivos e identidades (/docs/pr-preview/pr-26/es/platform/iot-fleets/device-management)
 
 
 
-Un dispositivo gestionado representa una entidad de tu flota y conserva el historial de los certificados que ha utilizado. Lamassu separa el dispositivo de su identidad actual para que puedas renovar o sustituir certificados sin perder trazabilidad.
+Esta guía se dirige al operador de una flota. Necesitas permisos sobre dispositivos, DMS y certificados para las acciones que vayas a realizar. Una flota se organiza mediante esos recursos, etiquetas y metadatos; no se crea un objeto independiente de «flota».
+
+Cada dispositivo tiene un `Device ID`, un DMS propietario (`dms_owner`) y, cuando está aprovisionado, un slot de identidad con una versión activa y versiones anteriores. En los flujos descritos, mantén el `Common Name` de la CSR y del certificado igual al `Device ID`: la vinculación utiliza ese CN para actualizar el dispositivo.
 
 Estados del dispositivo [#estados-del-dispositivo]
 
-* **Active** indica que el dispositivo tiene una identidad válida.
-* **No Identity** aparece cuando está registrado, pero todavía no tiene un certificado asociado.
-* **Renewal Pending** señala que ha entrado en la ventana de renovación.
-* **Expiring Soon** advierte que el certificado está próximo a expirar.
-* **Expired** indica que la identidad ha superado su fecha de validez.
-* **Revoked** identifica un certificado invalidado antes de su expiración.
-* **Decommissioned** corresponde a un dispositivo retirado de forma permanente.
+| Vista operativa     | Interpretación                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| **No Identity**     | Hay registro, pero todavía no hay identidad asociada.                                        |
+| **Active**          | El slot está activo; comprueba además las fechas, estado y usos del certificado.             |
+| **Renewal Pending** | La identidad está en la ventana operativa de renovación.                                     |
+| **Expiring Soon**   | Se aproxima al vencimiento según los umbrales configurados.                                  |
+| **Expired**         | La identidad ha vencido.                                                                     |
+| **Revoked**         | La identidad está marcada como revocada.                                                     |
+| **Decommissioned**  | El registro está retirado y no vuelve al estado operativo mediante una actualización normal. |
 
-El inventario permite filtrar por `Device ID`, etiquetas y estado.
+Los estados de dispositivo, slot y [certificado](/docs/platform/pki/concepts/certificate-lifecycle) son distintos. Los eventos y trabajos pueden actualizar la vista después de guardar el certificado; una etiqueta **Active** no prueba aceptación por un consumidor.
 
 Inspecciona un dispositivo [#inspecciona-un-dispositivo]
 
-La vista de detalle separa dos perspectivas:
+Filtra el inventario por ID, etiquetas y estado. Abre el detalle y registra DMS propietario, versión activa y serie del certificado actual.
 
-* **Certificate History** conserva todos los certificados asociados, con su número de serie, emisor, estado y periodo de validez.
-* **Device Event Timeline** ordena cronológicamente registros, enrolamientos, renovaciones y cambios de estado.
+* **Certificate History** relaciona versiones anteriores y actuales. Sustituir el slot no revoca por sí solo todas las versiones anteriores.
+* **Device Event Timeline** ayuda a reconstruir altas, aprovisionamientos, renovaciones y cambios de estado. Un cambio puede haberse guardado aunque falle la persistencia de su evento; contrasta también el registro y los certificados.
 
-Utiliza el historial para auditoría y la línea de tiempo para reconstruir un incidente o diagnosticar una transición inesperada.
+Compara esos datos con la identidad instalada en el dispositivo. Un slot actualizado en Lamassu no instala archivos en el equipo remoto.
 
 Registra un dispositivo manualmente [#registra-un-dispositivo-manualmente]
 
-El registro previo es útil cuando la política exige que el dispositivo exista antes de solicitar su primer certificado.
+Utiliza este flujo para preparar inventario o asignar una identidad desde la consola. Necesitas un DMS existente.
 
 <Steps>
   <Step>
     Crea el dispositivo [#crea-el-dispositivo]
 
-    Desde **Managed Devices**, abre el formulario de registro.
+    Desde **Managed Devices**, abre el registro. Confirma que el ID no exista en otro DMS: la búsqueda por ID no está limitada a una flota.
   </Step>
 
   <Step>
     Define su pertenencia [#define-su-pertenencia]
 
-    Introduce un **Device ID** único y selecciona el DMS que aplicará las políticas de enrolamiento y renovación.
+    Introduce el **Device ID** y selecciona el DMS que será su propietario. La etiqueta **Registration Authority** de la consola se refiere a ese DMS.
   </Step>
 
   <Step>
     Clasifica el dispositivo [#clasifica-el-dispositivo]
 
-    Añade un icono y etiquetas si necesitas agruparlo por modelo, ubicación, entorno u otro criterio operativo.
+    Añade icono y etiquetas de modelo, entorno o ubicación según tu inventario.
   </Step>
 
   <Step>
     Verifica el alta [#verifica-el-alta]
 
-    El dispositivo debe aparecer con estado **No Identity** hasta que complete el enrolamiento o reciba una identidad manual.
+    Vuelve a leer el dispositivo: debe tener el DMS previsto y estar en **No Identity**. Sigue [Registro manual](/docs/platform/iot-fleets/quickstarts/register-device) para completar la asignación.
   </Step>
 </Steps>
 
+Prerregistrar no demuestra que `/simpleenroll` vaya a admitir la solicitud. Revisa la interacción con `enable_replaceable_enrollment` en [Estrategias de aprovisionamiento](/docs/platform/iot-fleets/enrollment/provisioning-strategies).
+
 Asigna una identidad manualmente [#asigna-una-identidad-manualmente]
 
-La acción **Assign Identity** está disponible mientras el dispositivo permanece en **No Identity**.
+Desde **No Identity**, utiliza **Assign Identity**:
 
-1. Abre el dispositivo y selecciona **Assign Identity**.
-2. Elige un certificado activo cuyo `Common Name` coincida con el `Device ID`.
-3. Si no existe, selecciona **Issue New Instead** y elige una CA vinculada al DMS.
-4. Confirma la asignación.
+1. Elige un certificado activo, vigente y adecuado para el consumidor, con `CN` exactamente igual al `Device ID`.
+2. Si no existe, **Issue New Instead** permite iniciar una emisión con la CA prevista. Revisa primero el [perfil](/docs/platform/pki/certificate-profiles).
+3. Confirma y vuelve a consultar serie, versión activa e historial.
+4. Instala la pareja clave/certificado y las intermedias necesarias en el dispositivo, y prueba su uso.
 
-El dispositivo debe cambiar a **Active** y el certificado debe aparecer en su historial.
+Emitir, vincular e instalar son pasos distintos. Si falla la operación, comprueba cuáles se guardaron antes de repetirla.
 
 Revoca la identidad actual [#revoca-la-identidad-actual]
 
-En **Device Event Timeline**, localiza el último certificado activo y selecciona **Revoke**. Elige una razón conforme a tu política y confirma la operación.
+Localiza la serie activa en el historial y revócala con una razón apropiada. Comprueba registro, publicación OCSP/CRL y rechazo de una conexión nueva en el consumidor con la [guía de certificados](/docs/platform/pki/certificates).
 
-La revocación invalida el certificado, pero no elimina el dispositivo. Puedes restaurar su operación asignándole una identidad nueva. `CertificateHold` permite reactivar el certificado retenido; el resto de razones son definitivas.
+La revocación no elimina el dispositivo. Tampoco habilita automáticamente una nueva inscripción: la recuperación depende de su credencial, estado y política DMS. `CertificateHold` puede reactivarse bajo las condiciones de PKI; otras razones bloquean cambios posteriores del certificado.
 
 Retira un dispositivo [#retira-un-dispositivo]
 
-<Callout type="warn" title="Decommission es irreversible">
-  Esta acción revoca todos los certificados del dispositivo e impide que vuelva a obtener una identidad.
+Antes de **Decommission**, inventaría identidades activas y anteriores, conexiones y permisos del destino. Prepara su retirada en el consumidor.
+
+El backend guarda **Decommissioned** e intenta revocar el certificado de la versión activa con `CessationOfOperation` si el slot no estaba expirado o revocado. No recorre todo el historial. La revocación diferida puede fallar después de guardar la baja; verifica su resultado por serie.
+
+<Callout type="warn" title="Comprueba la retirada completa">
+  El estado retirado protege las actualizaciones normales del dispositivo y su slot. No constituye una garantía de que toda solicitud EST sea rechazada antes de emitir: la vinculación puede omitir un dispositivo retirado sin devolver error. Confirma que no quedan certificados o permisos utilizables y bloquea nuevas admisiones en el control correspondiente.
 </Callout>
 
-Usa **Decommission** únicamente cuando el dispositivo haya dejado de operar o ya no sea fiable. Tras confirmar, Lamassu revoca la identidad activa con `CessationOfOperation` y cambia el estado a **Decommissioned**.
+Conserva los registros según tu política de auditoría. No reutilices un ID retirado para ocultar el cambio de equipo.
 
 Automatiza el enrolamiento [#automatiza-el-enrolamiento]
 
 <Cards>
-  <Card title="Configura un DMS" description="Define la CA, confianza y políticas de la flota." href="/docs/platform/pki/device-enrollment" />
+  <Card title="Enrola y conecta un dispositivo" description="Obtén una identidad desde el cliente y prueba mTLS." href="/docs/platform/iot-fleets/quickstarts/enroll-device" />
 
-  <Card title="Integra EST" description="Permite que el dispositivo solicite y renueve su identidad." href="/docs/platform/pki/est-enrollment" />
+  <Card title="Renovación y recuperación" description="Instala el sucesor y trata fallos sin perder el estado conocido." href="/docs/platform/iot-fleets/enrollment/renewal-and-recovery" />
 </Cards>

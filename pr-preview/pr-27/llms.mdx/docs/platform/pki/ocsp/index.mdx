@@ -1,58 +1,95 @@
-# Validación online con OCSP (/docs/pr-preview/pr-27/platform/pki/ocsp)
+# Online validation with OCSP (/docs/pr-preview/pr-27/platform/pki/ocsp)
 
 
 
-Servicio OCSP [#servicio-ocsp]
+<span id="ocsp-service" />
 
-OCSP (Online Certificate Status Protocol) es el mecanismo que permite a una parte que confía comprobar, en tiempo real, si un certificado concreto está vigente o ha sido revocado. En lugar de descargar una lista completa de certificados revocados, el cliente envía una consulta con el número de serie del certificado y recibe una respuesta firmada con el estado actual.
+OCSP queries a certificate’s status and returns a signed response. This guide is for an integrator checking what Lamassu publishes and how the consumer must verify it. For complete identity validation, follow [Certificate validation](/docs/platform/pki/certificate-validation).
 
-Lamassu integra un respondedor OCSP propio que atiende estas consultas consultando directamente la base de datos interna de certificados. No se requiere ningún componente externo.
+How the responder works in Lamassu [#how-the-responder-works-in-lamassu]
 
-Cómo funciona el respondedor en Lamassu [#cómo-funciona-el-respondedor-en-lamassu]
+The responder retrieves the certificate by serial number and locates its issuing CA in the inventory. It translates persisted status as follows:
 
-Cuando un cliente solicita el estado de un certificado, el respondedor localiza el certificado por su número de serie y determina su estado según el registro interno:
+| Record status                                    | Signed response                                           |
+| ------------------------------------------------ | --------------------------------------------------------- |
+| `ACTIVE`                                         | `Good`.                                                   |
+| `REVOKED`                                        | `Revoked`, with revocation reason and timestamp.          |
+| Other states, including `INACTIVE` and `EXPIRED` | `Unknown` if the certificate and issuer can be retrieved. |
 
-* Si el certificado está activo, la respuesta indica `Good`.
-* Si el certificado ha sido revocado, la respuesta indica `Revoked` e incluye la marca de tiempo de revocación y el código de razón conforme a RFC 5280.
-* Si el número de serie no se encuentra o el estado no es reconocible, la respuesta indica `Unknown`.
+An absent serial number causes a lookup error; it does not guarantee a signed `Unknown` response. Lookup or signing errors produce an HTTP failure. Treat that as unavailable evidence according to consumer policy.
 
-La respuesta OCSP es firmada por la CA emisora del certificado consultado, utilizando el motor criptográfico asociado a esa CA. Lamassu no utiliza un certificado delegado de firma OCSP: la CA actúa directamente como respondedor.
+The issuing CA itself signs the response through its KMS-associated key. A delegated OCSP signing certificate is not used. An imported CA without a usable key cannot sign responses.
 
-Cada respuesta tiene una ventana de validez de 24 horas, reflejada en los campos `thisUpdate` y `nextUpdate` de la respuesta. Los clientes que cacheen respuestas deben tener en cuenta esta ventana al determinar durante cuánto tiempo una respuesta sigue siendo válida.
+The implementation sets `thisUpdate` approximately one day before response generation and `nextUpdate` one day after: the declared window is about 48 hours. Inspect received values and apply your freshness policy. The response reflects stored status when queried; a previously cached copy does not change upon revocation.
 
-Enlace en los certificados emitidos [#enlace-en-los-certificados-emitidos]
+Embedding in issued certificates [#embedding-in-issued-certificates]
 
-La URL del respondedor OCSP se incorpora automáticamente en la extensión AIA (*Authority Information Access*) de todos los certificados emitidos por Lamassu. Los clientes que verifican certificados pueden leer esta URL directamente del certificado sin necesidad de configuración adicional.
-
-Endpoints HTTP [#endpoints-http]
-
-El respondedor acepta los dos formatos definidos en RFC 6960:
-
-* `GET /ocsp/{ocsp_request}` incluye la petición OCSP codificada en Base64url dentro de la propia URL.
-* `POST /ocsp` envía la petición en el cuerpo con `Content-Type: application/ocsp-request`.
-
-Ejemplo de consulta con `curl` mediante POST:
+The signer constructs OCSP URLs from configured VA domains and adds them to AIA. Without domains, there is no URL to add; an imported certificate retains its original extensions. Inspect the actual certificate:
 
 ```bash
-curl -X POST https://<LAMASSU_HOST>/ocsp \
-  -H "Content-Type: application/ocsp-request" \
-  --data-binary @request.der \
+openssl x509 -in device.crt -noout -ocsp_uri
+```
+
+Check that the consumer can reach this URL. DNS, endpoint exposure and domain configuration belong to [Deployment](/docs/deployment/self-hosted/networking). Changing configuration does not modify already signed certificates.
+
+HTTP endpoints [#http-endpoints]
+
+The service accepts:
+
+| Method | VA service path        | Format                                                 |
+| ------ | ---------------------- | ------------------------------------------------------ |
+| `POST` | `/ocsp`                | DER request, `Content-Type: application/ocsp-request`. |
+| `GET`  | `/ocsp/{ocsp_request}` | DER request encoded using padded URL Base64.           |
+
+Use POST to avoid client encoding differences. A successful response has `Content-Type: application/ocsp-response` and a DER body. The public prefix depends on the Gateway; use the URL published in the certificate and checked by the operator.
+
+Generate and verify a query [#generate-and-verify-a-query]
+
+You need OpenSSL 3.x, `device.crt`, its direct issuer’s certificate `issuer.pem` and the consumer’s trusted roots in `roots.pem`. For an intermediate issuer, also prepare `intermediates.pem` containing the intermediate CAs.
+
+Generate the request:
+
+```bash
+openssl ocsp -issuer issuer.pem -cert device.crt \
+  -no_nonce -reqout request.der
+```
+
+This example omits the nonce because the responder does not echo it. Verification relies on signature, response correspondence and timestamps; it does not demonstrate freshness through a nonce.
+
+Replace the example URL with the inspected endpoint:
+
+```bash
+OCSP_URL='http://pki.example.com/ocsp'
+
+curl --fail --show-error --silent --max-time 15 \
+  -H 'Content-Type: application/ocsp-request' \
+  --data-binary @request.der "$OCSP_URL" \
   -o response.der
 ```
 
-La respuesta tiene `Content-Type: application/ocsp-response` y contiene la respuesta OCSP en formato DER.
+Verify the returned DER:
 
-Comprobación desde la interfaz [#comprobación-desde-la-interfaz]
+```bash
+openssl ocsp -respin response.der \
+  -issuer issuer.pem -cert device.crt \
+  -CAfile roots.pem -no_nonce -resp_text
+```
 
-Desde la pantalla de certificados de Lamassu es posible lanzar una petición OCSP directamente sobre el certificado seleccionado mediante la acción **OCSP Check**. Esta acción muestra el estado devuelto por el respondedor sin necesidad de herramientas externas.
+For intermediates, add `-verify_other intermediates.pem`. Require successful response verification and inspect the status corresponding to `device.crt`, issuer, serial, `thisUpdate` and `nextUpdate`. `Response verify OK` validates the response only: also observe `good`, `revoked` or `unknown`. Do not accept an identity based only on the command’s exit code.
 
-Referencias [#referencias]
+Check from the interface [#check-from-the-interface]
 
-* RFC 6960 - *X.509 Internet Public Key Infrastructure Online Certificate Status Protocol – OCSP*
-* RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile* (razones de revocación, sección 5.3.1)
+**OCSP Check** shows what Lamassu returns for a selected certificate. Complete the check from the consumer’s network and trust store: a console query does not establish its validation configuration.
+
+To check a change, save an earlier response, revoke a test certificate and request another response. The new query should reflect persisted status; compare timestamps to rule out reuse of an earlier response. If it fails, follow [PKI troubleshooting](/docs/platform/pki/troubleshooting).
+
+References [#references]
+
+* [RFC 6960: OCSP](https://www.rfc-editor.org/rfc/rfc6960).
+* [OpenSSL: openssl-ocsp](https://docs.openssl.org/3.6/man1/openssl-ocsp/).
 
 <Cards>
-  <Card title="Servicio CRL" href="/docs/platform/pki/crl" />
+  <Card title="CRL service" href="/docs/platform/pki/crl" />
 
-  <Card title="Validación de certificados" href="/docs/platform/pki/certificate-validation" />
+  <Card title="Certificate validation" href="/docs/platform/pki/certificate-validation" />
 </Cards>

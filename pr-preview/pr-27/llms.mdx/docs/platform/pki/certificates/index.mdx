@@ -1,56 +1,80 @@
-# Certificados (/docs/pr-preview/pr-27/platform/pki/certificates)
+# Certificates (/docs/pr-preview/pr-27/platform/pki/certificates)
 
 
 
-El inventario de certificados ofrece una vista global de las identidades emitidas por todas las autoridades. También puedes abrir **Issued Certificates** dentro de una CA para limitar la vista a ese emisor.
+This guide is for a PKI operator inspecting or retiring an issued identity. You need inventory access and, to change states, permissions on the certificate. Open **Certificates** for a global view or **Issued Certificates** within a CA to restrict it to that issuer.
 
-Busca un certificado [#busca-un-certificado]
+Find a certificate [#find-a-certificate]
 
-Abre **Certificates** y filtra por:
+Filter by `Common Name`, serial, status and issuer. Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata.
 
-* `Common Name` del sujeto.
-* Número de serie.
-* Estado.
-* Autoridad emisora.
+Identify a certificate by issuer and serial; a name can correspond to several renewals. Check which certificate the consumer actually uses and which occupies the device’s active identity. [Identity history](/docs/platform/iot-fleets/device-management) and the certificate inventory answer different questions.
 
-Utiliza **Quick Inspect** para una comprobación rápida o **View Details** para ver el sujeto, SANs, usos, cadena, periodo de validez y metadatos completos.
+Download the certificate [#download-the-certificate]
 
-Descarga el certificado [#descarga-el-certificado]
+Download the PEM and inspect it:
 
-La acción de descarga entrega el certificado en formato PEM. Si el certificado se emitió mediante un CSR externo, la clave privada permanece en el sistema que generó ese CSR. Si se generó en el navegador, la clave solo estuvo disponible al finalizar la emisión.
+```bash
+openssl x509 -in device.crt -noout -subject -issuer -serial -dates
+openssl x509 -in device.crt -noout -text
+```
 
-Revoca un certificado [#revoca-un-certificado]
+Check [issuance policy](/docs/platform/pki/certificate-profiles), chain and usages with the [verification walkthrough](/docs/platform/pki/quickstarts/issue-certificate). A certificate does not contain its private key. For an external CSR, the key remains where it was generated; for the browser flow, retain the file downloaded upon issuance. If the key is lost, plan a new identity rather than expecting recovery from the certificate.
 
-Revoca una identidad cuando la clave se haya comprometido, el sujeto ya no esté autorizado o el certificado deba dejar de aceptarse antes de expirar.
+Issue from an existing CSR [#issue-from-an-existing-csr]
+
+Use this flow when the identity’s key must remain on the system that generated it. You need an active CA with a usable key, a PEM CSR and a suitable profile.
+
+1. Verify the request with `openssl req -in request.csr -noout -verify -text`. Review subject, SAN and algorithm, and authorize the requested identity.
+2. Start issuance from the CA or inventory and select **Upload Existing CSR**.
+3. Confirm the CA and profile resolved according to [Profiles](/docs/platform/pki/certificate-profiles); the request does not guarantee that every field is retained.
+4. Download the certificate and inspect dates, issuer, subject, SAN, KU and EKU. Check correspondence with the private key on the originating system.
+5. Install certificate and chain in the intended consumer and test a connection. Issuance alone does not register a device or grant access in an integration.
+
+For browser key generation, follow [Issue your first certificate](/docs/platform/pki/quickstarts/issue-certificate).
+
+Revoke a certificate [#revoke-a-certificate]
+
+Revoke when the key is compromised, the subject is no longer authorized or the identity must stop being accepted before expiration. Before changing status, identify consumers and prepare any required replacement.
 
 <Steps>
   <Step>
-    Abre la acción [#abre-la-acción]
+    Open the action [#open-the-action]
 
-    En el inventario o la vista de detalle, selecciona **Revoke Certificate**.
+    Locate the correct issuer and serial and select **Revoke Certificate**. `EXPIRED` records and records revoked for a final reason reject subsequent status changes.
   </Step>
 
   <Step>
-    Elige una razón [#elige-una-razón]
+    Choose a reason [#choose-a-reason]
 
-    Selecciona la razón que represente el incidente. Esta información se publica en OCSP y en la CRL.
+    Select the incident reason. `CertificateHold` represents a reversible certificate suspension; other reasons block later changes. Do not use a suspension to address a compromised key.
   </Step>
 
   <Step>
-    Confirma y verifica [#confirma-y-verifica]
+    Confirm and verify [#confirm-and-verify]
 
-    Confirma la operación y comprueba que el estado sea **Revoked**. Si la CA regenera la CRL al revocar, verifica también que exista una versión nueva.
+    Save the change and read the record again: require **REVOKED**, reason and timestamp. Then verify a fresh [OCSP](/docs/platform/pki/ocsp) query and, if using [CRL](/docs/platform/pki/crl), its published version and the serial’s presence. Finally check rejection of a new connection in the consumer.
   </Step>
 </Steps>
 
-<Callout type="warn" title="Solo CertificateHold es reversible">
-  Una revocación con la razón `CertificateHold` puede reactivarse. Las demás razones producen una revocación definitiva.
+Revocation does not erase the certificate, delete the key or guarantee closure of existing sessions. Status and publication are separate steps.
+
+<Callout type="warn" title="Only CertificateHold is reversible">
+  A certificate revoked with `CertificateHold` can be reactivated if it is not in `EXPIRED` state. Its dates and consumer trust remain mandatory.
 </Callout>
 
-Continúa [#continúa]
+Reactivate a hold [#reactivate-a-hold]
+
+Check that the saved reason is `CertificateHold` and the identity still satisfies policy. Request `ACTIVE` through the status update operation exposed by your installation; consult the [API reference](/docs/api-reference). Do not assume changing consumer permissions also changes status in Lamassu.
+
+Read the record and query OCSP again. With `regenerate_on_revoke` enabled, the reactivation event requests CRL regeneration: check that the new list omits the serial. An earlier list can still mark it revoked until the client refreshes its copy.
+
+This does not undo permanent revocation or a cascade started by revoking a CA.
+
+Continue [#continue]
 
 <Cards>
-  <Card title="Validar con OCSP" description="Consulta el estado de un certificado en tiempo real." href="/docs/platform/pki/ocsp" />
+  <Card title="Validate with OCSP" description="Query and verify a certificate’s signed status." href="/docs/platform/pki/ocsp" />
 
-  <Card title="Distribuir una CRL" description="Publica el estado para validación offline." href="/docs/platform/pki/crl" />
+  <Card title="Distribute a CRL" description="Publish status for local validation." href="/docs/platform/pki/crl" />
 </Cards>

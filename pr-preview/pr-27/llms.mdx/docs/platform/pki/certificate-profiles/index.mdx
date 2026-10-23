@@ -1,111 +1,118 @@
-# Perfiles de certificado (/docs/pr-preview/pr-27/platform/pki/certificate-profiles)
+# Certificate profiles (/docs/pr-preview/pr-27/platform/pki/certificate-profiles)
 
 
 
-Un perfil de emisión convierte una política de certificados en configuración reutilizable. En lugar de decidir validez, sujeto, extensiones y algoritmos en cada solicitud, defines una vez qué está permitido y asocias el perfil a una CA, un DMS o una emisión concreta.
+An issuance profile turns a certificate policy into reusable configuration. Instead of deciding validity, subject, extensions and algorithms on every request, you define once what is allowed and attach the profile to a CA, a DMS or a specific issuance.
 
-Qué controla un perfil [#qué-controla-un-perfil]
+This guide is for the PKI administrator defining issuance policy. You need permissions to manage profiles and associate them with the intended CA or DMS, plus a test consumer with known identity and purpose requirements.
 
-Validez [#validez]
+What a profile controls [#what-a-profile-controls]
 
-Puedes expresar la vigencia como una duración desde el momento de emisión o como una fecha final fija. Una duración funciona bien para identidades recurrentes; una fecha común sirve para hacer que todo un lote termine antes de una migración o retirada.
+Validity [#validity]
 
-La fecha final nunca debe superar la de la CA emisora.
+You can express the lifetime as a duration from the moment of issuance or as a fixed end date. A duration works well for recurring identities; a common date is useful to make a whole batch end before a migration or retirement.
 
-Certificado de CA o certificado final [#certificado-de-ca-o-certificado-final]
+Plan the end date within the issuing CA’s validity and leave a renewal margin. The signer calculates the date from the profile; it does not automatically clamp validity to the issuer’s expiration. Check both dates in the resulting certificate. A fixed date in the past does not produce a usable identity either.
 
-`Sign as CA` establece `IsCA` y las restricciones básicas necesarias para una autoridad. Actívalo solo en perfiles destinados a crear o reemitir CAs subordinadas.
+CA certificate or end-entity certificate [#ca-certificate-or-end-entity-certificate]
 
-Key Usage y Extended Key Usage [#key-usage-y-extended-key-usage]
+`Sign as CA` sets `IsCA` and the basic constraints needed for an authority. Enable it only in profiles intended to create or reissue subordinate CAs.
 
-El perfil puede imponer usos como `DigitalSignature`, `KeyEncipherment`, `CertSign`, `CRLSign`, `ClientAuth`, `ServerAuth` u `OCSPSigning`.
+Key Usage and Extended Key Usage [#key-usage-and-extended-key-usage]
 
-Si activas **Honor Key Usage** o **Honor Extended Key Usages**, Lamassu conserva los valores solicitados por la CSR. Si los desactivas, los sustituye por los definidos en el perfil.
+The profile can enforce usages such as `DigitalSignature`, `KeyEncipherment`, `CertSign`, `CRLSign`, `ClientAuth`, `ServerAuth` or `OCSPSigning`.
 
-<Callout type="warn" title="Honor significa delegar parte de la política">
-  No habilites las opciones `Honor…` para solicitudes no confiables salvo que otro componente valide esos campos. De lo contrario, el solicitante puede elegir capacidades más amplias de las previstas.
+If you enable **Honor Key Usage** or **Honor Extended Key Usages**, Lamassu keeps the values requested by the CSR. If you disable them, it replaces them with the ones defined in the profile.
+
+<Callout type="warn" title="Honor means delegating part of the policy">
+  Do not enable the `Honor…` options for untrusted requests unless another component validates those fields. Otherwise, the requester may choose broader capabilities than intended.
 </Callout>
 
-Sujeto [#sujeto]
+Subject [#subject]
 
-Con **Honor Subject**, el certificado conserva el sujeto de la CSR. Sin esa opción, Lamassu aplica `CN`, `O`, `OU`, `C`, `ST` y `L` del perfil. Si el perfil no define `Common Name`, se conserva el CN solicitado.
+With **Honor Subject**, the certificate keeps the subject of the CSR. Without that option, Lamassu applies the profile's `CN`, `O`, `OU`, `C`, `ST` and `L`. If the profile does not define a `Common Name`, the requested CN is kept.
 
-Extensiones de la CSR [#extensiones-de-la-csr]
+CSR extensions [#csr-extensions]
 
-Con **Honor Extensions**, Lamassu filtra las extensiones adicionales solicitadas y conserva únicamente SAN. Sin esa opción, descarta las extensiones adicionales de la CSR.
+With **Honor Extensions**, Lamassu filters the additional requested extensions and keeps only SAN. Without that option, it discards the CSR's additional extensions.
 
-Este comportamiento permite aceptar DNS, IP, correo o URI como identidades alternativas sin aceptar extensiones arbitrarias.
+This preserves SAN, but does not establish that the requester is entitled to those DNS names, IP addresses, emails or URIs. Validate that authorization before issuing. OCSP and CRL locations come from the issuance service configuration; `Honor Extensions` does not copy CSR distribution points.
 
-Restricciones criptográficas [#restricciones-criptográficas]
+Cryptographic constraints [#cryptographic-constraints]
 
-La aplicación criptográfica puede:
+The cryptographic enforcement can:
 
-* permitir o bloquear claves RSA;
-* limitar los tamaños RSA admitidos;
-* permitir o bloquear claves ECDSA;
-* limitar los tamaños o curvas ECDSA admitidos.
+* allow or block RSA keys;
+* limit the supported RSA sizes;
+* allow or block ECDSA keys;
+* limit the supported ECDSA sizes or curves.
 
-Cuando está habilitada, Lamassu comprueba la clave pública antes de crear una CA o firmar una CSR. Una clave cuyo tipo o tamaño no figure en el perfil se rechaza.
+When it is enabled, Lamassu checks the public key before creating a CA or signing a CSR. A key whose type or size is not listed in the profile is rejected.
 
-Precedencia del perfil [#precedencia-del-perfil]
+Profile precedence [#profile-precedence]
 
-En operaciones que admiten varias fuentes, Lamassu resuelve el perfil en este orden:
+Resolution depends on the entry point. One complete profile is selected; its fields are not merged with the CA’s profile.
 
-1. Perfil enviado dentro de la operación.
-2. Identificador de perfil enviado en la operación.
-3. Perfil predeterminado asociado a la CA.
+| Operation                | First choice                               | Second choice                                   | If neither is supplied             |
+| ------------------------ | ------------------------------------------ | ----------------------------------------------- | ---------------------------------- |
+| Direct signing with a CA | `issuance_profile` embedded in the request | Request `issuance_profile_id`                   | CA default profile (`profile_id`). |
+| Issuance through a DMS   | `settings.issuance_profile_id`             | `settings.issuance_profile` embedded in the DMS | Enrollment CA default profile.     |
 
-Un DMS también puede referenciar su propio perfil de emisión. De este modo, varias flotas pueden usar la misma CA con políticas distintas.
+If the selected identifier cannot be resolved, the operation fails; it does not silently fall back to the CA’s profile. Avoid setting both options at once. Recording which profile was selected helps explain why a certificate differs from its CSR.
 
-Crea un perfil [#crea-un-perfil]
+Several fleets can share a CA while keeping different profiles through their DMSs. Requester authentication and device registration policy are configured separately in [DMS](/docs/platform/iot-fleets/enrollment/dms).
+
+Create a profile [#create-a-profile]
 
 <Steps>
   <Step>
-    Define un único propósito [#define-un-único-propósito]
+    Define a single purpose [#define-a-single-purpose]
 
-    Separa, por ejemplo, dispositivos mTLS, servidores y CAs intermedias. Un perfil pequeño y específico es más fácil de revisar que uno que permita todos los usos.
+    Separate, for example, mTLS devices, servers and intermediate CAs. A small, specific profile is easier to review than one that allows every use.
   </Step>
 
   <Step>
-    Elige la validez [#elige-la-validez]
+    Choose the validity [#choose-the-validity]
 
-    Alinea la duración con la capacidad real de renovación de la flota. Deja margen respecto a la expiración de la CA.
+    Align the duration with the fleet's real renewal capacity. Leave margin against the CA's expiration.
   </Step>
 
   <Step>
-    Fija usos y sujeto [#fija-usos-y-sujeto]
+    Fix usages and subject [#fix-usages-and-subject]
 
-    Para un dispositivo que se autentica como cliente, el punto de partida habitual es `DigitalSignature` y `ClientAuth`. Añade `ServerAuth` o `KeyEncipherment` solo si el protocolo lo necesita.
+    For a device that authenticates as a client, the usual starting point is `DigitalSignature` and `ClientAuth`. Add `ServerAuth` or `KeyEncipherment` only if the protocol needs it.
   </Step>
 
   <Step>
-    Restringe las claves [#restringe-las-claves]
+    Constrain the keys [#constrain-the-keys]
 
-    Habilita la aplicación criptográfica y enumera únicamente algoritmos y tamaños compatibles con tu política y tus dispositivos.
+    Enable cryptographic enforcement and list only algorithms and sizes compatible with your policy and your devices.
   </Step>
 
   <Step>
-    Asócialo y prueba [#asócialo-y-prueba]
+    Attach it and test [#attach-it-and-test]
 
-    Asocia el perfil a una CA o DMS. Emite un certificado de prueba y comprueba sujeto, SAN, KU, EKU, restricciones básicas y fechas con una herramienta X.509 independiente.
+    Attach the profile to a CA or DMS and check the precedence above. Issue a CSR with known usages and SAN; inspect the result with `openssl x509 -in device.crt -noout -text`. Check subject, SAN, KU, EKU and dates. For an end-entity identity, disable `Sign as CA`, require no `CA:TRUE` or `Certificate Sign`, and require `CA:FALSE` if Basic Constraints is present.
+
+    Also try a key excluded by policy: issuance should fail. Follow the [certificate verification](/docs/platform/pki/quickstarts/issue-certificate) and test acceptance in the intended consumer.
   </Step>
 </Steps>
 
-Ejemplos de diseño [#ejemplos-de-diseño]
+Design examples [#design-examples]
 
-**Dispositivo mTLS**\
-Certificado final, validez corta, `DigitalSignature`, `ClientAuth`, sujeto controlado por el DMS y SAN permitido cuando identifica al dispositivo.
+**mTLS device**\
+End-entity certificate, short validity, `DigitalSignature`, `ClientAuth`, subject controlled by the DMS and SAN allowed when it identifies the device.
 
-**Servidor TLS**\
-Certificado final, `DigitalSignature`, `ServerAuth` y SAN obligatorio con los nombres que utilizarán los clientes.
+**TLS server**\
+End-entity certificate, `DigitalSignature`, `ServerAuth` and mandatory SAN with the names clients will use.
 
-**CA intermedia**\
-`Sign as CA`, `CertSign` y `CRLSign`, validez superior a sus certificados finales y restricciones criptográficas más exigentes.
+**Intermediate CA**\
+`Sign as CA`, `CertSign` and `CRLSign`, validity longer than its end-entity certificates and stricter cryptographic constraints.
 
-Son patrones de partida, no una política universal. Verifica siempre los requisitos del protocolo, del consumidor y del marco regulatorio aplicable.
+These patterns express design decisions. Enabling `Honor Extensions` does not require a CSR to contain SAN or validate its names; enforce that in the request workflow. A profile does not install trust or grant permissions in the consumer.
 
-Cambios y eliminación [#cambios-y-eliminación]
+Changes and deletion [#changes-and-deletion]
 
-Actualizar un perfil afecta a emisiones futuras; no modifica certificados ya firmados. Prueba los cambios antes de aplicarlos a una CA en producción y conserva la justificación operativa.
+Updating a profile affects future issuances; it does not modify already-signed certificates. Test changes before applying them to a CA in production and keep the operational justification.
 
-Antes de eliminar un perfil, comprueba que ninguna CA o DMS dependa de él. Si deseas sustituirlo, crea la versión nueva, actualiza las referencias y realiza una emisión de prueba antes de retirar el anterior.
+Before deleting a profile, check that no CA or DMS depends on it. If you want to replace it, create the new version, update the references and perform a test issuance before retiring the old one.

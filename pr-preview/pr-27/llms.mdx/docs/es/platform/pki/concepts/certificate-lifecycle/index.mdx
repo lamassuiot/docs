@@ -1,0 +1,84 @@
+# Ciclo de vida de un certificado (/docs/pr-preview/pr-27/es/platform/pki/concepts/certificate-lifecycle)
+
+
+
+Emitir un certificado es solo el comienzo. Durante su vida útil debes comprobar su vigencia, renovarlo antes de que caduque y retirarlo cuando deje de ser fiable. Lamassu conserva el certificado, su CA emisora, su estado y, cuando pertenece a un dispositivo, la identidad a la que está vinculado.
+
+El recorrido completo [#el-recorrido-completo]
+
+<Steps>
+  <Step>
+    Solicitud [#solicitud]
+
+    El solicitante genera una clave y una CSR. En los flujos recomendados, la clave privada permanece en el dispositivo, navegador o motor criptográfico que la creó.
+  </Step>
+
+  <Step>
+    Emisión [#emisión]
+
+    La CA firma la CSR. El [perfil de emisión](/docs/platform/pki/certificate-profiles) determina la validez, los usos, el sujeto, las extensiones admitidas y las restricciones criptográficas.
+  </Step>
+
+  <Step>
+    Uso y supervisión [#uso-y-supervisión]
+
+    El certificado queda en estado `ACTIVE`. Lamassu monitoriza su fecha `Not After`; el trabajo de monitorización criptográfica marca como `EXPIRED` los certificados que han vencido.
+  </Step>
+
+  <Step>
+    Renovación o re-enrolamiento [#renovación-o-re-enrolamiento]
+
+    Se emite un certificado nuevo antes de que caduque el anterior. En un DMS puedes abrir ventanas preventiva y crítica para que el dispositivo se re-enrole mediante EST.
+  </Step>
+
+  <Step>
+    Revocación o retirada [#revocación-o-retirada]
+
+    Si la identidad deja de ser fiable, Lamassu registra la razón y la hora de revocación. OCSP y las CRLs permiten que los consumidores conozcan ese estado.
+  </Step>
+</Steps>
+
+Estados del certificado [#estados-del-certificado]
+
+Lamassu persiste cuatro estados X.509:
+
+* **`ACTIVE`**: el registro está habilitado. Comprueba además `Not Before` y `Not After`: este estado no demuestra vigencia temporal.
+* **`EXPIRED`**: ha superado su fecha de expiración. El monitor lo detecta de forma periódica; no es un estado que deba asignarse manualmente.
+* **`REVOKED`**: fue invalidado antes de expirar, con una razón y una marca temporal.
+* **`INACTIVE`**: está deshabilitado sin representar una revocación definitiva.
+
+La vista del dispositivo puede añadir estados operativos como ausencia de identidad, renovación pendiente, expiración próxima o baja. Son una interpretación del estado del dispositivo y de sus certificados, no nuevos estados X.509.
+
+Renovación y revocación no son equivalentes [#renovación-y-revocación-no-son-equivalentes]
+
+La **renovación** crea un certificado sucesor para una identidad que continúa siendo válida. La **revocación** comunica que el certificado actual ya no debe aceptarse. Renueva para mantener continuidad; revoca ante compromiso, retirada o un cambio que invalide la identidad.
+
+Solo `CertificateHold` permite reactivar un certificado revocado que no esté en estado `EXPIRED`. Una revocación con otra razón bloquea posteriores cambios de estado. Los registros `EXPIRED` también rechazan cambios; el consumidor debe comprobar las fechas aunque el monitor todavía no haya actualizado el estado. [Certificados](/docs/platform/pki/certificates) explica cómo comprobar revocación y reactivación.
+
+<Callout type="info" title="La reemisión de una CA reutiliza su clave">
+  La operación **Reissue CA** genera otro certificado para la misma clave y enlaza ambos números de serie mediante metadatos. No equivale a una rotación de clave. Para cambiar la clave, crea una CA sucesora y realiza una migración con periodo de solapamiento.
+</Callout>
+
+Efecto de revocar una CA [#efecto-de-revocar-una-ca]
+
+Revocar una CA inicia una cascada que intenta revocar sus descendientes con `CessationOfOperation`. Puede terminar con fallos parciales y no se deshace al reactivar el padre. Consulta [Jerarquía y rotación](/docs/platform/pki/ca-hierarchy-and-rotation) para sus condiciones y comprobaciones.
+
+Antes de confirmar:
+
+1. Identifica DMS, dispositivos y servicios que confían en esa cadena.
+2. Distribuye la nueva cadena de confianza.
+3. Reemite las identidades necesarias.
+4. Comprueba OCSP y CRL desde un consumidor real.
+5. Revoca la CA antigua cuando ya no exista tráfico legítimo.
+
+La baja de un dispositivo pertenece al ciclo de vida de IoT Fleets. Afecta a su identidad activa; no equivale a recorrer y revocar automáticamente todos los certificados del historial. Revisa por separado las identidades anteriores y los permisos del consumidor en [Gestión de dispositivos](/docs/platform/iot-fleets/device-management).
+
+Qué debes observar [#qué-debes-observar]
+
+* Certificados que entran en la ventana preventiva o crítica de renovación.
+* Errores repetidos de enrolamiento o re-enrolamiento.
+* Cambios de estado y razones de revocación.
+* Publicación y vigencia de OCSP y CRLs.
+* Dependencias que todavía presentan un certificado sustituido.
+
+El historial del dispositivo relaciona sus identidades anteriores y actuales. Para cambios administrativos y errores de mutación, consulta [Registros de auditoría](/docs/platform/administration/audit-logs).

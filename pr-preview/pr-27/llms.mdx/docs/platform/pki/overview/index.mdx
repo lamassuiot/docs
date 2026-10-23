@@ -1,63 +1,60 @@
-# Plataforma Lamassu IoT (/docs/pr-preview/pr-27/platform/pki/overview)
+# PKI (/docs/pr-preview/pr-27/platform/pki/overview)
 
 
 
-Lamassu IoT centraliza la emisión, distribución, renovación y revocación de identidades X.509 para dispositivos conectados. Puedes construir una PKI privada, proteger sus claves y automatizar el enrolamiento de una flota sin perder visibilidad sobre cada certificado.
+The PKI section explains how to build and operate X.509 trust in Lamassu: which authorities issue, which rules apply and how to check certificates. It is intended for PKI administrators and anyone who needs to use certificates in a consuming system.
 
-Empieza aquí [#empieza-aquí]
+Start here [#start-here]
+
+Follow [PKI getting started](/docs/platform/pki/quickstarts/overview) to create a CA, issue a client certificate and verify it with OpenSSL. The result is a certificate, its private key and a verified chain.
+
+You can complete that path before managing devices. When you need to associate the identity with an inventory or automate its enrollment, continue in [IoT Fleets](/docs/platform/iot-fleets/overview).
+
+What you need [#what-you-need]
+
+* An accessible instance and permission to manage the keys, CAs and certificates you will use.
+* An available cryptographic engine to keep the authority's key.
+* The certificate's purpose, such as authenticating a client through mTLS.
+* Consumer requirements: accepted issuers, algorithms, names and permitted usages.
+
+Prepare the instance and cryptographic provider in [Deployment](/docs/deployment/overview). The [trust model](/docs/platform/pki/concepts/trust-model) explains hierarchy choices.
+
+Core capabilities [#core-capabilities]
+
+Build your trust hierarchy [#build-your-trust-hierarchy]
+
+[Authorities](/docs/platform/pki/certificate-authorities) sign certificates. A root establishes the trust anchor, and an intermediate separates issuance by environment or purpose. [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) explains how to maintain trust when replacing an authority.
+
+Protect cryptographic keys [#protect-cryptographic-keys]
+
+CA signing keys are managed through [KMS and cryptographic engines](/docs/platform/pki/key-management). A client that generates a CSR can keep its own key: preserve that custody when choosing the issuance method.
+
+Issue and control certificates [#issue-and-control-certificates]
+
+A [profile](/docs/platform/pki/certificate-profiles) establishes subject, validity, usage and key restrictions. The CA applies issuance configuration and signs the certificate. In the [inventory](/docs/platform/pki/certificates), you can inspect the result, download it and manage its status.
+
+Publish validation status [#publish-validation-status]
+
+[Validation](/docs/platform/pki/certificate-validation) covers the chain, validity, usages and revocation status. Lamassu publishes status through [OCSP](/docs/platform/pki/ocsp) and [CRL](/docs/platform/pki/crl); the consumer configures which issuers it recognizes and how it checks that status.
+
+How to check the result [#how-to-check-the-result]
+
+An active certificate in the console is one part of the check. Also verify that:
+
+* its subject and extensions identify the expected client;
+* its public key matches the client's private key;
+* its chain reaches a root trusted by the consumer;
+* its dates and usages allow the operation;
+* the consumer applies revocation checks and authorization.
+
+The [issuance path](/docs/platform/pki/quickstarts/issue-certificate) includes the first independent checks.
+
+Continue [#continue]
 
 <Cards>
-  <Card title="Primeros pasos" description="Crea una CA, emite un certificado y registra tu primer dispositivo." href="/docs/platform/pki/quickstarts/overview" />
+  <Card title="PKI getting started" description="Create a CA, then issue and verify a client certificate." href="/docs/platform/pki/quickstarts/overview" />
 
-  <Card title="Cómo funciona Lamassu" description="Construye el modelo mental de autoridades, claves, identidades y validación." href="/docs/platform/pki/concepts/overview" />
-</Cards>
+  <Card title="Apply PKI to devices" description="Associate certificates with inventory and prepare enrollment." href="/docs/platform/iot-fleets/overview" />
 
-Capacidades principales [#capacidades-principales]
-
-Construye tu jerarquía de confianza [#construye-tu-jerarquía-de-confianza]
-
-Crea autoridades raíz e intermedias o importa una PKI existente. Define qué autoridad puede emitir cada identidad y conserva la cadena de confianza completa.
-
-Protege las claves criptográficas [#protege-las-claves-criptográficas]
-
-Genera y custodia claves mediante motores software, HSMs PKCS#11 o servicios cloud. Lamassu desacopla las operaciones de la ubicación física de la clave.
-
-Emite y controla certificados [#emite-y-controla-certificados]
-
-Emite certificados desde la consola o a partir de un CSR, consulta su estado y revócalos cuando dejan de ser fiables.
-
-Automatiza identidades de dispositivos [#automatiza-identidades-de-dispositivos]
-
-Define políticas de enrolamiento mediante un Device Management Service (DMS) y deja que los dispositivos soliciten o renueven su identidad a través de EST.
-
-Publica el estado de validación [#publica-el-estado-de-validación]
-
-Ofrece validación online mediante OCSP y distribuye CRLs para consumidores que necesitan comprobar certificados sin conexión.
-
-Reacciona a los eventos [#reacciona-a-los-eventos]
-
-Suscríbete a cambios del ciclo de vida y envía notificaciones por correo, Microsoft Teams o webhooks.
-
-Elige tu recorrido [#elige-tu-recorrido]
-
-<Cards>
-  <Card title="Administro la PKI" description="Configura motores, autoridades, emisión y validación." href="/docs/platform/pki/key-management" />
-
-  <Card title="Integro un dispositivo" description="Configura el DMS y usa EST para obtener una identidad." href="/docs/platform/pki/device-enrollment" />
-
-  <Card title="Opero la plataforma" description="Despliega Lamassu y prepara sus dependencias." href="/docs/deployment/overview" />
-
-  <Card title="Integro otro sistema" description="Conecta Lamassu con AWS IoT Core y otros destinos." href="/docs/platform/pki/integrations/aws-iot-core" />
-</Cards>
-
-Referencia operativa [#referencia-operativa]
-
-<Cards>
-  <Card title="Perfiles de certificado" description="Convierte la política de emisión en restricciones reutilizables." href="/docs/platform/pki/certificate-profiles" />
-
-  <Card title="Jerarquía y rotación" description="Sustituye certificados o claves de CA sin romper la confianza." href="/docs/platform/pki/ca-hierarchy-and-rotation" />
-
-  <Card title="Control de acceso" description="Configura principales, políticas y el primer administrador." href="/docs/platform/pki/access-control" />
-
-  <Card title="Resolución de problemas" description="Diagnostica Gateway, servicios, emisión y enrolamiento." href="/docs/platform/pki/troubleshooting" />
+  <Card title="PKI diagnostics" description="Check issuance, OCSP and CRL when the result fails." href="/docs/platform/pki/troubleshooting" />
 </Cards>

@@ -26,7 +26,7 @@ An **HTTP rule** grants actions associated with API routes. It is the mechanism 
 A **grant** is the association between a principal and a policy. Removing the grant removes all permissions contributed by that policy, without modifying it for other principals.
 
 <Callout type="info" title="Authentication and authorization are distinct controls">
-  A valid JWT or a valid client certificate does not grant access by itself. The credential must match at least one active principal and one of its policies must allow the requested operation.
+  A valid JWT or a valid client certificate does not grant access by itself. The credential must match at least one active principal and, unless the HTTP schema exempts the route, one of its policies must allow the requested operation. See *Authentication-only routes and unmapped paths* for those exemptions.
 </Callout>
 
 ## Two decision systems
@@ -59,23 +59,23 @@ The decision is made **before forwarding the request to the service**:
 
 When it allows access, `authz` returns the selected principal in `x-current-user`. The Gateway can propagate that header to the service to preserve the identity context.
 
-HTTP rules primarily answer **"can this identity call this API operation?"**. On their own they do not produce filters over the external service's database. To limit a route to a specific device, tenant or client, the schema must declare a constraint relating a request value to a normalized attribute of the principal.
+HTTP rules primarily answer **"can this identity call this API operation?"**. On their own they do not produce filters over the external service's database. To limit a route to a specific device, tenant or client, either the schema declares a constraint relating a request value to a normalized attribute of the principal, or the policy pins the request value to a literal with `param_constraints`. The first scopes each identity to its own resources through a single grant; the second restricts a grant to a fixed value regardless of who holds it.
 
 ### Authentication-only routes and unmapped paths
 
 Two schema-level settings cover endpoints that policies do not mention:
 
-- **`skip_authz: true` on a route** allows any authenticated identity to reach it without a policy grant. Use it for paths such as `/openapi.json` or `/health` that every authenticated caller should be able to access. The request still has to authenticate successfully: a failed credential is rejected before this setting is considered. A `skip_authz` route cannot declare constraints, and it wins over any other schema's route or default action for the same request.
-- **`default_action` with `base_paths`** decides what happens when a request falls under a path prefix the schema owns but no explicit route matches. `deny` — the value the Job Manager schema ships with — turns the implicit denial of unmapped paths into an explicit, auditable statement; `allow` opens unmapped endpoints under that prefix to any authenticated identity.
+- **`skip_authz: true` on a route** allows any identity that matches an active principal to reach it, even one with no granted policies. Use it for paths such as `/openapi.json` or `/health` that every authenticated caller should be able to access. The request still has to authenticate successfully: a credential that fails validation or matches no active principal is rejected before this setting is considered. A `skip_authz` route cannot declare constraints, and it wins over any other schema's route or default action for the same request.
+- **`default_action` with `base_paths`** decides what happens when a request falls under a path prefix the schema owns but no explicit route matches. `deny` — the value the Job Manager schema ships with — turns the implicit denial of unmapped paths into an explicit, auditable statement; `allow` opens unmapped endpoints under that prefix to any identity that matches an active principal.
 
-These are decisions of the schema, not of a policy: they never replace the grant a mapped route requires, they only fill the gap left by endpoints the schema does not enumerate. Keep three rules in mind:
+These are decisions of the schema, not of a policy: `skip_authz` removes the grant check for that route, even when another schema maps the same request to an action that requires a grant, and `default_action` only covers requests that no explicit route in any schema matches. Keep three rules in mind:
 
 - `default_action` requires at least one `base_paths` entry, and base paths are absolute paths such as `/api/wfx/nbi/v1`.
 - An explicit route in any schema takes precedence: the fallback only decides requests that no schema's routes cover. When the prefixes of two schemas overlap, the longest matching prefix decides.
 - Two schemas cannot claim the same base path with different default actions; the conflicting schema fails to load.
 
 <Callout type="warn" title="These settings bypass policies">
-  A `skip_authz` route and a `default_action: "allow"` prefix grant access without consulting any policy. Every authenticated identity can reach what they open, including identities with no granted policies. Review these settings whenever you add or upgrade an integrated service.
+  A `skip_authz` route and a `default_action: "allow"` prefix grant access without consulting any policy. Every identity that matches an active principal can reach what they open, including identities with no granted policies. A `skip_authz` route in one schema also opens a request that another schema maps to a grant-protected action. Review these settings whenever you add or upgrade an integrated service.
 </Callout>
 
 ### Services developed by Lamassu
@@ -107,7 +107,7 @@ They are not two equivalent controls applied twice. HTTP rules protect the perim
 A policy can contain both rule types when an identity needs to operate Lamassu resources and also call an integrated API. Granting an entity rule does not automatically grant an HTTP action, nor does an HTTP rule create access over an entity.
 
 <Callout type="warn" title="Deny by default">
-  If no combination of principal, policy and rule allows the operation, Lamassu denies it. Additionally, `auth.externalAuthorization.failOpen` is `false` by default: if `authz` is unavailable, the Gateway blocks protected routes.
+  If no combination of principal, policy and rule allows the operation, Lamassu denies it, unless the HTTP schema declares `skip_authz` on the route or `default_action: allow` on a base path that covers it (see *Authentication-only routes and unmapped paths*). Additionally, `auth.externalAuthorization.failOpen` is `false` by default: if `authz` is unavailable, the Gateway blocks protected routes.
 </Callout>
 
 ## OIDC principals
@@ -427,7 +427,7 @@ Check that the bootstrap principal was created and that the policies were preloa
 
 ### Access appears without a policy grant
 
-The path may be covered by a schema-level decision rather than by a policy: routes marked `skip_authz` allow any authenticated identity, and a request under a `base_paths` prefix whose schema sets `default_action: allow` is likewise allowed without consulting policies. Confirm which of the two applies before looking for missing or misassigned grants.
+The path may be covered by a schema-level decision rather than by a policy: routes marked `skip_authz` allow any identity that matches an active principal, and a request under a `base_paths` prefix whose schema sets `default_action: allow` is likewise allowed without consulting policies. Confirm which of the two applies before looking for missing or misassigned grants.
 
 ### Everything fails when authz is unavailable
 

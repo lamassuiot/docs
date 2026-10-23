@@ -57,7 +57,7 @@ The decision is made **before forwarding the request to the service**:
 7. If the route declares constraints, it compares request data with the normalized attributes of the same principal contributing the policy.
 8. A satisfying result lets Envoy forward the request; any other response blocks it at the Gateway.
 
-When it allows access, `authz` returns the selected principal in `x-current-user`. The Gateway can propagate that header to the service to preserve the identity context.
+When it allows access, `authz` returns the selected principal in the `X-Principal-ID` response header. The Gateway can propagate that header to the service to preserve the identity context.
 
 HTTP rules primarily answer **"can this identity call this API operation?"**. On their own they do not produce filters over the external service's database. To limit a route to a specific device, tenant or client, the schema must declare a constraint relating a request value to a normalized attribute of the principal.
 

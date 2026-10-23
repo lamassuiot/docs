@@ -1,0 +1,51 @@
+---
+title: Estrategias de aprovisionamiento
+description: Elige cómo se registra el dispositivo, quién autoriza su identidad y dónde se genera la clave.
+---
+
+Esta guía ayuda al administrador de aprovisionamiento a elegir un recorrido antes de configurar el DMS. Separa tres decisiones: cuándo existe el dispositivo, cómo se autoriza la solicitud y quién genera su clave. Ninguna de ellas concede por sí sola acceso en el destino.
+
+## Elige el registro
+
+| Recorrido | Cuándo existe el dispositivo | Qué compruebas |
+|---|---|---|
+| Asignación manual | El operador lo crea antes de asociar un certificado. | ID, DMS propietario, CN del certificado y serie vinculada. |
+| EST con `JITP` | Se crea para un CN desconocido durante `/simpleenroll`. | Credencial autorizada, ID libre, perfil, alta e identidad resultantes. |
+| EST con `PRE_REGISTRATION` | Debe existir antes de `/simpleenroll`. | Registro aprobado, mismo DMS y condiciones de sustitución de tu versión. |
+
+`JITP` de Lamassu crea inventario e identidad en Lamassu. [JITP de AWS](/docs/platform/iot-fleets/integrations/aws-iot-core) aprovisiona un destino en AWS; son decisiones diferentes.
+
+Para una primera prueba desde el cliente, utiliza [Enrola y conecta un dispositivo](/docs/platform/iot-fleets/quickstarts/enroll-device). Para preparar inventario sin EST, sigue [Registro manual](/docs/platform/iot-fleets/quickstarts/register-device).
+
+## Prerregistro y sustitución
+
+En el código examinado, encontrar cualquier dispositivo del mismo DMS activa el control `enable_replaceable_enrollment` antes de comprobar PRE_REGISTRATION. Con el flag desactivado, un dispositivo prerregistrado puede recibir `forbiddenNewEnrollment` incluso estando en **No Identity**. No se presenta ese recorrido como garantizado por seleccionar únicamente PRE_REGISTRATION.
+
+Activar el flag permite repetir `/simpleenroll` para un ID existente. El backend programa un intento diferido de revocación del certificado anterior con `Superseded`; también puede ejecutarlo si después falla la emisión o vinculación. Si no había identidad, el intento puede fallar por falta de serie. El flag no es una transacción de sustitución ni garantiza restaurar el estado anterior.
+
+Prueba el caso exacto de tu versión antes de habilitarlo en una población. Para una identidad ya operativa y una renovación autorizada, utiliza `/simplereenroll`; para recuperar una identidad, sigue [Renovación y recuperación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) y confirma el estado persistido antes de reintentar.
+
+## Elige la autenticación
+
+Decide por separado primer enrolamiento y reenrolamiento:
+
+- **Certificado cliente:** útil cuando cada equipo dispone de una credencial inicial cuya clave controla.
+- **Webhook:** útil cuando otra autoridad conoce inventario, credenciales o derecho a solicitar un ID.
+- **Certificado y webhook:** exige ambos controles en la operación configurada.
+- **NO_AUTH:** no acredita al solicitante; solo encaja cuando el control de admisión se resuelve de forma deliberada fuera de ese DMS.
+
+Autenticar un certificado inicial no demuestra por sí solo el derecho a elegir cualquier CN en la CSR. Define esa autorización en [Identidad inicial y autenticación](/docs/platform/iot-fleets/enrollment/bootstrap-identity).
+
+## Elige la custodia
+
+| Opción | Material que atraviesa EST |
+|---|---|
+| Clave generada por el dispositivo | CSR pública y certificado; la clave permanece en el cliente. |
+| Clave ya disponible en el dispositivo | CSR firmada con la clave existente y certificado nuevo. |
+| ServerKeyGen | Clave privada PKCS#8 y certificado en una respuesta multipart protegida por TLS. |
+
+Elegir ServerKeyGen no utiliza automáticamente el HSM o KMS de la CA para la clave del dispositivo. Revisa su [contrato y extracción](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen) y la capacidad del dispositivo para instalar el material.
+
+## Comprueba la decisión
+
+Antes de extender el flujo, prueba alta permitida, credencial incorrecta, ID de otro DMS, solicitud repetida y recuperación tras un fallo. Conserva ID, serie, versión activa y error. Comprueba también aceptación y rechazo en el consumidor; un certificado emitido no implica que el destino lo conozca o permita operar.

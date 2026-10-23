@@ -1,0 +1,90 @@
+---
+title: Registra un dispositivo manualmente
+description: Prepara un DMS, registra un dispositivo y asocia un certificado comprobado a su identidad.
+---
+
+Este recorrido está dirigido a quien empieza a administrar identidades de dispositivos. Registrarás `device-001` y le asignarás un certificado existente para comprobar la relación entre dispositivo, DMS e historial de identidad.
+
+La asignación modifica el inventario de Lamassu. La clave y el certificado se instalan por separado en el dispositivo; la conexión con un consumidor se comprueba en la integración de ese destino.
+
+## Antes de empezar
+
+- Una instancia accesible y permisos para administrar DMS, dispositivos y la asociación de certificados.
+- Una CA activa con clave disponible. Si todavía no existe, sigue [Crea tu primera CA](/docs/platform/pki/quickstarts/create-certificate-authority).
+- Un certificado final activo de esa CA cuyo `Common Name` sea exactamente `device-001`, con su clave privada. Sigue [Emite y verifica un certificado](/docs/platform/pki/quickstarts/issue-certificate) para obtener y comprobar ambos.
+- El identificador `device-001` libre en el inventario. Si ya lo usaste, elige otro y emite el certificado con ese mismo `Common Name`.
+
+## Prepara el DMS
+
+Un DMS debe existir antes de registrar el dispositivo. Si ya tienes uno adecuado, comprueba su CA y anota su identificador; si necesitas crearlo:
+
+1. Abre el inventario de DMS y la acción de creación. Asigna un nombre reconocible, como `Acme Evaluation DMS`.
+2. En **Enrollment CA**, selecciona la CA que emitió `device.crt`.
+3. En **Registration Mode**, selecciona `PRE_REGISTRATION` para el recorrido que comienza con un alta explícita.
+4. Configura **Authentication Mode** como `CLIENT_CERTIFICATE` y añade en **Validation CAs** la CA cuyos certificados iniciales aceptarás. Para esta evaluación puede ser la misma CA. Mantén habilitada **Verify CSR Signature** y deshabilitada la generación de claves en servidor si no la vas a utilizar.
+5. Revisa los ajustes de renovación y distribución de confianza con la [guía DMS](/docs/platform/iot-fleets/enrollment/dms), guarda el servicio y anota su identificador.
+6. Vuelve a abrir el DMS y confirma que la CA de enrolamiento es la prevista y que el servicio aparece en el inventario.
+
+Estos ajustes preparan la política DMS. Los pasos siguientes realizan el alta y la asignación desde la consola; no envían una solicitud EST ni prueban la admisión por ese protocolo.
+
+<Steps>
+  <Step>
+    ### Registra el dispositivo
+
+    Abre **Managed Devices** y la acción de registro. Completa:
+
+    - **Device ID**: `device-001`.
+    - **Registration Authority**: el DMS que acabas de preparar; la etiqueta identifica al servicio que cumple el rol de autoridad de registro.
+    - **Icon** y **Tags**: clasificación opcional.
+
+    Confirma el registro.
+  </Step>
+
+  <Step>
+    ### Comprueba el estado inicial
+
+    Abre el dispositivo. Debe aparecer en **No Identity** y mostrar el DMS propietario seleccionado.
+
+    El registro crea la entrada de inventario; el certificado todavía debe asociarse.
+  </Step>
+
+  <Step>
+    ### Asigna una identidad
+
+    Selecciona **Assign Identity** y el certificado existente con `CN=device-001`. Comprueba su número de serie, emisor y vigencia frente al certificado que verificaste en PKI.
+
+    Confirma la asociación. La alternativa **Issue New Instead** se explica en [Dispositivos e identidades](/docs/platform/iot-fleets/device-management#asigna-una-identidad-manualmente).
+  </Step>
+
+  <Step>
+    ### Verifica el dispositivo
+
+    Comprueba que tiene una identidad activa. En **Certificate History**, verifica el número de serie asociado; en **Device Event Timeline**, localiza el evento de asignación.
+
+    Conserva el identificador del dispositivo, el DMS propietario y el número de serie como referencias del resultado.
+  </Step>
+</Steps>
+
+## Resultado esperado
+
+| Comprobación | Resultado |
+| --- | --- |
+| Dispositivo | `device-001` aparece en el inventario con el DMS previsto. |
+| Identidad actual | El certificado asociado coincide con el que verificaste en PKI. |
+| Historial | La emisión asociada aparece con su número de serie y fechas. |
+| Clave y certificado | Dispones de la pareja comprobada para instalarla en el dispositivo. |
+
+## Si el resultado falla
+
+- Si el DMS no puede seleccionarse, confirma su creación y tus permisos de lectura.
+- Si no aparece un certificado elegible, comprueba que su `Common Name` coincide exactamente con el `Device ID`, está activo y lo emitió la CA prevista.
+- Si falla la asignación, revisa los permisos y el diagnóstico de la operación antes de repetirla. Vuelve a consultar el dispositivo y su historial para conocer el resultado persistido.
+- Si aparece un estado relacionado con vencimiento o renovación, comprueba las fechas del certificado y los umbrales del DMS en [Dispositivos e identidades](/docs/platform/iot-fleets/device-management).
+
+## Automatiza el siguiente dispositivo
+
+Continúa con [DMS](/docs/platform/iot-fleets/enrollment/dms) y [EST](/docs/platform/iot-fleets/enrollment/overview) para que el dispositivo solicite y renueve sus certificados. Prepara la confianza del servidor, la credencial inicial y las políticas de cada operación antes de implementar el cliente.
+
+Para un recorrido desde el cliente hasta mTLS, sigue [Enrola y conecta tu primer dispositivo](/docs/platform/iot-fleets/quickstarts/enroll-device) con un ID nuevo.
+
+Para utilizar la identidad en [AWS IoT Core](/docs/platform/iot-fleets/integrations/aws-iot-core), prepara también la confianza y los permisos del destino. Comprueba la conexión desde el dispositivo después de instalar la clave, el certificado y la cadena necesarios.

@@ -1,4 +1,5 @@
 import { docs } from "fumadocs-mdx:collections/server";
+import type { Item as PageTreeItem } from "fumadocs-core/page-tree";
 import { type InferPageType, loader } from "fumadocs-core/source";
 import {
   BadgeCheck,
@@ -56,6 +57,32 @@ export const source = loader({
   source: docs.toFumadocsSource(),
   baseUrl: DOCS_BASE_PATH,
   i18n: i18nConfig,
+  pageTree: {
+    transformers: [
+      {
+        folder(node) {
+          // A page named after its section belongs on the parent link.
+          const index =
+            node.index ??
+            node.children.find(
+              (child): child is PageTreeItem =>
+                child.type === "page" &&
+                typeof node.name === "string" &&
+                child.name === node.name,
+            );
+          if (!index) return node;
+
+          return {
+            ...node,
+            index,
+            children: node.children.filter(
+              (child) => child.type !== "page" || child.url !== index.url,
+            ),
+          };
+        },
+      },
+    ],
+  },
   // Fumadocs' createGetUrl places the locale before the mount point
   // (/en/docs/...); the site routes /docs/*, so the locale segment lives
   // inside the mount. DocsUrl also keeps the default locale unprefixed

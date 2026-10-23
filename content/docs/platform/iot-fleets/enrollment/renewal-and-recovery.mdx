@@ -1,0 +1,71 @@
+---
+title: Renewal and recovery
+description: Renew without losing the identity and recover devices according to their actual state.
+---
+
+Renewal retains the device identifier and requests a successor certificate. The client must complete the process: check the response, install the matching pair and demonstrate that the consumer accepts it. Lamassu alerts notify you; they do not perform those steps.
+
+## Prepare renewal
+
+- Query the current certificate in Lamassu and compare it with the installed certificate. You need its subject, serial and dates, as well as the client key.
+- Check the **re-enrollment** authentication mode: it is independent of initial authentication. With `CLIENT_CERTIFICATE`, use the current identity; do not assume the bootstrap credential is admitted.
+- Calculate the window's start: the current certificate's `NotAfter` minus `reenrollment_delta`. Preventive and critical thresholds produce states/notifications; they do not extend that window.
+- Review **Revoke on Re-enrollment** and recovery if installation fails. When enabled, Lamassu can revoke the previous identity before the client installs the new one.
+
+## Request the successor certificate
+
+The example continues the [EST tutorial](/docs/platform/iot-fleets/quickstarts/enroll-device), in the same Bash session with `set -euo pipefail`, `umask 077` and `EST_BASE`. Use a new key compatible with the profile. Conversion from the certificate preserves the subject and copies only SAN when present; check the subject and requested names before sending it. The backend checks the subject against the current identity: it attempts RawSubject equality and then compares CN, OU, O, L, ST and C. Rebuilding only the CN can lose required attributes.
+
+```bash
+test ! -e device.next.key
+test ! -e device.next.crt
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out device.next.key
+openssl x509 -x509toreq -in device.crt -key device.next.key -sha256 \
+  -copy_extensions copy -ext subjectAltName -out device-renewal.csr
+openssl req -in device-renewal.csr -verify -noout -subject
+openssl req -in device-renewal.csr -outform DER -out device-renewal.csr.der
+openssl base64 -A -in device-renewal.csr.der -out device-renewal.csr.b64
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem --cert device.crt --key device.key \
+  --header 'Content-Type: application/pkcs10' \
+  --data-binary @device-renewal.csr.b64 \
+  --dump-header renewal.headers --output renewal.b64 \
+  "$EST_BASE/simplereenroll"
+openssl base64 -d -in renewal.b64 -out renewal.p7b
+openssl pkcs7 -inform DER -in renewal.p7b -print_certs -quiet -out device.next.crt
+openssl verify -CAfile device-root.pem -purpose sslclient device.next.crt
+openssl x509 -in device.next.crt -noout -subject -issuer -serial -dates
+openssl x509 -in device.next.crt -pubkey -noout > next-certificate-public.pem
+openssl pkey -pubin -in next-certificate-public.pem -outform DER -out next-certificate-public.der
+openssl pkey -in device.next.key -pubout -outform DER -out next-key-public.der
+cmp next-certificate-public.der next-key-public.der
+```
+
+The request authenticates with `device.crt` and `device.key`; the CSR contains the new public key. Also check extensions, dates and correspondence of the serial with the current slot in Lamassu. Do not resubmit a failed request without querying that state: issuance, previous revocation and successor binding can have partial results.
+
+## Install and check the new pair
+
+Keep the result as `device.next.crt` and `device.next.key` until verified. Switch the pair through a coordinated operation in the device store or configuration; avoid temporarily exposing a certificate with another version's key.
+
+Test mTLS with the consumer and verify that it uses the new serial. Confirm the history and current certificate in Lamassu. If **Revoke on Re-enrollment** was disabled, the previous identity can remain valid: retire it according to PKI policy after testing the successor, and check revocation publication and consumption.
+
+If the previous identity is already revoked, retaining its files does not restore a valid connection. Recovery requires an admitted credential and authorized intervention according to the situation.
+
+## Recover according to state
+
+| Situation | Procedure |
+|---|---|
+| Valid certificate, outside the window | Schedule the request within the window. Do not use `simpleenroll` to bypass it. |
+| Expired certificate, key available | With certificate authentication, review `enable_expired_renewal` and whether Gateway permits presenting that credential. Revocation, subject and the remaining checks still apply. |
+| Renewal through webhook or `NO_AUTH` | The mTLS expiry check does not run in these modes. Define expiry and authorization policy in the corresponding admission process; the flag is not a universal prohibition. |
+| Lost or inaccessible key | You cannot prove possession of the previous identity. Authorize new admission and, if appropriate, controlled replacement; revoke the compromised identity. |
+| Current identity revoked | `simplereenroll` rejects the revoked current certificate. Investigate the reason and prepare an authorized readmission procedure; do not disable authentication to force it. |
+| Device without an identity | Use initial enrollment. For an existing entry, check the replacement restriction in [provisioning](/docs/platform/iot-fleets/enrollment/provisioning-strategies). |
+| Retired device | Review the operational decision before readmission. Decommissioned state and revocation of the entire history are not equivalent. |
+| Timeout, HTTP 500 or installation failure | Inspect the device, issued certificates and history before retrying. A successor may have been issued or the previous identity revoked. |
+
+## Continuous operation
+
+Schedule renewal with time for disconnections, trust distribution and consumer checks. Stagger requests across the population and bound retries within the window; authentication, subject and policy errors require correcting their cause. Maintain an admitted and tested recovery mechanism for lost keys and pairs that could not be installed.
+
+Continue with [Trust distribution](/docs/platform/iot-fleets/enrollment/trust-distribution), [Devices and identities](/docs/platform/iot-fleets/device-management) and [Troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting).

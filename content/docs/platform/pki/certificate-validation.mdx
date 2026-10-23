@@ -1,22 +1,49 @@
 ---
 title: Certificate validation
-description: Publish the status of identities through OCSP and CRL.
-sidebar:
-  group: VA
-  label: Overview
+description: Check chain, identity, purpose and revocation from the consumer.
 ---
 
-Issuance proves who signed a certificate; validation tells you whether it should still be accepted. Lamassu publishes status through two complementary mechanisms.
+This guide brings together the checks needed when integrating a certificate consumer. You need the presented certificate, intermediates and roots that your application has deliberately chosen to trust. Lamassu publishes status; the consumer applies acceptance policy.
+
+## Before querying status
+
+Verify these criteria together:
+
+| Check | Required result |
+|---|---|
+| Chain and signature | Valid chain to a root deliberately installed in the consumer. |
+| Dates | Current time between `Not Before` and `Not After`, including the CAs in the chain. |
+| Identity | Name, SAN or identifier matches the expected peer. |
+| Purpose | KU, EKU and constraints permit the specific operation. |
+| Revocation | Signed, current evidence corresponding to the queried issuer and certificate. |
+| Authorization | The application permits that identity to perform the action. |
+
+The [issuance walkthrough](/docs/platform/pki/quickstarts/issue-certificate) checks chain and purpose with OpenSSL. That check does not automatically query OCSP or download a CRL. Inventory presence or an OCSP `Good` response does not replace the other criteria.
 
 ## Choose a mechanism
 
-Use **OCSP** when the consumer is online and needs to check the latest status of a specific certificate.
+| Mechanism | When to use it | What you must maintain |
+|---|---|---|
+| OCSP | Status query for a specific certificate. | Responder access, signature verification and cache/freshness policy. |
+| CRL | Local checks for many certificates or offline operation. | Periodic download of an issuer-signed list and rejection of expired lists. |
 
-Use a **CRL** when validation must happen locally, offline or over a high volume of certificates. The consumer periodically downloads a signed list and keeps it until the next update.
+OCSP can also return a response reusable until `nextUpdate`; a CRL changes when a new version is published. Neither mechanism alone guarantees that a consumer learns a revocation at the moment it is saved.
 
-Many environments use both: OCSP as the primary check and a CRL as the local or fallback mechanism.
+If using both, define when fallback is allowed and what the client does when retrieval, signature or freshness checks fail, or the result is `Unknown`. Accepting an identity when its status cannot be checked must be an explicit application decision.
+
+## Check consumer behavior
+
+1. Accept a current, authorized certificate with a known chain.
+2. Reject another certificate with an unknown root or incompatible purpose.
+3. Revoke a test certificate and verify the OCSP response or new CRL.
+4. Check that a new connection with that identity is rejected.
+5. Simulate an unreachable endpoint and expired evidence; observe whether the result matches policy.
+
+Keep the serial number, issuer, revocation reason, query time and evidence timestamps. An existing session may need explicit closure or reauthentication in the consumer; publishing revocation does not automatically close it.
+
+For a chain with intermediates, validate their status according to consumer policy as well. An end-entity issuer’s CRL does not replace checks on every CA in the chain.
 
 <Cards>
-  <Card title="Online validation with OCSP" description="Query Good, Revoked and Unknown statuses in real time." href="/docs/platform/pki/ocsp" />
-  <Card title="Revocation lists" description="Generate, publish and distribute CRLs per authority." href="/docs/platform/pki/crl" />
+  <Card title="Online validation with OCSP" description="Generate a query and verify signature, status and timestamps." href="/docs/platform/pki/ocsp" />
+  <Card title="Revocation lists" description="Download, inspect and use an issuer’s CRL." href="/docs/platform/pki/crl" />
 </Cards>

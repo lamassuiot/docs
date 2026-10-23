@@ -9,19 +9,13 @@ import { z } from "zod";
 import { remarkDocsDiff } from "./lib/docs-diff/remark.ts";
 import { transformerDocsDiff } from "./lib/docs-diff/shiki.ts";
 
-// Sidebar placement inside "Operar Lamassu", which the site groups into
-// goal-oriented folders (see groupOperationNodes in
-// app/routes/docs.tsx). Lives in content so a docs change can place its own
-// pages: a page sets `sidebar.group` (and optionally `sidebar.label`); a
-// subfolder of related pages sets `group` in its meta.json.
+// Navigation folders and ordering are defined in localized meta.json files.
 export const docs = defineDocs({
   dir: "content/docs",
   docs: {
     schema: frontmatterSchema.extend({
       sidebar: z
         .object({
-          /** Group folder the page is listed under, e.g. 'CA'. Unknown names create a new group. */
-          group: z.string().optional(),
           /** Label in the sidebar, when it should differ from the title (e.g. 'Visión general'). */
           label: z.string().optional(),
         })
@@ -33,10 +27,7 @@ export const docs = defineDocs({
     },
   },
   meta: {
-    schema: metaSchema.extend({
-      /** Group folder this whole subfolder is nested under, e.g. 'CA'. */
-      group: z.string().optional(),
-    }),
+    schema: metaSchema,
   },
 });
 

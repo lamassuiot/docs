@@ -2,7 +2,6 @@
 title: Autoridades de certificación
 description: Crea, importa y opera las autoridades que establecen la confianza de tu PKI.
 sidebar:
-  group: CA
   label: Autoridades
 ---
 
@@ -10,12 +9,14 @@ Una autoridad de certificación (CA) vincula identidades con claves públicas me
 
 Para diseñar una cadena completa o sustituir una autoridad en producción, consulta [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation). Si necesitas estandarizar qué puede firmar cada autoridad, utiliza [Perfiles de certificado](/docs/platform/pki/certificate-profiles).
 
+Para administrar CAs necesitas permisos sobre las autoridades y las claves, un motor accesible y un perfil revisado. La CA de un consumidor externo no queda confiada por aparecer en este inventario: acuerda por separado la distribución de su raíz y cadena.
+
 ## Elige un flujo
 
 - **Nueva CA y nueva clave:** crea una raíz de confianza desde cero. Lamassu genera y custodia el par de claves.
 - **Nueva CA desde KMS:** reutiliza una clave que ya está registrada en la plataforma.
 - **Importar CA con clave privada:** incorpora una autoridad externa con la que Lamassu podrá emitir.
-- **Importar solo el certificado:** añade una autoridad para construir cadenas y validar, pero no para emitir.
+- **Importar solo el certificado:** registra material público. Si Lamassu encuentra su clave en el KMS, puede asociarla; si no la encuentra, la CA queda sin clave utilizable para emitir.
 
 ¿Es tu primera vez? Sigue [Crea tu primera CA](/docs/platform/pki/quickstarts/create-certificate-authority) para completar el recorrido mínimo.
 
@@ -40,7 +41,7 @@ Para diseñar una cadena completa o sustituir una autoridad en producción, cons
 
     Selecciona el motor criptográfico, el algoritmo y el tamaño o curva. Lamassu admite claves RSA y EC según las capacidades del motor.
 
-    Para RSA puedes elegir 1024, 2048, 3072 o 4096 bits. Para EC están disponibles las curvas P-256, P-384 y P-521.
+    Utiliza únicamente tamaños y curvas admitidos por el motor y por la política criptográfica del perfil. Consulta [Claves y motores](/docs/platform/pki/key-management) antes de reutilizar material externo.
   </Step>
 
   <Step>
@@ -68,18 +69,18 @@ Para diseñar una cadena completa o sustituir una autoridad en producción, cons
 
     Define **CA Certificate Expiration** y **Default End-Entity Certificate Issuance Expiration**. Puedes expresar una duración (`5y 8w 4d`), seleccionar una fecha o utilizar la fecha máxima permitida.
 
-    Selecciona un perfil de emisión existente o configura los `Key Usage` y `Extended Key Usage` en el formulario. Si no eliges un perfil, Lamassu aplica los usos básicos predeterminados.
+    Revisa por separado el certificado de la propia CA y el perfil predeterminado para lo que emitirá después. Elige una política explícita de [emisión](/docs/platform/pki/certificate-profiles); no confíes en que los valores iniciales del formulario sean adecuados para tus consumidores.
   </Step>
 
   <Step>
     ### Crea y verifica
 
-    Confirma el formulario. La CA debe aparecer en el inventario con su certificado PEM, estado, fecha de expiración y relación de certificados emitidos.
+    Confirma el formulario y abre la CA. Comprueba estado, emisor, fechas, motor y clave asociados. Descarga el certificado: debe tener `CA:TRUE` y un uso que permita firmar certificados. Verifica la autofirma para una raíz o la cadena hasta tu raíz para una intermedia. Completa una emisión de prueba para comprobar que la clave realmente puede firmar.
   </Step>
 </Steps>
 
 <Callout type="warn" title="Planifica la validez como una jerarquía">
-  Una CA no puede emitir certificados que superen su propia fecha de expiración. Deja margen suficiente para renovar o sustituir la autoridad sin interrumpir a los consumidores.
+  Planifica y verifica los vencimientos con las reglas de [Perfiles](/docs/platform/pki/certificate-profiles). La emisión no recorta automáticamente la validez al vencimiento del emisor; deja margen para sustituir la autoridad y renovar las identidades.
 </Callout>
 
 ## Utiliza una clave del KMS
@@ -90,35 +91,32 @@ Este flujo resulta útil cuando la clave se creó previamente en un HSM, se impo
 
 ## Importa una CA externa
 
-La importación conserva una autoridad creada fuera de Lamassu.
+Necesitas el certificado de CA en PEM, su cadena hasta una raíz conocida y, si vas a importarla, una clave privada exportable. Antes de cargar el material, verifica firma, fechas, `CA:TRUE`, usos de firma y correspondencia de la clave pública. El procedimiento de [verificación de claves](/docs/platform/pki/quickstarts/issue-certificate) también sirve para comparar la clave y el certificado de una CA.
 
 <Steps>
   <Step>
     ### Selecciona el motor
 
-    Elige el motor que custodiará la clave importada.
+    Comprueba el motor predeterminado de la instalación antes de importar una CA con clave. La operación de importación de CA delega la importación de la clave en ese motor; no garantiza selección de cualquier proveedor desde el formulario. Para seleccionar un motor al importar la clave por separado, utiliza el [KMS](/docs/platform/pki/key-management).
   </Step>
-
   <Step>
     ### Carga el material
 
-    Proporciona el certificado de CA y la clave privada en formato PEM. Para una CA subordinada, añade opcionalmente la cadena de validación.
+    Importa el certificado y, cuando corresponda, su clave PEM. Registra las CAs de la cadena necesarias para identificar al emisor. Tener una CA en el inventario no la instala en los almacenes de confianza externos.
   </Step>
-
   <Step>
     ### Define la emisión predeterminada
 
-    Configura la validez que recibirán los certificados finales cuando una solicitud no indique otra duración.
+    Asocia un perfil de emisión explícito si la CA va a firmar. Comprueba sus usos y fechas según [Perfiles](/docs/platform/pki/certificate-profiles).
   </Step>
-
   <Step>
     ### Verifica la importación
 
-    Lamassu comprueba que el certificado pertenece a una CA y que el material es coherente antes de registrarlo.
+    Revisa el tipo registrado, la clave y el motor asociados y la relación con el emisor. Una importación sin clave puede asociarse a una clave ya existente en KMS mediante el identificador de clave del certificado. Si no existe una clave utilizable, la CA sirve como material público pero no puede firmar.
+
+    Para una CA emisora, completa una emisión de prueba y comprueba OCSP y CRL. El alta del registro por sí sola no demuestra disponibilidad de la clave, coherencia completa de la cadena ni publicación del estado.
   </Step>
 </Steps>
-
-Si no dispones de la clave privada, importa únicamente el certificado. La autoridad podrá formar parte de cadenas de confianza y procesos de validación, pero no podrá emitir certificados desde Lamassu.
 
 ## Inspecciona una autoridad
 
@@ -146,7 +144,7 @@ Sigue [Emite tu primer certificado](/docs/platform/pki/quickstarts/issue-certifi
 ## Revoca una CA
 
 <Callout type="warn" title="La revocación afecta a toda la cadena dependiente">
-  Revocar una CA invalida la confianza en los certificados que ha emitido y puede interrumpir dispositivos y servicios. La acción es irreversible.
+  Revocar una CA impide que emita y puede interrumpir toda su rama. Solo `CertificateHold` permite reactivar la propia CA si no está expirada. Sus descendientes se intentan revocar con `CessationOfOperation`; reactivar el padre no restaura esos descendientes. Sigue las condiciones de [revocación en cascada](/docs/platform/pki/ca-hierarchy-and-rotation).
 </Callout>
 
 <Steps>
@@ -171,7 +169,7 @@ Sigue [Emite tu primer certificado](/docs/platform/pki/quickstarts/issue-certifi
   <Step>
     ### Comprueba la publicación
 
-    El estado debe cambiar a **REVOKED** y la CRL debe reflejar la nueva información. La CA deja de poder emitir certificados.
+    Comprueba **REVOKED** en la CA y revisa los descendientes uno a uno; la propagación admite fallos parciales. Verifica por separado la publicación de [OCSP y CRL](/docs/platform/pki/certificate-validation) y el rechazo por los consumidores. Un registro revocado no garantiza que una sesión existente se cierre.
   </Step>
 </Steps>
 

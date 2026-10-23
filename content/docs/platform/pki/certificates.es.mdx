@@ -1,58 +1,78 @@
 ---
 title: Certificados
 description: Consulta, descarga y revoca los certificados emitidos por Lamassu.
-sidebar:
-  group: CA
 ---
 
-El inventario de certificados ofrece una vista global de las identidades emitidas por todas las autoridades. También puedes abrir **Issued Certificates** dentro de una CA para limitar la vista a ese emisor.
+Esta guía sirve al operador PKI que necesita inspeccionar o retirar una identidad ya emitida. Necesitas acceso al inventario y, para cambiar estados, permisos sobre el certificado. Abre **Certificates** para una vista global o **Issued Certificates** dentro de una CA para limitarla a ese emisor.
 
 ## Busca un certificado
 
-Abre **Certificates** y filtra por:
+Filtra por `Common Name`, serie, estado y autoridad emisora. Usa **Quick Inspect** para una revisión rápida o **View Details** para sujeto, SAN, usos, cadena, fechas y metadatos.
 
-- `Common Name` del sujeto.
-- Número de serie.
-- Estado.
-- Autoridad emisora.
-
-Utiliza **Quick Inspect** para una comprobación rápida o **View Details** para ver el sujeto, SANs, usos, cadena, periodo de validez y metadatos completos.
+Identifica el certificado por emisor y número de serie; un nombre puede corresponder a varias renovaciones. Comprueba cuál utiliza realmente el consumidor y cuál ocupa la identidad activa del dispositivo. El [historial de identidades](/docs/platform/iot-fleets/device-management) y el inventario de certificados responden preguntas distintas.
 
 ## Descarga el certificado
 
-La acción de descarga entrega el certificado en formato PEM. Si el certificado se emitió mediante un CSR externo, la clave privada permanece en el sistema que generó ese CSR. Si se generó en el navegador, la clave solo estuvo disponible al finalizar la emisión.
+Descarga el PEM e inspecciónalo:
+
+```bash
+openssl x509 -in device.crt -noout -subject -issuer -serial -dates
+openssl x509 -in device.crt -noout -text
+```
+
+Comprueba la [política de emisión](/docs/platform/pki/certificate-profiles), cadena y usos con el [recorrido de verificación](/docs/platform/pki/quickstarts/issue-certificate). El certificado no contiene su clave privada. Para una CSR externa, esa clave permanece donde se generó; para el flujo de navegador, conserva el archivo descargado al completar la emisión. Si has perdido la clave, planifica una identidad nueva en lugar de esperar recuperarla desde el certificado.
+
+## Emite desde una CSR existente
+
+Utiliza este flujo cuando la clave de la identidad debe permanecer en el sistema que la generó. Necesitas una CA activa con clave utilizable, una CSR PEM y un perfil apropiado.
+
+1. Verifica la solicitud con `openssl req -in request.csr -noout -verify -text`. Revisa sujeto, SAN y algoritmo, y autoriza la identidad solicitada.
+2. Inicia la emisión desde la CA o el inventario y selecciona **Upload Existing CSR**.
+3. Confirma la CA y el perfil que se resolverá según [Perfiles](/docs/platform/pki/certificate-profiles); la solicitud no garantiza que todos sus campos se conserven.
+4. Descarga el certificado e inspecciona fechas, emisor, sujeto, SAN, KU y EKU. Comprueba su correspondencia con la clave privada en el sistema de origen.
+5. Instala certificado y cadena en el consumidor previsto y prueba una conexión. Emitir no registra por sí solo un dispositivo ni concede acceso en una integración.
+
+Para generar la clave en el navegador, sigue [Emite tu primer certificado](/docs/platform/pki/quickstarts/issue-certificate).
 
 ## Revoca un certificado
 
-Revoca una identidad cuando la clave se haya comprometido, el sujeto ya no esté autorizado o el certificado deba dejar de aceptarse antes de expirar.
+Revoca cuando la clave se haya comprometido, el sujeto ya no esté autorizado o la identidad deba dejar de aceptarse antes de expirar. Antes de cambiar el estado, identifica los consumidores y prepara la sustitución necesaria.
 
 <Steps>
   <Step>
     ### Abre la acción
 
-    En el inventario o la vista de detalle, selecciona **Revoke Certificate**.
+    Localiza emisor y serie correctos y selecciona **Revoke Certificate**. Los registros `EXPIRED` y los revocados por una razón definitiva no admiten posteriores cambios de estado.
   </Step>
-
   <Step>
     ### Elige una razón
 
-    Selecciona la razón que represente el incidente. Esta información se publica en OCSP y en la CRL.
+    Selecciona la razón del incidente. `CertificateHold` representa una suspensión reversible del certificado; las demás razones bloquean cambios posteriores. No uses una suspensión para tratar una clave comprometida.
   </Step>
-
   <Step>
     ### Confirma y verifica
 
-    Confirma la operación y comprueba que el estado sea **Revoked**. Si la CA regenera la CRL al revocar, verifica también que exista una versión nueva.
+    Guarda el cambio y vuelve a consultar el registro: exige **REVOKED**, razón y fecha. Verifica después una consulta [OCSP](/docs/platform/pki/ocsp) nueva y, si utilizas [CRL](/docs/platform/pki/crl), su versión publicada y presencia de la serie. Finalmente, comprueba el rechazo de una conexión nueva en el consumidor.
   </Step>
 </Steps>
 
+La revocación no borra el certificado, no elimina la clave ni garantiza cierre de sesiones existentes. El estado y su publicación son pasos distintos.
+
 <Callout type="warn" title="Solo CertificateHold es reversible">
-  Una revocación con la razón `CertificateHold` puede reactivarse. Las demás razones producen una revocación definitiva.
+  Un certificado revocado con `CertificateHold` puede reactivarse si no está en estado `EXPIRED`. Sus fechas y la confianza del consumidor siguen siendo obligatorias.
 </Callout>
+
+## Reactiva una suspensión
+
+Comprueba que la razón guardada es `CertificateHold` y que la identidad todavía cumple tu política. Solicita `ACTIVE` mediante la operación de actualización de estado que exponga tu instalación; consulta la [Referencia API](/docs/api-reference). No supongas que cambiar permisos del consumidor cambia también el estado en Lamassu.
+
+Vuelve a consultar el registro y OCSP. Con `regenerate_on_revoke` habilitado, el evento de reactivación solicita regeneración de la CRL: verifica que la nueva lista omite la serie. Una lista anterior puede seguir marcándola como revocada hasta que el cliente renueve su copia.
+
+Esto no revierte una revocación definitiva ni la cascada iniciada al revocar una CA.
 
 ## Continúa
 
 <Cards>
-  <Card title="Validar con OCSP" description="Consulta el estado de un certificado en tiempo real." href="/docs/platform/pki/ocsp" />
-  <Card title="Distribuir una CRL" description="Publica el estado para validación offline." href="/docs/platform/pki/crl" />
+  <Card title="Validar con OCSP" description="Consulta y verifica el estado firmado de un certificado." href="/docs/platform/pki/ocsp" />
+  <Card title="Distribuir una CRL" description="Publica el estado para validación local." href="/docs/platform/pki/crl" />
 </Cards>

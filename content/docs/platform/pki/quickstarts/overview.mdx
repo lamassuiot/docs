@@ -1,20 +1,41 @@
 ---
-title: Get started
-description: Get a first result with Lamassu and continue from a working base.
+title: PKI getting started
+description: Create a CA, issue a client certificate and check its chain and key.
 ---
 
-The quickstarts take you from a prepared instance to an active device identity. Each guide produces a verifiable result and links the detailed explanation when you need to go deeper.
+This path is intended for those starting to administer PKI or needing a first X.509 client identity. It ends with three files: a root CA certificate, an end-entity certificate and the client's private key.
+
+## Before you begin
+
+- A Lamassu instance accessible from your browser. To prepare one, see [Deployment](/docs/deployment/overview).
+- Permission to manage keys, authorities and issuance. See [Access control](/docs/platform/administration/access-control) if an operation is blocked.
+- An available cryptographic engine for the CA key; check the [keys and engines](/docs/platform/pki/key-management) inventory.
+- OpenSSL 3.x on the computer where you will verify the files.
+- A working directory with restricted access for the downloaded key.
 
 ## Recommended path
 
 <Cards>
-  <Card title="1. Create your first CA" description="Establish a root of trust capable of issuing certificates." href="/docs/platform/pki/quickstarts/create-certificate-authority" />
-  <Card title="2. Issue a certificate" description="Create an X.509 identity and verify its contents." href="/docs/platform/pki/quickstarts/issue-certificate" />
-  <Card title="3. Register a device" description="Add a device and assign it its first identity." href="/docs/platform/pki/quickstarts/register-device" />
+  <Card title="1. Create your first CA" description="Create an evaluation root and save its public certificate as ca.pem." href="/docs/platform/pki/quickstarts/create-certificate-authority" />
+  <Card title="2. Issue and verify a certificate" description="Issue for device-001 and check content, chain and key correspondence." href="/docs/platform/pki/quickstarts/issue-certificate" />
 </Cards>
 
-## Before you begin
+We use `Acme Evaluation Root CA` and `device-001` as example names. If you replace them, keep the same client identifier in the steps you want to connect.
 
-You need access to the Lamassu IoT console and permissions to administer keys, authorities and devices. The instance must have at least one cryptographic engine configured.
+The root in this path signs the end-entity certificate directly to simplify evaluation. Before designing an operational PKI, review the [trust model](/docs/platform/pki/concepts/trust-model) and [CA hierarchy](/docs/platform/pki/ca-hierarchy-and-rotation).
 
-If you don't have an instance yet, first choose a [deployment model](/docs/deployment/overview).
+## Expected result
+
+| File or resource | Check |
+| --- | --- |
+| Active root CA and `ca.pem` | It is a CA certificate, is currently valid and its self-signature verifies. |
+| End-entity certificate and `device.crt` | It identifies `device-001`, supports client authentication and verifies against `ca.pem`. |
+| Private key `device.key` | Its public key matches the one included in `device.crt`. |
+
+These checks validate the issued material. Acceptance by a service also requires its trust, authorization and revocation configuration.
+
+## Continue according to your goal
+
+- To operate certificates, continue with [Certificates](/docs/platform/pki/certificates) and [Validation](/docs/platform/pki/certificate-validation).
+- To manage a device identity in Lamassu, follow [Manual registration](/docs/platform/iot-fleets/quickstarts/register-device). That path includes DMS preparation.
+- For the device to request its certificate, prepare the [DMS](/docs/platform/iot-fleets/enrollment/dms) and [EST client](/docs/platform/iot-fleets/enrollment/overview).

@@ -43,7 +43,7 @@ Emitir un certificado es solo el comienzo. Durante su vida útil debes comprobar
 
 Lamassu persiste cuatro estados X.509:
 
-- **`ACTIVE`**: el certificado está habilitado y dentro de su periodo de validez.
+- **`ACTIVE`**: el registro está habilitado. Comprueba además `Not Before` y `Not After`: este estado no demuestra vigencia temporal.
 - **`EXPIRED`**: ha superado su fecha de expiración. El monitor lo detecta de forma periódica; no es un estado que deba asignarse manualmente.
 - **`REVOKED`**: fue invalidado antes de expirar, con una razón y una marca temporal.
 - **`INACTIVE`**: está deshabilitado sin representar una revocación definitiva.
@@ -54,7 +54,7 @@ La vista del dispositivo puede añadir estados operativos como ausencia de ident
 
 La **renovación** crea un certificado sucesor para una identidad que continúa siendo válida. La **revocación** comunica que el certificado actual ya no debe aceptarse. Renueva para mantener continuidad; revoca ante compromiso, retirada o un cambio que invalide la identidad.
 
-Solo una revocación con razón `CertificateHold` puede revertirse. Una revocación con cualquier otra razón es definitiva en Lamassu.
+Solo `CertificateHold` permite reactivar un certificado revocado que no esté en estado `EXPIRED`. Una revocación con otra razón bloquea posteriores cambios de estado. Los registros `EXPIRED` también rechazan cambios; el consumidor debe comprobar las fechas aunque el monitor todavía no haya actualizado el estado. [Certificados](/docs/platform/pki/certificates) explica cómo comprobar revocación y reactivación.
 
 <Callout type="info" title="La reemisión de una CA reutiliza su clave">
   La operación **Reissue CA** genera otro certificado para la misma clave y enlaza ambos números de serie mediante metadatos. No equivale a una rotación de clave. Para cambiar la clave, crea una CA sucesora y realiza una migración con periodo de solapamiento.
@@ -62,7 +62,7 @@ Solo una revocación con razón `CertificateHold` puede revertirse. Una revocaci
 
 ## Efecto de revocar una CA
 
-Revocar una CA es una operación en cascada. Lamassu revoca sus CAs hijas y los certificados que ha emitido con la razón `CessationOfOperation`. La propagación continúa por la jerarquía.
+Revocar una CA inicia una cascada que intenta revocar sus descendientes con `CessationOfOperation`. Puede terminar con fallos parciales y no se deshace al reactivar el padre. Consulta [Jerarquía y rotación](/docs/platform/pki/ca-hierarchy-and-rotation) para sus condiciones y comprobaciones.
 
 Antes de confirmar:
 
@@ -72,9 +72,7 @@ Antes de confirmar:
 4. Comprueba OCSP y CRL desde un consumidor real.
 5. Revoca la CA antigua cuando ya no exista tráfico legítimo.
 
-<Callout type="warn" title="Decommission es irreversible">
-  Dar de baja un dispositivo revoca sus certificados y le impide obtener nuevas identidades. Utiliza esta acción únicamente cuando el dispositivo se retire de forma permanente.
-</Callout>
+La baja de un dispositivo pertenece al ciclo de vida de IoT Fleets. Afecta a su identidad activa; no equivale a recorrer y revocar automáticamente todos los certificados del historial. Revisa por separado las identidades anteriores y los permisos del consumidor en [Gestión de dispositivos](/docs/platform/iot-fleets/device-management).
 
 ## Qué debes observar
 
@@ -84,4 +82,4 @@ Antes de confirmar:
 - Publicación y vigencia de OCSP y CRLs.
 - Dependencias que todavía presentan un certificado sustituido.
 
-El historial del dispositivo relaciona sus identidades anteriores y actuales. Para cambios administrativos y errores de mutación, consulta [Registros de auditoría](/docs/platform/pki/audit-logs).
+El historial del dispositivo relaciona sus identidades anteriores y actuales. Para cambios administrativos y errores de mutación, consulta [Registros de auditoría](/docs/platform/administration/audit-logs).

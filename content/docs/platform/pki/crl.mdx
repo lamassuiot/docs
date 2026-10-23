@@ -2,77 +2,101 @@
 title: Revocation lists (CRL)
 description: Generate and distribute signed lists to validate certificates offline.
 sidebar:
-  group: VA
   label: CRL
 ---
 
-# CRL service
+<span id="crl-service" />
 
-A CRL (*Certificate Revocation List*) is a signed list containing the serial numbers of certificates revoked before their expiration date. Unlike OCSP, it does not require a real-time query: the relying party downloads the list periodically and consults it locally.
-
-Lamassu generates and maintains one CRL per CA it manages. Each CRL is signed with the private key of the issuing CA itself and is stored in the object storage configured on the platform.
+A CRL is an issuer-signed list of revoked certificates. This guide is for an operator publishing lists and an integrator using them locally. You need the issuing CA certificate, its SKI and access to the published endpoint. The client must maintain a current copy: offline operation still requires refreshing evidence.
 
 ## VA role and per-CA configuration
 
-The publication of each CA's CRL is controlled by a *VA role*. This object defines how it is generated, when it is regenerated and which key signs it.
+The VA role stores configuration and metadata for the latest list published for a CA’s SKI. Generation requires a usable issuer key; do not assume an imported CA without a key has an available CRL.
 
-The main parameters are:
+| `crl_options` field | Purpose | Backend initial value |
+|---|---|---|
+| `validity` | Time from `thisUpdate` to `nextUpdate`. | 7 days. |
+| `refresh_interval` | Time since publication that triggers scheduled renewal. | 6 days and 23 hours. |
+| `regenerate_on_revoke` | Request regeneration on revocation or reactivation from `CertificateHold` events. | `true`. |
+| `subject_key_id_signer` | Configuration field initialized with the CA’s SKI. | CA SKI. |
 
-- **`validity`** defines the validity period reflected in `nextUpdate`. Its default value is 7 days.
-- **`refresh_interval`** sets the minimum interval between scheduled regenerations. By default it is approximately 6 days and 23 hours.
-- **`regenerate_on_revoke`** orders publishing a new version immediately after a revocation. It is enabled by default.
+The generator uses the key of the CA identified by the requested SKI. Do not interpret `subject_key_id_signer` as verified support for a different delegated CA: changing that field does not change the signer in this flow.
 
-The `subject_key_id_signer` field identifies the CA whose private key signs the CRL. By default, each CA signs its own CRL.
-
-Each CRL carries an incremental version number. Lamassu stores all versions under the path `pki/va/crl/{subject_key_id}/{version}.crl` in object storage.
+`latest_crl` contains version, validity start and end. Versions are kept as PEM in object storage at `pki/va/crl/{subject_key_id}/{version}.crl`; the public endpoint returns DER.
 
 ## Periodic and automatic regeneration
 
-A background process monitors active VA roles. When the remaining validity of the current CRL falls below the configured watch period (*blind period*), the system requests the generation of a new CRL. This prevents the published CRL from expiring without a valid version available.
+The scheduled job requests another list when `refresh_interval` is reached or when the list approaches expiration within the configured watch period. This depends on working jobs, storage and signing; it does not guarantee renewal during a service failure.
 
-Additionally, when `regenerate_on_revoke` is enabled, which is the default behavior, any certificate revocation immediately triggers the generation of a new CRL for the affected CA. This minimizes the time between revocation and its publication.
+With `regenerate_on_revoke`, the event handler requests a new CRL upon revocation or reactivation from `CertificateHold` to `ACTIVE`. This happens after the status change and has its own failure paths. Confirming revocation does not establish that the new CRL is already published or that all clients have downloaded it.
+
+Compare CRL numbers and timestamps before and after a change. Monitor expired lists and generation failures; clients must apply policy when current evidence is unavailable.
 
 ## CRL contents
 
-Each entry of the CRL includes the serial number of the revoked certificate, the revocation date and the RFC 5280 reason code.
+Each entry contains serial number, revocation time and reason. The generator queries certificates in `REVOKED` state for the selected CA. A reactivated certificate disappears when the list is recalculated; an earlier downloaded copy retains its contents.
 
-The CRL also includes the *Issuing Distribution Point* (IDP, OID 2.5.29.28) extension, marked as critical, which indicates the public URL from which it can be downloaded. That URL points to the `/crl/{subject_key_id}` endpoint of each configured VA domain.
+The list contains a critical *Issuing Distribution Point* (OID `2.5.29.28`) with configured distribution URLs. Check that your client interprets this extension and that it matches the list’s scope. If rejected, investigate format and scope; ignoring a critical extension is not successful validation.
 
 ## Public download endpoint
 
-The latest CRL of a CA can be obtained directly without authentication:
+The VA service exposes `GET /crl/{subject_key_id}` without management authorization. Use the **issuing CA’s** SKI, not the end-entity certificate’s SKI or serial. First inspect the certificate’s CDP:
 
 ```bash
-curl https://<LAMASSU_HOST>/crl/<CA_SUBJECT_KEY_ID> -o ca.crl
+openssl x509 -in device.crt -noout -text
 ```
 
-The response has `Content-Type: application/pkix-crl` and contains the CRL in DER format.
+Replace the following URL with the CDP URL and review exposure in [Deployment](/docs/deployment/self-hosted/networking):
+
+```bash
+CRL_URL='http://pki.example.com/crl/REPLACE_WITH_ISSUER_SKI'
+
+curl --fail --show-error --silent --max-time 15 \
+  "$CRL_URL" -o ca.crl.der
+
+openssl crl -inform DER -in ca.crl.der \
+  -outform PEM -out ca.crl.pem
+
+openssl crl -in ca.crl.pem -noout \
+  -issuer -lastupdate -nextupdate -crlnumber
+
+openssl crl -in ca.crl.pem -noout -text
+openssl crl -in ca.crl.pem -noout -verify -CAfile issuer.pem
+```
+
+You need OpenSSL 3.x and `issuer.pem` containing the direct issuer’s certificate. Require a valid signature, current timestamps and the expected issuer. For a root that issues directly:
+
+```bash
+openssl verify -CAfile roots.pem -CRLfile ca.crl.pem \
+  -crl_check -purpose sslclient device.crt
+```
+
+`roots.pem` contains deliberately trusted roots. For intermediates, add `-untrusted intermediates.pem` before the `device.crt` argument. `-crl_check` checks the end-entity certificate’s revocation against the local list; it does not download other lists or establish the status of the whole chain. A complete chain check needs the corresponding CRLs and a policy requiring them.
+
+The test should accept an allowed certificate absent from the list and reject it with `certificate revoked` after publishing and using the list containing its serial.
 
 ## VA role management API
 
-The VA role of a CA can be queried and updated through the API:
+The following paths are relative to the VA service; confirm the public prefix in the Gateway. They are not the URLs of the public OCSP and CRL endpoints.
 
-| Method | Path | Description |
+| Method | Relative path | Operation |
 |---|---|---|
-| `GET` | `/v1/roles/{ca-ski}` | Returns the VA role configuration and the metadata of the last issued CRL. |
-| `PUT` | `/v1/roles/{ca-ski}` | Updates the VA role configuration parameters (`validity`, `refresh_interval`, `regenerate_on_revoke`). |
+| `GET` | `/v1/roles/{ca-ski}` | Read `crl_options` and `latest_crl`. |
+| `PUT` | `/v1/roles/{ca-ski}` | Replace CRL configuration. |
 
-Example of querying the VA role:
+You need authentication and role read or update permissions. Consult your installation’s [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract: the backend replaces `crl_options`; it does not merge omitted fields.
 
-```bash
-curl https://<LAMASSU_HOST>/v1/roles/<CA_SUBJECT_KEY_ID> \
-  -H "Authorization: Bearer <TOKEN>"
-```
-
-The response includes the `latest_crl` field with the version, the start of validity and the expiration date of the currently published CRL.
+After a change, check saved configuration and the next list actually published. Updating the role alone does not establish regeneration or client acceptance.
 
 ## From the interface
 
-From a CA's detail panel you can preview the content of the active CRL and download it directly for offline use or for importing into applications that perform local validation.
+The CA view lets you inspect and download the available list. Compare version, issuer and timestamps with the copy downloaded from the public endpoint. Diagnose differences using [PKI troubleshooting](/docs/platform/pki/troubleshooting).
 
 ## References
 
-- RFC 5280 - *Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile*
+- [RFC 5280: X.509 and CRL profile](https://www.rfc-editor.org/rfc/rfc5280).
+- [OpenSSL: openssl-crl](https://docs.openssl.org/3.6/man1/openssl-crl/).
+- [OpenSSL: openssl-verify](https://docs.openssl.org/3.6/man1/openssl-verify/).
 
 <Cards>
   <Card title="OCSP service" href="/docs/platform/pki/ocsp" />

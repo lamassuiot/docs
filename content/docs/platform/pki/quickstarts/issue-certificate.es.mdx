@@ -1,60 +1,124 @@
 ---
-title: Emite tu primer certificado
-description: Emite una identidad X.509 desde la consola y verifica el resultado.
+title: Emite y verifica un certificado
+description: Emite un certificado de cliente y comprueba contenido, cadena y correspondencia de clave.
 ---
 
-En este quickstart Lamassu generará la clave y el CSR en el navegador, y la CA emitirá el certificado. Al terminar descargarás el certificado y su clave privada.
+Emitirás un certificado final para `device-001` mediante el flujo de generación de clave y CSR en el navegador. Al terminar conservarás `device.crt`, `device.key` y el certificado público de la raíz emisora, `ca.pem`.
 
 ## Antes de empezar
 
-- Una CA activa con permiso para emitir certificados.
-- Un nombre para la identidad, por ejemplo `device-001.example.internal`.
-- Un lugar seguro en el que custodiar la clave privada descargada.
+- Una CA raíz activa con clave de firma disponible y permisos para emitir. Si todavía no existe, sigue [Crea tu primera CA](/docs/platform/pki/quickstarts/create-certificate-authority).
+- Su certificado público en `ca.pem`; este ejemplo utiliza la raíz creada en el recorrido anterior.
+- OpenSSL 3.x y un directorio de trabajo con acceso restringido.
+- Un identificador para el cliente: aquí usaremos `device-001`.
 
-<Callout type="warn" title="La clave privada se entrega una sola vez">
-  En este flujo la clave se genera en el navegador y Lamassu no la almacena. Descárgala y protégela antes de cerrar el resultado de la operación.
+<Callout type="warn" title="Conserva la clave antes de cerrar el resultado">
+  En este flujo la clave del cliente se genera en el navegador y debes descargarla al finalizar. Si la pierdes, tendrás que generar una clave y emitir otro certificado. El inventario de certificados permite descargar el certificado público, pero no recuperar esta clave.
 </Callout>
 
 <Steps>
   <Step>
     ### Inicia la emisión
 
-    Abre la CA creada en el quickstart anterior, entra en **Issued Certificates** y selecciona **Issue New**.
+    Abre la CA del recorrido anterior, entra en **Issued Certificates** y selecciona **Issue New**.
   </Step>
 
   <Step>
     ### Elige el método
 
-    Selecciona **Generate Key & CSR in Browser**. Usa **Upload Existing CSR** cuando la clave privada deba generarse y permanecer en el sistema de destino.
+    Selecciona **Generate Key & CSR in Browser** para seguir este ejemplo.
+
+    Si la clave debe generarse y permanecer en el sistema de destino, utiliza **Upload Existing CSR**, descrito en la [guía de autoridades](/docs/platform/pki/certificate-authorities#emite-certificados).
   </Step>
 
   <Step>
     ### Identifica el certificado
 
-    Introduce el `Common Name` y, si corresponde, la organización, unidad organizativa y ubicación. Añade SANs para cada nombre DNS, dirección IP, correo o URI con el que se vaya a validar la identidad.
+    Introduce `device-001` como `Common Name`. Añade los datos de sujeto requeridos por tu política y SANs si el consumidor los utiliza para identificar al cliente.
+
+    Si vas a continuar con el registro manual, el `Device ID` será exactamente `device-001`.
   </Step>
 
   <Step>
     ### Configura clave y usos
 
-    Elige RSA o ECDSA, define la validez y selecciona los usos de clave. Para una identidad de dispositivo que usa mTLS, habilita **Digital Signature** y **Client Authentication**.
+    Elige un algoritmo y tamaño admitidos por el perfil; por ejemplo, ECDSA P-256 si está permitido. Para este certificado de cliente, selecciona **Digital Signature** y **Client Authentication** y emite como certificado final.
 
-    La validez no puede superar la fecha de expiración de la CA emisora.
+    Solicita, por ejemplo, 30 días de validez, siempre dentro de la vigencia de la CA. Revisa el [perfil de emisión](/docs/platform/pki/certificate-profiles) si el contenido resultante difiere de lo solicitado.
   </Step>
 
   <Step>
     ### Emite y descarga
 
-    Confirma la emisión y descarga inmediatamente el certificado y la clave privada en formato PEM.
+    Confirma la emisión. Guarda el certificado PEM como `device.crt` y la clave privada como `device.key` en el directorio preparado.
   </Step>
 
   <Step>
     ### Verifica el resultado
 
-    El certificado debe aparecer en **Issued Certificates** con estado activo. Comprueba su sujeto, SANs, emisor, usos y periodo de validez.
+    Comprueba en **Issued Certificates** que el certificado aparece activo. Anota su número de serie y verifica el material descargado con las comprobaciones siguientes.
   </Step>
 </Steps>
 
+## Inspecciona contenido y fechas
+
+```bash
+openssl x509 -in device.crt -noout -subject -issuer -serial -dates
+openssl x509 -in device.crt -noout -text
+```
+
+Comprueba `CN=device-001`, el emisor esperado, fechas vigentes, **Digital Signature** y el uso extendido **TLS Web Client Authentication**. Debe ser un certificado final: no debe declarar `CA:TRUE` ni habilitar **Certificate Sign**. Si **Basic Constraints** está presente, debe indicar `CA:FALSE`. Si solicitaste SANs, revisa que los identificadores esperados aparezcan en el certificado.
+
+## Verifica la cadena
+
+```bash
+openssl verify -CAfile ca.pem -purpose sslclient device.crt
+```
+
+El resultado esperado es `device.crt: OK`. Esta comprobación utiliza tu raíz explícita y evalúa la cadena, las fechas y la compatibilidad con el propósito de cliente TLS. La presencia de los usos y nombres esperados se comprueba también mediante la inspección anterior.
+
+Si utilizas una CA intermedia, la raíz confiable debe estar en `ca.pem` y debes aportar las intermedias mediante `-untrusted intermediates.pem`. Esta variante se desarrolla en el [modelo de confianza](/docs/platform/pki/concepts/trust-model).
+
+El comando no consulta OCSP ni CRL. Para comprobar revocación, continúa con [Validación de certificados](/docs/platform/pki/certificate-validation). Consulta la referencia de [openssl-verify](https://docs.openssl.org/3.6/man1/openssl-verify/) para sus opciones.
+
+## Comprueba que la clave corresponde
+
+En Bash, compara los dos resúmenes de clave pública:
+
+```bash
+(
+  set -e -o pipefail
+  openssl x509 -in device.crt -pubkey -noout \
+    | openssl pkey -pubin -outform DER \
+    | openssl dgst -sha256
+
+  openssl pkey -in device.key -pubout -outform DER \
+    | openssl dgst -sha256
+)
+```
+
+Ambos comandos deben terminar correctamente y mostrar el mismo resumen SHA-256. Si difieren, la clave privada no corresponde al certificado seleccionado. Vuelve a localizar la pareja correcta antes de instalarla.
+
+Las opciones utilizadas se recogen en [openssl-x509](https://docs.openssl.org/3.6/man1/openssl-x509/) y [openssl-pkey](https://docs.openssl.org/3.6/man1/openssl-pkey/).
+
+## Si el resultado falla
+
+| Resultado | Qué revisar |
+| --- | --- |
+| La CA rechaza la emisión | Permisos, estado y clave de la CA, algoritmo y perfil. |
+| Sujeto o usos diferentes | Perfil aplicado y valores solicitados. |
+| No se encuentra el emisor | CA descargada y cadena intermedia necesaria. |
+| Falla la vigencia | Fechas del certificado y de la CA, y reloj del equipo. |
+| Los resúmenes de clave difieren | Archivos de certificado y clave de la misma emisión. |
+
+Consulta [Diagnóstico PKI](/docs/platform/pki/troubleshooting) si necesitas acotar un fallo de emisión.
+
 ## Siguiente paso
 
-[Registra tu primer dispositivo](/docs/platform/pki/quickstarts/register-device) para asociar la identidad a una entidad gestionada, o consulta la [gestión de certificados](/docs/platform/pki/certificates).
+Has completado el recorrido PKI cuando el certificado verifica y su clave corresponde. Elige cómo utilizarlo:
+
+- [Gestionar certificados](/docs/platform/pki/certificates) para inspección, estado y revocación.
+- [Registrar un dispositivo manualmente](/docs/platform/iot-fleets/quickstarts/register-device) para asociar esta identidad al inventario de Lamassu.
+- [Preparar EST](/docs/platform/iot-fleets/enrollment/dms) para que el dispositivo solicite sus siguientes identidades.
+
+La aceptación en un consumidor requiere configurar su confianza, su comprobación de revocación y los permisos concedidos a la identidad.

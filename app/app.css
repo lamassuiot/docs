@@ -237,6 +237,22 @@ html[data-show-diff] div.lm-diff-block.lm-diff-del {
   opacity: 0.8;
 }
 
+/* The change the previous/next buttons just jumped to. */
+html[data-show-diff] .lm-diff-focus {
+  animation: lm-diff-focus 1.4s ease-out;
+}
+
+@keyframes lm-diff-focus {
+  from {
+    outline: 2px solid var(--color-fd-primary);
+    outline-offset: 3px;
+  }
+  to {
+    outline: 2px solid transparent;
+    outline-offset: 3px;
+  }
+}
+
 /* Code: per-line statuses, drawn like Fumadocs' own `// [!code ++]` lines. */
 html[data-show-diff] .lm-diff-line.lm-diff-ins {
   background: var(--lm-diff-ins-bg);

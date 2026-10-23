@@ -21,13 +21,13 @@ The DMS acts as the enrollment point. It can authenticate an EST request with a 
 
 ### Who accepts the result
 
-The consuming service or device keeps its own trust store. Lamassu can distribute the system CA, the enrollment CA and other managed CAs through `/cacerts`, but the consumer decides which ones it installs and how it applies validation.
+The consumer keeps its own trust store. EST `/cacerts` can distribute the service TLS certificate, the enrollment CA and selected managed CAs. Initial trust for authenticating that service must come from an already trusted channel. Download and inspect the contents: do not assume they form a complete chain or install every entry as a root.
 
 ## Identity flow
 
 1. The device proves it can enroll according to the DMS policy.
 2. The DMS validates the request and forwards the CSR to the enrollment CA.
-3. The CA applies the profile and signs without ever receiving the device's private key.
+3. In the device-generated CSR flow, the CA applies the profile and signs without receiving the device’s private key.
 4. The device installs the certificate and the chain it needs.
 5. The system that trusts the device validates the chain, dates, uses and revocation status.
 
@@ -41,7 +41,7 @@ A DMS relates three sets that are worth designing separately:
 
 - **Enrollment CA:** signs the new identities.
 - **Validation CAs:** authenticate the client certificates used for enrollment or migration. During re-enrollment, Lamassu tries the enrollment CA first and then the additional validation CAs.
-- **Distributed CAs:** form the content the device obtains through EST `/cacerts`. You can include the system CA, the enrollment CA and a list of managed CAs.
+- **Distributed CAs:** form the content the device obtains through EST `/cacerts`. You can include the service TLS certificate, the enrollment CA and an explicit list of managed CAs. Including the issuer does not automatically add all its ancestors.
 
 This separation makes it possible to migrate a fleet: you temporarily accept certificates from the old hierarchy, issue with the new one and distribute both chains during the overlap.
 
@@ -53,6 +53,8 @@ A valid chain does not by itself guarantee that a certificate should be accepted
 - that `Key Usage` and `Extended Key Usage` allow the operation;
 - that names, SANs and subject match the expected identity;
 - that the certificate does not appear revoked in [OCSP](/docs/platform/pki/ocsp) or a [CRL](/docs/platform/pki/crl).
+
+An OCSP `Good` status does not replace chain, date, usage and identity checks either; [Validation](/docs/platform/pki/certificate-validation) brings those criteria together.
 
 During the mTLS authentication of a DMS, Lamassu attempts to check revocation. If the certificate does not contain enough information to perform that check, the backend logs a warning and continues treating it as not revoked. Design your profiles and distribution points to avoid that situation in production.
 

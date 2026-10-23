@@ -2,11 +2,12 @@
 title: Jerarquía y rotación de CAs
 description: Diseña autoridades raíz e intermedias y sustituye certificados o claves sin romper la confianza.
 sidebar:
-  group: CA
   label: Jerarquía y rotación
 ---
 
 La jerarquía determina el alcance de cualquier error o compromiso. Una raíz firma CAs intermedias; las intermedias emiten las identidades que usan dispositivos y servicios. Esta separación permite aislar entornos y rotar una rama sin reemplazar toda la confianza.
+
+Este procedimiento se dirige al operador PKI que sustituye una autoridad en uso. Necesitas acceso a las CAs, claves y perfiles, un inventario de dependencias y coordinación con quienes gestionan los almacenes de confianza y dispositivos. Antes de cambiar la emisión, prepara una cohorte de prueba y decide el criterio para cerrar el solapamiento.
 
 ## Diseña la jerarquía
 
@@ -58,7 +59,7 @@ Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiraci�
   <Step>
     ### Distribuye la nueva confianza
 
-    Añade la nueva raíz o cadena a los consumidores antes de emitir con ella. En un DMS, utiliza las CAs gestionadas de `/cacerts` para mantener temporalmente las cadenas antigua y nueva.
+    Añade la nueva raíz o cadena a los consumidores antes de emitir con ella. Si distribuyes mediante EST `/cacerts`, incluye explícitamente las CAs gestionadas necesarias y comprueba el contenido; no presupongas que incluir la CA emisora añade todas sus intermedias. Instala la nueva confianza en una cohorte y verifica que también sigue aceptando la identidad anterior.
   </Step>
 
   <Step>
@@ -82,9 +83,13 @@ Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiraci�
 
 ## Revocación en cascada
 
-Al revocar una CA, Lamassu actualiza también sus CAs hijas y certificados emitidos a `REVOKED` con razón `CessationOfOperation`. Las revocaciones de las hijas propagan el efecto a sus propias ramas.
+Lamassu guarda la revocación de la CA y después intenta revocar sus CAs hijas y certificados emitidos con `CessationOfOperation`. La propagación continúa recursivamente por las hijas. No es una transacción sobre toda la jerarquía: puede haber recursos ya modificados y otros cuya actualización haya fallado.
 
-Esto protege la coherencia de la jerarquía, pero convierte la revocación en una acción de gran impacto. No la utilices como mecanismo ordinario para dejar de emitir: primero completa la migración y elimina la CA de los flujos operativos.
+Los recursos en estado `EXPIRED` y los ya revocados por una razón definitiva no admiten otra transición de estado. Los errores por descendiente se registran; revisa el inventario y los registros aunque la operación sobre el padre haya terminado.
+
+`CertificateHold` permite reactivar el padre mientras no esté expirado, pero no restaura las hijas ni los certificados revocados definitivamente durante la cascada. Por eso suspender una CA tampoco sirve como pausa reversible de toda la rama.
+
+Antes de cerrar el cambio, contrasta el listado de dependencias inicial con los estados finales y verifica la publicación de revocación en cada emisor. No utilices la revocación como mecanismo ordinario para dejar de emitir: completa la migración y retira la CA de los flujos operativos.
 
 ## Comprobaciones después del cambio
 

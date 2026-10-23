@@ -1,58 +1,78 @@
 ---
 title: Certificates
 description: Inspect, download and revoke the certificates issued by Lamassu.
-sidebar:
-  group: CA
 ---
 
-The certificate inventory offers a global view of the identities issued by all authorities. You can also open **Issued Certificates** inside a CA to limit the view to that issuer.
+This guide is for a PKI operator inspecting or retiring an issued identity. You need inventory access and, to change states, permissions on the certificate. Open **Certificates** for a global view or **Issued Certificates** within a CA to restrict it to that issuer.
 
 ## Find a certificate
 
-Open **Certificates** and filter by:
+Filter by `Common Name`, serial, status and issuer. Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata.
 
-- Subject's `Common Name`.
-- Serial number.
-- Status.
-- Issuing authority.
-
-Use **Quick Inspect** for a quick check or **View Details** to see the subject, SANs, usages, chain, validity period and full metadata.
+Identify a certificate by issuer and serial; a name can correspond to several renewals. Check which certificate the consumer actually uses and which occupies the device’s active identity. [Identity history](/docs/platform/iot-fleets/device-management) and the certificate inventory answer different questions.
 
 ## Download the certificate
 
-The download action delivers the certificate in PEM format. If the certificate was issued from an external CSR, the private key stays on the system that generated that CSR. If it was generated in the browser, the key was only available when the issuance finished.
+Download the PEM and inspect it:
+
+```bash
+openssl x509 -in device.crt -noout -subject -issuer -serial -dates
+openssl x509 -in device.crt -noout -text
+```
+
+Check [issuance policy](/docs/platform/pki/certificate-profiles), chain and usages with the [verification walkthrough](/docs/platform/pki/quickstarts/issue-certificate). A certificate does not contain its private key. For an external CSR, the key remains where it was generated; for the browser flow, retain the file downloaded upon issuance. If the key is lost, plan a new identity rather than expecting recovery from the certificate.
+
+## Issue from an existing CSR
+
+Use this flow when the identity’s key must remain on the system that generated it. You need an active CA with a usable key, a PEM CSR and a suitable profile.
+
+1. Verify the request with `openssl req -in request.csr -noout -verify -text`. Review subject, SAN and algorithm, and authorize the requested identity.
+2. Start issuance from the CA or inventory and select **Upload Existing CSR**.
+3. Confirm the CA and profile resolved according to [Profiles](/docs/platform/pki/certificate-profiles); the request does not guarantee that every field is retained.
+4. Download the certificate and inspect dates, issuer, subject, SAN, KU and EKU. Check correspondence with the private key on the originating system.
+5. Install certificate and chain in the intended consumer and test a connection. Issuance alone does not register a device or grant access in an integration.
+
+For browser key generation, follow [Issue your first certificate](/docs/platform/pki/quickstarts/issue-certificate).
 
 ## Revoke a certificate
 
-Revoke an identity when the key has been compromised, the subject is no longer authorized or the certificate must stop being accepted before it expires.
+Revoke when the key is compromised, the subject is no longer authorized or the identity must stop being accepted before expiration. Before changing status, identify consumers and prepare any required replacement.
 
 <Steps>
   <Step>
     ### Open the action
 
-    In the inventory or detail view, select **Revoke Certificate**.
+    Locate the correct issuer and serial and select **Revoke Certificate**. `EXPIRED` records and records revoked for a final reason reject subsequent status changes.
   </Step>
-
   <Step>
     ### Choose a reason
 
-    Select the reason that represents the incident. This information is published in OCSP and in the CRL.
+    Select the incident reason. `CertificateHold` represents a reversible certificate suspension; other reasons block later changes. Do not use a suspension to address a compromised key.
   </Step>
-
   <Step>
     ### Confirm and verify
 
-    Confirm the operation and check that the status is **Revoked**. If the CA regenerates the CRL upon revocation, also verify that a new version exists.
+    Save the change and read the record again: require **REVOKED**, reason and timestamp. Then verify a fresh [OCSP](/docs/platform/pki/ocsp) query and, if using [CRL](/docs/platform/pki/crl), its published version and the serial’s presence. Finally check rejection of a new connection in the consumer.
   </Step>
 </Steps>
 
+Revocation does not erase the certificate, delete the key or guarantee closure of existing sessions. Status and publication are separate steps.
+
 <Callout type="warn" title="Only CertificateHold is reversible">
-  A revocation with the reason `CertificateHold` can be reactivated. All other reasons produce a final revocation.
+  A certificate revoked with `CertificateHold` can be reactivated if it is not in `EXPIRED` state. Its dates and consumer trust remain mandatory.
 </Callout>
+
+## Reactivate a hold
+
+Check that the saved reason is `CertificateHold` and the identity still satisfies policy. Request `ACTIVE` through the status update operation exposed by your installation; consult the [API reference](/docs/api-reference). Do not assume changing consumer permissions also changes status in Lamassu.
+
+Read the record and query OCSP again. With `regenerate_on_revoke` enabled, the reactivation event requests CRL regeneration: check that the new list omits the serial. An earlier list can still mark it revoked until the client refreshes its copy.
+
+This does not undo permanent revocation or a cascade started by revoking a CA.
 
 ## Continue
 
 <Cards>
-  <Card title="Validate with OCSP" description="Query the status of a certificate in real time." href="/docs/platform/pki/ocsp" />
-  <Card title="Distribute a CRL" description="Publish the status for offline validation." href="/docs/platform/pki/crl" />
+  <Card title="Validate with OCSP" description="Query and verify a certificate’s signed status." href="/docs/platform/pki/ocsp" />
+  <Card title="Distribute a CRL" description="Publish status for local validation." href="/docs/platform/pki/crl" />
 </Cards>

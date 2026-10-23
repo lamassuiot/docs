@@ -21,13 +21,13 @@ El DMS actúa como punto de enrolamiento. Puede autenticar una solicitud EST con
 
 ### Quién acepta el resultado
 
-El servicio o dispositivo consumidor mantiene su propio almacén de confianza. Lamassu puede distribuir la CA del sistema, la CA de enrolamiento y otras CAs gestionadas mediante `/cacerts`, pero el consumidor decide cuáles instala y cómo aplica la validación.
+El consumidor mantiene su propio almacén de confianza. EST `/cacerts` puede distribuir el certificado TLS del servicio, la CA de enrolamiento y CAs gestionadas seleccionadas. La confianza inicial para autenticar ese servicio debe proceder de un canal ya confiable. Descarga e inspecciona el contenido: no asumas que es una cadena completa ni instales todas las entradas como raíces.
 
 ## Flujo de una identidad
 
 1. El dispositivo demuestra que puede enrolarse según la política del DMS.
 2. El DMS valida la solicitud y remite la CSR a la CA de enrolamiento.
-3. La CA aplica el perfil y firma sin recibir la clave privada del dispositivo.
+3. En el flujo con CSR generado en el dispositivo, la CA aplica el perfil y firma sin recibir su clave privada.
 4. El dispositivo instala el certificado y la cadena que necesita.
 5. El sistema que confía en el dispositivo valida cadena, fechas, usos y estado de revocación.
 
@@ -41,7 +41,7 @@ Un DMS relaciona tres conjuntos que conviene diseñar por separado:
 
 - **CA de enrolamiento:** firma las nuevas identidades.
 - **CAs de validación:** autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, Lamassu prueba primero la CA de enrolamiento y después las CAs de validación adicionales.
-- **CAs distribuidas:** forman el contenido que el dispositivo obtiene mediante EST `/cacerts`. Puedes incluir la CA del sistema, la CA de enrolamiento y una lista de CAs gestionadas.
+- **CAs distribuidas:** forman el contenido que el dispositivo obtiene mediante EST `/cacerts`. Puedes incluir el certificado TLS del servicio, la CA de enrolamiento y una lista explícita de CAs gestionadas. Incluir la CA emisora no añade automáticamente todos sus ascendientes.
 
 Esta separación permite migrar una flota: aceptas temporalmente certificados de la jerarquía anterior, emites con la nueva y distribuyes ambas cadenas durante el solapamiento.
 
@@ -53,6 +53,8 @@ Una cadena válida no garantiza por sí sola que el certificado deba aceptarse. 
 - que `Key Usage` y `Extended Key Usage` permiten la operación;
 - que nombres, SANs y sujeto coinciden con la identidad esperada;
 - que el certificado no aparece revocado mediante [OCSP](/docs/platform/pki/ocsp) o una [CRL](/docs/platform/pki/crl).
+
+El estado `Good` de OCSP tampoco sustituye la comprobación de cadena, fechas, uso e identidad; [Validación](/docs/platform/pki/certificate-validation) reúne esos criterios.
 
 Durante la autenticación mTLS de un DMS, Lamassu intenta comprobar la revocación. Si el certificado no contiene información suficiente para efectuar esa comprobación, el backend registra una advertencia y continúa tratándolo como no revocado. Diseña los perfiles y puntos de distribución para evitar esa situación en producción.
 

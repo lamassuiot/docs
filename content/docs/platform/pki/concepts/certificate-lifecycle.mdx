@@ -43,7 +43,7 @@ Issuing a certificate is only the beginning. During its useful life you must che
 
 Lamassu persists four X.509 states:
 
-- **`ACTIVE`**: the certificate is enabled and within its validity period.
+- **`ACTIVE`**: the record is enabled. Also check `Not Before` and `Not After`: this state does not establish time validity.
 - **`EXPIRED`**: it has passed its expiration date. The monitor detects this periodically; it is not a state that should be assigned manually.
 - **`REVOKED`**: it was invalidated before expiring, with a reason and a timestamp.
 - **`INACTIVE`**: it is disabled without representing a definitive revocation.
@@ -54,7 +54,7 @@ The device view may add operational states such as missing identity, pending ren
 
 **Renewal** creates a successor certificate for an identity that remains valid. **Revocation** communicates that the current certificate must no longer be accepted. Renew to maintain continuity; revoke in response to compromise, retirement or a change that invalidates the identity.
 
-Only a revocation with the reason `CertificateHold` can be undone. A revocation with any other reason is final in Lamassu.
+Only `CertificateHold` allows reactivating a revoked certificate that is not in `EXPIRED` state. Revocation for another reason blocks subsequent status changes. `EXPIRED` records also reject changes; the consumer must check dates even before the monitor updates the state. [Certificates](/docs/platform/pki/certificates) explains how to verify revocation and reactivation.
 
 <Callout type="info" title="Reissuing a CA reuses its key">
   The **Reissue CA** operation generates another certificate for the same key and links both serial numbers through metadata. It is not a key rotation. To change the key, create a successor CA and perform a migration with an overlapping period.
@@ -62,7 +62,7 @@ Only a revocation with the reason `CertificateHold` can be undone. A revocation 
 
 ## Effect of revoking a CA
 
-Revoking a CA is a cascading operation. Lamassu revokes its child CAs and the certificates it issued, with the reason `CessationOfOperation`. The propagation continues down the hierarchy.
+Revoking a CA starts a cascade that attempts to revoke descendants with `CessationOfOperation`. It may end with partial failures and is not undone by reactivating the parent. Read [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for conditions and checks.
 
 Before confirming:
 
@@ -72,9 +72,7 @@ Before confirming:
 4. Check OCSP and CRL from a real consumer.
 5. Revoke the old CA once no legitimate traffic remains.
 
-<Callout type="warn" title="Decommission is irreversible">
-  Decommissioning a device revokes its certificates and prevents it from obtaining new identities. Use this action only when the device is being retired permanently.
-</Callout>
+Device retirement belongs to the IoT Fleets lifecycle. It affects the active identity; it does not automatically traverse and revoke every historical certificate. Review previous identities and consumer permissions separately in [Device management](/docs/platform/iot-fleets/device-management).
 
 ## What you should watch
 
@@ -84,4 +82,4 @@ Before confirming:
 - OCSP and CRL publication and validity.
 - Dependencies still presenting a replaced certificate.
 
-The device history relates its previous and current identities. For administrative changes and mutation errors, see [Audit logs](/docs/platform/pki/audit-logs).
+The device history relates its previous and current identities. For administrative changes and mutation errors, see [Audit logs](/docs/platform/administration/audit-logs).

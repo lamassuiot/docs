@@ -1,4 +1,4 @@
-# Access control (/docs/pr-preview/pr-28/platform/pki/access-control)
+# Access control (/docs/pr-preview/pr-28/platform/administration/access-control)
 
 
 
@@ -421,7 +421,7 @@ Operational checklist [#operational-checklist]
 * Search for wildcards in policies before upgrading Lamassu.
 * Review `skip_authz` routes and `default_action` settings in HTTP schemas when integrating or upgrading a service.
 * Always test one allowed and one denied operation for each role.
-* Correlate changes to principals, policies and grants with the [audit logs](/docs/platform/pki/audit-logs).
+* Correlate changes to principals, policies and grants with the [audit logs](/docs/platform/administration/audit-logs).
 
 Diagnostics [#diagnostics]
 
@@ -458,4 +458,4 @@ Everything fails when authz is unavailable [#everything-fails-when-authz-is-unav
 
 This is the expected behavior with `failOpen: false`. Restore the service, its PostgreSQL connection and its JWKS connectivity. Do not temporarily switch to `failOpen: true` without accepting that protected routes could become accessible without an authorization decision.
 
-Continue with [Audit logs](/docs/platform/pki/audit-logs) to investigate configuration changes or with [Troubleshooting](/docs/platform/pki/troubleshooting) to diagnose the deployment.
+Continue with [Audit logs](/docs/platform/administration/audit-logs) to investigate configuration changes or with [Troubleshooting](/docs/deployment/troubleshooting) to diagnose the deployment.

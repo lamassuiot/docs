@@ -1,4 +1,4 @@
-# AWS IoT Core (/docs/pr-preview/pr-28/platform/pki/integrations/aws-iot-core)
+# AWS IoT Core (/docs/pr-preview/pr-28/platform/iot-fleets/integrations/aws-iot-core)
 
 
 
@@ -315,9 +315,9 @@ Troubleshooting [#troubleshooting]
 **Resolution:** Check that `shadow_config.enable` is `true` in the connector metadata for the corresponding DMS. If a Named Shadow is used, verify `shadow_config.shadow_name` holds the correct name and that the firmware reads that Named Shadow and not the Classic Shadow. Confirm the connector's credentials have `iotdata:GetThingShadow` and `iotdata:UpdateThingShadow` permissions.
 
 <Cards>
-  <Card title="Configure a DMS" href="/docs/platform/pki/device-enrollment" />
+  <Card title="Configure a DMS" href="/docs/platform/iot-fleets/enrollment/dms" />
 
-  <Card title="Device enrollment (EST)" href="/docs/platform/pki/est-enrollment" />
+  <Card title="Device enrollment (EST)" href="/docs/platform/iot-fleets/enrollment/overview" />
 
   <Card title="Certificate management" href="/docs/platform/pki/certificates" />
 </Cards>

@@ -4,13 +4,15 @@
 
 An issuance profile turns a certificate policy into reusable configuration. Instead of deciding validity, subject, extensions and algorithms on every request, you define once what is allowed and attach the profile to a CA, a DMS or a specific issuance.
 
+This guide is for the PKI administrator defining issuance policy. You need permissions to manage profiles and associate them with the intended CA or DMS, plus a test consumer with known identity and purpose requirements.
+
 What a profile controls [#what-a-profile-controls]
 
 Validity [#validity]
 
 You can express the lifetime as a duration from the moment of issuance or as a fixed end date. A duration works well for recurring identities; a common date is useful to make a whole batch end before a migration or retirement.
 
-The end date must never outlive the issuing CA.
+Plan the end date within the issuing CA’s validity and leave a renewal margin. The signer calculates the date from the profile; it does not automatically clamp validity to the issuer’s expiration. Check both dates in the resulting certificate. A fixed date in the past does not produce a usable identity either.
 
 CA certificate or end-entity certificate [#ca-certificate-or-end-entity-certificate]
 
@@ -34,7 +36,7 @@ CSR extensions [#csr-extensions]
 
 With **Honor Extensions**, Lamassu filters the additional requested extensions and keeps only SAN. Without that option, it discards the CSR's additional extensions.
 
-This behavior allows accepting DNS, IP, email or URI as alternative identities without accepting arbitrary extensions.
+This preserves SAN, but does not establish that the requester is entitled to those DNS names, IP addresses, emails or URIs. Validate that authorization before issuing. OCSP and CRL locations come from the issuance service configuration; `Honor Extensions` does not copy CSR distribution points.
 
 Cryptographic constraints [#cryptographic-constraints]
 
@@ -49,13 +51,16 @@ When it is enabled, Lamassu checks the public key before creating a CA or signin
 
 Profile precedence [#profile-precedence]
 
-In operations that accept multiple sources, Lamassu resolves the profile in this order:
+Resolution depends on the entry point. One complete profile is selected; its fields are not merged with the CA’s profile.
 
-1. The profile sent within the operation.
-2. The profile identifier sent in the operation.
-3. The default profile associated with the CA.
+| Operation                | First choice                               | Second choice                                   | If neither is supplied             |
+| ------------------------ | ------------------------------------------ | ----------------------------------------------- | ---------------------------------- |
+| Direct signing with a CA | `issuance_profile` embedded in the request | Request `issuance_profile_id`                   | CA default profile (`profile_id`). |
+| Issuance through a DMS   | `settings.issuance_profile_id`             | `settings.issuance_profile` embedded in the DMS | Enrollment CA default profile.     |
 
-A DMS can also reference its own issuance profile. This way, several fleets can use the same CA with different policies.
+If the selected identifier cannot be resolved, the operation fails; it does not silently fall back to the CA’s profile. Avoid setting both options at once. Recording which profile was selected helps explain why a certificate differs from its CSR.
+
+Several fleets can share a CA while keeping different profiles through their DMSs. Requester authentication and device registration policy are configured separately in [DMS](/docs/platform/iot-fleets/enrollment/dms).
 
 Create a profile [#create-a-profile]
 
@@ -87,7 +92,9 @@ Create a profile [#create-a-profile]
   <Step>
     Attach it and test [#attach-it-and-test]
 
-    Attach the profile to a CA or DMS. Issue a test certificate and check subject, SAN, KU, EKU, basic constraints and dates with an independent X.509 tool.
+    Attach the profile to a CA or DMS and check the precedence above. Issue a CSR with known usages and SAN; inspect the result with `openssl x509 -in device.crt -noout -text`. Check subject, SAN, KU, EKU and dates. For an end-entity identity, disable `Sign as CA`, require no `CA:TRUE` or `Certificate Sign`, and require `CA:FALSE` if Basic Constraints is present.
+
+    Also try a key excluded by policy: issuance should fail. Follow the [certificate verification](/docs/platform/pki/quickstarts/issue-certificate) and test acceptance in the intended consumer.
   </Step>
 </Steps>
 
@@ -102,7 +109,7 @@ End-entity certificate, `DigitalSignature`, `ServerAuth` and mandatory SAN with 
 **Intermediate CA**\
 `Sign as CA`, `CertSign` and `CRLSign`, validity longer than its end-entity certificates and stricter cryptographic constraints.
 
-These are starting patterns, not a universal policy. Always verify the requirements of the protocol, the consumer and the applicable regulatory framework.
+These patterns express design decisions. Enabling `Honor Extensions` does not require a CSR to contain SAN or validate its names; enforce that in the request workflow. A profile does not install trust or grant permissions in the consumer.
 
 Changes and deletion [#changes-and-deletion]
 

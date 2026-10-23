@@ -1,4 +1,4 @@
-# Control de acceso (/docs/pr-preview/pr-28/es/platform/pki/access-control)
+# Control de acceso (/docs/pr-preview/pr-28/es/platform/administration/access-control)
 
 
 
@@ -421,7 +421,7 @@ Lista de comprobación operativa [#lista-de-comprobación-operativa]
 * Busca comodines en políticas antes de actualizar Lamassu.
 * Revisa las rutas `skip_authz` y los ajustes de `default_action` de los esquemas HTTP al integrar o actualizar un servicio.
 * Prueba siempre una operación permitida y otra denegada para cada rol.
-* Correlaciona los cambios de principales, políticas y grants con los [registros de auditoría](/docs/platform/pki/audit-logs).
+* Correlaciona los cambios de principales, políticas y grants con los [registros de auditoría](/docs/platform/administration/audit-logs).
 
 Diagnóstico [#diagnóstico]
 
@@ -458,4 +458,4 @@ Todo falla cuando authz no está disponible [#todo-falla-cuando-authz-no-está-d
 
 Es el comportamiento esperado con `failOpen: false`. Restaura el servicio, su conexión con PostgreSQL y su conectividad con el JWKS. No cambies temporalmente a `failOpen: true` sin aceptar que las rutas protegidas podrían quedar accesibles sin decisión de autorización.
 
-Continúa con [Registros de auditoría](/docs/platform/pki/audit-logs) para investigar cambios de configuración o con [Resolución de problemas](/docs/platform/pki/troubleshooting) para diagnosticar el despliegue.
+Continúa con [Registros de auditoría](/docs/platform/administration/audit-logs) para investigar cambios de configuración o con [Resolución de problemas](/docs/deployment/troubleshooting) para diagnosticar el despliegue.

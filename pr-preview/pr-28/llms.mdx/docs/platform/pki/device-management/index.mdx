@@ -1,89 +1,99 @@
-# Devices and identities (/docs/pr-preview/pr-28/platform/pki/device-management)
+# Devices and identities (/docs/pr-preview/pr-28/platform/iot-fleets/device-management)
 
 
 
-A managed device represents an entity in your fleet and keeps the history of the certificates it has used. Lamassu separates the device from its current identity so you can renew or replace certificates without losing traceability.
+This guide is for a fleet operator. You need device, DMS and certificate permissions for the intended actions. A fleet is organized through these resources, tags and metadata; there is no separate “fleet” object to create.
+
+Each device has a `Device ID`, one owning DMS (`dms_owner`) and, once provisioned, an identity slot with an active version and previous versions. In these flows, keep the CSR and certificate `Common Name` equal to `Device ID`: binding uses that CN to update the device.
 
 Device states [#device-states]
 
-* **Active** indicates the device has a valid identity.
-* **No Identity** appears when it is registered but does not yet have an associated certificate.
-* **Renewal Pending** signals that it has entered the renewal window.
-* **Expiring Soon** warns that the certificate is close to expiring.
-* **Expired** indicates the identity has passed its validity date.
-* **Revoked** identifies a certificate invalidated before its expiration.
-* **Decommissioned** corresponds to a device permanently retired.
+| Operational view    | Meaning                                                              |
+| ------------------- | -------------------------------------------------------------------- |
+| **No Identity**     | A record exists without an associated identity.                      |
+| **Active**          | The slot is active; also check certificate dates, status and usages. |
+| **Renewal Pending** | The identity is in the operational renewal window.                   |
+| **Expiring Soon**   | Expiration is approaching according to configured thresholds.        |
+| **Expired**         | The identity has expired.                                            |
+| **Revoked**         | The identity is marked revoked.                                      |
+| **Decommissioned**  | The record is retired and ordinary updates do not restore operation. |
 
-The inventory lets you filter by `Device ID`, tags and status.
+Device, slot and [certificate](/docs/platform/pki/concepts/certificate-lifecycle) states are distinct. Events and jobs can update the view after saving a certificate; an **Active** label does not establish consumer acceptance.
 
 Inspect a device [#inspect-a-device]
 
-The detail view separates two perspectives:
+Filter the inventory by ID, tags and status. Open details and record the owning DMS, active version and current certificate serial.
 
-* **Certificate History** keeps every certificate associated with the device, with its serial number, issuer, status and validity period.
-* **Device Event Timeline** orders registrations, enrollments, renewals and status changes chronologically.
+* **Certificate History** relates previous and current versions. Replacing the slot does not by itself revoke every previous version.
+* **Device Event Timeline** helps reconstruct registration, provisioning, renewal and status changes. A change may be saved even if event persistence fails; also inspect the record and certificates.
 
-Use the history for audit and the timeline to reconstruct an incident or diagnose an unexpected transition.
+Compare these values with the identity installed on the device. Updating a Lamassu slot does not install files on the remote equipment.
 
 Register a device manually [#register-a-device-manually]
 
-Pre-registration is useful when policy requires the device to exist before requesting its first certificate.
+Use this flow to prepare inventory or assign an identity through the console. You need an existing DMS.
 
 <Steps>
   <Step>
     Create the device [#create-the-device]
 
-    From **Managed Devices**, open the registration form.
+    Open registration in **Managed Devices**. Confirm the ID does not already exist in another DMS: ID lookup is not restricted to a fleet.
   </Step>
 
   <Step>
     Define its membership [#define-its-membership]
 
-    Enter a unique **Device ID** and select the DMS that will apply the enrollment and renewal policies.
+    Enter **Device ID** and select its owning DMS. The console’s **Registration Authority** label refers to that DMS.
   </Step>
 
   <Step>
     Classify the device [#classify-the-device]
 
-    Add an icon and tags if you need to group devices by model, location, environment or another operational criterion.
+    Add model, environment or location tags and an icon according to your inventory.
   </Step>
 
   <Step>
     Verify the registration [#verify-the-registration]
 
-    The device should appear with status **No Identity** until it completes enrollment or receives a manually assigned identity.
+    Read the device again: require the intended DMS and **No Identity**. Follow [Manual registration](/docs/platform/iot-fleets/quickstarts/register-device) to complete assignment.
   </Step>
 </Steps>
 
+Preregistration does not establish that `/simpleenroll` will admit the request. Review its interaction with `enable_replaceable_enrollment` in [Provisioning strategies](/docs/platform/iot-fleets/enrollment/provisioning-strategies).
+
 Assign an identity manually [#assign-an-identity-manually]
 
-The **Assign Identity** action is available while the device remains in **No Identity**.
+From **No Identity**, use **Assign Identity**:
 
-1. Open the device and select **Assign Identity**.
-2. Choose an active certificate whose `Common Name` matches the `Device ID`.
-3. If none exists, select **Issue New Instead** and choose a CA linked to the DMS.
-4. Confirm the assignment.
+1. Select an active, current certificate suitable for the consumer, with `CN` exactly equal to `Device ID`.
+2. If unavailable, **Issue New Instead** starts issuance using the intended CA. Review the [profile](/docs/platform/pki/certificate-profiles) first.
+3. Confirm and read the serial, active version and history again.
+4. Install the key/certificate pair and required intermediates on the device and test usage.
 
-The device should change to **Active** and the certificate should appear in its history.
+Issuing, binding and installing are separate steps. If an operation fails, check which steps persisted before repeating it.
 
 Revoke the current identity [#revoke-the-current-identity]
 
-In **Device Event Timeline**, locate the latest active certificate and select **Revoke**. Choose a reason consistent with your policy and confirm the operation.
+Locate the active serial in history and revoke it with an appropriate reason. Verify the record, OCSP/CRL publication and rejection of a new consumer connection using the [certificate guide](/docs/platform/pki/certificates).
 
-Revocation invalidates the certificate but does not delete the device. You can restore its operation by assigning it a new identity. `CertificateHold` allows reactivating the retained certificate; all other reasons are final.
+Revocation does not remove the device. It does not automatically enable another enrollment either: recovery depends on its credential, status and DMS policy. `CertificateHold` can be reactivated under PKI conditions; other reasons block subsequent certificate changes.
 
 Decommission a device [#decommission-a-device]
 
-<Callout type="warn" title="Decommission is irreversible">
-  This action revokes all the device's certificates and prevents it from obtaining an identity again.
+Before **Decommission**, inventory active and previous identities, connections and destination permissions. Prepare retirement in the consumer.
+
+The backend saves **Decommissioned** and attempts to revoke the active version’s certificate with `CessationOfOperation` if the slot was not expired or revoked. It does not traverse all history. Deferred revocation can fail after retirement is saved; check the result by serial.
+
+<Callout type="warn" title="Check complete retirement">
+  Retired status protects ordinary device and slot updates. It does not guarantee that every EST request is rejected before issuance: binding can skip a retired device without returning an error. Check for remaining usable certificates or permissions and block new admission in the relevant control.
 </Callout>
 
-Use **Decommission** only when the device has stopped operating or is no longer trustworthy. After confirming, Lamassu revokes the active identity with `CessationOfOperation` and changes the status to **Decommissioned**.
+Retain records according to audit policy. Do not reuse a retired ID to hide an equipment change.
 
 Automate enrollment [#automate-enrollment]
 
 <Cards>
-  <Card title="Configure a DMS" description="Define the CA, trust and policies of the fleet." href="/docs/platform/pki/device-enrollment" />
+  <Card title="Enroll and connect a device" description="Obtain an identity from the client and test mTLS." href="/docs/platform/iot-fleets/quickstarts/enroll-device" />
 
-  <Card title="Integrate EST" description="Let the device request and renew its identity." href="/docs/platform/pki/est-enrollment" />
+  <Card title="Renewal and recovery" description="Install the successor and handle failures without losing known state." href="/docs/platform/iot-fleets/enrollment/renewal-and-recovery" />
 </Cards>

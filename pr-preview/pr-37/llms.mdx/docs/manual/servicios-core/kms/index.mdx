@@ -1,0 +1,200 @@
+# Keys and cryptographic engines (/docs/pr-preview/pr-37/platform/pki/key-management)
+
+
+
+<span id="cryptographic-key-management" />
+
+The Cryptographic Key Management Service (KMS) of Lamassu IoT centralizes the generation, import, custody and use of the platform's keys. This is where you manage the keys that support the CAs and the rest of the signing operations that depend on the PKI.
+
+In the current configuration, Lamassu IoT works exclusively with asymmetric keys, such as RSA and elliptic curves. These keys are used to issue X.509 certificates, sign requests and perform authentication and validation operations within the system.
+
+What the KMS solves [#what-the-kms-solves]
+
+The KMS unifies key lifecycle management and prevents every service from having to integrate directly with a specific cryptographic provider.
+
+In practice, it lets you:
+
+* Generate new key pairs from Lamassu IoT.
+* Import keys created externally.
+* Delegate custody and cryptographic operations to external engines.
+* Reuse existing keys for CAs, CSRs and signing or verification tasks.
+
+Cryptographic engines [#cryptographic-engines]
+
+Lamassu can work with different cryptographic engines depending on deployment requirements. In some environments a software engine is enough; in others custody must be delegated to an HSM, a cloud service or a specialized platform.
+
+A single instance can have several engines configured at the same time, including multiple instances of the same type. This lets you adapt operations to different security, cost and regulatory requirements.
+
+This guide is for the PKI operator: select and use an already enabled engine. Installation, credentials, persistent storage and connectivity belong to [Deployment](/docs/deployment/self-hosted/helm). Before generating a CA, check the default engine, advertised algorithms and a test signature. Availability in your installation depends on its version and configuration.
+
+File System [#file-system]
+
+Generates software keys and stores private material in files. Custody depends on installation permissions, storage and backups. Before using it for an operational CA, agree how the key will be recovered and how replicas will access it; the KMS record does not replace those files.
+
+HashiCorp Vault [#hashicorp-vault]
+
+The adapter uses KV storage for private material. This is not signing within Vault Transit: someone able to read the secret can recover the key. Review read permissions, availability and recovery with the deployment owner.
+
+AWS Secrets Manager [#aws-secrets-manager]
+
+Offers encrypted persistence in AWS at a cost. It protects the key at rest, but an authorized administrator can recover it; it does not provide the same extraction resistance as a KMS or HSM.
+
+AWS KMS [#aws-kms]
+
+Delegates signing to AWS KMS. The adapter also implements external material import, subject to provider capabilities and permissions. A key generated outside the service has already existed outside its custody; importing it does not remove those copies. Check generation, import and signing as separate operations.
+
+PKCS#11 [#pkcs11]
+
+Allows integrating local HSMs, isolated environments and *Key as a Service* offerings. Generation, persistence and extraction resistance depend on the specific device or provider. It is the most flexible option when policy requires hardware custody.
+
+Azure Key Vault [#azure-key-vault]
+
+The backend also provides adapters for **Key Vault Keys** and **Key Vault Secrets**. The former delegates signing to the key service; the latter stores private material as secrets and signs using that material. These are different custody models. Confirm which adapter is enabled in your installation and test the required operations.
+
+Lamassu shows the enabled engines in the console.
+
+Each engine defines which algorithms it supports, such as RSA or ECC/ECDSA, and which key sizes it can generate.
+
+Confirm with the deployment operator which engine is configured as the default. That engine will be used when a process needs to create or persist a key and the user has not selected a specific one, for example when creating or importing a CA.
+
+Key inventory [#key-inventory]
+
+The main KMS screen shows the complete inventory of keys registered in the system. It is the reference view for reviewing which keys exist, where they are kept and which entities they relate to.
+
+The table includes the following fields:
+
+* **Name**: descriptive name of the key.
+* **Type**: algorithm and key size, for example RSA 2048 or EC P-256.
+* **Strength**: visual indicator of cryptographic strength.
+* **Public/Private**: whether Lamassu manages the full pair or only the public key.
+* **Crypto Engine**: cryptographic engine keeping the key.
+* **Aliases**: alternative names associated with the key.
+* **Tags**: labels for classification and search.
+* **Related Entities**: certificates or other entities linked to that key.
+
+From this view you also reach the most common actions:
+
+* **View Details** to inspect metadata, identifiers and relationships.
+* **Generate CSR** to create a PKCS#10 request with the selected key.
+* **Sign / Verify** to test cryptographic operations on the key.
+* **Delete Key** to remove the key from the system.
+
+Create or import keys [#create-or-import-keys]
+
+You need key administration permissions and a reachable engine. The issuance profile must allow the chosen algorithm if the key will be used in a CA or CSR. Open **Create New Key** and choose generation or import.
+
+Generate a new key pair [#generate-a-new-key-pair]
+
+If the key will be born inside Lamassu, the recommended flow is to generate a new pair managed directly by one of the configured engines.
+
+On the wizard's first screen, choose **Generate New Key Pair** and then define the main parameters:
+
+* **Key Name**: unique and descriptive name.
+* **Crypto Engine**: engine that will keep the key.
+* **Key Type** and **Key Size**: algorithm and size or curve.
+* **Tags**: metadata to classify the key.
+* **Metadata**: additional information for advanced uses.
+
+Import an existing pair [#import-an-existing-pair]
+
+Importing lets you register in Lamassu a key generated outside the platform. It is the usual flow in BYOK scenarios, migrations or integration with cryptographic material already in production.
+
+* When you have an exportable private key and the destination engine supports import.
+* When an existing PKI needs to be migrated without reissuing certificates.
+* When Lamassu must operate with a root of trust created by a third party.
+
+In the wizard, choose **Import Existing Key Pair** and complete the requested fields:
+
+* **Key Name**: descriptive name within Lamassu IoT.
+* **Crypto Engine**: engine that will keep the imported key.
+* **Tags**: labels for organization and search.
+* **Metadata**: additional optional information.
+* **Private Key (PEM)**: private key in PEM format.
+
+After a successful import, open the record, check the engine and public key, and perform a test signature. A non-exportable HSM key cannot be uploaded through this PEM form: configure engine access and check how the existing key is registered. Review dependencies and any provider resources already created if an operation fails partway through.
+
+Operations on a key [#operations-on-a-key]
+
+Each registered key has a detail view and several operational actions.
+
+View details [#view-details]
+
+The **View Details** screen concentrates the technical and administrative information of the key.
+
+The **Overview** tab shows, among others, these fields:
+
+* **Key Name**: descriptive name.
+* **Key Identifier**: unique system identifier. Lamassu uses PKCS11-based ID formats.
+* **Tags**: associated labels.
+* **Aliases**: alternative names.
+* **Crypto Engine**: engine where the key resides.
+* **Algorithm, Key Size & Strength**: algorithm, parameters and strength level.
+
+The **Related Entities** section shows which Lamassu objects depend on that key.
+
+The **Public Key** tab shows public material in PEM. The record’s identifier and URI locate the key; a PKCS#11-formatted URI does not establish that the engine is an HSM or that a local module can access it.
+
+Sign and verify [#sign-and-verify]
+
+The **Sign / Verify** action validates that the key and the cryptographic engine work correctly.
+
+Sign a test message, save the signature and verify it using the same public key, algorithm and encoding. Then change the message: verification should fail. This tests one operation; it does not establish every engine capability or a CA’s chain.
+
+When you open it, two areas appear: **Sign** and **Verify**.
+
+Sign [#sign]
+
+This tab uses the private key to generate a digital signature over a message or an already computed *digest*.
+
+Main fields:
+
+* **Algorithm**: signing algorithm available for the key type.
+* **Message Type**: `Raw` for clear data or `Digest` for a precomputed hash.
+* **Payload Encoding**: input encoding, such as UTF-8, Hex or Base64.
+* **Message**: content to sign.
+* **Signature**: result of the operation, shown in hexadecimal.
+
+Verify [#verify]
+
+This tab checks whether a signature corresponds to the associated public key.
+
+Main fields:
+
+* **Algorithm**: must match the algorithm used for the signature.
+* **Message Type**: `Raw` or `Digest`.
+* **Payload Encoding**: encoding of the message.
+* **Message**: original message or hash.
+* **Signature**: signature to check.
+* **Result**: indicator of the validation result.
+
+Generate a CSR [#generate-a-csr]
+
+The **Generate CSR** action creates a PKCS#10 request signed with the private key kept in Lamassu, without exposing it outside the cryptographic engine.
+
+This flow is useful for:
+
+* Requesting certificates from an external CA.
+* Renewing an identity while keeping the same key.
+
+When you open the form, it asks for the subject data and the main certificate attributes:
+
+* **Common Name (CN)**: main name of the identity.
+* **Organization (O)**: organization or company.
+* **Organizational Unit (OU)**: department or unit.
+* **Country (C)**: two-letter country code.
+* **State / Province (ST)**: state or province.
+* **Locality (L)**: city or locality.
+* **Email Address**: contact email.
+* **Subject Alternative Names (SANs)**: alternative names or identifiers, such as DNS or IP.
+
+Download the CSR and run `openssl req -in request.csr -noout -verify -text`. Check signature, subject and SAN before sending it. A CSR does not determine the final certificate by itself: [issuance policy](/docs/platform/pki/certificate-profiles) can replace its fields.
+
+Sign locally with PKCS#11 [#sign-locally-with-pkcs11]
+
+Lamassu also offers specific help for local integrations through **Sign locally with OpenSSL & PKCS11 tools**.
+
+Requiere el módulo, token y permisos del proveedor correspondiente. Comprueba que el identificador de Lamassu se corresponde con el objeto accesible desde ese módulo. La configuración del módulo pertenece al entorno del cliente o al [Despliegue](/docs/deployment/self-hosted/helm).
+
+Before deleting a key [#before-deleting-a-key]
+
+Review **Related Entities** and locate CAs, certificates and validation processes that still need signatures. Revoking a CA does not remove the need to publish status during its retention period. Deleting a key does not automatically revoke its certificates either. Plan replacement and retention before using **Delete Key**; provider deletion behavior depends on the engine.

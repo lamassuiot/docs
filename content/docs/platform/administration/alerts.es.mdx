@@ -24,7 +24,7 @@ Los canales Microsoft Teams y Webhook aceptan un bloque opcional `http_client` q
 
 - `apikey_options` necesita `header` y `key`.
 - `jwt_options` necesita `oidc_client_id`, `oidc_client_secret` y un `oidc_well_known` absoluto `http` o `https`.
-- `mtls_options` necesita el PEM en línea `cert_content` y `key_content`; los valores que referencian archivos del servidor se rechazan.
+- `mtls_options` necesita `cert_content` y `key_content` como PEM codificado en Base64, como el resto de certificados de la API; también se acepta el PEM en claro. Los valores que referencian archivos del servidor se rechazan.
 
 La [referencia de la API de Alerts](/docs/api-reference/alerts) documenta el esquema completo de `http_client`.
 

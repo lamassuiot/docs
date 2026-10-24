@@ -40,7 +40,7 @@ The consumer keeps its own trust store. EST `/cacerts` can distribute the servic
 A DMS relates three sets that are worth designing separately:
 
 - **Enrollment CA:** signs the new identities.
-- **Validation CAs:** authenticate the client certificates used for enrollment or migration. During re-enrollment, Lamassu tries the enrollment CA first and then the additional validation CAs.
+- **Validation CAs:** authenticate the client certificates used for enrollment or migration. During re-enrollment, Lamassu tries the enrollment CA first and then the validation CAs configured in the re-enrollment block.
 - **Distributed CAs:** form the content the device obtains through EST `/cacerts`. You can include the service TLS certificate, the enrollment CA and an explicit list of managed CAs. Including the issuer does not automatically add all its ancestors.
 
 This separation makes it possible to migrate a fleet: you temporarily accept certificates from the old hierarchy, issue with the new one and distribute both chains during the overlap.

@@ -79,7 +79,7 @@ Webhook and combined modes also execute during re-enrollment when configured in 
 
 For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired` and `chain_level_validation`. The inspected flow receives one certificate credential; it does not guarantee forwarding every handshake intermediate to the validator. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
 
-For certificate re-enrollment, the validator uses the enrollment CA, then `additional_validation_cas`, and `enable_expired_renewal`. Do not assume copying initial `validation_cas` changes those issuers.
+For certificate re-enrollment, the validator tries the enrollment CA first and then the CAs listed in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; those are the re-enrollment validation CAs, and each settings block consults only its own `validation_cas` — copying the initial block's list does not extend re-enrollment acceptance. The re-enrollment validator compares the presented TLS leaf against those CAs; the re-enrollment block's `chain_level_validation` and `allow_expired` values are stored but not consulted, and expiry is governed by `enable_expired_renewal`.
 
 For a webhook, configure destination, Lamassu-to-service authentication, method and timeout. The [authentication contract](/docs/platform/iot-fleets/enrollment/bootstrap-identity) explains the device credential and request body. `NO_AUTH` does not establish ownership of the requested ID.
 
@@ -115,6 +115,8 @@ Migration `20260604110000` copies initial authentication into renewal settings i
 
 Migration `20261021120000` rewrites every stored webhook config into this layout: `validate_server_cert` becomes the negated `insecure_skip_verify` (a config where `validate_server_cert` was false keeps skipping verification), `oidc` becomes `jwt_options`, `apikey` becomes `apikey_options` and `mtls` becomes `mtls_options`. When both the legacy certificate and key are PEM, they move into `mtls_options.cert_content` and `key_content` and need no action. Otherwise, including a mixed config (PEM certificate, file-path key), both values become `mtls_options.cert_file` and `key_file`. Delivery rejects any webhook config that references files, whatever its auth mode, so every enroll and reenroll that calls that webhook fails until the certificate and key are re-entered as PEM content, or the leftover file fields are removed if the webhook does not use mTLS. If your version's console does not expose those fields, edit the DMS through the [DMS API](/docs/api-reference/dms-manager).
 
+Migration `20261022120000` moves `reenrollment_settings.additional_validation_cas` into `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`, replacing whatever the nested key held. That nested value was never consulted when validating re-enrollments, so the effective trust set is unchanged; a missing or null flat list becomes an empty list. DMSs without `reenrollment_settings` are untouched. Bodies that still carry `additional_validation_cas` are accepted but the value is silently ignored — unknown JSON fields are dropped — and GET responses no longer include it. Read the DMS before sending API edits: an update body built from the old layout silently empties the migrated list.
+
 ## Issuance profile
 
 `settings.issuance_profile_id` takes precedence over `settings.issuance_profile`; without either, the CA default profile is used. Rules are documented once in [Profiles](/docs/platform/pki/certificate-profiles). DMS changes affect future requests; they do not modify signed certificates or install client trust.
@@ -127,7 +129,7 @@ Migration `20261021120000` rewrites every stored webhook config into this layout
 | `preventive_delta` | Preventive operational monitoring threshold. |
 | `critical_delta` | Critical operational monitoring threshold. |
 | `enable_expired_renewal` | Accepts an expired presented certificate in the renewal mTLS validator. Does not authorize another mode or remove Gateway constraints by itself. |
-| `additional_validation_cas` | Additional mTLS credential issuers during migration. |
+| `est_rfc7030_settings.client_certificate_settings.validation_cas` | Additional validation CAs for the renewal mTLS credential, tried after the enrollment CA; typically populated during CA rotation while old-CA cohorts renew. |
 | `revoke_on_reenrollment` | If the previous certificate is ACTIVE, attempts Superseded revocation before binding its successor. |
 
 Monitoring does not renew: the client must schedule the request and installation. Webhook and NO_AUTH modes do not use the same mTLS expired-credential validator; the webhook must explicitly authorize permitted recovery. Review [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for operation order and partial failures.

@@ -40,7 +40,7 @@ El consumidor mantiene su propio almacén de confianza. EST `/cacerts` puede dis
 Un DMS relaciona tres conjuntos que conviene diseñar por separado:
 
 - **CA de enrolamiento:** firma las nuevas identidades.
-- **CAs de validación:** autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, Lamassu prueba primero la CA de enrolamiento y después las CAs de validación adicionales.
+- **CAs de validación:** autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, Lamassu prueba primero la CA de enrolamiento y después las CAs de validación configuradas en el bloque de re-enrolamiento.
 - **CAs distribuidas:** forman el contenido que el dispositivo obtiene mediante EST `/cacerts`. Puedes incluir el certificado TLS del servicio, la CA de enrolamiento y una lista explícita de CAs gestionadas. Incluir la CA emisora no añade automáticamente todos sus ascendientes.
 
 Esta separación permite migrar una flota: aceptas temporalmente certificados de la jerarquía anterior, emites con la nueva y distribuyes ambas cadenas durante el solapamiento.

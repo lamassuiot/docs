@@ -21,7 +21,7 @@ A DMS must exist before registering the device. If you already have a suitable o
 1. Open the DMS inventory and its creation action. Assign a recognizable name, such as `Acme Evaluation DMS`.
 2. In **Enrollment CA**, select the CA that issued `device.crt`.
 3. In **Registration Mode**, select `PRE_REGISTRATION` for the path that starts with explicit registration.
-4. Set **Authentication Mode** to `CLIENT_CERTIFICATE` and add the CA whose initial certificates you will accept in **Validation CAs**. For this evaluation, it can be the same CA. Keep **Verify CSR Signature** enabled and server key generation disabled if you will not use it.
+4. In the authentication section, enable **Require client certificate** and leave **Call external webhook** off. Under **Require client certificate**, add the CA whose initial certificates you will accept to **Validation CAs**; for this evaluation, it can be the same CA. Keep **Verify CSR Signature** enabled and leave **Enable server-side key generation** off if you will not use it.
 5. Review renewal and trust distribution settings with the [DMS guide](/docs/platform/iot-fleets/enrollment/dms), save the service and note its identifier.
 6. Reopen the DMS and confirm that the enrollment CA is the expected one and the service appears in inventory.
 

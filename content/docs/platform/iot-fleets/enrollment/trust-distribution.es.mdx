@@ -35,7 +35,7 @@ No uses indiscriminadamente todo `cacerts.pem` como `-CAfile`: eso puede ampliar
 
 Antes de cambiar Enrollment CA, inventaría equipos desconectados, bootstrap, certificados operativos y consumidores. Distribuye la nueva raíz y las intermedias necesarias; comprueba que una cohorte acepta cadenas antigua y nueva.
 
-En el DMS, separa las CAs distribuidas de `additional_validation_cas`, utilizadas para la credencial de reenrolamiento. El validador examinado prueba la CA de enrolamiento y después esas CAs con la hoja recibida; aceptar una cadena multinivel requiere verificar cómo llega al servicio y qué emisor está configurado.
+En el DMS, separa las CAs distribuidas de las CAs de validación de reenrolamiento en `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; esa lista es opcional porque la CA de enrolamiento siempre valida las credenciales de reenrolamiento. El validador acepta la hoja recibida cuando encadena a la CA de enrolamiento o a una de esas CAs; aceptar una cadena multinivel requiere verificar cómo llega al servicio y qué emisor está configurado.
 
 Cambia emisión, renueva por grupos y compara la serie instalada con el slot activo. Retira la confianza anterior cuando ningún equipo legítimo la necesite y tu política permita cerrar el solapamiento. Sigue [Jerarquía y rotación](/docs/platform/pki/ca-hierarchy-and-rotation) para la operación PKI.
 

@@ -35,7 +35,7 @@ Do not indiscriminately use all of `cacerts.pem` as `-CAfile`: this can expand t
 
 Before changing Enrollment CA, inventory disconnected equipment, bootstrap and operational certificates, and consumers. Distribute the new root and required intermediates; check that a cohort accepts both old and new chains.
 
-In the DMS, separate distributed CAs from `additional_validation_cas`, used for re-enrollment credentials. The inspected validator tries the enrollment CA followed by those CAs against the received leaf; accepting a multilevel chain requires checking what reaches the service and which issuer is configured.
+In the DMS, separate distributed CAs from the re-enrollment validation CAs in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; that list is optional because the enrollment CA always validates re-enrollment credentials. The validator accepts the received leaf when it chains to the enrollment CA or to one of those CAs; accepting a multilevel chain requires checking what reaches the service and which issuer is configured.
 
 Switch issuance, renew in cohorts and compare the installed serial with the active slot. Remove previous trust once no legitimate equipment needs it and policy permits ending overlap. Follow [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for the PKI operation.
 

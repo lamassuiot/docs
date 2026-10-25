@@ -132,6 +132,12 @@ This requires distinct SNI hostnames and cluster networking outside the Lamassu 
 4. If data planes and TLS termination must stay independent behind one IP, add a front-door SNI passthrough layer.
 5. If none of those are possible, use different external ports or change the external network design.
 
+## Egress proxy
+
+Internal Lamassu clients — the Vault engine connection, service-to-service calls and webhook deliveries — honor the `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` environment variables. The exception is the authorization-engine connector: it uses its own transport and does not consult these proxy variables. If your deployment routes egress through a proxy, list in-cluster service names in `NO_PROXY` (for example `.svc,.cluster.local`) so internal traffic stays inside the cluster. Loopback traffic is never sent through a proxy.
+
+The default transport of these clients bounds the dial timeout (30 seconds), the TLS handshake (10 seconds) and idle connection reuse (90 seconds) so an unreachable dependency fails fast instead of hanging; these values are Go transport defaults, not Lamassu settings. HTTP/2 is negotiated when the peer supports it. The authorization-engine connector keeps its own transport without these dial and handshake timeouts; only its overall 30-second request timeout bounds each call.
+
 ## Verify the traffic path
 
 ```bash

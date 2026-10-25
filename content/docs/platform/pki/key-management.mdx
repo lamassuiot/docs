@@ -37,6 +37,8 @@ Generates software keys and stores private material in files. Custody depends on
 
 The adapter uses KV storage for private material. This is not signing within Vault Transit: someone able to read the secret can recover the key. Review read permissions, availability and recovery with the deployment owner.
 
+The adapter reaches Vault over its configured HTTP(S) endpoint. The Vault server certificate is verified against the system trust store; a Vault signed by a private CA is trusted by adding its CA certificate to the engine's `ca_cert_file` (PEM-encoded). `insecure_skip_verify=true` disables verification and is a last resort; agree the transport settings with the deployment owner.
+
 ### AWS Secrets Manager
 
 Offers encrypted persistence in AWS at a cost. It protects the key at rest, but an authorized administrator can recover it; it does not provide the same extraction resistance as a KMS or HSM.

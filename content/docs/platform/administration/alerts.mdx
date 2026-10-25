@@ -63,6 +63,20 @@ The [alerts API reference](/docs/api-reference/alerts) documents the full `http_
   </Step>
 </Steps>
 
+## Configure the webhook HTTP client
+
+The Webhook and Microsoft Teams channels show this configuration in the subscribe form, at the channel step, and again when editing a subscription; Email does not use it. The fields map to the optional `http_client` block described above:
+
+- **Log Level** selects `debug`, `info`, `warn` or `error`; `info` is the default.
+- **Call Timeout** defaults to 10 seconds. The console rejects a value above 30 seconds with `Webhook timeout must be at most 30s.`; the API clamps the same value to the cap instead (see [Calls are bounded](#webhook-delivery-rules)).
+- There is no TLS-verification switch for these channels, because the service always verifies the receiver certificate (see [TLS is always verified](#webhook-delivery-rules)).
+- **HTTP Authentication** selects `No Authentication` (the default), `API Key` (API key value and Header Name, `X-API-Key` by default), `OIDC Client Credentials` (Client ID, Client Secret and Well-Known URL) or `Mutual TLS` (Client Certificate and Client Private Key pasted as PEM). A stored private key stays hidden until you select **Show**.
+- A `http://` URL shows the console warning `Unencrypted HTTP connection` (see the [Credentials over http://](#webhook-delivery-rules) callout below).
+
+The form validates inline against the same delivery rules: the webhook URL and the OIDC Well-Known URL must be absolute `http` or `https` URLs, an API-key header may not use a reserved name, and the mTLS certificate and key must be PEM content, not file paths.
+
+The summary in the Confirm step shows the authentication as `None`, `OIDC client credentials`, `API key` or `Mutual TLS`. The subscription details show the authentication, the API key header name (never the value), the OIDC issuer URL, mTLS as `Configured` and a fixed `TLS verification: Verified` row. The API key, client secret and private key are not shown in the subscription details.
+
 ## Webhook delivery rules
 
 Notifications delivered through the Microsoft Teams and Webhook channels follow a fixed HTTP policy:
@@ -81,6 +95,8 @@ Credentials are sent regardless of the URL scheme. With an `http://` `webhook_ur
 ## Manage a subscription
 
 Open an existing subscription to review its destination and filter, modify the configuration or select **Unsubscribe**. Remove subscriptions that no longer have an operational owner to avoid ignored deliveries or stale endpoints.
+
+Subscriptions created with older console versions may store the webhook target under `url` and `method` instead of `webhook_url` and `webhook_method`. The service delivers only through `webhook_url` and `webhook_method`, so such a subscription does not deliver even though the subscription details show the stored target. Open the subscription and save it again: the edit form prefills the stored target, and saving rewrites the channel configuration in the current layout.
 
 ## Event families
 

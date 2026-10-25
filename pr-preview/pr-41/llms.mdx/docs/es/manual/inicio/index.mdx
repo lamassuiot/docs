@@ -1,0 +1,41 @@
+# Primeros pasos de PKI (/docs/pr-preview/pr-41/es/platform/pki/quickstarts/overview)
+
+
+
+Este recorrido está dirigido a quien empieza a administrar la PKI o necesita una primera identidad X.509 de cliente. Termina con tres archivos: el certificado de una CA raíz, un certificado final y la clave privada de ese cliente.
+
+Antes de empezar [#antes-de-empezar]
+
+* Una instancia de Lamassu accesible desde el navegador. Si necesitas prepararla, consulta [Despliegue](/docs/deployment/overview).
+* Permisos para gestionar claves, autoridades y emisión. Consulta [Control de acceso](/docs/platform/administration/access-control) si una operación está bloqueada.
+* Un motor criptográfico disponible para la clave de la CA; comprueba el inventario de [claves y motores](/docs/platform/pki/key-management).
+* OpenSSL 3.x en el equipo desde el que verificarás los archivos.
+* Un directorio de trabajo con acceso restringido para custodiar la clave descargada.
+
+Ruta recomendada [#ruta-recomendada]
+
+<Cards>
+  <Card title="1. Crea tu primera CA" description="Crea una raíz de evaluación y guarda su certificado público como ca.pem." href="/docs/platform/pki/quickstarts/create-certificate-authority" />
+
+  <Card title="2. Emite y verifica un certificado" description="Emite para device-001 y comprueba contenido, cadena y correspondencia de clave." href="/docs/platform/pki/quickstarts/issue-certificate" />
+</Cards>
+
+Usaremos `Acme Evaluation Root CA` y `device-001` como nombres de ejemplo. Si los sustituyes, conserva el mismo identificador de cliente en los pasos que quieras conectar.
+
+La raíz de este recorrido firma directamente el certificado final para facilitar la evaluación. Antes de diseñar una PKI operativa, revisa el [modelo de confianza](/docs/platform/pki/concepts/trust-model) y la [jerarquía de CAs](/docs/platform/pki/ca-hierarchy-and-rotation).
+
+Resultado esperado [#resultado-esperado]
+
+| Archivo o recurso                | Comprobación                                                                          |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| CA raíz activa y `ca.pem`        | Es un certificado de CA, está vigente y su autofirma se comprueba.                    |
+| Certificado final y `device.crt` | Identifica a `device-001`, admite autenticación de cliente y verifica hasta `ca.pem`. |
+| Clave privada `device.key`       | Su clave pública coincide con la incluida en `device.crt`.                            |
+
+Estas comprobaciones validan el material emitido. La aceptación en un servicio requiere además su configuración de confianza, autorización y revocación.
+
+Continúa según tu objetivo [#continúa-según-tu-objetivo]
+
+* Para operar certificados, continúa con [Certificados](/docs/platform/pki/certificates) y [Validación](/docs/platform/pki/certificate-validation).
+* Para gestionar una identidad de dispositivo en Lamassu, sigue [Registro manual](/docs/platform/iot-fleets/quickstarts/register-device). Ese recorrido incluye la preparación del DMS.
+* Para que el dispositivo solicite su certificado, prepara el [DMS](/docs/platform/iot-fleets/enrollment/dms) y el [cliente EST](/docs/platform/iot-fleets/enrollment/overview).

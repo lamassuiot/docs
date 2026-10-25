@@ -1,0 +1,95 @@
+# Validación online con OCSP (/docs/pr-preview/pr-41/es/platform/pki/ocsp)
+
+
+
+<span id="servicio-ocsp" />
+
+OCSP permite consultar el estado de un certificado y obtener una respuesta firmada. Esta guía sirve al integrador que necesita comprobar qué publica Lamassu y cómo debe verificarlo el consumidor. Para la validación completa de una identidad, sigue [Validación de certificados](/docs/platform/pki/certificate-validation).
+
+Cómo funciona el respondedor en Lamassu [#cómo-funciona-el-respondedor-en-lamassu]
+
+El respondedor obtiene el certificado por número de serie y localiza su CA emisora en el inventario. Traduce el estado persistido así:
+
+| Estado del registro                             | Respuesta firmada                                      |
+| ----------------------------------------------- | ------------------------------------------------------ |
+| `ACTIVE`                                        | `Good`.                                                |
+| `REVOKED`                                       | `Revoked`, con razón y fecha de revocación.            |
+| Otros estados, incluidos `INACTIVE` y `EXPIRED` | `Unknown` si puede obtener el certificado y su emisor. |
+
+Un número de serie ausente provoca un error de búsqueda; no garantiza una respuesta firmada `Unknown`. Los errores de búsqueda o firma se devuelven como fallo HTTP. Trata ese fallo como falta de evidencia, según la política del consumidor.
+
+La propia CA emisora firma la respuesta mediante su clave asociada al KMS. No se utiliza un certificado delegado de firma OCSP. Una CA importada sin clave utilizable no puede firmar respuestas.
+
+La implementación establece `thisUpdate` aproximadamente un día antes de generar la respuesta y `nextUpdate` un día después: la ventana declarada es de unas 48 horas. Inspecciona los valores recibidos y aplica tu política de vigencia. La respuesta refleja el estado almacenado al consultarla; una copia anterior en caché no cambia al revocar.
+
+Enlace en los certificados emitidos [#enlace-en-los-certificados-emitidos]
+
+El firmador construye las URLs OCSP a partir de los dominios VA configurados y las añade a AIA. Si no hay dominios, no hay URL que añadir; un certificado importado conserva sus extensiones originales. Revisa el certificado real:
+
+```bash
+openssl x509 -in device.crt -noout -ocsp_uri
+```
+
+Comprueba que esa URL es accesible desde el consumidor. DNS, exposición del endpoint y configuración de dominios pertenecen a [Despliegue](/docs/deployment/self-hosted/networking). Cambiar esa configuración no modifica certificados ya firmados.
+
+Endpoints HTTP [#endpoints-http]
+
+El servicio acepta:
+
+| Método | Ruta del servicio VA   | Formato                                                  |
+| ------ | ---------------------- | -------------------------------------------------------- |
+| `POST` | `/ocsp`                | Solicitud DER, `Content-Type: application/ocsp-request`. |
+| `GET`  | `/ocsp/{ocsp_request}` | Solicitud DER codificada en Base64 URL con padding.      |
+
+Utiliza POST para evitar diferencias de codificación entre clientes. La respuesta correcta tiene `Content-Type: application/ocsp-response` y cuerpo DER. El prefijo público depende del Gateway; utiliza la URL publicada en el certificado y comprobada por el operador.
+
+Genera y verifica una consulta [#genera-y-verifica-una-consulta]
+
+Necesitas OpenSSL 3.x, `device.crt`, el certificado de su emisor directo `issuer.pem` y las raíces confiables del consumidor en `roots.pem`. Si el emisor es intermedio, prepara además `intermediates.pem` con las CAs intermedias.
+
+Genera la solicitud:
+
+```bash
+openssl ocsp -issuer issuer.pem -cert device.crt \
+  -no_nonce -reqout request.der
+```
+
+Este ejemplo omite el nonce porque el respondedor no lo devuelve. La verificación depende de firma, correspondencia de la respuesta y tiempos; no demuestra frescura mediante un nonce.
+
+Sustituye la URL de ejemplo por el endpoint inspeccionado:
+
+```bash
+OCSP_URL='http://pki.example.com/ocsp'
+
+curl --fail --show-error --silent --max-time 15 \
+  -H 'Content-Type: application/ocsp-request' \
+  --data-binary @request.der "$OCSP_URL" \
+  -o response.der
+```
+
+Verifica el DER recibido:
+
+```bash
+openssl ocsp -respin response.der \
+  -issuer issuer.pem -cert device.crt \
+  -CAfile roots.pem -no_nonce -resp_text
+```
+
+Si hay intermedias, añade `-verify_other intermediates.pem`. Exige verificación correcta de la respuesta y comprueba el estado correspondiente a `device.crt`, emisor, serie, `thisUpdate` y `nextUpdate`. Un resultado `Response verify OK` solo valida la respuesta: también debes observar `good`, `revoked` o `unknown`. No aceptes una identidad basándote únicamente en el código de salida del comando.
+
+Comprobación desde la interfaz [#comprobación-desde-la-interfaz]
+
+**OCSP Check** permite observar lo que responde Lamassu para un certificado seleccionado. Completa la comprobación desde la red y el almacén de confianza del consumidor: la consulta de la consola no prueba su configuración de validación.
+
+Para comprobar un cambio, guarda una respuesta anterior, revoca un certificado de prueba y solicita otra. La consulta nueva debe reflejar el estado persistido; compara los tiempos para descartar reutilización de una respuesta anterior. Si falla, sigue [Diagnóstico PKI](/docs/platform/pki/troubleshooting).
+
+Referencias [#referencias]
+
+* [RFC 6960: OCSP](https://www.rfc-editor.org/rfc/rfc6960).
+* [OpenSSL: openssl-ocsp](https://docs.openssl.org/3.6/man1/openssl-ocsp/).
+
+<Cards>
+  <Card title="Servicio CRL" href="/docs/platform/pki/crl" />
+
+  <Card title="Validación de certificados" href="/docs/platform/pki/certificate-validation" />
+</Cards>

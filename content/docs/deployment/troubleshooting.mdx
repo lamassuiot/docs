@@ -107,6 +107,8 @@ Generic values request 100 mCPU and 128 MiB and limit to 500 mCPU and 512 MiB. T
 
 Filesystem-based KMS engines and VA local storage use exclusive-access volumes. Keep a single replica or migrate to shared backends before enabling autoscaling.
 
+Internal calls now fail fast instead of hanging for the clients covered by [Egress proxy](/docs/deployment/self-hosted/networking#egress-proxy): connection attempts time out after 30 seconds and TLS handshakes after 10 seconds. The authorization-engine connector keeps its own transport without these dial and handshake timeouts; only its overall 30-second request timeout bounds each call. If an egress proxy handles the cluster's outbound traffic, check the pod's `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` environment variables and list in-cluster service names in `NO_PROXY`.
+
 ## Events are not arriving
 
 Domain and audit events depend on the bus publisher:

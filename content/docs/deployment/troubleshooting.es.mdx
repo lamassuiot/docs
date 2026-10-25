@@ -107,6 +107,8 @@ Los valores genéricos solicitan 100 mCPU y 128 MiB y limitan a 500 mCPU y 512 M
 
 Los motores KMS basados en filesystem y el almacenamiento local de VA utilizan volúmenes de acceso exclusivo. Mantén una réplica o migra a backends compartidos antes de habilitar autoscaling.
 
+Las llamadas internas ahora fallan rápido en lugar de bloquearse para los clientes cubiertos por [Proxy de salida](/docs/deployment/self-hosted/networking#proxy-de-salida): los intentos de conexión agotan el tiempo tras 30 segundos y los handshakes TLS tras 10 segundos. El conector del motor de autorización mantiene su propio transporte sin estos timeouts de conexión ni de handshake TLS; solo su timeout global de petición de 30 segundos acota cada llamada. Si un proxy de salida gestiona el tráfico de salida del clúster, comprueba las variables de entorno `HTTP_PROXY`, `HTTPS_PROXY` y `NO_PROXY` del pod e incluye los nombres de servicio internos en `NO_PROXY`.
+
 ## Los eventos no llegan
 
 Los eventos de dominio y auditoría dependen del publisher del bus:

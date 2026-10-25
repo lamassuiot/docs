@@ -34,7 +34,7 @@ The default response uses the PKCS#7/Base64 format described for cacerts, but co
 
 Use the same request and certificate response formats. Authentication comes from the independent `reenrollment_settings.est_rfc7030_settings` block. With a client certificate, its CN must match the CSR CN; the subject is also checked against the current certificate.
 
-The enrollment CA or an additional CA validates the credential in mTLS mode. The expiry check through `enable_expired_renewal` belongs to that validator. A revoked current certificate and a request before the window are rejected. See [Renewal](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for installation and recovery.
+In mTLS mode, the enrollment CA always validates the re-enrollment credential; certificates from other issuers are accepted only if they are listed as re-enrollment validation CAs. The expiry check through `enable_expired_renewal` belongs to that validator. A revoked current certificate and a request before the window are rejected. See [Renewal](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for installation and recovery.
 
 ## serverkeygen
 

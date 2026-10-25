@@ -65,7 +65,7 @@ Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiraci�
   <Step>
     ### Cambia la emisión
 
-    Actualiza la CA de enrolamiento y el perfil de los DMS. Mantén las CAs de validación adicionales si todavía deben aceptarse certificados antiguos durante el re-enrolamiento.
+    Actualiza la CA de enrolamiento y el perfil de los DMS. Mientras los certificados antiguos deban seguir aceptándose en el re-enrolamiento, añade la CA de enrolamiento anterior como CA de validación de re-enrolamiento: la nueva CA de enrolamiento se considera confiable automáticamente, pero la antigua era la CA de enrolamiento y no figura en ninguna otra lista, así que sin esa entrada sus certificados ya no podrán renovarse.
   </Step>
 
   <Step>
@@ -77,7 +77,7 @@ Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiraci�
   <Step>
     ### Cierra el solapamiento
 
-    Cuando ningún consumidor legítimo dependa de la autoridad anterior, retírala de la emisión y de las CAs distribuidas. Revócala si la política lo exige.
+    Cuando ningún consumidor legítimo dependa de la autoridad anterior, retírala de la emisión, de las CAs de validación de re-enrolamiento y de las CAs distribuidas. Revócala si la política lo exige.
   </Step>
 </Steps>
 

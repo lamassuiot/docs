@@ -34,7 +34,7 @@ La respuesta predeterminada usa el formato PKCS#7/Base64 descrito para cacerts, 
 
 Usa el mismo formato de solicitud y de certificado de respuesta. La autenticación se obtiene del bloque independiente `reenrollment_settings.est_rfc7030_settings`. Con certificado cliente, su CN debe coincidir con el CN de la CSR; también se comprueba el sujeto frente al certificado actual.
 
-La CA de enrolamiento o una CA adicional valida la credencial en el modo mTLS. La comprobación de vencimiento por `enable_expired_renewal` corresponde a ese validador. El certificado actual revocado y una solicitud anterior a la ventana se rechazan. Consulta [Renovación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) para instalación y recuperación.
+En el modo mTLS, la CA de enrolamiento siempre valida la credencial de reenrolamiento; los certificados de otros emisores se aceptan solo si figuran como CAs de validación de reenrolamiento. La comprobación de vencimiento por `enable_expired_renewal` corresponde a ese validador. El certificado actual revocado y una solicitud anterior a la ventana se rechazan. Consulta [Renovación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) para instalación y recuperación.
 
 ## serverkeygen
 

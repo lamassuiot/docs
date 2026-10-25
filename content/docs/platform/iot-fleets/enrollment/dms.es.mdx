@@ -79,7 +79,7 @@ Webhook y modo combinado también se ejecutan en reenrolamiento si se configuran
 
 Para mTLS inicial, `client_certificate_settings` contiene `validation_cas`, `allow_expired` y `chain_level_validation`. El flujo examinado recibe una credencial de certificado, no garantiza transportar todas las intermedias del handshake al validador. Para el caso directo, configura como CA de validación el emisor directo del bootstrap y prueba la ruta real del Gateway.
 
-En reenrolamiento con certificado, el validador utiliza la CA de enrolamiento, después `additional_validation_cas`, y la opción `enable_expired_renewal`. No presupongas que copiar `validation_cas` del bloque inicial cambia esos emisores.
+En reenrolamiento con certificado, el validador utiliza la CA de enrolamiento, las CAs listadas en `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas` y `enable_expired_renewal`. Esa lista es opcional porque la CA de enrolamiento siempre es confiable en el reenrolamiento; el validador de reenrolamiento no lee las `validation_cas` del bloque inicial.
 
 Para el webhook, configura destino, autenticación de Lamassu hacia ese servicio, método y timeout. El [contrato de autenticación](/docs/platform/iot-fleets/enrollment/bootstrap-identity) explica la credencial del dispositivo y el cuerpo de la llamada. `NO_AUTH` no acredita propiedad del ID solicitado.
 
@@ -127,14 +127,14 @@ La migración `20261021120000` reescribe todas las configuraciones de webhook al
 | `preventive_delta` | Umbral operativo preventivo de monitorización. |
 | `critical_delta` | Umbral operativo crítico de monitorización. |
 | `enable_expired_renewal` | Aceptación de un certificado presentado vencido en el validador mTLS de renovación. No autoriza por sí solo otro modo ni elimina restricciones del Gateway. |
-| `additional_validation_cas` | Emisores adicionales para la credencial mTLS durante una migración. |
+| `est_rfc7030_settings.client_certificate_settings.validation_cas` | CAs de validación de reenrolamiento; opcional, porque la CA de enrolamiento siempre es confiable. |
 | `revoke_on_reenrollment` | Si el certificado anterior está ACTIVE, intenta revocarlo con Superseded antes de vincular el sucesor. |
 
 Monitorizar no renueva: el cliente debe programar la solicitud y la instalación. En modos webhook o NO_AUTH, la política de credencial vencida no pasa por el mismo validador mTLS; el webhook debe autorizar explícitamente la recuperación que admita. Revisa [Renovación y recuperación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) para orden de operaciones y fallos parciales.
 
 ## ServerKeyGen
 
-`settings.server_keygen_settings.enabled` habilita generación software en el servidor. Algoritmo y tamaño proceden de su campo `key`; el perfil de emisión debe permitirlos. La respuesta contiene una clave PKCS#8 sin cifrar dentro de TLS, además del certificado. Consulta formato y extracción en [Referencia EST](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen).
+`settings.server_keygen_settings.enabled` habilita generación software en el servidor. La consola lo expone mediante un interruptor **Enable server-side key generation** y una selección de **Key type**: `ECDSA` P-256, P-384 o P-521, o `RSA` de 2048, 3072 o 4096 bits; los valores predeterminados son P-256 para `ECDSA` y 4096 bits para `RSA`. Algoritmo y tamaño proceden de su campo `key`, que se guarda como `{type,bits}` donde P-256, P-384 y P-521 equivalen a `bits` 256, 384 y 521; `key` se omite cuando está deshabilitado. El perfil de emisión debe permitirlos. La respuesta contiene una clave PKCS#8 sin cifrar dentro de TLS, además del certificado. Consulta formato y extracción en [Referencia EST](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen).
 
 ## Distribución de confianza
 

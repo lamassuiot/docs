@@ -111,7 +111,7 @@ Once provisioning completes, the connector stores the resulting certificate's AR
 
 ### `jitp` mode
 
-Just-In-Time Provisioning (JITP) mode delegates provisioning to AWS instead of the connector doing it directly. When the connector detects the DMS is in `jitp` mode, it creates a JITP provisioning template in AWS IoT Core and attaches it to the registered CA certificate. This template is created or updated at the moment the DMS is created or updated in Lamassu — not at device enrollment time. From then on, when a device with a certificate issued by that CA connects to AWS IoT Core for the first time, AWS executes the template automatically: it creates the Thing, registers the certificate and activates it.
+Just-In-Time Provisioning (JITP) mode delegates provisioning to AWS instead of the connector doing it directly. When the connector detects the DMS is in `jitp` mode, it creates a JITP provisioning template in AWS IoT Core and attaches it to the registered CA certificate. The connector attempts to create this template when the DMS is created and again on every full DMS edit (`PUT /v1/dms/{id}`) — not at device enrollment time. The attempt is not idempotent: when a template named after the DMS ID already exists, the creation call fails, the event is retried three times and finally lands in the `lamassu-dlq` poison queue (see Troubleshooting). A DMS update that omits `metadata` or sends `null` keeps the stored metadata, so the connector key `lamassu.io/iot/{connector_id}` remains present and the attempt is still triggered. A body that supplies a `metadata` object replaces the stored metadata entirely: if that object does not carry the connector key, the key is dropped and the connector silently skips the DMS's future events. Once the template is attached, when a device with a certificate issued by that CA connects to AWS IoT Core for the first time, AWS executes the template automatically: it creates the Thing, registers the certificate and activates it.
 
 The Thing name in the JITP template is derived from `AWS::IoT::Certificate::CommonName`, which corresponds to the device certificate's CN — the same convention as `auto` mode.
 
@@ -314,6 +314,14 @@ The first statement lets the device connect using its ThingName as the MQTT iden
 **Cause:** The shadow feature is disabled in the DMS configuration, the connector's credentials lack IoT data-plane permissions, or the firmware reads a different shadow than the configured one.
 
 **Resolution:** Check that `shadow_config.enable` is `true` in the connector metadata for the corresponding DMS. If a Named Shadow is used, verify `shadow_config.shadow_name` holds the correct name and that the firmware reads that Named Shadow and not the Classic Shadow. Confirm the connector's credentials have `iotdata:GetThingShadow` and `iotdata:UpdateThingShadow` permissions.
+
+---
+
+**Symptom:** After editing a DMS in `jitp` mode, messages about that DMS update appear in the `lamassu-dlq` poison queue.
+
+**Cause:** Every full DMS edit (`PUT /v1/dms/{id}`) triggers a `CreateProvisioningTemplate` attempt for the template named after the DMS ID, and the call is not idempotent: when the template already exists, it fails, the event is retried three times and finally lands in `lamassu-dlq`.
+
+**Resolution:** Verify the template named after the DMS ID still exists in AWS IoT Core and that JITP enrollment works. The `lamassu-dlq` message reflects the failed re-creation attempt, not a broken JITP flow.
 
 <Cards>
   <Card title="Configure a DMS" href="/docs/platform/iot-fleets/enrollment/dms" />

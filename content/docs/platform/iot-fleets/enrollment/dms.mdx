@@ -148,7 +148,7 @@ All ancestors are not added automatically. [Trust distribution](/docs/platform/i
 
 ## Operate the DMS inventory
 
-**Edit** changes name, settings and metadata. Backend updates replace these complete blocks; read the DMS before sending API edits to avoid losing fields.
+**Edit** changes name, settings and metadata. Updates go through the [DMS API](/docs/api-reference/dms-manager). `PUT /v1/dms/{id}` always targets the DMS identified by the URL path: the body carries no `id` field, and any `id` or `creation_ts` in it is silently ignored — authorization is evaluated against the same URL identifier. The body must include a non-empty `name` and a `settings` object; missing either returns HTTP 400 and leaves the stored DMS unchanged. `name` and `settings` are always full replacements, so read the DMS before sending API edits to avoid losing fields. `metadata` is optional: omitting it or sending `null` keeps the stored metadata, a supplied object replaces it entirely, and `{}` clears it (a later GET returns an empty object, not `null`). Old-style bodies that carry the full DMS object keep working while they include `name` and `settings`; unknown fields are ignored. Updates reject an empty `name` with HTTP 400: a DMS whose stored name was zeroed by an earlier update must be renamed before any client round-trips it — the AWS IoT connector’s JITP writeback included.
 
 **Go to DMS owned devices** restricts inventory by owner. **Show/Edit Metadata** contains operational and integration data; consult the integration guide before changing it. **EST (RFC-7030)** helps locate URLs.
 

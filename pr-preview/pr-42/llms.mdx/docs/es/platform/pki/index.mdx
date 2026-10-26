@@ -1,0 +1,60 @@
+# PKI (/docs/pr-preview/pr-42/es/platform/pki/overview)
+
+
+
+El bloque PKI explica cómo construir y operar la confianza X.509 de Lamassu: qué autoridades emiten, qué reglas aplican y cómo se comprueban los certificados. Está dirigido al administrador PKI y a quien necesita utilizar certificados en un sistema consumidor.
+
+Empieza aquí [#empieza-aquí]
+
+Sigue [Primeros pasos de PKI](/docs/platform/pki/quickstarts/overview) para crear una CA, emitir un certificado de cliente y verificarlo con OpenSSL. El resultado es un certificado, su clave privada y una cadena comprobada.
+
+Puedes completar ese recorrido antes de gestionar dispositivos. Cuando necesites asociar la identidad a un inventario o automatizar su enrolamiento, continúa en [IoT Fleets](/docs/platform/iot-fleets/overview).
+
+Qué necesitas [#qué-necesitas]
+
+* Una instancia accesible y permisos para gestionar las claves, CAs y certificados que usarás.
+* Un motor criptográfico disponible para custodiar la clave de la autoridad.
+* El propósito del certificado: por ejemplo, autenticar un cliente mediante mTLS.
+* Los requisitos del consumidor: emisores aceptados, algoritmos, nombres y usos permitidos.
+
+La configuración de la instancia y del proveedor criptográfico se prepara en [Despliegue](/docs/deployment/overview). La elección de jerarquía se explica en el [modelo de confianza](/docs/platform/pki/concepts/trust-model).
+
+Capacidades principales [#capacidades-principales]
+
+Construye tu jerarquía de confianza [#construye-tu-jerarquía-de-confianza]
+
+Las [autoridades](/docs/platform/pki/certificate-authorities) firman certificados. Una raíz establece el ancla de confianza y una intermedia permite separar la emisión por entorno o propósito. La [jerarquía y rotación](/docs/platform/pki/ca-hierarchy-and-rotation) explica cómo mantener esa confianza al sustituir una autoridad.
+
+Protege las claves criptográficas [#protege-las-claves-criptográficas]
+
+Las claves de firma de las CAs se gestionan mediante [KMS y motores criptográficos](/docs/platform/pki/key-management). La clave de un cliente que genera una CSR puede permanecer en ese cliente: conserva su custodia al elegir el método de emisión.
+
+Emite y controla certificados [#emite-y-controla-certificados]
+
+Un [perfil](/docs/platform/pki/certificate-profiles) establece restricciones de sujeto, validez, usos y claves. La CA aplica la configuración de emisión y firma el certificado. En el [inventario](/docs/platform/pki/certificates) puedes inspeccionar el resultado, descargarlo y gestionar su estado.
+
+Publica el estado de validación [#publica-el-estado-de-validación]
+
+La [validación](/docs/platform/pki/certificate-validation) reúne cadena, vigencia, usos y estado de revocación. Lamassu publica estado mediante [OCSP](/docs/platform/pki/ocsp) y [CRL](/docs/platform/pki/crl); el consumidor configura qué emisores reconoce y cómo comprueba ese estado.
+
+Cómo comprobar el resultado [#cómo-comprobar-el-resultado]
+
+Un certificado activo en la consola es una parte de la comprobación. Revisa también que:
+
+* su sujeto y sus extensiones identifiquen al cliente esperado;
+* su clave pública corresponda a la clave privada del cliente;
+* su cadena alcance una raíz confiable para el consumidor;
+* sus fechas y usos permitan la operación;
+* el consumidor aplique la comprobación de revocación y su autorización.
+
+El [recorrido de emisión](/docs/platform/pki/quickstarts/issue-certificate) incluye las primeras comprobaciones independientes.
+
+Continúa [#continúa]
+
+<Cards>
+  <Card title="Primeros pasos de PKI" description="Crea una CA y emite y verifica un certificado de cliente." href="/docs/platform/pki/quickstarts/overview" />
+
+  <Card title="Aplica la PKI a dispositivos" description="Asocia certificados al inventario y prepara el enrolamiento." href="/docs/platform/iot-fleets/overview" />
+
+  <Card title="Diagnóstico PKI" description="Comprueba emisión, OCSP y CRL cuando el resultado falla." href="/docs/platform/pki/troubleshooting" />
+</Cards>

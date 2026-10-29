@@ -96,6 +96,7 @@ A pod is not Ready [#a-pod-is-not-ready]
 Review <code>kubectl describe pod</code> first. Common causes are:
 
 * wrong credentials or DNS for PostgreSQL or RabbitMQ;
+* a missing AMQP CA or client certificate Secret referenced by `amqp.ca.secretName` or `amqp.client.secretName`;
 * unbound persistent volume;
 * inaccessible image or incorrect pull policy;
 * invalid cryptographic engine configuration;

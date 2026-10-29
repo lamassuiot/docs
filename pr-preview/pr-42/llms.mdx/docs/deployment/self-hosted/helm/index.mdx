@@ -201,7 +201,7 @@ Do not add `gateway.addresses` by default. Leave address assignment to the load-
 If Keycloak is external and already has its own reachable URL, point the OIDC settings at it and omit the `/auth` entry from `gateway.extraRouting`.
 
 <div className="lm-diff-ins lm-diff-block">
-  If your values file still carries the legacy gateway JWT validation settings — `auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` or `auth.authorization.roles.admin` — remove them. The migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md` documents their removal with no compatibility aliases, and `values.schema.json` rejects the leftover blocks instead of silently ignoring them.
+  If your values file still carries the legacy gateway JWT validation settings — `auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` or `auth.authorization.roles.admin` — remove them. The migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md` documents their removal with no compatibility aliases, and `values.schema.json` rejects the leftover blocks instead of silently ignoring them. The replacements are `services.authz.jwkUrl` and `services.authz.bootstrap`, already shown in the example above.
 </div>
 
 TLS with an existing Secret [#tls-with-an-existing-secret]
@@ -244,7 +244,7 @@ tls:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  The chart mounts configured Secrets read-only into every AMQP-consuming workload: the CA certificate under `/etc/lamassu/amqp/ca` and the client certificate and key under `/etc/lamassu/amqp/client`. The client private key is mounted with restrictive permissions (`defaultMode: 0440`; the CA volume uses `0444`).
+  The chart mounts configured Secrets read-only into every AMQP-consuming workload: the CA certificate under `/etc/lamassu/amqp/ca` and the client certificate and key under `/etc/lamassu/amqp/client`. The mounted file names are always `ca.crt`, `tls.crt` and `tls.key` — the `certificateKey` and `privateKeyKey` values rename only the Secret data keys, never the on-disk paths. The client private key is mounted with restrictive permissions (`defaultMode: 0440`; the CA volume uses `0444`), which works because the chart adds `fsGroup` to the pod security context when `amqp.client.secretName` is set — it uses the container `runAsGroup` (default `65532`) when `fsGroup` is not already set.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

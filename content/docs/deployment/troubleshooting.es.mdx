@@ -97,6 +97,7 @@ La autorización externa falla cerrada por defecto. Si authz no está disponible
 Revisa primero <code>kubectl describe pod</code>. Las causas habituales son:
 
 - credenciales o DNS incorrectos para PostgreSQL o RabbitMQ;
+- un Secret de CA o de certificado de cliente de AMQP inexistente referenciado por `amqp.ca.secretName` o `amqp.client.secretName`;
 - volumen persistente sin enlazar;
 - imagen inaccesible o política de pull incorrecta;
 - configuración inválida del motor criptográfico;
@@ -116,6 +117,15 @@ Los eventos de dominio y auditoría dependen del publisher del bus:
 - revisa exchange, routing key, colas y consumidores;
 - inspecciona dead-letter queues;
 - alerta sobre colas durables huérfanas y crecimiento de backlog.
+
+Si `amqp.tls` está habilitado, revisa también la parte TLS:
+
+- confirma que el listener del broker hable AMQPS en el puerto configurado — el puerto por defecto sigue siendo `5672` y no cambia automáticamente al habilitar TLS;
+- confirma que el Secret de la CA exista en el namespace del release y que su clave de datos coincida con `amqp.ca.certificateKey`;
+- recuerda que un Secret referenciado inexistente impide arrancar los pods consumidores;
+- tras actualizar el Secret de la CA o del certificado de cliente, reinicia los pods consumidores: el cliente AMQP carga los certificados al arrancar.
+
+Consulta [TLS de AMQP (AMQPS)](/docs/deployment/self-hosted/helm#tls-de-amqp-amqps) para la configuración completa.
 
 Una caída del consumidor no siempre impide que la operación principal termine. Por eso debes monitorizar RabbitMQ y verificar de forma independiente la persistencia de [auditoría](/docs/platform/administration/audit-logs).
 

@@ -109,10 +109,6 @@ auth:
     frontend:
       clientId: frontend
       authority: https://pki.example.com/auth/realms/lamassu
-    apiGateway:
-      jwks:
-        - name: oidc-authn
-          uri: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
 
 services:
   ca:
@@ -137,6 +133,8 @@ Do not add `gateway.addresses` by default. Leave address assignment to the load-
 
 If Keycloak is external and already has its own reachable URL, point the OIDC settings at it and omit the `/auth` entry from `gateway.extraRouting`.
 
+If your values file still carries the legacy gateway JWT validation settings — `auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` or `auth.authorization.roles.admin` — remove them. The migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md` documents their removal with no compatibility aliases, and `values.schema.json` rejects the leftover blocks instead of silently ignoring them. The replacements are `services.authz.jwkUrl` and `services.authz.bootstrap`, already shown in the example above.
+
 ### TLS with an existing Secret
 
 Create a Secret containing `tls.crt` and `tls.key`, then reference it:
@@ -147,6 +145,34 @@ tls:
   externalOptions:
     secretName: lamassu-downstream-tls
 ```
+
+### AMQP TLS (AMQPS)
+
+`amqp.tls: true` selects AMQPS in every event-bus configuration block. The default port stays `5672` and does not change automatically when TLS is enabled, so set `amqp.port` to the broker's TLS listener, commonly `5671`.
+
+With no CA Secret configured, the event-bus clients use the system-trusted CAs. To trust a private CA, create a Secret in the release namespace containing the CA certificate in PEM format and set `amqp.ca.secretName` (and `amqp.ca.certificateKey` if the data key is not `ca.crt`).
+
+For brokers that require mutual TLS, create a Secret containing the client certificate and private key and set `amqp.client.secretName` (with `amqp.client.certificateKey` and `amqp.client.privateKeyKey` if the data keys are not `tls.crt` and `tls.key`).
+
+```yaml
+amqp:
+  tls: true
+  port: 5671
+  ca:
+    secretName: rabbitmq-ca
+  client:
+    secretName: lamassu-amqp-client
+```
+
+The chart mounts configured Secrets read-only into every AMQP-consuming workload: the CA certificate under `/etc/lamassu/amqp/ca` and the client certificate and key under `/etc/lamassu/amqp/client`. The mounted file names are always `ca.crt`, `tls.crt` and `tls.key` — the `certificateKey` and `privateKeyKey` values rename only the Secret data keys, never the on-disk paths. The client private key is mounted with restrictive permissions (`defaultMode: 0440`; the CA volume uses `0444`), which works because the chart adds `fsGroup` to the pod security context when `amqp.client.secretName` is set — it uses the container `runAsGroup` (default `65532`) when `fsGroup` is not already set.
+
+Both Secret options require `amqp.tls: true`: `values.schema.json` rejects a non-empty `secretName` when `tls` is false, rejects unknown keys and rejects data-key names outside `^[A-Za-z0-9._-]+$`. The referenced Secret must exist in the release namespace or the consuming pods fail to start.
+
+The AMQP client loads certificates at startup, so restart the consuming pods after updating either Secret. Changing any `amqp` value rolls the consuming pods through the `checksum/config` annotation, but a change to Secret content alone does not trigger a rollout.
+
+<Callout type="warn" title="Set the AMQP port before upgrading">
+  Per the migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: in 3.8.0 `amqp.tls` was not applied and event-bus clients used plaintext AMQP; from 4.0.0, `amqp.tls: true` switches them to AMQPS. Set `amqp.port` to the broker TLS listener before upgrading, or set `amqp.tls: false` to keep plaintext AMQP.
+</Callout>
 
 ### Provision the first administrator
 

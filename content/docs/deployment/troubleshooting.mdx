@@ -97,6 +97,7 @@ External authorization fails closed by default. If authz is unavailable, protect
 Review <code>kubectl describe pod</code> first. Common causes are:
 
 - wrong credentials or DNS for PostgreSQL or RabbitMQ;
+- a missing AMQP CA or client certificate Secret referenced by `amqp.ca.secretName` or `amqp.client.secretName`;
 - unbound persistent volume;
 - inaccessible image or incorrect pull policy;
 - invalid cryptographic engine configuration;
@@ -116,6 +117,15 @@ Domain and audit events depend on the bus publisher:
 - review exchange, routing key, queues and consumers;
 - inspect dead-letter queues;
 - alert on orphan durable queues and backlog growth.
+
+If `amqp.tls` is enabled, verify the TLS side as well:
+
+- confirm the broker listener speaks AMQPS on the configured port — the default port stays `5672` and does not follow TLS automatically;
+- confirm the CA Secret exists in the release namespace and its data key matches `amqp.ca.certificateKey`;
+- remember that a missing referenced Secret prevents the consuming pods from starting;
+- after updating the CA or client certificate Secret, restart the consuming pods: the AMQP client loads certificates at startup.
+
+See [AMQP TLS (AMQPS)](/docs/deployment/self-hosted/helm#amqp-tls-amqps) for the full configuration.
 
 A consumer outage does not always prevent the main operation from completing. That is why you must monitor RabbitMQ and independently verify the persistence of [audit logs](/docs/platform/administration/audit-logs).
 

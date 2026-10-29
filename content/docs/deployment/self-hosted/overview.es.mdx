@@ -22,7 +22,7 @@ El chart de Lamassu es un **chart de aplicación**, no un chart de bootstrap del
 |---|---|---|
 | Aplicaciones Lamassu | Deployments y StatefulSets para la UI y las APIs, Services internos, ConfigMaps, una ServiceAccount y HPA/PDB opcionales | Un clúster Kubernetes operativo, capacidad de cómputo y acceso a las imágenes |
 | Datos PostgreSQL | Un job de pre-install/pre-upgrade que crea las bases de datos y schemas necesarios, ejecuta migraciones y aplica el bootstrap de autorización | Un servidor PostgreSQL accesible, credenciales autorizadas para crear bases de datos y schemas, y operaciones de backup/HA |
-| Mensajería | Configuración de conexión a RabbitMQ para los servicios Lamassu | Un broker RabbitMQ accesible, credenciales y la gestión de su ciclo de vida |
+| Mensajería | Configuración de conexión a RabbitMQ para los servicios Lamassu; la conexión puede usar AMQPS con una CA privada y un certificado de cliente opcional, definidos mediante valores del chart | Un broker RabbitMQ accesible, credenciales y la gestión de su ciclo de vida |
 | Identidad | Configuración OIDC/JWT y de autorización externa, además de los principales iniciales de Lamassu | Un proveedor OIDC, realm/tenant, cliente, usuarios, grupos y roles |
 | Enrutamiento externo | Un `Gateway`, recursos `HTTPRoute`, una configuración `EnvoyProxy` y políticas de seguridad de Envoy | Las CRD de Gateway API y Envoy, el controlador Envoy Gateway, una `GatewayClass`, un balanceador y la ruta de red externa |
 | TLS | Recursos `Issuer` y `Certificate` CA de cert-manager; un `Certificate` downstream gestionado por el chart o una referencia a tu Secret TLS | cert-manager; para TLS de confianza, un emisor de confianza o un Secret TLS ya poblado |

@@ -222,6 +222,18 @@ El Gateway debe mostrar `PROGRAMMED=True`. Si está programado pero no tiene una
 
 El test de Helm comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y verifica la respuesta de la UI.
 
+## Actualiza Lamassu
+
+Los pasos de upgrade específicos de cada versión se mantienen en `charts/lamassu/CHANGELOG/` dentro del repositorio Helm. El chart también incluye un job de pre-upgrade opcional que migra las claves privadas de CA existentes al motor KMS configurado para el release. Está desactivado por defecto (`migrations.caToKms.enabled: false`) y solo es necesario cuando actualizas desde una versión anterior a 3.7.0.
+
+Mientras el flag esté activo, cada `helm upgrade` crea el job `<chart fullname>-ca-to-kms-migration` (`lamassu-ca-to-kms-migration` para el release `lamassu`); una instalación nueva no lo crea. Se ejecuta antes del resto de hooks de pre-upgrade, la configuración de bootstrap de autorización y el job de migración de base de datos, que usan hook weights `-4` y `-3` frente a su `-10`.
+
+El job consume la misma configuración del servicio KMS que el chart renderiza en el ConfigMap de KMS, incluidos los motores de `services.kms.cryptoEngines`, y ejecuta la imagen de la herramienta de migración definida en `migrations.caToKms.image`. La monta en modo read-only en `/etc/lamassuiot/config.yml` desde la clave `config` del ConfigMap, así que configura el motor de destino en tus valores antes del upgrade que realiza la migración.
+
+El job resuelve su configuración mediante un volumen proyectado con dos fuentes opcionales: el ConfigMap `<chart fullname>-kms-config`, cuyo nombre incorpora el release (`lamassu-kms-config` para el release `lamassu`, `prod-lamassu-kms-config` para el release `prod`), y el ConfigMap legacy `kms-config`, sin el nombre del release, creado por versiones anteriores del chart. La configuración legacy mantiene la autoridad mientras siga presente y el job usa el ConfigMap del release una vez el legacy desaparece. Ambas fuentes son opcionales, por lo que un ConfigMap ausente nunca deja el pod del upgrade en `ContainerCreating`.
+
+Mantén `migrations.caToKms.enabled: true` en el upgrade que realiza la migración y elimina después el flag de tus valores una vez completada la migración; su valor por defecto es `false`.
+
 ## Decisiones para producción
 
 Antes de pasar a producción, revisa:
@@ -233,6 +245,6 @@ Antes de pasar a producción, revisa:
 - un emisor TLS de confianza o un certificado gestionado externamente
 - recursos, réplicas, autoscaling, disruption budgets y placement
 - SMTP, observabilidad y entrega de alertas
-- las [guías de actualización entre versiones](/docs/upgrades/3-8-0-to-4-0-0) y las notas de `charts/lamassu/CHANGELOG/` antes de cada upgrade
+- las [guías de actualización entre versiones](/docs/upgrades/3-8-0-to-4-0-0) y las notas de migración de `charts/lamassu/CHANGELOG/` antes de cada upgrade, incluido el hook opcional de migración CA-to-KMS descrito arriba
 
 La referencia completa de valores se mantiene en `charts/lamassu/VALUES.md` dentro del repositorio Helm.

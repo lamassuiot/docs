@@ -67,7 +67,7 @@ Requisitos de plataforma [#requisitos-de-plataforma]
 * almacenamiento persistente adecuado para la configuración elegida de PostgreSQL, RabbitMQ, VA y KMS
 * una implementación de balanceador o alguna otra ruta deliberada desde los clientes hasta el Gateway
 
-Los despliegues KMS que usan el sidecar PKCS#11 nativo requieren Kubernetes 1.29 o posterior.
+Los despliegues KMS que usan el sidecar PKCS#11 nativo requieren Kubernetes 1.29 o posterior. Las imágenes de contenedor precompiladas de Lamassu se publican para `linux/amd64` y `linux/arm64`, y el módulo cliente PKCS#11 del KMS (`p11-kit-client.so`) se instala en la ruta de biblioteca Debian de la arquitectura destino: `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so` en amd64 y `/usr/lib/aarch64-linux-gnu/pkcs11/p11-kit-client.so` en arm64. La ruta x86\_64 se conserva como alias de compatibilidad para configuraciones existentes.
 
 Elige la siguiente página [#elige-la-siguiente-página]
 

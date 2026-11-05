@@ -109,10 +109,6 @@ auth:
     frontend:
       clientId: frontend
       authority: https://pki.example.com/auth/realms/lamassu
-    apiGateway:
-      jwks:
-        - name: oidc-authn
-          uri: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
 
 services:
   ca:
@@ -207,6 +203,6 @@ Antes de pasar a producción, revisa:
 - un emisor TLS de confianza o un certificado gestionado externamente
 - recursos, réplicas, autoscaling, disruption budgets y placement
 - SMTP, observabilidad y entrega de alertas
-- sigue [Actualiza el chart de Helm](/docs/deployment/self-hosted/migration) y las notas de cada versión en `charts/lamassu/CHANGELOG/` antes de cada upgrade
+- las [guías de actualización entre versiones](/docs/upgrades/3-8-0-to-4-0-0) y las notas de `charts/lamassu/CHANGELOG/` antes de cada upgrade
 
 La referencia completa de valores se mantiene en `charts/lamassu/VALUES.md` dentro del repositorio Helm.

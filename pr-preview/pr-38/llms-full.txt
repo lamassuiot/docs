@@ -1780,7 +1780,13 @@ Webhook and combined modes also execute during re-enrollment when configured in 
 
 For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired` and `chain_level_validation`. The inspected flow receives one certificate credential; it does not guarantee forwarding every handshake intermediate to the validator. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
 
-For certificate re-enrollment, the validator <del className="lm-diff-del">uses</del><ins className="lm-diff-ins">tries</ins> the enrollment CA<del className="lm-diff-del">, then `additional_validation_cas`, and `enable_expired_renewal`. Do not assume </del><ins className="lm-diff-ins"> first and then the CAs listed in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; those are the re-enrollment validation CAs, and each settings block consults only its own `validation_cas` — </ins>copying <ins className="lm-diff-ins">the </ins>initial <del className="lm-diff-del">`validation_cas` changes those issuers</del><ins className="lm-diff-ins">block's list does not extend re-enrollment acceptance. The re-enrollment validator compares the presented TLS leaf against those CAs; the re-enrollment block's `chain_level_validation` and `allow_expired` values are stored but not consulted, and expiry is governed by `enable_expired_renewal`</ins>.
+<div className="lm-diff-del lm-diff-block">
+  For certificate re-enrollment, the validator uses the enrollment CA, then `additional_validation_cas`, and `enable_expired_renewal`. Do not assume copying initial `validation_cas` changes those issuers.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  For certificate re-enrollment, the validator tries the enrollment CA first and then the CAs listed in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; those are the re-enrollment validation CAs, and each settings block consults only its own `validation_cas`. CAs listed only in the initial block's `validation_cas` do not extend re-enrollment acceptance; during a CA rotation, add the old issuance CA to the re-enrollment block's list. The re-enrollment validator compares the presented TLS leaf against those CAs; the re-enrollment block's `chain_level_validation` and `allow_expired` values are stored but not consulted, and expiry is governed by `enable_expired_renewal`.
+</div>
 
 For a webhook, configure destination, Lamassu-to-service authentication, method and timeout. The [authentication contract](/docs/platform/iot-fleets/enrollment/bootstrap-identity) explains the device credential and request body. `NO_AUTH` does not establish ownership of the requested ID.
 

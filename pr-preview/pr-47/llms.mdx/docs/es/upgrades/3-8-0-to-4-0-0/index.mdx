@@ -30,6 +30,7 @@ Resumen [#resumen]
 | [Cambio de autorización](#cambio-de-autorización)                                               | Todos los despliegues                                                  | Alta: sin bootstrap no hay administrador                                    | Configurar `authz` según la guía de control de acceso                              |
 | [AMQP sobre TLS](#amqp)                                                                         | Despliegues con TLS en el broker de mensajería                         | Media: los clientes en texto plano son rechazados                           | Apuntar los clientes al puerto TLS y confiar en el certificado del broker          |
 | [Almacenamiento local e imágenes de contenedor](#almacenamiento-local-e-imágenes-de-contenedor) | Motores de KMS en sistema de archivos y CRLs locales                   | Media: los datos pueden quedar atrás                                        | Preservar volúmenes, trasladar los datos y revisar permisos                        |
+| [Valores de tipo de certificado](#valores-de-tipo-de-certificado)                               | Consumidores que leen o comparan los valores de `type` del certificado | Baja: dos valores almacenados cambian de nombre                             | Adaptar los consumidores a los valores nuevos                                      |
 
 Al final se incluye una [lista de verificación](#lista-de-verificación) para confirmar el resultado.
 
@@ -100,6 +101,14 @@ Si la versión de la consola no expone los ajustes independientes, pueden editar
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Valores de tipo de certificado [#valores-de-tipo-de-certificado]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Los valores de tipo de certificado almacenados en los datos cambian de nombre: `IMPORTED` pasa a `IMPORTED_WITH_KEY`, y `EXTERNAL` pasa a `IMPORTED_WITHOUT_KEY`. `MANAGED` no cambia. Adaptar los consumidores que leen o comparan esos valores.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   Consolidación en PostgreSQL [#consolidación-en-postgresql]
 </div>
 
@@ -146,6 +155,22 @@ Si la versión de la consola no expone los ajustes independientes, pueden editar
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Comprobaciones previas a la actualización [#comprobaciones-previas-a-la-actualización]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La migración del esquema de CA añade una restricción UNIQUE sobre `ca_certificates.id`, de modo que aborta si ya existen IDs de CA duplicados. Resuelve cualquier ID de CA duplicado antes de actualizar. Las importaciones ya rechazan IDs de CA duplicados con `409`, así que normalmente no pueden introducirse duplicados nuevos.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La migración del esquema del KMS convierte la clave primaria en `(key_id, engine_id)` y aborta con el error `cannot promote (key_id, engine_id) to primary key: N row(s) have no engine_id; backfill them before migrating` cuando hay filas de `kms_keys` sin `engine_id`. Rellena `engine_id` antes de ejecutar las migraciones.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Esa misma migración elimina con un `NOTICE` los alias iguales a un key\_id existente, porque los identificadores se resuelven ahora como key\_id antes que como alias; los alias afectados se descartan en lugar de redirigirse.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   Claves de CA heredadas en el KMS [#claves-de-ca-heredadas-en-el-kms]
 </div>
 
@@ -157,6 +182,7 @@ Si la versión de la consola no expone los ajustes independientes, pueden editar
   * `key_id` es el `subject_key_id` del certificado (SHA-256 de la clave pública).
   * La herramienta es idempotente: las claves ya presentes en el KMS se omiten, de modo que puede ejecutarse varias veces con seguridad.
   * Los certificados que no puedan leerse, o que carezcan de motor o de ID de clave de sujeto, se omiten con un aviso. Revisa los registros y resuelve los casos afectados.
+  * Cuando certificados de CA que comparten un `subject_key_id` declaran `engine_id` en conflicto, la herramienta omite esa clave como fallida y sale con código `1`, lo que hace fallar un hook `pre-upgrade` de Helm. Resuelve el conflicto manualmente antes de volver a ejecutarla.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -196,7 +222,7 @@ Si la versión de la consola no expone los ajustes independientes, pueden editar
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  SSE necesita difundir entre las instancias del servicio, así que cada instancia enlaza su propia cola AMQP duradera (llamada `device-manager-sse-<uuid>`). Las colas de instancias caídas o reemplazadas permanecen hasta que se limpien fuera de banda: configura en el broker una política de expiración o limpieza para no acumular colas.
+  SSE necesita difundir entre las instancias del servicio, así que cada instancia enlaza su propia cola AMQP duradera, derivada del ID de servicio `device-manager-sse-<uuid>`. Las colas de instancias caídas o reemplazadas permanecen hasta que se limpien fuera de banda: configura en el broker una política de expiración o limpieza para no acumular colas.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -204,7 +230,7 @@ Si la versión de la consola no expone los ajustes independientes, pueden editar
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  El motor de almacenamiento SQLite se elimina. Los proveedores admitidos son `postgres`, `couch_db` y `dynamo_db`. Los despliegues que usaban SQLite deben pasar primero a PostgreSQL y consolidar sus datos en los esquemas de `pki` como se describe en [Consolidación en PostgreSQL](#consolidación-en-postgresql).
+  El motor de almacenamiento SQLite se elimina. El único motor de almacenamiento registrado en 4.0.0 es PostgreSQL: los motores `couch_db` y `dynamo_db` no están registrados en el árbol de 4.0.0 — sus constantes de configuración siguen existiendo, pero no seleccionan ningún motor — así que los despliegues que usaban SQLite, o que aún ejecutan `couch_db` o `dynamo_db`, deben pasar a PostgreSQL y consolidar sus datos en los esquemas de `pki` como se describe en [Consolidación en PostgreSQL](#consolidación-en-postgresql).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -249,7 +275,7 @@ Lista de verificación [#lista-de-verificación]
 
 Tras aplicar la actualización, comprobar en este orden:
 
-1. **Bases de datos.** Confirmar que cada servicio lee la base `pki` con su propio esquema (`kms`, `ca`, `va`, `devicemanager`, `dmsmanager`, `alerts`), que los datos de `authz` y `wfx` son accesibles y que el estado de las migraciones está registrado por esquema. Si el despliegue usaba SQLite, confirmar que el nuevo almacenamiento en PostgreSQL funciona de extremo a extremo.
+1. **Bases de datos.** Confirmar que cada servicio lee la base `pki` con su propio esquema (`kms`, `ca`, `va`, `devicemanager`, `dmsmanager`, `alerts`), que los datos de `authz` y `wfx` son accesibles y que el estado de las migraciones está registrado por esquema, incluidas las migraciones del ID único de CA y de la clave compuesta del KMS. Si el despliegue usaba SQLite, confirmar que el nuevo almacenamiento en PostgreSQL funciona de extremo a extremo.
 2. **Claves de CA heredadas.** Ejecutar `ca-to-kms-migration` con `--dry-run`, revisar el informe y los avisos, ejecutarla sin la opción y confirmar que las claves esperadas aparecen en el KMS.
 3. **Eventos de dispositivo.** Consultar `GET /v1/devices/:id/events` en dispositivos con eventos históricos, confirmar que los datos se migraron y apuntar los consumidores a los nuevos endpoints.
 4. **Autorización.** Autenticarse con el principal de bootstrap y confirmar que la administración funciona; comprobar que una identidad sin permiso recibe `403`; revisar los permisos de clientes e integraciones.

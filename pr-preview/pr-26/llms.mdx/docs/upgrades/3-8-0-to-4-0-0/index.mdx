@@ -189,7 +189,7 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  In 3.8.0 `amqp.tls` was not applied and event-bus clients always connected over plaintext. In 4.0.0 `amqp.tls: true` switches them to AMQPS. The default `amqp.port` stays `5672` and does not change when TLS is enabled, so a values file that already set `amqp.tls: true` must point `amqp.port` at the broker's TLS listener (commonly `5671`), or set `amqp.tls: false` to keep plaintext. Clients must also trust the broker's certificate.
+  In 3.8.0 `amqp.tls` was not applied and event-bus clients always connected over plaintext. In 4.0.0 `amqp.tls: true` switches them to AMQPS. The default `amqp.port` stays `5672` and does not change when TLS is enabled, so a values file that already set `amqp.tls: true` must point `amqp.port` at the broker's TLS listener (`amqps`, commonly `5671`), or set `amqp.tls: false` to keep plaintext. Clients must also trust the broker's certificate.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -722,7 +722,7 @@ Re-enrollment authentication settings are now stored independently from initial 
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Point the tool's `storage` configuration at the `pki` database, where the CA and KMS data now live in the `ca` and `kms` schemas.
+  Point the tool's `storage` configuration at the `pki` database, where the CA and KMS data now live in the `ca` and `kms` schemas. The tool's options are described in `backend/cmd/ca-to-kms-migration/README.md` in the `lamassuiot` repository.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

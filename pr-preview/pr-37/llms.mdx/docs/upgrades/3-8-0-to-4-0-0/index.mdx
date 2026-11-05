@@ -3,39 +3,124 @@
 
 
 <div className="lm-diff-ins lm-diff-block">
-  This page lists what changes between 3.8.0 and 4.0.0 and what to verify after applying the upgrade. Current behavior is documented in the corresponding feature pages.
+  Upgrading from 3.8.0 to 4.0.0 automatically migrates stored DMS configuration. Most of it converts without intervention, but three changes can leave enrollments failing or configs holding unexpected values if they are not reviewed. This page states what changes, what symptoms to expect and what to do in each case. Current behavior of each feature is documented in the [DMS](/docs/platform/iot-fleets/enrollment/dms) pages.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  DMS: independent re-enrollment authentication [#dms-independent-re-enrollment-authentication]
+  Summary [#summary]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Re-enrollment authentication settings are stored independently from initial authentication. After the upgrade, read both blocks before editing a DMS. If your console version does not expose independent settings, use the [DMS API](/docs/api-reference/dms-manager).
+  | Change                                                                                | Who is affected                                                   | Severity                                                            | Action                                                         |
+  | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------- |
+  | [Webhooks with file references](#webhooks-with-file-references)                       | DMSs with a webhook whose mTLS certificate or key were file paths | High: enrollments and re-enrollments calling the webhook fail       | Re-enter certificate and key as PEM, or remove the file fields |
+  | [Receiver certificate verification](#receiver-certificate-verification)               | DMSs with a webhook that had `validate_server_cert: false`        | Medium: webhook credentials are sent to an unverified receiver      | Set `insecure_skip_verify` to `false`                          |
+  | [Re-enrollment trust set](#re-enrollment-trust-set)                                   | Scripts and consoles that edit DMSs through the API               | Medium: an edit in the old layout silently empties `validation_cas` | Read the DMS before editing and use the new field              |
+  | [Independent re-enrollment authentication](#independent-re-enrollment-authentication) | Any DMS                                                           | Low: informational                                                  | Read both blocks before editing                                |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  DMS: webhook config layout [#dms-webhook-config-layout]
+  A [verification checklist](#verification-checklist) at the end confirms the result.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Stored webhook configs are rewritten to the current layout: `validate_server_cert` becomes the negated `insecure_skip_verify`, `oidc` becomes `jwt_options`, `apikey` becomes `apikey_options` and `mtls` becomes `mtls_options`. When both the legacy certificate and key are PEM, they move into `mtls_options.cert_content` and `key_content` and need no action.
+  DMS webhooks [#dms-webhooks]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Check `insecure_skip_verify` on every migrated config: a config with `validate_server_cert: false` becomes `insecure_skip_verify: true`, so receiver-certificate verification stays skipped until you set it to `false`. The webhook authorization channel carries the API key or bearer token, so skipping verification exposes those credentials to a network-positioned attacker.
+  Stored webhook configs are rewritten to the current layout. Fields are renamed as follows:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  A mixed config (PEM certificate, file-path key) becomes `mtls_options.cert_file` and `key_file`, which delivery rejects. Delivery of any webhook config that references files fails on every call, whatever its auth mode, so every enroll and reenroll that calls that webhook fails until the certificate and key are re-entered as Base64-encoded or plain PEM, or the leftover file fields are removed if the webhook does not use mTLS. Meanwhile, a metadata-only update through `PUT` or `PATCH` on `/v1/dms/:id/metadata` still succeeds. If a stored config holds file paths in `mtls_options.cert_content` or `key_content`, every full settings update (`POST /v1/dms`, `PUT /v1/dms/:id`) fails validation — settings are replaced wholesale, so the stored config must be resent.
+  | Field in 3.8.0         | Field in 4.0.0                         |
+  | ---------------------- | -------------------------------------- |
+  | `validate_server_cert` | `insecure_skip_verify` (value negated) |
+  | `oidc`                 | `jwt_options`                          |
+  | `apikey`               | `apikey_options`                       |
+  | `mtls`                 | `mtls_options`                         |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  DMS: re-enrollment trust set [#dms-re-enrollment-trust-set]
+  When the legacy mTLS certificate and key are both PEM, they move into `mtls_options.cert_content` and `mtls_options.key_content` and need no action. The two cases below do need it.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  `reenrollment_settings.additional_validation_cas` moves into `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`. That nested value was never consulted when validating re-enrollments, so the effective trust set is unchanged; a missing or null flat list becomes an empty list. Bodies that still carry `additional_validation_cas` are accepted but the value is silently ignored — unknown JSON fields are dropped — and GET responses no longer include it. Read the DMS before sending API edits: an update body built from the old layout silently empties `validation_cas`.
+  Webhooks with file references [#webhooks-with-file-references]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A mixed config, with a PEM certificate and a file-path key, is migrated to `mtls_options.cert_file` and `mtls_options.key_file`. Webhook delivery rejects those fields, and does so on every call, whatever the configured authentication mode. As a result, every enroll and re-enroll that calls that webhook fails until the config is fixed.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  There are two ways to fix it, depending on the webhook:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * If the webhook uses mTLS, re-enter the certificate and key as Base64-encoded or plain PEM.
+  * If the webhook does not use mTLS, remove the leftover file fields.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Metadata-only updates keep working in the meantime (`PUT` or `PATCH` on `/v1/dms/:id/metadata`).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A variant of the same problem exists: if the stored config holds file paths inside `mtls_options.cert_content` or `mtls_options.key_content`, every full settings update (`POST /v1/dms` or `PUT /v1/dms/:id`) fails validation. Settings are replaced wholesale, so the stored config must be resent with the certificate and key as PEM.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Receiver certificate verification [#receiver-certificate-verification]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A config with `validate_server_cert: false` becomes `insecure_skip_verify: true`. Receiver certificate verification therefore stays skipped until that field is set to `false`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  It should be corrected on every migrated config. The webhook authorization channel carries the API key or bearer token, so skipping verification exposes those credentials to a network-positioned attacker. Keeping `insecure_skip_verify: true` is only justified when the receiver certificate is deliberately unverifiable.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Re-enrollment trust set [#re-enrollment-trust-set]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The flat field `reenrollment_settings.additional_validation_cas` moves into the nested field `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {
+    "reenrollment_settings": {
+      "est_rfc7030_settings": {
+        "client_certificate_settings": {
+          "validation_cas": ["<CA_ID>"]
+        }
+      }
+    }
+  }
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The effective trust set does not change, because the nested value was never consulted when validating re-enrollments. If the flat list was missing or null, it becomes an empty list.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  What does change is how API requests are handled. Bodies that still carry `additional_validation_cas` are accepted, but the value is silently ignored because unknown JSON fields are dropped, and GET responses no longer include it. Consequently, an update body built from the old layout empties `validation_cas` without returning any error. To avoid it, always read the DMS before sending an edit and reuse the layout the API returns.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Independent re-enrollment authentication [#independent-re-enrollment-authentication]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Re-enrollment authentication settings are now stored independently from initial authentication. Nothing needs migrating, but both blocks should be read before editing a DMS so that one is not modified while believing the other is being edited.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  If the console version does not expose independent settings, they can be edited through the [DMS API](/docs/api-reference/dms-manager).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -43,13 +128,21 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  After applying the upgrade, check each area touched by the notes above:
+  After applying the upgrade, check in this order:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  1. **DMS webhooks** — list DMSs with webhook enrollment or re-enrollment and confirm each `config` block carries `insecure_skip_verify` and the expected option block (`apikey_options`, `jwt_options` or `mtls_options` with PEM content, no file fields).
-  2. **Receiver verification** — confirm `insecure_skip_verify` is `false` unless the receiver certificate is intentionally unverified.
-  3. **Re-enrollment trust set** — read `est_rfc7030_settings.client_certificate_settings.validation_cas` and confirm it still holds the CAs expected for old-CA cohorts during rotation overlaps.
-  4. **API clients** — verify that any script or console built from the old DMS layout (flat `additional_validation_cas`, legacy `mtls`/`apikey`/`oidc` fields) is updated; bodies carrying those fields silently drop their values.
-  5. **Delivery** — trigger or observe one enroll or re-enroll through each migrated webhook and confirm the authorization call completes.
+  1. **Webhooks without file fields.** List the DMSs that use a webhook for enrollment or re-enrollment and confirm each `config` block carries `insecure_skip_verify` and the expected option block (`apikey_options`, `jwt_options` or `mtls_options`), with the certificate and key as PEM and no `cert_file` or `key_file`.
+  2. **Receiver verification.** Confirm `insecure_skip_verify` is `false`, unless the receiver certificate is intentionally unverified.
+  3. **Delivery.** Trigger, or wait for, one enroll or re-enroll through each migrated webhook and confirm the authorization call completes.
+  4. **Trust set.** Read `est_rfc7030_settings.client_certificate_settings.validation_cas` and confirm it holds the expected CAs, in particular those of the old CA during rotation overlaps.
+  5. **API clients.** Update any script or console that uses the old DMS layout (flat `additional_validation_cas`, or the legacy `mtls`, `apikey` and `oidc` fields), since they silently drop those values.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="Configure a DMS" href="/docs/platform/iot-fleets/enrollment/dms" />
+
+    <Card title="DMS API" href="/docs/api-reference/dms-manager" />
+  </Cards>
 </div>

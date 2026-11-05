@@ -3,39 +3,124 @@
 
 
 <div className="lm-diff-ins lm-diff-block">
-  Esta página recoge qué cambia entre 3.8.0 y 4.0.0 y qué comprobar después de aplicar la actualización. El comportamiento actual se documenta en las páginas correspondientes de cada funcionalidad.
+  La actualización de 3.8.0 a 4.0.0 migra automáticamente la configuración almacenada de los DMS. Casi todo se convierte sin intervención, pero hay tres cambios que pueden dejar enrolamientos fallando o configuraciones con valores inesperados si no se revisan. Esta página indica qué cambia, qué síntomas produce y qué hacer en cada caso. El comportamiento vigente de cada funcionalidad está en las páginas de [DMS](/docs/platform/iot-fleets/enrollment/dms).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  DMS: autenticación de reenrolamiento independiente [#dms-autenticación-de-reenrolamiento-independiente]
+  Resumen [#resumen]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Los ajustes de autenticación de reenrolamiento se almacenan independientes de la autenticación inicial. Después de actualizar, lee ambos bloques antes de editar un DMS. Si la versión de tu consola no expone los ajustes independientes, usa la [API DMS](/docs/api-reference/dms-manager).
+  | Cambio                                                                                          | Quién se ve afectado                                                   | Gravedad                                                                    | Acción                                                                             |
+  | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+  | [Webhooks con referencias a archivos](#webhooks-con-referencias-a-archivos)                     | DMS con webhook cuyo certificado o clave de mTLS eran rutas de archivo | Alta: los enrolamientos y reenrolamientos que llaman al webhook fallan      | Volver a introducir certificado y clave como PEM, o eliminar los campos de archivo |
+  | [Verificación del certificado del receptor](#verificación-del-certificado-del-receptor)         | DMS con webhook que tenían `validate_server_cert: false`               | Media: las credenciales del webhook viajan sin verificar al receptor        | Poner `insecure_skip_verify` a `false`                                             |
+  | [Conjunto de confianza del reenrolamiento](#conjunto-de-confianza-del-reenrolamiento)           | Scripts y consolas que editan DMS por API                              | Media: una edición con el formato antiguo vacía `validation_cas` sin avisar | Leer el DMS antes de editarlo y usar el campo nuevo                                |
+  | [Autenticación de reenrolamiento independiente](#autenticación-de-reenrolamiento-independiente) | Cualquier DMS                                                          | Baja: solo informativo                                                      | Revisar ambos bloques antes de editar                                              |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  DMS: formato de la configuración de webhook [#dms-formato-de-la-configuración-de-webhook]
+  Al final se incluye una [lista de verificación](#lista-de-verificación) para confirmar el resultado.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Las configuraciones de webhook almacenadas se reescriben al formato actual: `validate_server_cert` pasa a ser el negado de `insecure_skip_verify`, `oidc` pasa a `jwt_options`, `apikey` pasa a `apikey_options` y `mtls` pasa a `mtls_options`. Cuando el certificado y la clave heredados son ambos PEM, se trasladan a `mtls_options.cert_content` y `key_content` y no requieren ninguna acción.
+  Webhooks del DMS [#webhooks-del-dms]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Revisa `insecure_skip_verify` en cada configuración migrada: una configuración con `validate_server_cert: false` pasa a `insecure_skip_verify: true`, así que la verificación del certificado del receptor sigue sin realizarse hasta que pongas ese flag a `false`. El canal de autorización del webhook lleva la API key o el bearer token, así que saltarse la verificación expone esas credenciales a un atacante con posición de red.
+  Las configuraciones de webhook almacenadas se reescriben al formato actual. Los campos se renombran de la siguiente manera:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Una configuración mixta (certificado PEM, clave como ruta de archivo) pasa a `mtls_options.cert_file` y `key_file`, que la entrega rechaza. La entrega de cualquier configuración de webhook que haga referencia a archivos falla en cada llamada, sea cual sea su modo de autenticación, por lo que todos los enroll y reenroll que llaman a ese webhook fallan hasta que el certificado y la clave se vuelvan a introducir como PEM, en Base64 o plano, o se eliminen los campos de archivo sobrantes si el webhook no usa mTLS. Mientras tanto, una actualización solo de metadatos mediante `PUT` o `PATCH` en `/v1/dms/:id/metadata` sigue funcionando. Si una configuración almacenada guarda rutas de archivos en `mtls_options.cert_content` o `key_content`, toda actualización completa de ajustes (`POST /v1/dms`, `PUT /v1/dms/:id`) falla la validación — los ajustes se sustituyen al completo, así que la configuración almacenada debe reenviarse.
+  | Campo en 3.8.0         | Campo en 4.0.0                               |
+  | ---------------------- | -------------------------------------------- |
+  | `validate_server_cert` | `insecure_skip_verify` (con el valor negado) |
+  | `oidc`                 | `jwt_options`                                |
+  | `apikey`               | `apikey_options`                             |
+  | `mtls`                 | `mtls_options`                               |
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  DMS: conjunto de confianza del reenrolamiento [#dms-conjunto-de-confianza-del-reenrolamiento]
+  Cuando el certificado y la clave heredados de mTLS son ambos PEM, se trasladan a `mtls_options.cert_content` y `mtls_options.key_content` y no requieren ninguna acción. Los dos casos siguientes son los que sí la requieren.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  `reenrollment_settings.additional_validation_cas` se traslada a `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`. Ese valor anidado nunca se consultó al validar reenrolamientos, así que el conjunto de confianza efectivo no cambia; una lista plana ausente o nula pasa a ser una lista vacía. Los cuerpos que aún contengan `additional_validation_cas` se aceptan, pero su valor se ignora en silencio — los campos JSON desconocidos se descartan — y las respuestas GET ya no lo incluyen. Lee el DMS antes de enviar ediciones por API: un cuerpo de actualización construido con el formato antiguo vacía en silencio `validation_cas`.
+  Webhooks con referencias a archivos [#webhooks-con-referencias-a-archivos]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una configuración mixta, con el certificado en PEM y la clave como ruta de archivo, se migra a `mtls_options.cert_file` y `mtls_options.key_file`. La entrega del webhook rechaza esos campos, y lo hace en cada llamada, sea cual sea el modo de autenticación configurado. El efecto es que todos los enrolamientos y reenrolamientos que invocan ese webhook fallan hasta corregir la configuración.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Para corregirlo hay dos opciones, según el webhook:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * Si el webhook usa mTLS, volver a introducir el certificado y la clave como PEM, en Base64 o en texto plano.
+  * Si el webhook no usa mTLS, eliminar los campos de archivo sobrantes.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Mientras tanto, las actualizaciones de solo metadatos siguen funcionando (`PUT` o `PATCH` sobre `/v1/dms/:id/metadata`).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Existe una variante del mismo problema: si la configuración almacenada guarda rutas de archivo dentro de `mtls_options.cert_content` o `mtls_options.key_content`, toda actualización completa de ajustes (`POST /v1/dms` o `PUT /v1/dms/:id`) falla la validación. Los ajustes se sustituyen al completo, de modo que la configuración almacenada debe reenviarse con el certificado y la clave como PEM.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Verificación del certificado del receptor [#verificación-del-certificado-del-receptor]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una configuración con `validate_server_cert: false` pasa a `insecure_skip_verify: true`. Por tanto, la verificación del certificado del receptor sigue sin realizarse hasta que se ponga ese campo a `false`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Conviene corregirlo en cada configuración migrada. El canal de autorización del webhook transporta la API key o el bearer token, de modo que saltarse la verificación expone esas credenciales a un atacante con posición de red. Solo se justifica mantener `insecure_skip_verify: true` si el certificado del receptor no es verificable de forma deliberada.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Conjunto de confianza del reenrolamiento [#conjunto-de-confianza-del-reenrolamiento]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El campo plano `reenrollment_settings.additional_validation_cas` se traslada al campo anidado `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {
+    "reenrollment_settings": {
+      "est_rfc7030_settings": {
+        "client_certificate_settings": {
+          "validation_cas": ["<CA_ID>"]
+        }
+      }
+    }
+  }
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El conjunto de confianza efectivo no cambia, porque el valor anidado nunca se consultó al validar reenrolamientos. Si la lista plana estaba ausente o era nula, pasa a ser una lista vacía.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Lo que sí cambia es el tratamiento de las peticiones por API. Los cuerpos que aún contienen `additional_validation_cas` se aceptan, pero su valor se ignora en silencio porque los campos JSON desconocidos se descartan, y las respuestas GET ya no lo incluyen. En consecuencia, un cuerpo de actualización construido con el formato antiguo vacía `validation_cas` sin devolver ningún error. Para evitarlo, leer siempre el DMS antes de enviar una edición y reutilizar el formato que devuelve la API.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Autenticación de reenrolamiento independiente [#autenticación-de-reenrolamiento-independiente]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma independiente de los de la autenticación inicial. No hay nada que migrar, pero antes de editar un DMS conviene leer ambos bloques para no modificar uno creyendo que se está editando el otro.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Si la versión de la consola no expone los ajustes independientes, pueden editarse mediante la [API DMS](/docs/api-reference/dms-manager).
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -43,13 +128,21 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Después de aplicar la actualización, revisa cada área tocada por las notas anteriores:
+  Tras aplicar la actualización, comprobar en este orden:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  1. **Webhooks del DMS** — lista los DMS con webhook en enrolamiento o reenrolamiento y confirma que cada bloque `config` lleva `insecure_skip_verify` y el bloque de opciones esperado (`apikey_options`, `jwt_options` o `mtls_options` con contenido PEM, sin campos de archivo).
-  2. **Verificación del receptor** — confirma que `insecure_skip_verify` está a `false` salvo que el certificado del receptor sea intencionadamente no verificado.
-  3. **Conjunto de confianza del reenrolamiento** — lee `est_rfc7030_settings.client_certificate_settings.validation_cas` y confirma que sigue conteniendo las CAs esperadas para las cohortes de la CA antigua durante los solapamientos de rotación.
-  4. **Clientes de la API** — verifica que cualquier script o consola construida con el formato antiguo del DMS (campo plano `additional_validation_cas`, campos heredados `mtls`/`apikey`/`oidc`) está actualizado; los cuerpos que los contienen descartan sus valores en silencio.
-  5. **Entrega** — lanza u observa un enroll o reenroll a través de cada webhook migrado y confirma que la llamada de autorización se completa.
+  1. **Webhooks sin campos de archivo.** Listar los DMS que usan webhook en enrolamiento o reenrolamiento y confirmar que cada bloque `config` incluye `insecure_skip_verify` y el bloque de opciones esperado (`apikey_options`, `jwt_options` o `mtls_options`), con el certificado y la clave en PEM y sin `cert_file` ni `key_file`.
+  2. **Verificación del receptor.** Confirmar que `insecure_skip_verify` es `false`, salvo que el certificado del receptor no sea verificable de forma intencionada.
+  3. **Entrega.** Lanzar, o esperar a que ocurra, un enrolamiento o reenrolamiento a través de cada webhook migrado y confirmar que la llamada de autorización se completa.
+  4. **Conjunto de confianza.** Leer `est_rfc7030_settings.client_certificate_settings.validation_cas` y confirmar que contiene las CAs esperadas, en particular las de la CA antigua durante los solapamientos de rotación.
+  5. **Clientes de la API.** Actualizar los scripts y consolas que usen el formato antiguo del DMS (`additional_validation_cas` plano, o los campos `mtls`, `apikey` y `oidc` heredados), ya que descartan esos valores sin avisar.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="Configurar un DMS" href="/docs/platform/iot-fleets/enrollment/dms" />
+
+    <Card title="API DMS" href="/docs/api-reference/dms-manager" />
+  </Cards>
 </div>

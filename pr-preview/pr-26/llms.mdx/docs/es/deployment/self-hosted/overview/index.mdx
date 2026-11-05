@@ -67,7 +67,7 @@ Requisitos de plataforma [#requisitos-de-plataforma]
 * almacenamiento persistente adecuado para la configuración elegida de PostgreSQL, RabbitMQ, VA y KMS
 * una implementación de balanceador o alguna otra ruta deliberada desde los clientes hasta el Gateway
 
-Los despliegues KMS que usan el sidecar PKCS#11 nativo requieren Kubernetes 1.29 o posterior.
+Los despliegues KMS que usan el sidecar PKCS#11 nativo requieren Kubernetes 1.29 o posterior. Las imágenes de contenedor precompiladas de Lamassu se publican para `linux/amd64` y `linux/arm64`, y el módulo cliente PKCS#11 del KMS (`p11-kit-client.so`) se instala en la ruta de biblioteca Debian de la arquitectura destino: `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so` en amd64 y `/usr/lib/aarch64-linux-gnu/pkcs11/p11-kit-client.so` en arm64. La ruta x86\_64 se conserva como alias de compatibilidad para configuraciones existentes.
 
 Elige la siguiente página [#elige-la-siguiente-página]
 
@@ -75,7 +75,7 @@ Elige la siguiente página [#elige-la-siguiente-página]
   <Card title="Instala con Helm" description="Prepara dependencias, configura valores, instala y verifica un despliegue controlado." href="/docs/deployment/self-hosted/helm" />
 
   <div className="lm-diff-ins lm-diff-block">
-    <Card title="Actualiza el chart" description="Actualiza un release de Helm existente, incluidos los pasos de migración de 3.8.0 a 4.0.0." href="/docs/deployment/self-hosted/migration" />
+    <Card title="Actualiza desde 3.8.0" description="Actualiza una release de Helm existente a 4.0.0: cambios de arquitectura, breaking changes, pasos de migración y validación." href="/docs/upgrades/3-8-0-to-4-0-0" />
   </div>
 
   <Card title="Expón el Gateway" description="Elige un diseño de tráfico externo, comprende gateway.addresses y gestiona varios Gateways." href="/docs/deployment/self-hosted/networking" />

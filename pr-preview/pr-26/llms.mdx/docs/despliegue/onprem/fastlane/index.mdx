@@ -29,7 +29,7 @@ You need:
 * `kubectl` and Helm, or the MicroK8s CLI
 * `yq`
 * cert-manager
-* `jq` only when using `--sample-data`
+* `jq` only when using `--sample-data` or `--development`
 * `ssh-keygen` only when using `--with-hsm`
 * free external ports 80 and 443 on a single-node K3s host
 
@@ -75,26 +75,41 @@ See [Expose the Gateway](/docs/deployment/self-hosted/networking) for K3s port c
 
 Command-line options [#command-line-options]
 
-| Option                     | Default            | Purpose                                                                      |
-| -------------------------- | ------------------ | ---------------------------------------------------------------------------- |
-| `-h`, `--help`             | —                  | Show help                                                                    |
-| `-c`, `--context`          | current context    | Select the kubeconfig context for kubectl and Helm                           |
-| `-n`, `--non-interactive`  | false              | Skip prompts and generate dependency credentials                             |
-| `-ns`, `--namespace`       | `lamassu-dev`      | Namespace for the installation                                               |
-| `-d`, `--domain`           | `dev.lamassu.io`   | Domain used by the UI, OIDC and certificate                                  |
-| `-v`, `--version`          | latest             | Lamassu chart version                                                        |
-| `--https-port`             | `443`              | Gateway HTTPS listener port                                                  |
-| `--http-port`              | `80`               | Gateway HTTP listener port                                                   |
-| `--tls-crt`                | —                  | PEM certificate for downstream TLS                                           |
-| `--tls-key`                | —                  | PEM private key for downstream TLS                                           |
-| `-l`, `--local-chart-path` | repository chart   | Use an unpacked local Lamassu chart                                          |
-| `-ip`, `--gateway-ip`      | auto-detected      | Override the address written to `gateway.addresses`                          |
-| `--otel`                   | false              | Install Victoria Logs, VictoriaTraces, Jaeger and an OpenTelemetry Collector |
-| `--sample-data`            | false              | Create sample CAs, profiles, certificates, DMS data and devices              |
-| `--with-hsm`               | false              | Install lab HSM components and configure KMS for PKCS#11                     |
-| `--softhsm-chart-path`     | `./charts/softhsm` | Use a different local SoftHSM chart                                          |
+| Option                     | Default            | Purpose                                                                                                                                                                                                            |
+| -------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `-h`, `--help`             | —                  | Show help                                                                                                                                                                                                          |
+| `-c`, `--context`          | current context    | Select the kubeconfig context for kubectl and Helm                                                                                                                                                                 |
+| `-n`, `--non-interactive`  | false              | Skip prompts and generate dependency credentials                                                                                                                                                                   |
+| `-ns`, `--namespace`       | `lamassu-dev`      | Namespace for the installation                                                                                                                                                                                     |
+| `-d`, `--domain`           | `dev.lamassu.io`   | Domain used by the UI, OIDC and certificate                                                                                                                                                                        |
+| `-v`, `--version`          | latest             | Lamassu chart version                                                                                                                                                                                              |
+| `--https-port`             | `443`              | Gateway HTTPS listener port                                                                                                                                                                                        |
+| `--http-port`              | `80`               | Gateway HTTP listener port                                                                                                                                                                                         |
+| `--tls-crt`                | —                  | PEM certificate for downstream TLS                                                                                                                                                                                 |
+| `--tls-key`                | —                  | PEM private key for downstream TLS                                                                                                                                                                                 |
+| `-l`, `--local-chart-path` | repository chart   | Use an unpacked local Lamassu chart                                                                                                                                                                                |
+| `-ip`, `--gateway-ip`      | auto-detected      | Override the address written to `gateway.addresses`                                                                                                                                                                |
+| `--otel`                   | false              | Install Victoria Logs, VictoriaTraces, Jaeger and an OpenTelemetry Collector                                                                                                                                       |
+| `--development`            | false              | Development mode: fully provisions the Keycloak `lamassu` user (fixed `lamassu`/`lamassu` password, no first-login steps) and lets the `frontend` client accept any redirect URI or web origin. Not for production |
+| `--sample-data`            | false              | Create sample CAs, profiles, certificates, DMS data and devices                                                                                                                                                    |
+| `--with-hsm`               | false              | Install lab HSM components and configure KMS for PKCS#11                                                                                                                                                           |
+| `--softhsm-chart-path`     | `./charts/softhsm` | Use a different local SoftHSM chart                                                                                                                                                                                |
 
 Fastlane does not provide an offline mode. Use the manual Helm workflow and a prepared registry/chart mirror for disconnected environments.
+
+Development mode [#development-mode]
+
+`--development` adjusts the Keycloak `lamassu` realm generated by Fastlane for a disposable evaluation environment:
+
+* the `lamassu` user is fully provisioned (first name Lamassu, last name Admin, email `lamassu@lamassu.io`, verified): there are no profile setup or password change steps on first login
+* the well-known `lamassu`/`lamassu` password is fixed and permanent: it is never rotated and grants the `pki-admin` role, including non-interactive tokens through the `frontend` client
+* the `frontend` client accepts any redirect URI and any web origin (`*`) instead of the original `/*` patterns
+
+<Callout type="warn" title="Development mode is not for production">
+  With `--development`, the fixed `lamassu`/`lamassu` password grants `pki-admin` access to anyone who can reach the installation. Never use it on anything exposed beyond a development machine or a network-reachable host.
+</Callout>
+
+`--development` applies when the `lamassu` realm is first imported. It does not modify an existing cluster. It can be combined with `--sample-data`: the development transform runs first, then sample data is added to the same realm configuration.
 
 What the script configures [#what-the-script-configures]
 
@@ -120,7 +135,7 @@ Without them, it configures cert-manager with a self-signed issuer. This is suit
 
 Credentials and generated files [#credentials-and-generated-files]
 
-Non-interactive mode generates random PostgreSQL, RabbitMQ and Keycloak administrator passwords. The initial Lamassu login is `lamassu` / `lamassu` and requires a password change on first use.
+Non-interactive mode generates random PostgreSQL, RabbitMQ and Keycloak administrator passwords. The initial Lamassu login is `lamassu` / `lamassu` and requires a password change on first use, unless `--development` was used: in that case the password stays fixed and permanent.
 
 Fastlane writes `lamassu.yaml` in the current directory and injects credentials into it.
 

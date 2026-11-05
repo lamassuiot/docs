@@ -29,7 +29,7 @@ Necesitas:
 * `kubectl` y Helm, o la CLI de MicroK8s
 * `yq`
 * cert-manager
-* `jq` solo si usas `--sample-data`
+* `jq` solo si usas `--sample-data` o `--development`
 * `ssh-keygen` solo si usas `--with-hsm`
 * los puertos externos 80 y 443 libres en un host K3s de un único nodo
 
@@ -75,26 +75,41 @@ Consulta [Expón el Gateway](/docs/deployment/self-hosted/networking) para los c
 
 Opciones de línea de comandos [#opciones-de-línea-de-comandos]
 
-| Opción                     | Valor predeterminado  | Propósito                                                                  |
-| -------------------------- | --------------------- | -------------------------------------------------------------------------- |
-| `-h`, `--help`             | —                     | Muestra la ayuda                                                           |
-| `-c`, `--context`          | contexto actual       | Selecciona el contexto de kubeconfig para kubectl y Helm                   |
-| `-n`, `--non-interactive`  | false                 | Omite prompts y genera credenciales para las dependencias                  |
-| `-ns`, `--namespace`       | `lamassu-dev`         | Namespace de la instalación                                                |
-| `-d`, `--domain`           | `dev.lamassu.io`      | Dominio usado por la UI, OIDC y el certificado                             |
-| `-v`, `--version`          | latest                | Versión del chart de Lamassu                                               |
-| `--https-port`             | `443`                 | Puerto del listener HTTPS                                                  |
-| `--http-port`              | `80`                  | Puerto del listener HTTP                                                   |
-| `--tls-crt`                | —                     | Certificado PEM para TLS downstream                                        |
-| `--tls-key`                | —                     | Clave privada PEM para TLS downstream                                      |
-| `-l`, `--local-chart-path` | chart del repositorio | Usa un chart local de Lamassu sin empaquetar                               |
-| `-ip`, `--gateway-ip`      | detección automática  | Sobrescribe la dirección escrita en `gateway.addresses`                    |
-| `--otel`                   | false                 | Instala Victoria Logs, VictoriaTraces, Jaeger y un OpenTelemetry Collector |
-| `--sample-data`            | false                 | Crea CA, perfiles, certificados, DMS y dispositivos de ejemplo             |
-| `--with-hsm`               | false                 | Instala componentes HSM de laboratorio y configura KMS con PKCS#11         |
-| `--softhsm-chart-path`     | `./charts/softhsm`    | Usa otro chart local de SoftHSM                                            |
+| Opción                     | Valor predeterminado  | Propósito                                                                                                                                                                                                                                          |
+| -------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-h`, `--help`             | —                     | Muestra la ayuda                                                                                                                                                                                                                                   |
+| `-c`, `--context`          | contexto actual       | Selecciona el contexto de kubeconfig para kubectl y Helm                                                                                                                                                                                           |
+| `-n`, `--non-interactive`  | false                 | Omite prompts y genera credenciales para las dependencias                                                                                                                                                                                          |
+| `-ns`, `--namespace`       | `lamassu-dev`         | Namespace de la instalación                                                                                                                                                                                                                        |
+| `-d`, `--domain`           | `dev.lamassu.io`      | Dominio usado por la UI, OIDC y el certificado                                                                                                                                                                                                     |
+| `-v`, `--version`          | latest                | Versión del chart de Lamassu                                                                                                                                                                                                                       |
+| `--https-port`             | `443`                 | Puerto del listener HTTPS                                                                                                                                                                                                                          |
+| `--http-port`              | `80`                  | Puerto del listener HTTP                                                                                                                                                                                                                           |
+| `--tls-crt`                | —                     | Certificado PEM para TLS downstream                                                                                                                                                                                                                |
+| `--tls-key`                | —                     | Clave privada PEM para TLS downstream                                                                                                                                                                                                              |
+| `-l`, `--local-chart-path` | chart del repositorio | Usa un chart local de Lamassu sin empaquetar                                                                                                                                                                                                       |
+| `-ip`, `--gateway-ip`      | detección automática  | Sobrescribe la dirección escrita en `gateway.addresses`                                                                                                                                                                                            |
+| `--otel`                   | false                 | Instala Victoria Logs, VictoriaTraces, Jaeger y un OpenTelemetry Collector                                                                                                                                                                         |
+| `--development`            | false                 | Modo desarrollo: provisiona completamente el usuario `lamassu` de Keycloak (contraseña fija `lamassu`/`lamassu`, sin pasos en el primer inicio) y permite al cliente `frontend` aceptar cualquier redirect URI u origen web. No es para producción |
+| `--sample-data`            | false                 | Crea CA, perfiles, certificados, DMS y dispositivos de ejemplo                                                                                                                                                                                     |
+| `--with-hsm`               | false                 | Instala componentes HSM de laboratorio y configura KMS con PKCS#11                                                                                                                                                                                 |
+| `--softhsm-chart-path`     | `./charts/softhsm`    | Usa otro chart local de SoftHSM                                                                                                                                                                                                                    |
 
 Fastlane no ofrece un modo offline. Para entornos sin conexión, usa el flujo manual con Helm y prepara un registro y mirror de charts.
+
+Modo de desarrollo [#modo-de-desarrollo]
+
+`--development` ajusta el realm `lamassu` de Keycloak que genera Fastlane para un entorno de evaluación desechable:
+
+* el usuario `lamassu` queda completamente provisionado (nombre Lamassu, apellido Admin, email `lamassu@lamassu.io`, verificado): no hay pasos de perfil ni de cambio de contraseña en el primer inicio de sesión
+* la contraseña conocida `lamassu`/`lamassu` es fija y permanente: no se rota nunca y concede el rol `pki-admin`, incluidos tokens no interactivos a través del cliente `frontend`
+* el cliente `frontend` acepta cualquier redirect URI y cualquier origen web (`*`) en lugar de los patrones `/*` originales
+
+<Callout type="warn" title="El modo de desarrollo no es para producción">
+  Con `--development`, la contraseña fija `lamassu`/`lamassu` concede acceso `pki-admin` a cualquiera que alcance la instalación. No lo uses nunca en nada expuesto más allá de una máquina de desarrollo o de un host accesible por red.
+</Callout>
+
+`--development` se aplica cuando el realm `lamassu` se importa por primera vez. No modifica un clúster existente. Puede combinarse con `--sample-data`: la transformación de desarrollo se ejecuta primero y después se añaden los datos de ejemplo a la misma configuración del realm.
 
 Qué configura el script [#qué-configura-el-script]
 
@@ -120,7 +135,7 @@ Sin ellos, configura cert-manager con un emisor self-signed. Es adecuado para la
 
 Credenciales y archivos generados [#credenciales-y-archivos-generados]
 
-El modo no interactivo genera contraseñas aleatorias para los administradores de PostgreSQL, RabbitMQ y Keycloak. El acceso inicial a Lamassu es `lamassu` / `lamassu` y obliga a cambiar la contraseña en el primer uso.
+El modo no interactivo genera contraseñas aleatorias para los administradores de PostgreSQL, RabbitMQ y Keycloak. El acceso inicial a Lamassu es `lamassu` / `lamassu` y obliga a cambiar la contraseña en el primer uso, salvo que se haya usado `--development`: en ese caso la contraseña permanece fija y permanente.
 
 Fastlane escribe `lamassu.yaml` en el directorio actual e incluye credenciales en él.
 

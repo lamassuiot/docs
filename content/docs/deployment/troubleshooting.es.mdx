@@ -121,7 +121,7 @@ Una caída del consumidor no siempre impide que la operación principal termine.
 
 ## Observabilidad
 
-El chart puede habilitar instrumentación OpenTelemetry. Las trazas se exportan por OTLP HTTP y los logs pueden dirigirse a un endpoint compatible, como VictoriaLogs. Usa un identificador de correlación y la misma ventana temporal para unir Gateway, authz, servicio y dependencia.
+El chart puede habilitar la instrumentación OpenTelemetry para los servicios que la admiten; el AWS Connector, authz, wfx y la UI no están instrumentados. Las trazas se exportan por OTLP HTTP y los logs pueden dirigirse a un endpoint compatible, como VictoriaLogs. Usa un identificador de correlación y la misma ventana temporal para unir Gateway, servicio y dependencia.
 
 Antes de cerrar una incidencia, guarda:
 

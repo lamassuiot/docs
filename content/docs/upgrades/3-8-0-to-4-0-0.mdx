@@ -103,7 +103,7 @@ Service images run on a distroless base as the numeric user `65532`; the `authz`
 
 #### AMQP over TLS
 
-In 3.8.0 `amqp.tls` was not applied and event-bus clients always connected over plaintext. In 4.0.0 `amqp.tls: true` switches them to AMQPS. The default `amqp.port` stays `5672` and does not change when TLS is enabled, so a values file that already set `amqp.tls: true` must point `amqp.port` at the broker's TLS listener (commonly `5671`), or set `amqp.tls: false` to keep plaintext. Clients must also trust the broker's certificate.
+In 3.8.0 `amqp.tls` was not applied and event-bus clients always connected over plaintext. In 4.0.0 `amqp.tls: true` switches them to AMQPS. The default `amqp.port` stays `5672` and does not change when TLS is enabled, so a values file that already set `amqp.tls: true` must point `amqp.port` at the broker's TLS listener (`amqps`, commonly `5671`), or set `amqp.tls: false` to keep plaintext. Clients must also trust the broker's certificate.
 
 #### Renamed and reshaped values
 
@@ -439,7 +439,7 @@ LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration --dry-run
 LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration
 ```
 
-Point the tool's `storage` configuration at the `pki` database, where the CA and KMS data now live in the `ca` and `kms` schemas.
+Point the tool's `storage` configuration at the `pki` database, where the CA and KMS data now live in the `ca` and `kms` schemas. The tool's options are described in `backend/cmd/ca-to-kms-migration/README.md` in the `lamassuiot` repository.
 
 <Callout type="warn" title="The tools' READMEs are outdated">
 The `goose-lamassu` README still shows per-database examples (`dbname=ca`, `dbname=kms`) and claims the tool validates the database name, and the `ca-to-kms-migration` README still describes the pre-4.0.0 two-database layout. Follow the `dbname=pki` form on this page instead of their examples.

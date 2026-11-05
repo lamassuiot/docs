@@ -103,7 +103,7 @@ Las imágenes de servicio se basan en distroless y se ejecutan con el usuario nu
 
 #### AMQP sobre TLS
 
-En 3.8.0 `amqp.tls` no se aplicaba y los clientes del bus de eventos se conectaban siempre en texto plano. En 4.0.0, `amqp.tls: true` los pasa a AMQPS. El valor por defecto de `amqp.port` sigue siendo `5672` y no cambia al activar TLS, así que un archivo de values que ya tuviera `amqp.tls: true` debe apuntar `amqp.port` al listener TLS del broker (habitualmente `5671`), o poner `amqp.tls: false` para seguir en texto plano. Los clientes deben además confiar en el certificado del broker.
+En 3.8.0 `amqp.tls` no se aplicaba y los clientes del bus de eventos se conectaban siempre en texto plano. En 4.0.0, `amqp.tls: true` los pasa a AMQPS. El valor por defecto de `amqp.port` sigue siendo `5672` y no cambia al activar TLS, así que un archivo de values que ya tuviera `amqp.tls: true` debe apuntar `amqp.port` al listener TLS del broker (`amqps`, habitualmente `5671`), o poner `amqp.tls: false` para seguir en texto plano. Los clientes deben además confiar en el certificado del broker.
 
 #### Values renombrados y reestructurados
 
@@ -439,7 +439,7 @@ LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration --dry-run
 LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration
 ```
 
-Apunta la configuración `storage` de la herramienta a la base `pki`, donde los datos de CA y del KMS viven ahora en los esquemas `ca` y `kms`.
+Apunta la configuración `storage` de la herramienta a la base `pki`, donde los datos de CA y del KMS viven ahora en los esquemas `ca` y `kms`. Las opciones de la herramienta se describen en `backend/cmd/ca-to-kms-migration/README.md`, en el repositorio `lamassuiot`.
 
 <Callout type="warn" title="Los README de las herramientas están desactualizados">
 El README de `goose-lamassu` aún muestra ejemplos por base de datos (`dbname=ca`, `dbname=kms`) y afirma que la herramienta valida el nombre de la base de datos, y el README de `ca-to-kms-migration` sigue describiendo el modelo de dos bases anterior a 4.0.0. Sigue la forma con `dbname=pki` de esta página en lugar de sus ejemplos.

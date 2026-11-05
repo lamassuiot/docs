@@ -135,13 +135,16 @@ kubectl get pvc -n "$NAMESPACE" \
 
 Con el release `lamassu` y el nombre de chart por defecto, los nuevos PVC son `golang-engine-storage-lamassu-kms-0` y `local-crl-file-storage-lamassu-va-0`; con el release `prod` son `golang-engine-storage-prod-lamassu-kms-0` y `local-crl-file-storage-prod-lamassu-va-0`. Comprueba que existen los PVC antiguos y nuevos antes de continuar.
 
-2. **Reduce a cero los nuevos StatefulSets** para que nada escriba en ninguno de los volúmenes mientras copias:
+2. **Anota el número de réplicas y reduce a cero los nuevos StatefulSets** para que nada escriba en ninguno de los volúmenes mientras copias:
 
 ```bash
+KMS_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$KMS_STS" -o jsonpath='{.spec.replicas}')
+VA_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$VA_STS" -o jsonpath='{.spec.replicas}')
+
 kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" "$VA_STS" --replicas=0
 ```
 
-3. **Arranca un pod auxiliar efímero** que monte las cuatro PVC:
+3. **Arranca un pod auxiliar efímero** que monte las cuatro PVC. Se ejecuta como root para poder cambiar la propiedad de los archivos, así que fija su imagen por digest y no montes el token de la service account:
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -152,9 +155,10 @@ metadata:
   namespace: $NAMESPACE
 spec:
   restartPolicy: Never
+  automountServiceAccountToken: false
   containers:
     - name: migrate
-      image: docker.io/library/alpine:3.20
+      image: docker.io/library/alpine@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc # 3.20
       command: ["sh", "-c", "sleep 3600"]
       volumeMounts:
         - {name: old-kms, mountPath: /old/kms}
@@ -177,9 +181,9 @@ kubectl wait -n $NAMESPACE --for=condition=Ready pod/pvc-migrate-helper --timeou
 kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c 'find /new/kms /new/va -type f'
 ```
 
-Un resultado vacío es lo habitual: el pod propio de un StatefulSet rara vez llega a escribir nada cuando le faltan sus datos.
+Un resultado vacío es lo habitual: el pod propio de un StatefulSet rara vez llega a escribir nada cuando le faltan sus datos. Si la salida no está vacía, anota los archivos y confirma con el responsable del servicio que se pueden descartar antes de copiar; no superpongas los datos de 3.8.0 sobre un almacén desconocido.
 
-5. **Copia los datos y ajusta la propiedad**:
+5. **Copia los datos, ajusta la propiedad y verifica la copia**. El segundo comando debe imprimir `copy verified`; cualquier salida de `diff` indica que la copia está incompleta, así que no continúes:
 
 ```bash
 kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
@@ -187,27 +191,35 @@ kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
   cp -a /old/va/. /new/va/ &&
   chown -R 65532:65532 /new/kms /new/va
 '
+
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
+  diff -r /old/kms /new/kms &&
+  diff -r /old/va /new/va &&
+  echo "copy verified"
+'
 ```
 
 El `chown` es obligatorio aunque los archivos antiguos ya parezcan ser de un usuario sin root. La 3.8.0 no fijaba la identidad del contenedor, por lo que los archivos podían llevar cualquier UID declarado por la imagen; la 4.0.0 exige exactamente `65532:65532` y no retrocede a lo que declare la imagen.
 
-6. **Vuelve a escalar y elimina el auxiliar**:
+6. **Elimina el auxiliar y restaura el número de réplicas anotado**:
 
 ```bash
 kubectl delete pod -n $NAMESPACE pvc-migrate-helper
-kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" "$VA_STS" --replicas=1
+kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" --replicas="$KMS_REPLICAS"
+kubectl scale statefulset -n "$NAMESPACE" "$VA_STS" --replicas="$VA_REPLICAS"
 ```
 
 ## Verifica la migración
 
 - Los logs de KMS y VA no muestran errores `no such file or directory` ni `code=NotFound`.
 - Una CRL emitida anteriormente vuelve a servirse: `GET /crl/<ca-ski>` sobre VA.
+- Una clave existente del KMS funciona: emite un certificado desde una CA que ya existía antes de la actualización. Ninguna de las otras comprobaciones lee una clave del KMS, así que esta es la única que demuestra que el material de claves se ha copiado.
 - `helm test "$RELEASE" -n $NAMESPACE --logs` pasa; el hook de conectividad comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y la respuesta de la UI.
 - Inicia sesión con una identidad de administrador y confirma que las operaciones están autorizadas.
 
 ## Elimina los volúmenes antiguos
 
-Solo cuando todo funcione, elimina los volúmenes huérfanos de 3.8.0 para recuperar almacenamiento:
+Solo cuando pasen todas las comprobaciones anteriores, elimina los volúmenes huérfanos de 3.8.0 para recuperar almacenamiento. El borrado es irreversible y el volumen antiguo del KMS puede contener la última copia del material de claves de tus CA, así que antes haz un `VolumeSnapshot` o una copia de seguridad de ambos PVC antiguos y consérvala hasta que confíes en que el despliegue actualizado funciona correctamente:
 
 ```bash
 kubectl delete pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0

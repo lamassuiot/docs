@@ -135,13 +135,16 @@ kubectl get pvc -n "$NAMESPACE" \
 
 With release `lamassu` and the default chart name, the new PVCs are `golang-engine-storage-lamassu-kms-0` and `local-crl-file-storage-lamassu-va-0`; with release `prod` they are `golang-engine-storage-prod-lamassu-kms-0` and `local-crl-file-storage-prod-lamassu-va-0`. Confirm both old and new PVCs exist before continuing.
 
-2. **Scale the new StatefulSets down** so nothing writes to either volume while you copy:
+2. **Record the replica counts and scale the new StatefulSets down** so nothing writes to either volume while you copy:
 
 ```bash
+KMS_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$KMS_STS" -o jsonpath='{.spec.replicas}')
+VA_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$VA_STS" -o jsonpath='{.spec.replicas}')
+
 kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" "$VA_STS" --replicas=0
 ```
 
-3. **Run a short-lived helper pod** that mounts all four claims:
+3. **Run a short-lived helper pod** that mounts all four claims. It runs as root so it can change file ownership, so pin its image by digest and do not mount the service-account token:
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -152,9 +155,10 @@ metadata:
   namespace: $NAMESPACE
 spec:
   restartPolicy: Never
+  automountServiceAccountToken: false
   containers:
     - name: migrate
-      image: docker.io/library/alpine:3.20
+      image: docker.io/library/alpine@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc # 3.20
       command: ["sh", "-c", "sleep 3600"]
       volumeMounts:
         - {name: old-kms, mountPath: /old/kms}
@@ -177,9 +181,9 @@ kubectl wait -n $NAMESPACE --for=condition=Ready pod/pvc-migrate-helper --timeou
 kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c 'find /new/kms /new/va -type f'
 ```
 
-An empty result is the common case: a StatefulSet's own pod rarely gets far enough to write anything when its dependent data is missing.
+An empty result is the common case: a StatefulSet's own pod rarely gets far enough to write anything when its dependent data is missing. If the output is not empty, record the files and confirm with the service owner that they are disposable before you run the copy; do not overlay the 3.8.0 data onto an unknown store.
 
-5. **Copy the data and align ownership**:
+5. **Copy the data, align ownership and verify the copy**. The second command must print `copy verified`; any `diff` output means the copy is incomplete, so do not continue:
 
 ```bash
 kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
@@ -187,27 +191,35 @@ kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
   cp -a /old/va/. /new/va/ &&
   chown -R 65532:65532 /new/kms /new/va
 '
+
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
+  diff -r /old/kms /new/kms &&
+  diff -r /old/va /new/va &&
+  echo "copy verified"
+'
 ```
 
 The `chown` is required even if the old files already look non-root-owned. 3.8.0 did not pin a container identity, so files could carry any image-declared UID; 4.0.0 requires exactly `65532:65532` and does not fall back to whatever the image declares.
 
-6. **Scale back up and remove the helper**:
+6. **Remove the helper and restore the recorded replica counts**:
 
 ```bash
 kubectl delete pod -n $NAMESPACE pvc-migrate-helper
-kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" "$VA_STS" --replicas=1
+kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" --replicas="$KMS_REPLICAS"
+kubectl scale statefulset -n "$NAMESPACE" "$VA_STS" --replicas="$VA_REPLICAS"
 ```
 
 ## Verify the migration
 
 - KMS and VA logs show no `no such file or directory` or `code=NotFound` errors.
 - A previously issued CRL is servable again: `GET /crl/<ca-ski>` on VA.
+- An existing KMS key works: issue a certificate from a CA that existed before the upgrade. None of the other checks reads a KMS key, so this is the only one that proves the key material was copied.
 - `helm test "$RELEASE" -n $NAMESPACE --logs` passes; the connectivity hook checks the CA, DMS Manager, Device Manager and VA health endpoints and the UI response.
 - Sign in with an administrator identity and confirm operations are authorized.
 
 ## Delete the old volumes
 
-Only once everything works, delete the orphaned 3.8.0 volumes to reclaim storage:
+Only once every check above passes, delete the orphaned 3.8.0 volumes to reclaim storage. The delete is irreversible and the old KMS volume may hold the last copy of your CA key material, so take a `VolumeSnapshot` or a backup of both old PVCs first and keep it until you are confident the upgraded deployment is healthy:
 
 ```bash
 kubectl delete pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0

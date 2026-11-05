@@ -16,6 +16,7 @@ import {
   Server,
   ShieldCheck,
   Zap,
+  ArrowUpCircle,
 } from "lucide-react";
 import { type ComponentType, createElement } from "react";
 import { asset } from "@/lib/asset";
@@ -51,6 +52,13 @@ const lucideIconMap: Record<
   fastlane: Zap,
   cloud: Cloud,
   saas: Globe,
+  // Root-folder tab icon: sized like the 20px logos of the other tabs and
+  // tinted so Upgrades reads as distinct from them.
+  upgrade: ({ className }) =>
+    createElement(ArrowUpCircle, {
+      size: 20,
+      className: `${className ?? ""} text-[#c8861f]`,
+    }),
 };
 
 export const source = loader({

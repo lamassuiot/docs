@@ -1,9 +1,15 @@
 ---
 title: 3.8.0 to 4.0.0
-description: 4.0.0 changes that affect DMS configuration, what can break after upgrading from 3.8.0, and how to verify it.
+description: 4.0.0 changes that affect DMS configuration, backend storage, device events and authorization; what can break after upgrading from 3.8.0, and how to verify it.
 ---
 
 Upgrading from 3.8.0 to 4.0.0 automatically migrates stored DMS configuration. Most of it converts without intervention, but three changes can leave enrollments failing or configs holding unexpected values if they are not reviewed. This page states what changes, what symptoms to expect and what to do in each case. Current behavior of each feature is documented in the [DMS](/docs/platform/iot-fleets/enrollment/dms) pages.
+
+The upgrade also carries backend changes that are not DMS-specific: storage consolidates into the PostgreSQL `pki` database, legacy CA keys can be registered in the KMS, device events move to a dedicated store, `authz` replaces the gateway's token validation, and SQLite storage disappears. These steps are covered from [PostgreSQL consolidation](#postgresql-consolidation) onward and should be completed before the DMS checks.
+
+<Callout type="warn" title="Backend migration steps are provisional">
+The 4.0.0 release is upcoming and the backend migration steps on this page are provisional. Verify each procedure against the final release artifacts before upgrading production.
+</Callout>
 
 ## Summary
 
@@ -13,6 +19,15 @@ Upgrading from 3.8.0 to 4.0.0 automatically migrates stored DMS configuration. M
 | [Receiver certificate verification](#receiver-certificate-verification) | DMSs with a webhook that had `validate_server_cert: false` | Medium: webhook credentials are sent to an unverified receiver | Set `insecure_skip_verify` to `false` |
 | [Re-enrollment trust set](#re-enrollment-trust-set) | Scripts and consoles that edit DMSs through the API | Medium: an edit in the old layout silently empties `validation_cas` | Read the DMS before editing and use the new field |
 | [Independent re-enrollment authentication](#independent-re-enrollment-authentication) | Any DMS | Low: informational | Read both blocks before editing |
+| [DMS update API](#dms-update-api) | Clients that send the DMS ID in the update body | Low: the update targets the ID in the URL | Send update requests with the ID in the URL |
+| [PostgreSQL consolidation](#postgresql-consolidation) | 3.8.0 deployments with per-service databases | High: services find no data after the upgrade | Move data and migration history into the `pki` schemas |
+| [Legacy CA keys in the KMS](#legacy-ca-keys-in-the-kms) | Installations whose CA keys predate the KMS | Medium: CA keys stay unmanaged | Run `ca-to-kms-migration`, with `--dry-run` first |
+| [Device events](#device-events) | Consumers that read the device `events` field | Medium: the field disappears from the device representation | Use the new event endpoints |
+| [SQLite storage removed](#sqlite-storage-removed) | Deployments with SQLite storage | High: the backend no longer supports it | Move to PostgreSQL before upgrading |
+| [Authorization cutover](#authorization-cutover) | All deployments | High: without bootstrap there is no administrator | Configure `authz` following the access-control guide |
+| [AMQP over TLS](#amqp) | Deployments with TLS on the message broker | Medium: plaintext clients are rejected | Point clients at the TLS port and trust the broker certificate |
+| [Local storage and container images](#local-storage-and-container-images) | Filesystem KMS engines and locally stored CRLs | Medium: data can be left behind | Preserve volumes, transfer data and check permissions |
+| [Certificate type values](#certificate-type-values) | Consumers that read or match on certificate `type` values | Low: two stored values are renamed | Adapt consumers to the new values |
 
 A [verification checklist](#verification-checklist) at the end confirms the result.
 
@@ -74,17 +89,121 @@ Re-enrollment authentication settings are now stored independently from initial 
 
 If the console version does not expose independent settings, they can be edited through the [DMS API](/docs/api-reference/dms-manager).
 
+## DMS update API
+
+`PUT /v1/dms/:id` now takes the DMS ID from the URL and validates the request body. An ID in the body is ignored. Update clients that relied on the body ID.
+
+## Certificate type values
+
+Certificate type values stored in the data are renamed: `IMPORTED` becomes `IMPORTED_WITH_KEY`, and `EXTERNAL` becomes `IMPORTED_WITHOUT_KEY`. `MANAGED` is unchanged. Adapt consumers that read or match on those values.
+
+## PostgreSQL consolidation
+
+The 4.0.0 backend connects to one PostgreSQL database named `pki` and isolates each service in a schema: `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` and `alerts`. Standalone `authz` can use a separate `authz` database; the development monolith stores its data in the `authz` schema of `pki`. WFX keeps its own `wfx` database.
+
+Installations on 3.8.0 with separate per-service databases must move their data and migration history into the corresponding `pki` schemas, preserving structure, indexes, constraints and data.
+
+<Callout type="warn" title="There is no automatic data transfer">
+The migration tooling applies migrations to an existing schema; no command moves data between databases. The transfer procedure on this page is provisional — validate it against the final release artifacts before upgrading production.
+</Callout>
+
+Plan the transfer like any data migration: take a verifiable backup of PostgreSQL first, schedule downtime and prevent writes while data is copied.
+
+### Migrations against the pki database
+
+For manual migration, `goose-lamassu` requires `search_path=<schema>` in the connection string and must run against the `pki` database. The binary does not validate the database name, so verify `dbname=pki` before running:
+
+```bash
+./goose-lamassu "host=$DB_HOST port=5432 user=$DB_USER dbname=pki search_path=kms" up
+```
+
+Use the connection and TLS options appropriate for your environment, and repeat per schema: `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` and `alerts`.
+
+<Callout type="warn" title="The tool's own README is outdated">
+The `goose-lamassu` documentation still shows per-database examples (`dbname=ca`, `dbname=kms`) and claims the tool validates the database name. It does not — only `search_path` is validated. Follow the `dbname=pki` form above.
+</Callout>
+
+### Pre-upgrade data checks
+
+The CA schema migration adds a UNIQUE constraint on `ca_certificates.id`, so it aborts if duplicate CA IDs already exist. Resolve any duplicate CA IDs before upgrading. Imports already reject duplicate CA IDs with `409`, so new duplicates cannot normally be introduced.
+
+The KMS schema migration promotes the primary key to `(key_id, engine_id)` and aborts with the error `cannot promote (key_id, engine_id) to primary key: N row(s) have no engine_id; backfill them before migrating` when `kms_keys` rows lack `engine_id`. Backfill `engine_id` before running the migrations.
+
+That same migration deletes aliases equal to an existing key_id with a `NOTICE`, because identifiers now resolve as a key_id before an alias; affected aliases are dropped rather than redirected.
+
+### Legacy CA keys in the KMS
+
+CA certificates of type `MANAGED` or `IMPORTED_WITH_KEY` whose private keys predate the KMS service have the key stored only in the crypto engine, under the certificate's `subject_key_id`, with no record in the KMS. The `ca-to-kms-migration` tool registers them:
+
+- `key_id` is the certificate's `subject_key_id` (SHA-256 of the public key).
+- The tool is idempotent: keys already present in the KMS are skipped, so it can be run several times safely.
+- Certificates that cannot be read, or that lack an engine or a subject key ID, are skipped with a warning. Review the logs and resolve affected records.
+- When CA certificates that share a `subject_key_id` declare conflicting `engine_id`s, the tool skips that key as failed and exits with code `1`, which fails a Helm `pre-upgrade` hook. Resolve the conflict manually before rerunning.
+
+Run it with `--dry-run` first to scan and report without writing to KMS storage, then run the real migration:
+
+```bash
+LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration --dry-run
+LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration
+```
+
+Point the tool's `storage` configuration at the `pki` database: in 4.0.0 the CA and KMS data live in the `ca` and `kms` schemas of the same database. The tool's README still describes the pre-4.0.0 two-database layout, so do not copy its examples. In Kubernetes, the recommended approach is to run the migration as a Helm `pre-upgrade` hook Job; see the tool's README (`backend/cmd/ca-to-kms-migration/README.md` in the repository).
+
+## Device events
+
+Historical device events move from the `devices.events` column to a dedicated `device_events` store. The upgrade transforms the existing data.
+
+The `events` field no longer appears in the device representation. Adapt consumers that read it and use the new endpoints instead:
+
+- `GET /v1/devices/:id/events` returns a device's events.
+- `POST /v1/devices/:id/events` creates an event.
+
+When the request `Accept` header includes `text/event-stream`, the events endpoint streams events over Server-Sent Events, with a keepalive every 15 seconds. SSE returns `501` when it is disabled in the deployment.
+
+SSE needs to fan out across service instances, so each instance binds its own durable AMQP queue derived from the service ID `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until cleaned up out-of-band — configure an expiration or cleanup policy on the broker to avoid accumulating queues.
+
+## SQLite storage removed
+
+The SQLite storage engine is removed. The only storage engine registered in 4.0.0 is PostgreSQL: the `couch_db` and `dynamo_db` engines are not registered in the 4.0.0 tree — their configuration constants remain, but they select no engine — so deployments that used SQLite, or that still run on `couch_db` or `dynamo_db`, must move to PostgreSQL and consolidate their data into the `pki` schemas as described in [PostgreSQL consolidation](#postgresql-consolidation).
+
+## Authorization cutover
+
+4.0.0 introduces the `authz` service, which validates tokens against the OIDC provider's JWKS endpoint and applies fine-grained authorization to service requests. Validation no longer uses the gateway's former JWT policy.
+
+Configure the JWKS endpoint, the credentials for accessing PKI and authz data, the policies, and an initial bootstrap principal. Without a matching principal there is no implicit initial administrator, so nobody can administer the PKI.
+
+<Callout type="info" title="Full guide available">
+The [access control](/docs/platform/administration/access-control) page documents principals, policies and the first administrator. The [Helm installation](/docs/deployment/self-hosted/helm) page documents `services.authz.bootstrap` and how the pre-install job applies it.
+</Callout>
+
+## AMQP
+
+If TLS is enabled for AMQP, clients connect to the broker's TLS port — `amqps`, commonly `5671` — and must trust the broker's certificate. Verify the effective configuration before upgrading, especially if plaintext AMQP was previously used. The port is operator-configured, so check the one your deployment uses.
+
+## Local storage and container images
+
+If the KMS uses a filesystem engine or the VA stores CRLs locally, preserve that data during the upgrade and, where necessary, transfer it. Make sure the identity running the services can access keys, CRLs and cryptographic devices, and verify their operation before retiring the original data.
+
+Service images run on a distroless, non-root base with numeric UID `65532`; the `authz` image is Ubuntu with a non-root user (the same numeric UID). If you mount volumes holding keys or CRLs, ensure ownership and permissions allow that identity to read them and, where applicable, write them.
+
 ## Verification checklist
 
 After applying the upgrade, check in this order:
 
-1. **Webhooks without file fields.** List the DMSs that use a webhook for enrollment or re-enrollment and confirm each `config` block carries `insecure_skip_verify` and the expected option block (`apikey_options`, `jwt_options` or `mtls_options`), with the certificate and key as PEM and no `cert_file` or `key_file`.
-2. **Receiver verification.** Confirm `insecure_skip_verify` is `false`, unless the receiver certificate is intentionally unverified.
-3. **Delivery.** Trigger, or wait for, one enroll or re-enroll through each migrated webhook and confirm the authorization call completes.
-4. **Trust set.** Read `est_rfc7030_settings.client_certificate_settings.validation_cas` and confirm it holds the expected CAs, in particular those of the old CA during rotation overlaps.
-5. **API clients.** Update any script or console that uses the old DMS layout (flat `additional_validation_cas`, or the legacy `mtls`, `apikey` and `oidc` fields), since they silently drop those values.
+1. **Databases.** Confirm each service reads the `pki` database with its own schema (`kms`, `ca`, `va`, `devicemanager`, `dmsmanager`, `alerts`), that `authz` and `wfx` data are reachable, and that the migration status is registered per schema — including the CA unique-ID and KMS composite-key migrations. If the deployment used SQLite, confirm the new PostgreSQL storage works end to end.
+2. **Legacy CA keys.** Run `ca-to-kms-migration` with `--dry-run`, review the report and any warnings, then run it without the flag and confirm the expected keys appear in the KMS.
+3. **Device events.** Query `GET /v1/devices/:id/events` for devices with historical events, confirm the data was migrated, and point consumers at the new endpoints.
+4. **Authorization.** Authenticate as the bootstrap principal and confirm administration works; check that a denied identity receives `403`; review client and integration permissions.
+5. **AMQP.** Confirm the backend connects to the broker with the expected TLS settings and that the cleanup policy for SSE queues is in place.
+6. **Local storage.** Confirm the services can read the KMS keys and CRLs on their volumes, and that CRL issuance and retrieval work.
+7. **Webhooks without file fields.** List the DMSs that use a webhook for enrollment or re-enrollment and confirm each `config` block carries `insecure_skip_verify` and the expected option block (`apikey_options`, `jwt_options` or `mtls_options`), with the certificate and key as PEM and no `cert_file` or `key_file`.
+8. **Receiver verification.** Confirm `insecure_skip_verify` is `false`, unless the receiver certificate is intentionally unverified.
+9. **Delivery.** Trigger, or wait for, one enroll or re-enroll through each migrated webhook and confirm the authorization call completes.
+10. **Trust set.** Read `est_rfc7030_settings.client_certificate_settings.validation_cas` and confirm it holds the expected CAs, in particular those of the old CA during rotation overlaps.
+11. **API clients.** Update any script or console that uses the old DMS layout (flat `additional_validation_cas`, or the legacy `mtls`, `apikey` and `oidc` fields), since they silently drop those values, and confirm DMS updates send the ID in the URL.
 
 <Cards>
   <Card title="Configure a DMS" href="/docs/platform/iot-fleets/enrollment/dms" />
   <Card title="DMS API" href="/docs/api-reference/dms-manager" />
+  <Card title="Access control" href="/docs/platform/administration/access-control" />
 </Cards>

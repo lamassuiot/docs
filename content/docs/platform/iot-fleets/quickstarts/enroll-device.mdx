@@ -34,7 +34,7 @@ Create the `Acme EST Evaluation` DMS with this configuration:
 | Enable Replaceable Enrollment | Disabled; the ID must be new. |
 | Initial authentication | `CLIENT_CERTIFICATE`; Validation CAs includes the direct bootstrap issuer; no expired certificates. |
 | Renewal authentication | `CLIENT_CERTIFICATE`, configured in the independent re-enrollment block. |
-| Additional Validation CAs / Enable Expired Renewal | Empty list for this direct issuance / disabled. |
+| Re-enrollment Validation CAs / Enable Expired Renewal | Empty list for this direct issuance / disabled. |
 | Re-enrollment Delta | 1 hour. |
 | Preventive / Critical Delta | 30 minutes / 10 minutes. |
 | Revoke on Re-enrollment | Disabled to test the successor before retiring the previous identity. |

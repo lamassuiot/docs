@@ -65,7 +65,7 @@ Lamassu does not allow reissuing an already-revoked CA or a CA whose expiration 
   <Step>
     ### Switch issuance
 
-    Update the enrollment CA and profile of the DMSs. Keep the additional validation CAs if old certificates still need to be accepted during re-enrollment.
+    Update the enrollment CA and profile of the DMSs, and add the old CA to each DMS's re-enrollment validation CAs (`reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`) while old-CA cohorts still renew. The [DMS guide](/docs/platform/iot-fleets/enrollment/dms) documents the setting.
   </Step>
 
   <Step>

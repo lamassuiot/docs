@@ -295,34 +295,63 @@ Provision the first administrator [#provision-the-first-administrator]
 
 The chart includes a bootstrap principal that looks for the OIDC role `pki-admin` in `realm_access.roles`. It grants it `SUPER ADMIN` and, when Job Manager is enabled, the administrative policy of its NBI API.
 
-```yaml title="values.yaml"
-auth:
-  authorization:
-    rolesClaim: realm_access.roles
-    roles:
-      admin: pki-admin
-  externalAuthorization:
-    enabled: true
-    failOpen: false
+<div className="lm-diff-final">
+  ```yaml title="values.yaml"
+  auth:
+    externalAuthorization:
+      enabled: true
+      failOpen: false
 
-services:
-  authz:
-    jwkUrl: https://idp.example.com/realms/iot/protocol/openid-connect/certs
-    bootstrap:
-      - principal_id: "oidc:pki-admin"
-        principal_name: "PKI Admin"
-        principal_type: "oidc"
-        policy_ids:
-          # SUPER ADMIN
-          - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
-          # Job Manager - Mgmt NBI Admin
-          - "lamassu.7df018c1-3140-4a35-9067-2e7d6cec3ed2"
-        auth_config:
-          claims:
-            - claim: "realm_access.roles"
-              operator: "contains"
-              value: "pki-admin"
-```
+  services:
+    authz:
+      jwkUrl: https://idp.example.com/realms/iot/protocol/openid-connect/certs
+      bootstrap:
+        - principal_id: "oidc:pki-admin"
+          principal_name: "PKI Admin"
+          principal_type: "oidc"
+          policy_ids:
+            # SUPER ADMIN
+            - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+            # Job Manager - Mgmt NBI Admin
+            - "lamassu.7df018c1-3140-4a35-9067-2e7d6cec3ed2"
+          auth_config:
+            claims:
+              - claim: "realm_access.roles"
+                operator: "contains"
+                value: "pki-admin"
+  ```
+</div>
+
+<div className="lm-diff-merged">
+  ```yaml title="values.yaml" lmdiff="=----====================="
+  auth:
+    authorization:
+      rolesClaim: realm_access.roles
+      roles:
+        admin: pki-admin
+    externalAuthorization:
+      enabled: true
+      failOpen: false
+
+  services:
+    authz:
+      jwkUrl: https://idp.example.com/realms/iot/protocol/openid-connect/certs
+      bootstrap:
+        - principal_id: "oidc:pki-admin"
+          principal_name: "PKI Admin"
+          principal_type: "oidc"
+          policy_ids:
+            # SUPER ADMIN
+            - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+            # Job Manager - Mgmt NBI Admin
+            - "lamassu.7df018c1-3140-4a35-9067-2e7d6cec3ed2"
+          auth_config:
+            claims:
+              - claim: "realm_access.roles"
+                operator: "contains"
+                value: "pki-admin"
+  ```
+</div>
 
 The pre-install and pre-upgrade Helm Job runs the `authz` migrations, preloads the policies and creates the bootstrap principals before the services start. If the principal already exists, it does not replace it: it only adds the configured grants that are still missing. You can keep the entry in `values.yaml` across upgrades.
 
@@ -334,9 +363,19 @@ The pre-install and pre-upgrade Helm Job runs the `authz` migrations, preloads t
   </Step>
 
   <Step>
-    Configure the two JWT validations [#configure-the-two-jwt-validations]
+    <div className="lm-diff-del lm-diff-block">
+      Configure the two JWT validations
+    </div>
 
-    The Gateway uses `auth.authentication.apiGateway.jwks` to authenticate requests. `authz` uses `services.authz.jwkUrl` to resolve OIDC principals. Both endpoints must contain the keys of the same issuer and be reachable from their respective components.
+    <div className="lm-diff-ins lm-diff-block">
+      Configure token validation [#configure-token-validation]
+    </div>
+
+    <del className="lm-diff-del">The Gateway uses `auth.authentication.apiGateway.jwks` to authenticate requests. `authz` uses `services.authz.jwkUrl` to resolve OIDC principals. Both endpoints must contain</del><ins className="lm-diff-ins">`authz` validates every token against `services.authz.jwkUrl`, which is fetched from the `authz` pod. The Gateway does not validate tokens itself: Lamassu services authorize each request through `authz`, and routes labeled `auth=external`, such as the Job Manager ones, are checked by the Gateway through `authz` when `auth.externalAuthorization` is enabled. The endpoint must serve</ins> the keys of the <del className="lm-diff-del">same </del>issuer <del className="lm-diff-del">and be reachable from their respective components</del><ins className="lm-diff-ins">configured in `auth.oidc.frontend.authority`</ins>.
+
+    <div className="lm-diff-ins lm-diff-block">
+      Releases upgraded from 3.8.0 must remove `auth.oidc.apiGateway` and `auth.authorization`, which the 4.0.0 chart rejects. See [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0#gateway-token-validation-removed).
+    </div>
   </Step>
 
   <Step>

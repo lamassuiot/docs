@@ -342,13 +342,16 @@ kubectl get pvc -n "$NAMESPACE" \
 
 Con la release `lamassu` y el nombre de chart por defecto, los nuevos PVC son `golang-engine-storage-lamassu-kms-0` y `local-crl-file-storage-lamassu-va-0`; con la release `prod` son `golang-engine-storage-prod-lamassu-kms-0` y `local-crl-file-storage-prod-lamassu-va-0`. Comprueba que existen los PVC antiguos y nuevos antes de continuar. Si solo migras uno de los dos servicios, quita las PVC del otro de los comandos siguientes.
 
-2. **Anota el número de réplicas y reduce a cero los nuevos StatefulSets** para que nada escriba en ninguno de los volúmenes mientras copias:
+2. **Anota el número de réplicas, reduce a cero los nuevos StatefulSets y espera a que terminen todos los pods que usan las PVC**, para que nada escriba en ninguno de los volúmenes mientras copias. Helm elimina los StatefulSets `kms` y `va` de 3.8.0 durante la actualización, pero sus pods `kms-0` y `va-0` pueden seguir terminando y reteniendo las PVC antiguas. Mientras sigan en marcha, el pod auxiliar no puede montar las PVC o copia un volumen en el que aún se escribe. El `wait` termina al instante para los pods que ya no existen:
 
 ```bash
 KMS_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$KMS_STS" -o jsonpath='{.spec.replicas}')
 VA_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$VA_STS" -o jsonpath='{.spec.replicas}')
 
 kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" "$VA_STS" --replicas=0
+
+kubectl wait -n "$NAMESPACE" --for=delete --timeout=300s \
+  pod/kms-0 pod/va-0 "pod/${KMS_STS}-0" "pod/${VA_STS}-0"
 ```
 
 3. **Arranca un pod auxiliar efímero** que monte las cuatro PVC. Se ejecuta como root para poder cambiar la propiedad de los archivos, así que fija su imagen por digest y no montes el token de la service account:
@@ -448,6 +451,7 @@ El README de `goose-lamassu` aún muestra ejemplos por base de datos (`dbname=ca
 ### Solución de problemas
 
 - **Los pods del KMS o la VA fallan con `no such file or directory` o `code=NotFound` justo después de actualizar.** Los pods están enlazados a los PVC nuevos y vacíos y la migración de datos aún no se ha hecho, o se copió en el PVC equivocado. Sigue el [paso 4](#paso-4-migra-los-datos-del-kms-y-la-va) y comprueba que existen las cuatro PVC.
+- **El pod auxiliar se queda en `Pending` o `ContainerCreating` y `kubectl wait` agota el tiempo.** Otro pod sigue reteniendo alguna de las PVC; en almacenamiento de bloque, `kubectl describe pod pvc-migrate-helper` muestra un `Multi-Attach error`. Comprueba con `kubectl get pods -n $NAMESPACE` que `kms-0`, `va-0` y los nuevos pods del KMS y la VA han desaparecido, y vuelve a ejecutar el wait.
 - **`helm upgrade` falla con un error de validación por clave desconocida.** Elimina o renombra los values heredados —normalmente `toolbox`, `auth.oidc.apiGateway` o `auth.authorization`—, porque el schema estricto rechaza las claves que no conoce.
 - **La actualización falla en el job de base de datos.** El rol de PostgreSQL no puede crear bases de datos o esquemas, o una migración de esquema abortó por IDs de CA duplicados o por valores de `engine_id` vacíos. Revisa los logs del job, corrige los permisos o los datos y vuelve a ejecutar la actualización.
 - **La actualización falla en el hook de CA a KMS.** Hay certificados de CA que comparten un `subject_key_id` y declaran `engine_id` en conflicto. Resuelve el conflicto y vuelve a ejecutar.

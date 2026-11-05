@@ -698,7 +698,7 @@ Platform requirements [#platform-requirements]
 * persistent storage suitable for the selected PostgreSQL, RabbitMQ, VA and KMS configuration
 * a load-balancer implementation or another deliberate path from clients to the Gateway
 
-KMS deployments using the native PKCS#11 sidecar require Kubernetes 1.29 or newer.
+KMS deployments using the native PKCS#11 sidecar require Kubernetes 1.29 or newer. Prebuilt Lamassu container images are published for `linux/amd64` and `linux/arm64`, and the KMS PKCS#11 client module (`p11-kit-client.so`) is installed at the target architecture's Debian library path: `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so` on amd64 and `/usr/lib/aarch64-linux-gnu/pkcs11/p11-kit-client.so` on arm64. The x86\_64 path is retained as a compatibility alias for existing configurations.
 
 Choose the next page [#choose-the-next-page]
 

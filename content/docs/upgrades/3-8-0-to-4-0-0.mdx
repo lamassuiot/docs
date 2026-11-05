@@ -1,0 +1,32 @@
+---
+title: 3.8.0 to 4.0.0
+description: What changes in 4.0.0 and what to verify after upgrading from 3.8.0.
+---
+
+This page lists what changes between 3.8.0 and 4.0.0 and what to verify after applying the upgrade. Current behavior is documented in the corresponding feature pages.
+
+## DMS: independent re-enrollment authentication
+
+Re-enrollment authentication settings are stored independently from initial authentication. After the upgrade, read both blocks before editing a DMS. If your console version does not expose independent settings, use the [DMS API](/docs/api-reference/dms-manager).
+
+## DMS: webhook config layout
+
+Stored webhook configs are rewritten to the current layout: `validate_server_cert` becomes the negated `insecure_skip_verify`, `oidc` becomes `jwt_options`, `apikey` becomes `apikey_options` and `mtls` becomes `mtls_options`. When both the legacy certificate and key are PEM, they move into `mtls_options.cert_content` and `key_content` and need no action.
+
+Check `insecure_skip_verify` on every migrated config: a config with `validate_server_cert: false` becomes `insecure_skip_verify: true`, so receiver-certificate verification stays skipped until you set it to `false`. The webhook authorization channel carries the API key or bearer token, so skipping verification exposes those credentials to a network-positioned attacker.
+
+A mixed config (PEM certificate, file-path key) becomes `mtls_options.cert_file` and `key_file`, which delivery rejects. Delivery of any webhook config that references files fails on every call, whatever its auth mode, so every enroll and reenroll that calls that webhook fails until the certificate and key are re-entered as Base64-encoded or plain PEM, or the leftover file fields are removed if the webhook does not use mTLS. Meanwhile, a metadata-only update through `PUT` or `PATCH` on `/v1/dms/:id/metadata` still succeeds. If a stored config holds file paths in `mtls_options.cert_content` or `key_content`, every full settings update (`POST /v1/dms`, `PUT /v1/dms/:id`) fails validation — settings are replaced wholesale, so the stored config must be resent.
+
+## DMS: re-enrollment trust set
+
+`reenrollment_settings.additional_validation_cas` moves into `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`. That nested value was never consulted when validating re-enrollments, so the effective trust set is unchanged; a missing or null flat list becomes an empty list. Bodies that still carry `additional_validation_cas` are accepted but the value is silently ignored — unknown JSON fields are dropped — and GET responses no longer include it. Read the DMS before sending API edits: an update body built from the old layout silently empties `validation_cas`.
+
+## Verification checklist
+
+After applying the upgrade, check each area touched by the notes above:
+
+1. **DMS webhooks** — list DMSs with webhook enrollment or re-enrollment and confirm each `config` block carries `insecure_skip_verify` and the expected option block (`apikey_options`, `jwt_options` or `mtls_options` with PEM content, no file fields).
+2. **Receiver verification** — confirm `insecure_skip_verify` is `false` unless the receiver certificate is intentionally unverified.
+3. **Re-enrollment trust set** — read `est_rfc7030_settings.client_certificate_settings.validation_cas` and confirm it still holds the CAs expected for old-CA cohorts during rotation overlaps.
+4. **API clients** — verify that any script or console built from the old DMS layout (flat `additional_validation_cas`, legacy `mtls`/`apikey`/`oidc` fields) is updated; bodies carrying those fields silently drop their values.
+5. **Delivery** — trigger or observe one enroll or re-enroll through each migrated webhook and confirm the authorization call completes.

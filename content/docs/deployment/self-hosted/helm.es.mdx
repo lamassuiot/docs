@@ -109,10 +109,6 @@ auth:
     frontend:
       clientId: frontend
       authority: https://pki.example.com/auth/realms/lamassu
-    apiGateway:
-      jwks:
-        - name: oidc-authn
-          uri: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
 
 services:
   ca:
@@ -137,6 +133,8 @@ No añadas `gateway.addresses` por defecto. Deja la asignación de dirección a 
 
 Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OIDC hacia él y omite la entrada `/auth` de `gateway.extraRouting`.
 
+Si tu archivo de valores aún contiene los ajustes heredados de validación JWT del Gateway — `auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` o `auth.authorization.roles.admin` — elimínalos. La guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md` documenta su eliminación sin alias de compatibilidad, y `values.schema.json` rechaza los bloques residuales en lugar de ignorarlos silenciosamente. Los reemplazos son `services.authz.jwkUrl` y `services.authz.bootstrap`, que ya aparecen en el ejemplo anterior.
+
 ### TLS con un Secret existente
 
 Crea un Secret con `tls.crt` y `tls.key` y referéncialo:
@@ -147,6 +145,34 @@ tls:
   externalOptions:
     secretName: lamassu-downstream-tls
 ```
+
+### TLS de AMQP (AMQPS)
+
+`amqp.tls: true` selecciona AMQPS en todos los bloques de configuración del event bus. El puerto por defecto sigue siendo `5672` y no cambia automáticamente al habilitar TLS, así que define `amqp.port` con el listener TLS del broker, normalmente `5671`.
+
+Sin un Secret de CA configurado, los clientes del event bus usan las CA de confianza del sistema. Para confiar en una CA privada, crea un Secret en el namespace del release con el certificado de la CA en formato PEM y define `amqp.ca.secretName` (y `amqp.ca.certificateKey` si la clave de datos no es `ca.crt`).
+
+Para brokers que exijan TLS mutuo, crea un Secret con el certificado de cliente y su clave privada y define `amqp.client.secretName` (con `amqp.client.certificateKey` y `amqp.client.privateKeyKey` si las claves de datos no son `tls.crt` y `tls.key`).
+
+```yaml
+amqp:
+  tls: true
+  port: 5671
+  ca:
+    secretName: rabbitmq-ca
+  client:
+    secretName: lamassu-amqp-client
+```
+
+El chart monta los Secrets configurados en modo de solo lectura en todas las cargas de trabajo que consumen AMQP: el certificado de la CA en `/etc/lamassu/amqp/ca` y el certificado y la clave de cliente en `/etc/lamassu/amqp/client`. Los nombres de los archivos montados son siempre `ca.crt`, `tls.crt` y `tls.key` — los valores `certificateKey` y `privateKeyKey` renombran solo las claves de datos del Secret, nunca las rutas en disco. La clave privada del cliente se monta con permisos restrictivos (`defaultMode: 0440`; el volumen de la CA usa `0444`), que funcionan porque el chart añade `fsGroup` al security context del pod cuando `amqp.client.secretName` está definido — usa el `runAsGroup` del contenedor (por defecto `65532`) cuando `fsGroup` no está ya definido.
+
+Ambas opciones de Secret exigen `amqp.tls: true`: `values.schema.json` rechaza un `secretName` no vacío cuando `tls` es false, rechaza claves desconocidas y rechaza nombres de clave de datos fuera de `^[A-Za-z0-9._-]+$`. El Secret referenciado debe existir en el namespace del release o los pods consumidores no llegan a arrancar.
+
+El cliente AMQP carga los certificados al arrancar, así que reinicia los pods consumidores tras actualizar cualquiera de los dos Secrets. Cambiar cualquier valor de `amqp` reinicia las cargas de trabajo consumidoras mediante la anotación `checksum/config`, pero cambiar solo el contenido de un Secret no desencadena un rollout.
+
+<Callout type="warn" title="Define el puerto AMQP antes del upgrade">
+  Según la guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: en 3.8.0 `amqp.tls` no se aplicaba y los clientes del event bus usaban AMQP en claro; desde 4.0.0, `amqp.tls: true` los cambia a AMQPS. Define `amqp.port` con el listener TLS del broker antes del upgrade, o usa `amqp.tls: false` para mantener AMQP en claro.
+</Callout>
 
 ### Provisiona el primer administrador
 

@@ -26,11 +26,14 @@ import {
   type PageDiff,
 } from "@/components/diff-toggle";
 import { MdxCard, MdxLink } from "@/components/mdx-link";
+import { ScalarIcon } from "@/components/scalar-icon";
 import { VersionSelector } from "@/components/version-selector";
-import { DOCS_BASE_PATH } from "@/lib/base-path";
+import { DOCS_BASE_PATH, docsPath } from "@/lib/base-path";
 import { baseOptions, gitConfig } from "@/lib/layout.shared";
 import { DEFAULT_LOCALE, splitLocaleSlugs } from "@/lib/locales";
 import { source } from "@/lib/source";
+import { getSidebarTabs } from "fumadocs-ui/utils/get-sidebar-tabs";
+import { createElement } from "react";
 import {
   canonicalDocPath,
   resolveDocRedirect,
@@ -261,12 +264,27 @@ export default function Page({ loaderData }: Route.ComponentProps) {
   const target = resolveDocRedirect(location, DOCS_BASE_PATH);
   if (target) return <Navigate to={target} replace />;
 
+  // Sidebar tabs derive from root folders; API Reference is a route, not a
+  // content folder, so it is appended as a manual tab. Built from the
+  // loader-provided `pageTree`: importing `source` here would pull the whole
+  // server content collection into the client bundle.
+  const tabs = [
+    ...getSidebarTabs(pageTree),
+    {
+      url: docsPath("api-reference/ca"),
+      title: loaderData.locale === DEFAULT_LOCALE ? "API Reference" : "Referencia de API",
+      description: "",
+      icon: createElement(ScalarIcon, { className: "size-full text-[#237b69]" }),
+      urls: new Set<string>([docsPath("api-reference/ca")]),
+    },
+  ];
+
   return (
     <DocsLayout
       {...baseOptions()}
       i18n
       tree={pageTree}
-      sidebar={{ banner: <VersionSelector /> }}
+      sidebar={{ banner: <VersionSelector />, tabs }}
     >
       {content}
     </DocsLayout>

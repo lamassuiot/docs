@@ -33,13 +33,13 @@ simplereenroll [#simplereenroll]
 
 Usa el mismo formato de solicitud y de certificado de respuesta. La autenticación se obtiene del bloque independiente `reenrollment_settings.est_rfc7030_settings`. Con certificado cliente, su CN debe coincidir con el CN de la CSR; también se comprueba el sujeto frente al certificado actual.
 
-La CA de enrolamiento o una CA de validación configurada en el bloque de reenrolamiento valida la credencial en el modo mTLS. La comprobación de vencimiento por `enable_expired_renewal` corresponde a ese validador. El certificado actual revocado y una solicitud anterior a la ventana se rechazan. Consulta [Renovación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) para instalación y recuperación.
+En el modo mTLS, la CA de enrolamiento siempre valida la credencial de reenrolamiento; los certificados de otros emisores se aceptan solo si figuran como CAs de validación en el bloque de reenrolamiento. La comprobación de vencimiento por `enable_expired_renewal` corresponde a ese validador. El certificado actual revocado y una solicitud anterior a la ventana se rechazan. Consulta [Renovación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) para instalación y recuperación.
 
 serverkeygen [#serverkeygen]
 
 El servidor genera una clave software, reconstruye la CSR con esa clave y ejecuta el enrolamiento inicial. El flag debe estar habilitado y el algoritmo permitido por el perfil. La clave de esta operación no pasa a ser una clave hardware por utilizar una CA alojada en HSM.
 
-El código admite RSA y ECDSA de 224, 256, 384 o 521 bits. Un tamaño ECDSA no reconocido puede producir fallback a 256; elige explícitamente un tamaño compatible y comprueba la clave resultante. No reutilices un ID enrolado para probar esta operación sin revisar sustitución.
+El código admite RSA y ECDSA, y el valor `bits` del ajuste de clave del DMS significa algo distinto en cada caso. En ECDSA selecciona la curva: 224, 256, 384 o 521 corresponden a P-224, P-256, P-384 y P-521, y un tamaño no reconocido produce fallback a P-256, así que elige explícitamente un tamaño compatible y comprueba la clave resultante. En RSA se usa directamente como tamaño del módulo; la consola ofrece 2048, 3072 y 4096 bits. No reutilices un ID enrolado para probar esta operación sin revisar sustitución.
 
 Formato de respuesta [#formato-de-respuesta]
 

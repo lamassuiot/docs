@@ -62,7 +62,7 @@ Key rotation procedure [#key-rotation-procedure]
   <Step>
     Switch issuance [#switch-issuance]
 
-    Update the enrollment CA and profile of the DMSs, and add the old CA to each DMS's re-enrollment validation CAs (`reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`) while old-CA cohorts still renew. The [DMS guide](/docs/platform/iot-fleets/enrollment/dms) documents the setting.
+    Update the enrollment CA and profile of the DMSs. While old-CA cohorts still renew, add the previous enrollment CA to each DMS's re-enrollment validation CAs (`reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`): the new enrollment CA is trusted automatically, but the old one was the enrollment CA and appears in no re-enrollment trust list, so without that entry its certificates can no longer renew. The [DMS guide](/docs/platform/iot-fleets/enrollment/dms) documents the setting.
   </Step>
 
   <Step>
@@ -74,7 +74,7 @@ Key rotation procedure [#key-rotation-procedure]
   <Step>
     Close the overlap [#close-the-overlap]
 
-    Once no legitimate consumer depends on the previous authority, remove it from issuance and from the distributed CAs. Revoke it if policy requires it.
+    Once no legitimate consumer depends on the previous authority, remove it from issuance, from the re-enrollment validation CAs and from the distributed CAs. Revoke it if policy requires it.
   </Step>
 </Steps>
 

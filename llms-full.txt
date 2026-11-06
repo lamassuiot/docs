@@ -1792,7 +1792,7 @@ Webhook and combined modes also execute during re-enrollment when configured in 
 
 For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired` and `chain_level_validation`. The inspected flow receives one certificate credential; it does not guarantee forwarding every handshake intermediate to the validator. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
 
-For certificate re-enrollment, the validator tries the enrollment CA first and then the CAs listed in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; those are the re-enrollment validation CAs, and each settings block consults only its own `validation_cas`. CAs listed only in the initial block's `validation_cas` do not extend re-enrollment acceptance; during a CA rotation, add the old issuance CA to the re-enrollment block's list. The re-enrollment validator compares the presented TLS leaf against those CAs; the re-enrollment block's `chain_level_validation` and `allow_expired` values are stored but not consulted, and expiry is governed by `enable_expired_renewal`.
+For certificate re-enrollment, the validator tries the enrollment CA first and then the CAs listed in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; those are the re-enrollment validation CAs. That list is optional because the enrollment CA is always trusted for re-enrollment, and each settings block consults only its own `validation_cas`. CAs listed only in the initial block's `validation_cas` do not extend re-enrollment acceptance; during a CA rotation, add the old issuance CA to the re-enrollment block's list. The re-enrollment validator compares the presented TLS leaf against those CAs; the re-enrollment block's `chain_level_validation` and `allow_expired` values are stored but not consulted, and expiry is governed by `enable_expired_renewal`.
 
 For a webhook, configure destination, Lamassu-to-service authentication, method and timeout. The [authentication contract](/docs/platform/iot-fleets/enrollment/bootstrap-identity) explains the device credential and request body. `NO_AUTH` does not establish ownership of the requested ID.
 
@@ -1836,20 +1836,20 @@ Issuance profile [#issuance-profile]
 
 Re-enrollment configuration [#re-enrollment-configuration]
 
-| `settings.reenrollment_settings` field                            | Purpose                                                                                                                                                      |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `reenrollment_delta`                                              | Opens the window at the active certificate’s `NotAfter` minus this delta.                                                                                    |
-| `preventive_delta`                                                | Preventive operational monitoring threshold.                                                                                                                 |
-| `critical_delta`                                                  | Critical operational monitoring threshold.                                                                                                                   |
-| `enable_expired_renewal`                                          | Accepts an expired presented certificate in the renewal mTLS validator. Does not authorize another mode or remove Gateway constraints by itself.             |
-| `est_rfc7030_settings.client_certificate_settings.validation_cas` | Additional validation CAs for the renewal mTLS credential, tried after the enrollment CA; typically populated during CA rotation while old-CA cohorts renew. |
-| `revoke_on_reenrollment`                                          | If the previous certificate is ACTIVE, attempts Superseded revocation before binding its successor.                                                          |
+| `settings.reenrollment_settings` field                            | Purpose                                                                                                                                                                                                                |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reenrollment_delta`                                              | Opens the window at the active certificate’s `NotAfter` minus this delta.                                                                                                                                              |
+| `preventive_delta`                                                | Preventive operational monitoring threshold.                                                                                                                                                                           |
+| `critical_delta`                                                  | Critical operational monitoring threshold.                                                                                                                                                                             |
+| `enable_expired_renewal`                                          | Accepts an expired presented certificate in the renewal mTLS validator. Does not authorize another mode or remove Gateway constraints by itself.                                                                       |
+| `est_rfc7030_settings.client_certificate_settings.validation_cas` | Re-enrollment validation CAs for the renewal mTLS credential, tried after the enrollment CA; optional, because the enrollment CA is always trusted. Typically populated during CA rotation while old-CA cohorts renew. |
+| `revoke_on_reenrollment`                                          | If the previous certificate is ACTIVE, attempts Superseded revocation before binding its successor.                                                                                                                    |
 
 Monitoring does not renew: the client must schedule the request and installation. Webhook and NO\_AUTH modes do not use the same mTLS expired-credential validator; the webhook must explicitly authorize permitted recovery. Review [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for operation order and partial failures.
 
 ServerKeyGen [#serverkeygen]
 
-`settings.server_keygen_settings.enabled` enables software key generation on the server. Algorithm and size come from its `key` field; the profile must permit them. The response contains an unencrypted PKCS#8 key inside TLS alongside the certificate. See format and extraction in [EST reference](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen).
+`settings.server_keygen_settings.enabled` enables software key generation on the server. The console exposes it through an **Enable server-side key generation** switch and a **Key type** selection: `ECDSA` P-256, P-384 or P-521, or `RSA` with 2048, 3072 or 4096 bits; the defaults are P-256 for `ECDSA` and 4096 bit for `RSA`. Algorithm and size come from its `key` field, stored as `{type,bits}` where P-256, P-384 and P-521 map to `bits` 256, 384 and 521; `key` is omitted when disabled. The profile must permit them. The response contains an unencrypted PKCS#8 key inside TLS alongside the certificate. See format and extraction in [EST reference](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen).
 
 Trust distribution [#trust-distribution]
 
@@ -1999,13 +1999,13 @@ simplereenroll [#simplereenroll]
 
 Use the same request and certificate response formats. Authentication comes from the independent `reenrollment_settings.est_rfc7030_settings` block. With a client certificate, its CN must match the CSR CN; the subject is also checked against the current certificate.
 
-The enrollment CA or a validation CA configured in the re-enrollment block validates the credential in mTLS mode. The expiry check through `enable_expired_renewal` belongs to that validator. A revoked current certificate and a request before the window are rejected. See [Renewal](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for installation and recovery.
+In mTLS mode, the enrollment CA always validates the re-enrollment credential; certificates from other issuers are accepted only if they are listed as validation CAs in the re-enrollment block. The expiry check through `enable_expired_renewal` belongs to that validator. A revoked current certificate and a request before the window are rejected. See [Renewal](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for installation and recovery.
 
 serverkeygen [#serverkeygen]
 
 The server generates a software key, rebuilds the CSR with that key and performs initial enrollment. The flag must be enabled and the algorithm permitted by the profile. This operation's key does not become a hardware key because the CA is hosted in an HSM.
 
-The code supports RSA and ECDSA with 224, 256, 384 or 521 bits. An unrecognized ECDSA size can fall back to 256; explicitly select a compatible size and check the resulting key. Do not reuse an enrolled ID to test this operation without reviewing replacement.
+The code supports RSA and ECDSA, and the `bits` value of the DMS key setting means something different for each. For ECDSA it selects the curve: 224, 256, 384 or 521 map to P-224, P-256, P-384 and P-521, and an unrecognized size falls back to P-256, so explicitly select a compatible size and check the resulting key. For RSA it is used directly as the modulus size; the console offers 2048, 3072 and 4096 bits. Do not reuse an enrolled ID to test this operation without reviewing replacement.
 
 Response format [#response-format]
 
@@ -2378,7 +2378,7 @@ Migrate trust [#migrate-trust]
 
 Before changing Enrollment CA, inventory disconnected equipment, bootstrap and operational certificates, and consumers. Distribute the new root and required intermediates; check that a cohort accepts both old and new chains.
 
-In the DMS, separate distributed CAs from the re-enrollment validation CAs at `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`, used for re-enrollment credentials. When switching the enrollment CA, add the previous issuance CA to that list so old-CA identities keep re-enrolling during overlap. The inspected validator tries the enrollment CA followed by those CAs against the received leaf; accepting a multilevel chain requires checking what reaches the service and which issuer is configured.
+In the DMS, separate distributed CAs from the re-enrollment validation CAs at `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`, used for re-enrollment credentials. That list is optional because the enrollment CA always validates re-enrollment credentials, but when switching the enrollment CA, add the previous issuance CA to it so old-CA identities keep re-enrolling during overlap. The inspected validator tries the enrollment CA followed by those CAs against the received leaf; accepting a multilevel chain requires checking what reaches the service and which issuer is configured.
 
 Switch issuance, renew in cohorts and compare the installed serial with the active slot. Remove previous trust once no legitimate equipment needs it and policy permits ending overlap. Follow [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for the PKI operation.
 
@@ -2797,21 +2797,21 @@ Create an explicit leaf profile compatible with EC P-256, with **Honor Subject**
 
 Create the `Acme EST Evaluation` DMS with this configuration:
 
-| Setting                                               | Evaluation value                                                                                    |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Enrollment CA                                         | Issuing root from `device-root.pem`.                                                                |
-| Issuance profile                                      | The 1-hour leaf profile you just prepared.                                                          |
-| Protocol / Registration Mode                          | `EST_RFC7030` / `JITP`.                                                                             |
-| Verify CSR Signature                                  | Enabled.                                                                                            |
-| Enable Replaceable Enrollment                         | Disabled; the ID must be new.                                                                       |
-| Initial authentication                                | `CLIENT_CERTIFICATE`; Validation CAs includes the direct bootstrap issuer; no expired certificates. |
-| Renewal authentication                                | `CLIENT_CERTIFICATE`, configured in the independent re-enrollment block.                            |
-| Re-enrollment Validation CAs / Enable Expired Renewal | Empty list for this direct issuance / disabled.                                                     |
-| Re-enrollment Delta                                   | 1 hour.                                                                                             |
-| Preventive / Critical Delta                           | 30 minutes / 10 minutes.                                                                            |
-| Revoke on Re-enrollment                               | Disabled to test the successor before retiring the previous identity.                               |
-| ServerKeyGen                                          | Disabled; the operational key is generated in the client.                                           |
-| CA Distribution                                       | Include Enrollment CA enabled; Include Lamassu System CA disabled.                                  |
+| Setting                                               | Evaluation value                                                                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Enrollment CA                                         | Issuing root from `device-root.pem`.                                                                   |
+| Issuance profile                                      | The 1-hour leaf profile you just prepared.                                                             |
+| Protocol / Registration Mode                          | `EST_RFC7030` / `JITP`.                                                                                |
+| Verify CSR Signature                                  | Enabled.                                                                                               |
+| Enable Replaceable Enrollment                         | Disabled; the ID must be new.                                                                          |
+| Initial authentication                                | `CLIENT_CERTIFICATE`; Validation CAs includes the direct bootstrap issuer; no expired certificates.    |
+| Renewal authentication                                | `CLIENT_CERTIFICATE`, configured in the independent re-enrollment block.                               |
+| Re-enrollment Validation CAs / Enable Expired Renewal | Not needed for this direct issuance; the Enrollment CA is always trusted for re-enrollment / disabled. |
+| Re-enrollment Delta                                   | 1 hour.                                                                                                |
+| Preventive / Critical Delta                           | 30 minutes / 10 minutes.                                                                               |
+| Revoke on Re-enrollment                               | Disabled to test the successor before retiring the previous identity.                                  |
+| ServerKeyGen                                          | Disabled; the operational key is generated in the client.                                              |
+| CA Distribution                                       | Include Enrollment CA enabled; Include Lamassu System CA disabled.                                     |
 
 Equal duration and window allow immediate renewal testing. These are evaluation values; size production settings according to connectivity and recovery times. Save, reread both authentication blocks and retain the DMS ID. If your console does not expose the independent block, configure and check the resource through the [DMS API](/docs/api-reference/dms-manager) and [DMS guide](/docs/platform/iot-fleets/enrollment/dms).
 
@@ -2956,7 +2956,7 @@ A DMS must exist before registering the device. If you already have a suitable o
 1. Open the DMS inventory and its creation action. Assign a recognizable name, such as `Acme Evaluation DMS`.
 2. In **Enrollment CA**, select the CA that issued `device.crt`.
 3. In **Registration Mode**, select `PRE_REGISTRATION` for the path that starts with explicit registration.
-4. Set **Authentication Mode** to `CLIENT_CERTIFICATE` and add the CA whose initial certificates you will accept in **Validation CAs**. For this evaluation, it can be the same CA. Keep **Verify CSR Signature** enabled and server key generation disabled if you will not use it.
+4. In the authentication section, enable **Require client certificate** and leave **Call external webhook** off. Under **Require client certificate**, add the CA whose initial certificates you will accept to **Validation CAs**; for this evaluation, it can be the same CA. Keep **Verify CSR Signature** enabled and leave **Enable server-side key generation** off if you will not use it.
 5. Review renewal and trust distribution settings with the [DMS guide](/docs/platform/iot-fleets/enrollment/dms), save the service and note its identifier.
 6. Reopen the DMS and confirm that the enrollment CA is the expected one and the service appears in inventory.
 
@@ -3167,7 +3167,7 @@ Key rotation procedure [#key-rotation-procedure]
   <Step>
     Switch issuance [#switch-issuance]
 
-    Update the enrollment CA and profile of the DMSs, and add the old CA to each DMS's re-enrollment validation CAs (`reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`) while old-CA cohorts still renew. The [DMS guide](/docs/platform/iot-fleets/enrollment/dms) documents the setting.
+    Update the enrollment CA and profile of the DMSs. While old-CA cohorts still renew, add the previous enrollment CA to each DMS's re-enrollment validation CAs (`reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`): the new enrollment CA is trusted automatically, but the old one was the enrollment CA and appears in no re-enrollment trust list, so without that entry its certificates can no longer renew. The [DMS guide](/docs/platform/iot-fleets/enrollment/dms) documents the setting.
   </Step>
 
   <Step>
@@ -3179,7 +3179,7 @@ Key rotation procedure [#key-rotation-procedure]
   <Step>
     Close the overlap [#close-the-overlap]
 
-    Once no legitimate consumer depends on the previous authority, remove it from issuance and from the distributed CAs. Revoke it if policy requires it.
+    Once no legitimate consumer depends on the previous authority, remove it from issuance, from the re-enrollment validation CAs and from the distributed CAs. Revoke it if policy requires it.
   </Step>
 </Steps>
 
@@ -3763,7 +3763,7 @@ Enrollment, validation and distribution CAs [#enrollment-validation-and-distribu
 A DMS relates three sets that are worth designing separately:
 
 * **Enrollment CA:** signs the new identities.
-* **Validation CAs:** authenticate the client certificates used for enrollment or migration. During re-enrollment, Lamassu tries the enrollment CA first and then the validation CAs configured in the re-enrollment block.
+* **Validation CAs:** authenticate the client certificates used for enrollment or migration. During re-enrollment, the enrollment CA is always trusted and Lamassu then tries the validation CAs configured in the re-enrollment block; those are optional.
 * **Distributed CAs:** form the content the device obtains through EST `/cacerts`. You can include the service TLS certificate, the enrollment CA and an explicit list of managed CAs. Including the issuer does not automatically add all its ancestors.
 
 This separation makes it possible to migrate a fleet: you temporarily accept certificates from the old hierarchy, issue with the new one and distribute both chains during the overlap.

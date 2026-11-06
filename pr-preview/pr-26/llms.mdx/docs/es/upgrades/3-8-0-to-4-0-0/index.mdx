@@ -539,7 +539,11 @@ Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma ind
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Helm ejecuta los hooks de preactualización —la migración de CA a KMS si está activada y el job de base de datos— antes de aplicar ninguna carga, así que los servicios nunca arrancan contra una base de datos sin preparar. Si la validación rechaza values desconocidos, corrige el archivo y vuelve a ejecutar. Si el despliegue usa almacenamiento local en el KMS o la VA, esos pods fallan hasta que completes el paso 4.
+  Helm ejecuta los hooks de preactualización —la migración de CA a KMS si está activada y el job de base de datos— antes de aplicar ninguna carga, así que los servicios nunca arrancan contra una base de datos sin preparar. Si la validación rechaza values desconocidos, corrige el archivo y vuelve a ejecutar.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Si el despliegue usa almacenamiento local en el KMS o la VA, esos pods fallan hasta que completes el paso 4, así que `--wait` no puede terminar bien: Helm espera a que estén listos, agota el tiempo, sale con error y marca la release como `failed`. Para entonces los hooks ya se han ejecutado y se han aplicado todos los manifiestos, incluidos los nuevos StatefulSets y sus PVC. Sin `--atomic`, Helm no revierte nada. Continúa con el paso 4 y después vuelve a lanzar el mismo comando `helm upgrade` para que termine y Helm registre la release como `deployed`. Los dos hooks son idempotentes, así que es seguro volver a ejecutarlos.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -566,14 +570,28 @@ Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma ind
   KMS_PVC="golang-engine-storage-${KMS_STS}-0"
   VA_PVC="local-crl-file-storage-${VA_STS}-0"
 
-  kubectl get pvc -n "$NAMESPACE" \
+  # Falla si una búsqueda vino vacía o una PVC nueva es la antigua.
+  # El punto 3 la vuelve a llamar antes de crear el pod auxiliar.
+  claims_ok() {
+    local pair sts new old
+    for pair in "$KMS_STS:$KMS_PVC:golang-engine-storage-kms-0" \
+                "$VA_STS:$VA_PVC:local-crl-file-storage-va-0"; do
+      IFS=: read -r sts new old <<< "$pair"
+      if [ -z "$sts" ] || [ "$new" = "$old" ]; then
+        echo "ABORT: new claim '$new' is missing or equals the 3.8.0 claim '$old'" >&2
+        return 1
+      fi
+    done
+  }
+
+  claims_ok && kubectl get pvc -n "$NAMESPACE" \
     golang-engine-storage-kms-0 "$KMS_PVC" \
     local-crl-file-storage-va-0 "$VA_PVC"
   ```
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Con la release `lamassu` y el nombre de chart por defecto, los nuevos PVC son `golang-engine-storage-lamassu-kms-0` y `local-crl-file-storage-lamassu-va-0`; con la release `prod` son `golang-engine-storage-prod-lamassu-kms-0` y `local-crl-file-storage-prod-lamassu-va-0`. Comprueba que existen los PVC antiguos y nuevos antes de continuar. Si solo migras uno de los dos servicios, quita las PVC del otro de los comandos siguientes.
+  Con la release `lamassu` y el nombre de chart por defecto, los nuevos PVC son `golang-engine-storage-lamassu-kms-0` y `local-crl-file-storage-lamassu-va-0`; con la release `prod` son `golang-engine-storage-prod-lamassu-kms-0` y `local-crl-file-storage-prod-lamassu-va-0`. Comprueba que existen los PVC antiguos y nuevos antes de continuar. Si `claims_ok` imprime `ABORT`, el bloque se detiene antes de listar las PVC: o falló la búsqueda de un StatefulSet, o una PVC nueva resuelve a la PVC de 3.8.0. En el segundo caso la copia se verificaría contra sí misma y la limpieza final borraría el volumen en uso. El chart siempre añade `-kms` y `-va` al nombre con ámbito de release, así que una colisión indica que las PVC no son las que esta guía espera; investiga antes de seguir. El punto 3 repite la comprobación y no crea el pod auxiliar, así que nada toca los volúmenes. La comprobación devuelve un error en lugar de llamar a `exit`, que cerraría tu shell y perdería las variables definidas hasta ahora. Si solo migras uno de los dos servicios, quita las PVC del otro de los comandos siguientes.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -598,7 +616,7 @@ Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma ind
 
 <div className="lm-diff-ins lm-diff-block">
   ```bash
-  cat <<EOF | kubectl apply -f -
+  claims_ok && cat <<EOF | kubectl apply -f -
   apiVersion: v1
   kind: Pod
   metadata:
@@ -678,6 +696,10 @@ Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma ind
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  7. **Vuelve a lanzar el comando `helm upgrade` del paso 3.** Los pods del KMS y la VA arrancan ahora con los datos copiados, así que `--wait` termina bien y la release pasa de `failed` a `deployed`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   Paso 5: Elimina los values de migración puntual [#paso-5-elimina-los-values-de-migración-puntual]
 </div>
 
@@ -734,6 +756,7 @@ Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma ind
 
 <div className="lm-diff-ins lm-diff-block">
   * **Los pods del KMS o la VA fallan con `no such file or directory` o `code=NotFound` justo después de actualizar.** Los pods están enlazados a los PVC nuevos y vacíos y la migración de datos aún no se ha hecho, o se copió en el PVC equivocado. Sigue el [paso 4](#paso-4-migra-los-datos-del-kms-y-la-va) y comprueba que existen las cuatro PVC.
+  * **`helm upgrade --wait` agota el tiempo y `helm status` muestra la release como `failed`.** Con almacenamiento local en el KMS o la VA es lo esperado en la primera ejecución: los nuevos pods no pueden estar listos hasta que se copien sus datos. Los hooks se ejecutaron y los manifiestos y PVC se aplicaron, así que completa el [paso 4](#paso-4-migra-los-datos-del-kms-y-la-va) y vuelve a lanzar el mismo comando `helm upgrade`. Si otros pods tampoco están listos, revisa sus logs, porque falla algo más.
   * **El pod auxiliar se queda en `Pending` o `ContainerCreating` y `kubectl wait` agota el tiempo.** Otro pod sigue reteniendo alguna de las PVC; en almacenamiento de bloque, `kubectl describe pod pvc-migrate-helper` muestra un `Multi-Attach error`. Comprueba con `kubectl get pods -n $NAMESPACE` que `kms-0`, `va-0` y los nuevos pods del KMS y la VA han desaparecido, y vuelve a ejecutar el wait.
   * **`helm upgrade` falla con un error de validación por clave desconocida.** Elimina o renombra los values heredados —normalmente `toolbox`, `auth.oidc.apiGateway` o `auth.authorization`—, porque el schema estricto rechaza las claves que no conoce.
   * **La actualización falla en el job de base de datos.** El rol de PostgreSQL no puede crear bases de datos o esquemas, o una migración de esquema abortó por IDs de CA duplicados o por valores de `engine_id` vacíos. Revisa los logs del job, corrige los permisos o los datos y vuelve a ejecutar la actualización.
@@ -765,7 +788,7 @@ Tras <del className="lm-diff-del">aplicar </del>la actualización, <del classNam
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Solo cuando pasen todas las comprobaciones, elimina los volúmenes huérfanos de 3.8.0 para recuperar almacenamiento. El borrado es irreversible y el volumen antiguo del KMS puede contener la última copia del material de claves de tus CA, así que antes haz un `VolumeSnapshot` o una copia de seguridad de ambos PVC antiguos y consérvala hasta que confíes en que el despliegue actualizado funciona correctamente:
+  Solo cuando pasen todas las comprobaciones, elimina los volúmenes huérfanos de 3.8.0 para recuperar almacenamiento. El borrado es irreversible y el volumen antiguo del KMS puede contener la última copia del material de claves de tus CA, así que antes haz un `VolumeSnapshot` o una copia de seguridad de ambos PVC antiguos y consérvala hasta que confíes en que el despliegue actualizado funciona correctamente. Son los nombres fijos de 3.8.0 que anotaste en el paso 1; antes de borrarlos, confirma que ningún pod en marcha los monta, por ejemplo con `kubectl describe pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0`, donde `Used By` debe ser `<none>`:
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

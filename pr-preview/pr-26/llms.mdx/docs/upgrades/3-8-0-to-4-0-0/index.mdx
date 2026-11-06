@@ -576,22 +576,28 @@ Re-enrollment authentication settings are now stored independently from initial 
   KMS_PVC="golang-engine-storage-${KMS_STS}-0"
   VA_PVC="local-crl-file-storage-${VA_STS}-0"
 
-  # Stop if a lookup came back empty or a new claim is the old one
-  for pair in "$KMS_STS:$KMS_PVC:golang-engine-storage-kms-0" "$VA_STS:$VA_PVC:local-crl-file-storage-va-0"; do
-    IFS=: read -r sts new old <<< "$pair"
-    if [ -z "$sts" ] || [ "$new" = "$old" ]; then
-      echo "ABORT: new claim '$new' is missing or equals the 3.8.0 claim '$old'" >&2
-    fi
-  done
+  # Fails if a lookup came back empty or a new claim is the old one.
+  # Item 3 calls it again before creating the helper pod.
+  claims_ok() {
+    local pair sts new old
+    for pair in "$KMS_STS:$KMS_PVC:golang-engine-storage-kms-0" \
+                "$VA_STS:$VA_PVC:local-crl-file-storage-va-0"; do
+      IFS=: read -r sts new old <<< "$pair"
+      if [ -z "$sts" ] || [ "$new" = "$old" ]; then
+        echo "ABORT: new claim '$new' is missing or equals the 3.8.0 claim '$old'" >&2
+        return 1
+      fi
+    done
+  }
 
-  kubectl get pvc -n "$NAMESPACE" \
+  claims_ok && kubectl get pvc -n "$NAMESPACE" \
     golang-engine-storage-kms-0 "$KMS_PVC" \
     local-crl-file-storage-va-0 "$VA_PVC"
   ```
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  With release `lamassu` and the default chart name, the new PVCs are `golang-engine-storage-lamassu-kms-0` and `local-crl-file-storage-lamassu-va-0`; with release `prod` they are `golang-engine-storage-prod-lamassu-kms-0` and `local-crl-file-storage-prod-lamassu-va-0`. Confirm both old and new PVCs exist before continuing. If the check prints `ABORT`, stop: either a StatefulSet lookup failed, or a new claim resolves to the 3.8.0 claim. In the second case the copy would verify against itself and the final cleanup would delete the live volume. The chart always appends `-kms` and `-va` to the release-scoped name, so a collision means the claims are not what this guide expects; investigate before going on. If you only migrate one of the two services, drop the other one's claims from the commands that follow.
+  With release `lamassu` and the default chart name, the new PVCs are `golang-engine-storage-lamassu-kms-0` and `local-crl-file-storage-lamassu-va-0`; with release `prod` they are `golang-engine-storage-prod-lamassu-kms-0` and `local-crl-file-storage-prod-lamassu-va-0`. Confirm both old and new PVCs exist before continuing. If `claims_ok` prints `ABORT`, the block stops before listing the claims: either a StatefulSet lookup failed, or a new claim resolves to the 3.8.0 claim. In the second case the copy would verify against itself and the final cleanup would delete the live volume. The chart always appends `-kms` and `-va` to the release-scoped name, so a collision means the claims are not what this guide expects; investigate before going on. Item 3 runs the same check and refuses to create the helper pod, so nothing touches the volumes. The check returns instead of calling `exit`, which would close your shell and lose the variables set so far. If you only migrate one of the two services, drop the other one's claims from the commands that follow.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -616,7 +622,7 @@ Re-enrollment authentication settings are now stored independently from initial 
 
 <div className="lm-diff-ins lm-diff-block">
   ```bash
-  cat <<EOF | kubectl apply -f -
+  claims_ok && cat <<EOF | kubectl apply -f -
   apiVersion: v1
   kind: Pod
   metadata:

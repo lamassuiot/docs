@@ -24,23 +24,23 @@ Crea un perfil final explícito, compatible con EC P-256, con **Honor Subject**,
 
 Crea el DMS `Acme EST Evaluation` con esta configuración:
 
-| Ajuste                                             | Valor de evaluación                                                                                |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Enrollment CA                                      | Raíz emisora de `device-root.pem`.                                                                 |
-| Perfil de emisión                                  | Perfil final de 1 hora que acabas de preparar.                                                     |
-| Protocol / Registration Mode                       | `EST_RFC7030` / `JITP`.                                                                            |
-| Verify CSR Signature                               | Habilitado.                                                                                        |
-| Enable Replaceable Enrollment                      | Deshabilitado; el ID debe ser nuevo.                                                               |
-| Autenticación inicial                              | `CLIENT_CERTIFICATE`; Validation CAs incluye el emisor directo del bootstrap; no aceptar vencidos. |
-| Autenticación de renovación                        | `CLIENT_CERTIFICATE`, configurada en el bloque independiente de re-enrollment.                     |
-| Additional Validation CAs / Enable Expired Renewal | Lista vacía para esta emisión directa / deshabilitado.                                             |
-| Re-enrollment Delta                                | 1 hora.                                                                                            |
-| Preventive / Critical Delta                        | 30 minutos / 10 minutos.                                                                           |
-| Revoke on Re-enrollment                            | Deshabilitado para probar el sucesor antes de retirar el anterior.                                 |
-| ServerKeyGen                                       | Deshabilitado; la clave operativa se genera en el cliente.                                         |
-| CA Distribution                                    | Include Enrollment CA habilitado; Include Lamassu System CA deshabilitado.                         |
+| Ajuste                                                | Valor de evaluación                                                                                                         |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Enrollment CA                                         | Raíz emisora de `device-root.pem`.                                                                                          |
+| Perfil de emisión                                     | Perfil final de 1 hora que acabas de preparar.                                                                              |
+| Protocol / Registration Mode                          | `EST_RFC7030` / `JITP`.                                                                                                     |
+| Verify CSR Signature                                  | Habilitado.                                                                                                                 |
+| Enable Replaceable Enrollment                         | Deshabilitado; el ID debe ser nuevo.                                                                                        |
+| Autenticación inicial                                 | `CLIENT_CERTIFICATE`; Validation CAs incluye el emisor directo del bootstrap; no aceptar vencidos.                          |
+| Autenticación de renovación                           | `CLIENT_CERTIFICATE`, configurada en el bloque independiente de re-enrollment.                                              |
+| Re-enrollment Validation CAs / Enable Expired Renewal | No se necesitan para esta emisión directa; la CA de enrolamiento siempre es confiable en el reenrolamiento / deshabilitado. |
+| Re-enrollment Delta                                   | 1 hora.                                                                                                                     |
+| Preventive / Critical Delta                           | 30 minutos / 10 minutos.                                                                                                    |
+| Revoke on Re-enrollment                               | Deshabilitado para probar el sucesor antes de retirar el anterior.                                                          |
+| ServerKeyGen                                          | Deshabilitado; la clave operativa se genera en el cliente.                                                                  |
+| CA Distribution                                       | Include Enrollment CA habilitado; Include Lamassu System CA deshabilitado.                                                  |
 
-La duración y ventana iguales permiten probar renovación inmediatamente. Son valores de evaluación; dimensiona producción según conectividad y tiempos de recuperación. Guarda, vuelve a leer los dos bloques de autenticación y conserva el ID del DMS. Si tu consola no expone el bloque independiente, configura y comprueba el recurso mediante la [API DMS](/docs/api-reference/dms-manager) y la [guía DMS](/docs/platform/iot-fleets/enrollment/dms).
+La duración y ventana iguales permiten probar renovación inmediatamente. Son valores de evaluación; dimensiona producción según conectividad y tiempos de recuperación. Guarda, vuelve a leer los dos bloques de autenticación y conserva el ID del DMS. <del className="lm-diff-del">Si tu</del><ins className="lm-diff-ins">La</ins> consola <del className="lm-diff-del">no </del>expone <del className="lm-diff-del">el bloque independiente, configura y comprueba </del><ins className="lm-diff-ins">editores independientes para la autenticación de enrolamiento y de reenrolamiento; la </ins>[<ins className="lm-diff-ins">guía DMS</ins>](/docs/platform/iot-fleets/enrollment/dms)<ins className="lm-diff-ins"> describe sus campos, y también puedes comprobar </ins>el recurso mediante la [API DMS](/docs/api-reference/dms-manager)<del className="lm-diff-del"> y la </del>[<del className="lm-diff-del">guía DMS</del>](/docs/platform/iot-fleets/enrollment/dms).
 
 Prepara el cliente y comprueba cacerts [#prepara-el-cliente-y-comprueba-cacerts]
 

@@ -1,32 +1,32 @@
-import{j as s}from"./index-prc0XQdj.js";let t=`
+import{j as s}from"./index-prc0XQdj.js";let l=`
 
-Install Lamassu with Helm [#install-lamassu-with-helm]
+Instala Lamassu con Helm [#instala-lamassu-con-helm]
 
-Use the Helm workflow when you need explicit control over identity, databases, messaging, certificates, storage and upgrades. For an evaluation environment where the script can make those choices for you, use [Fastlane](/docs/deployment/self-hosted/fastlane).
+Usa Helm cuando necesites control explícito sobre identidad, bases de datos, mensajería, certificados, almacenamiento y upgrades. Para un entorno de evaluación en el que el script pueda tomar esas decisiones, usa [Fastlane](/docs/deployment/self-hosted/fastlane).
 
-Before you begin [#before-you-begin]
+Antes de comenzar [#antes-de-comenzar]
 
-Prepare the platform services that are deliberately outside the Lamassu chart:
+Prepara los servicios de plataforma que quedan deliberadamente fuera del chart de Lamassu:
 
-* a Kubernetes 1.24+ cluster and Helm 3.2+
-* a reachable PostgreSQL server and a role allowed to create databases and schemas
-* a reachable RabbitMQ broker and credentials
-* an OIDC provider, normally Keycloak, with a realm/tenant and client for Lamassu
-* Envoy Gateway 1.8+ and a \`GatewayClass\`
-* cert-manager 1.14+; for trusted TLS, either a trusted issuer or a Kubernetes TLS Secret
-* a StorageClass and an [external traffic design](/docs/deployment/self-hosted/networking)
+* un clúster Kubernetes 1.24+ y Helm 3.2+
+* un servidor PostgreSQL accesible y un rol autorizado para crear bases de datos y schemas
+* un broker RabbitMQ accesible y sus credenciales
+* un proveedor OIDC, normalmente Keycloak, con un realm/tenant y un cliente para Lamassu
+* Envoy Gateway 1.8+ y una \`GatewayClass\`
+* cert-manager 1.14+; para TLS de confianza, un emisor de confianza o un Secret TLS de Kubernetes
+* una StorageClass y un [diseño de tráfico externo](/docs/deployment/self-hosted/networking)
 
-The chart defaults to a \`GatewayClass\` named \`eg\`. Change \`gateway.className\` if your platform team uses another name.
+El chart usa por defecto una \`GatewayClass\` llamada \`eg\`. Cambia \`gateway.className\` si tu equipo de plataforma utiliza otro nombre.
 
-<Callout type="info" title="What Helm does with PostgreSQL">
-  You provide the PostgreSQL server. The chart's pre-install job connects with the supplied credentials, creates the required \`pki\`, \`authz\` and \`wfx\` databases and service schemas, runs migrations, and applies \`services.authz.bootstrap\`.
+<Callout type="info" title="Qué hace Helm con PostgreSQL">
+  Tú proporcionas el servidor PostgreSQL. El job de pre-install del chart se conecta con las credenciales indicadas, crea las bases de datos \`pki\`, \`authz\` y \`wfx\` y los schemas de los servicios, ejecuta las migraciones y aplica \`services.authz.bootstrap\`.
 </Callout>
 
-The chart has no Helm dependencies that install PostgreSQL, RabbitMQ, an OIDC provider, Envoy Gateway or cert-manager.
+El chart no tiene dependencias Helm que instalen PostgreSQL, RabbitMQ, un proveedor OIDC, Envoy Gateway ni cert-manager.
 
-1. Install the Gateway prerequisites [#1-install-the-gateway-prerequisites]
+1. Instala los requisitos del Gateway [#1-instala-los-requisitos-del-gateway]
 
-Install or upgrade the Envoy Gateway CRDs before its controller. The commands below match the version used by the Lamassu Helm repository:
+Instala o actualiza las CRD de Envoy Gateway antes de su controlador. Estos comandos usan la misma versión que el repositorio Helm de Lamassu:
 
 \`\`\`bash
 export ENVOY_GATEWAY_VERSION=v1.8.0
@@ -44,7 +44,7 @@ helm upgrade --install eg oci://docker.io/envoyproxy/gateway-helm \\
   --create-namespace
 \`\`\`
 
-Create the default \`GatewayClass\` if it does not already exist. Save this manifest as \`gateway-class.yaml\`:
+Crea la \`GatewayClass\` predeterminada si todavía no existe. Guarda este manifiesto como \`gateway-class.yaml\`:
 
 \`\`\`yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -60,11 +60,11 @@ kubectl apply -f gateway-class.yaml
 kubectl rollout status deployment/envoy-gateway -n envoy-gateway-system
 \`\`\`
 
-Install cert-manager separately before Lamassu. The current chart renders its self-signed issuer and CA certificate resources even when \`tls.type: external\` makes the Gateway use an existing TLS Secret. Selecting external TLS therefore does not remove the cert-manager prerequisite.
+Instala cert-manager por separado antes de Lamassu. El chart actual renderiza sus recursos de issuer self-signed y certificado CA incluso cuando \`tls.type: external\` hace que el Gateway use un Secret TLS existente. Seleccionar TLS externo no elimina por tanto el requisito de cert-manager.
 
-2. Create a values file [#2-create-a-values-file]
+2. Crea un archivo de valores [#2-crea-un-archivo-de-valores]
 
-Start with the chart defaults and override the environment-specific values. This example assumes PostgreSQL, RabbitMQ and Keycloak are reachable through Kubernetes DNS, and exposes Keycloak at \`/auth\` through the shared Lamassu Gateway:
+Parte de los valores predeterminados del chart y sobrescribe los específicos del entorno. Este ejemplo supone que PostgreSQL, RabbitMQ y Keycloak son accesibles mediante DNS de Kubernetes y expone Keycloak en \`/auth\` a través del Gateway compartido:
 
 \`\`\`yaml
 postgres:
@@ -106,10 +106,6 @@ auth:
     frontend:
       clientId: frontend
       authority: https://pki.example.com/auth/realms/lamassu
-    apiGateway:
-      jwks:
-        - name: oidc-authn
-          uri: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
 
 services:
   ca:
@@ -130,13 +126,13 @@ services:
               value: pki-admin
 \`\`\`
 
-Do not add \`gateway.addresses\` by default. Leave address assignment to the load-balancer implementation unless your network design requires a specific Kubernetes-side VIP. The public IP of an upstream NAT gateway or reverse proxy does not belong in this value.
+No añadas \`gateway.addresses\` por defecto. Deja la asignación de dirección a la implementación del balanceador salvo que tu diseño de red requiera una VIP concreta en Kubernetes. La IP pública de un NAT o proxy upstream no corresponde a este valor.
 
-If Keycloak is external and already has its own reachable URL, point the OIDC settings at it and omit the \`/auth\` entry from \`gateway.extraRouting\`.
+Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OIDC hacia él y omite la entrada \`/auth\` de \`gateway.extraRouting\`.
 
-TLS with an existing Secret [#tls-with-an-existing-secret]
+TLS con un Secret existente [#tls-con-un-secret-existente]
 
-Create a Secret containing \`tls.crt\` and \`tls.key\`, then reference it:
+Crea un Secret con \`tls.crt\` y \`tls.key\` y referéncialo:
 
 \`\`\`yaml
 tls:
@@ -145,19 +141,19 @@ tls:
     secretName: lamassu-downstream-tls
 \`\`\`
 
-Provision the first administrator [#provision-the-first-administrator]
+Provisiona el primer administrador [#provisiona-el-primer-administrador]
 
-There is no implicit superuser. Create the role or group expected by \`services.authz.bootstrap\` in the OIDC provider and assign it to at least one administrator before exposing Lamassu.
+No existe un superusuario implícito. Crea en el proveedor OIDC el rol o grupo esperado por \`services.authz.bootstrap\` y asígnalo al menos a un administrador antes de exponer Lamassu.
 
-The pre-install and pre-upgrade job applies the bootstrap idempotently: existing principals are preserved and missing grants are added.
+El job de pre-install y pre-upgrade aplica el bootstrap de forma idempotente: conserva los principales existentes y añade los grants que falten.
 
-<Callout type="warn" title="Validate access before exposing the platform">
-  Test both an authorized identity and a denied identity. If no token matches an active bootstrap principal, nobody can administer the PKI.
+<Callout type="warn" title="Valida el acceso antes de exponer la plataforma">
+  Prueba una identidad autorizada y otra denegada. Si ningún token coincide con un principal activo del bootstrap, nadie podrá administrar la PKI.
 </Callout>
 
-See [Access control](/docs/platform/administration/access-control) for the principal and policy model.
+Consulta [Control de acceso](/docs/platform/administration/access-control) para conocer el modelo de principales y políticas.
 
-3. Install Lamassu [#3-install-lamassu]
+3. Instala Lamassu [#3-instala-lamassu]
 
 \`\`\`bash
 helm repo add lamassu https://lamassuiot.github.io/lamassu-helm
@@ -170,7 +166,7 @@ helm upgrade --install lamassu lamassu/lamassu \\
   --wait
 \`\`\`
 
-To install a local checkout instead:
+Para instalar un checkout local:
 
 \`\`\`bash
 helm upgrade --install lamassu ./charts/lamassu \\
@@ -180,7 +176,7 @@ helm upgrade --install lamassu ./charts/lamassu \\
   --wait
 \`\`\`
 
-4. Verify the deployment [#4-verify-the-deployment]
+4. Verifica el despliegue [#4-verifica-el-despliegue]
 
 \`\`\`bash
 kubectl get pods -n lamassu
@@ -189,42 +185,42 @@ kubectl get service -A
 helm test lamassu -n lamassu --logs
 \`\`\`
 
-The Gateway should report \`PROGRAMMED=True\`. If it is programmed but has no usable address, continue with [Expose the Gateway](/docs/deployment/self-hosted/networking).
+El Gateway debe mostrar \`PROGRAMMED=True\`. Si está programado pero no tiene una dirección utilizable, continúa con [Expón el Gateway](/docs/deployment/self-hosted/networking).
 
-The Helm test checks the CA, DMS Manager, Device Manager and VA health endpoints and verifies the UI response.
+El test de Helm comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y verifica la respuesta de la UI.
 
-Production decisions [#production-decisions]
+Decisiones para producción [#decisiones-para-producción]
 
-Before going live, review:
+Antes de pasar a producción, revisa:
 
-* backup and recovery for PostgreSQL and persistent volumes
-* a production KMS engine; the default filesystem engine is not an HA design
-* shared VA storage before increasing VA replicas
-* managed OIDC roles and removal of evaluation credentials
-* a trusted TLS issuer or externally managed certificate
-* resource requests, replicas, autoscaling, disruption budgets and placement
-* SMTP, observability and alert delivery
-* the migration notes in \`charts/lamassu/CHANGELOG/\` before every upgrade
+* backup y recuperación de PostgreSQL y volúmenes persistentes
+* un motor KMS de producción; el motor filesystem predeterminado no ofrece alta disponibilidad
+* almacenamiento compartido para VA antes de aumentar sus réplicas
+* roles OIDC gestionados y eliminación de credenciales de evaluación
+* un emisor TLS de confianza o un certificado gestionado externamente
+* recursos, réplicas, autoscaling, disruption budgets y placement
+* SMTP, observabilidad y entrega de alertas
+* las [guías de actualización entre versiones](/docs/upgrades/3-8-0-to-4-0-0) y las notas de \`charts/lamassu/CHANGELOG/\` antes de cada upgrade
 
-The complete values reference is maintained in \`charts/lamassu/VALUES.md\` in the Helm repository.
-`,l={title:"Install with Helm",description:"Prepare dependencies, configure the Lamassu chart and verify a controlled Kubernetes deployment."},h={contents:[{heading:"install-lamassu-with-helm",content:"Use the Helm workflow when you need explicit control over identity, databases, messaging, certificates, storage and upgrades. For an evaluation environment where the script can make those choices for you, use Fastlane."},{heading:"before-you-begin",content:"Prepare the platform services that are deliberately outside the Lamassu chart:"},{heading:"before-you-begin",content:"a Kubernetes 1.24+ cluster and Helm 3.2+"},{heading:"before-you-begin",content:"a reachable PostgreSQL server and a role allowed to create databases and schemas"},{heading:"before-you-begin",content:"a reachable RabbitMQ broker and credentials"},{heading:"before-you-begin",content:"an OIDC provider, normally Keycloak, with a realm/tenant and client for Lamassu"},{heading:"before-you-begin",content:"Envoy Gateway 1.8+ and a `GatewayClass`"},{heading:"before-you-begin",content:"cert-manager 1.14+; for trusted TLS, either a trusted issuer or a Kubernetes TLS Secret"},{heading:"before-you-begin",content:"a StorageClass and an external traffic design"},{heading:"before-you-begin",content:"The chart defaults to a `GatewayClass` named `eg`. Change `gateway.className` if your platform team uses another name."},{heading:"before-you-begin",content:"You provide the PostgreSQL server. The chart's pre-install job connects with the supplied credentials, creates the required `pki`, `authz` and `wfx` databases and service schemas, runs migrations, and applies `services.authz.bootstrap`."},{heading:"before-you-begin",content:"The chart has no Helm dependencies that install PostgreSQL, RabbitMQ, an OIDC provider, Envoy Gateway or cert-manager."},{heading:"1-install-the-gateway-prerequisites",content:"Install or upgrade the Envoy Gateway CRDs before its controller. The commands below match the version used by the Lamassu Helm repository:"},{heading:"1-install-the-gateway-prerequisites",content:"Create the default `GatewayClass` if it does not already exist. Save this manifest as `gateway-class.yaml`:"},{heading:"1-install-the-gateway-prerequisites",content:"Install cert-manager separately before Lamassu. The current chart renders its self-signed issuer and CA certificate resources even when `tls.type: external` makes the Gateway use an existing TLS Secret. Selecting external TLS therefore does not remove the cert-manager prerequisite."},{heading:"2-create-a-values-file",content:"Start with the chart defaults and override the environment-specific values. This example assumes PostgreSQL, RabbitMQ and Keycloak are reachable through Kubernetes DNS, and exposes Keycloak at `/auth` through the shared Lamassu Gateway:"},{heading:"2-create-a-values-file",content:"Do not add `gateway.addresses` by default. Leave address assignment to the load-balancer implementation unless your network design requires a specific Kubernetes-side VIP. The public IP of an upstream NAT gateway or reverse proxy does not belong in this value."},{heading:"2-create-a-values-file",content:"If Keycloak is external and already has its own reachable URL, point the OIDC settings at it and omit the `/auth` entry from `gateway.extraRouting`."},{heading:"tls-with-an-existing-secret",content:"Create a Secret containing `tls.crt` and `tls.key`, then reference it:"},{heading:"provision-the-first-administrator",content:"There is no implicit superuser. Create the role or group expected by `services.authz.bootstrap` in the OIDC provider and assign it to at least one administrator before exposing Lamassu."},{heading:"provision-the-first-administrator",content:"The pre-install and pre-upgrade job applies the bootstrap idempotently: existing principals are preserved and missing grants are added."},{heading:"provision-the-first-administrator",content:"Test both an authorized identity and a denied identity. If no token matches an active bootstrap principal, nobody can administer the PKI."},{heading:"provision-the-first-administrator",content:"See Access control for the principal and policy model."},{heading:"3-install-lamassu",content:"To install a local checkout instead:"},{heading:"4-verify-the-deployment",content:"The Gateway should report `PROGRAMMED=True`. If it is programmed but has no usable address, continue with Expose the Gateway."},{heading:"4-verify-the-deployment",content:"The Helm test checks the CA, DMS Manager, Device Manager and VA health endpoints and verifies the UI response."},{heading:"production-decisions",content:"Before going live, review:"},{heading:"production-decisions",content:"backup and recovery for PostgreSQL and persistent volumes"},{heading:"production-decisions",content:"a production KMS engine; the default filesystem engine is not an HA design"},{heading:"production-decisions",content:"shared VA storage before increasing VA replicas"},{heading:"production-decisions",content:"managed OIDC roles and removal of evaluation credentials"},{heading:"production-decisions",content:"a trusted TLS issuer or externally managed certificate"},{heading:"production-decisions",content:"resource requests, replicas, autoscaling, disruption budgets and placement"},{heading:"production-decisions",content:"SMTP, observability and alert delivery"},{heading:"production-decisions",content:"the migration notes in `charts/lamassu/CHANGELOG/` before every upgrade"},{heading:"production-decisions",content:"The complete values reference is maintained in `charts/lamassu/VALUES.md` in the Helm repository."}],headings:[{id:"install-lamassu-with-helm",content:"Install Lamassu with Helm"},{id:"before-you-begin",content:"Before you begin"},{id:"1-install-the-gateway-prerequisites",content:"1\\. Install the Gateway prerequisites"},{id:"2-create-a-values-file",content:"2\\. Create a values file"},{id:"tls-with-an-existing-secret",content:"TLS with an existing Secret"},{id:"provision-the-first-administrator",content:"Provision the first administrator"},{id:"3-install-lamassu",content:"3\\. Install Lamassu"},{id:"4-verify-the-deployment",content:"4\\. Verify the deployment"},{id:"production-decisions",content:"Production decisions"}]};const r=[{depth:1,url:"#install-lamassu-with-helm",title:s.jsx(s.Fragment,{children:"Install Lamassu with Helm"})},{depth:2,url:"#before-you-begin",title:s.jsx(s.Fragment,{children:"Before you begin"})},{depth:2,url:"#1-install-the-gateway-prerequisites",title:s.jsx(s.Fragment,{children:"1. Install the Gateway prerequisites"})},{depth:2,url:"#2-create-a-values-file",title:s.jsx(s.Fragment,{children:"2. Create a values file"})},{depth:3,url:"#tls-with-an-existing-secret",title:s.jsx(s.Fragment,{children:"TLS with an existing Secret"})},{depth:3,url:"#provision-the-first-administrator",title:s.jsx(s.Fragment,{children:"Provision the first administrator"})},{depth:2,url:"#3-install-lamassu",title:s.jsx(s.Fragment,{children:"3. Install Lamassu"})},{depth:2,url:"#4-verify-the-deployment",title:s.jsx(s.Fragment,{children:"4. Verify the deployment"})},{depth:2,url:"#production-decisions",title:s.jsx(s.Fragment,{children:"Production decisions"})}];function n(i){const e={a:"a",code:"code",h1:"h1",h2:"h2",h3:"h3",li:"li",p:"p",pre:"pre",span:"span",ul:"ul",...i.components},{Callout:a}=e;return a||c("Callout"),s.jsxs(s.Fragment,{children:[s.jsx(e.h1,{id:"install-lamassu-with-helm",children:"Install Lamassu with Helm"}),`
-`,s.jsxs(e.p,{children:["Use the Helm workflow when you need explicit control over identity, databases, messaging, certificates, storage and upgrades. For an evaluation environment where the script can make those choices for you, use ",s.jsx(e.a,{href:"/docs/deployment/self-hosted/fastlane",children:"Fastlane"}),"."]}),`
-`,s.jsx(e.h2,{id:"before-you-begin",children:"Before you begin"}),`
-`,s.jsx(e.p,{children:"Prepare the platform services that are deliberately outside the Lamassu chart:"}),`
+La referencia completa de valores se mantiene en \`charts/lamassu/VALUES.md\` dentro del repositorio Helm.
+`,r={title:"Instala con Helm",description:"Prepara las dependencias, configura el chart de Lamassu y verifica un despliegue controlado en Kubernetes."},t={contents:[{heading:"instala-lamassu-con-helm",content:"Usa Helm cuando necesites control explícito sobre identidad, bases de datos, mensajería, certificados, almacenamiento y upgrades. Para un entorno de evaluación en el que el script pueda tomar esas decisiones, usa Fastlane."},{heading:"antes-de-comenzar",content:"Prepara los servicios de plataforma que quedan deliberadamente fuera del chart de Lamassu:"},{heading:"antes-de-comenzar",content:"un clúster Kubernetes 1.24+ y Helm 3.2+"},{heading:"antes-de-comenzar",content:"un servidor PostgreSQL accesible y un rol autorizado para crear bases de datos y schemas"},{heading:"antes-de-comenzar",content:"un broker RabbitMQ accesible y sus credenciales"},{heading:"antes-de-comenzar",content:"un proveedor OIDC, normalmente Keycloak, con un realm/tenant y un cliente para Lamassu"},{heading:"antes-de-comenzar",content:"Envoy Gateway 1.8+ y una `GatewayClass`"},{heading:"antes-de-comenzar",content:"cert-manager 1.14+; para TLS de confianza, un emisor de confianza o un Secret TLS de Kubernetes"},{heading:"antes-de-comenzar",content:"una StorageClass y un diseño de tráfico externo"},{heading:"antes-de-comenzar",content:"El chart usa por defecto una `GatewayClass` llamada `eg`. Cambia `gateway.className` si tu equipo de plataforma utiliza otro nombre."},{heading:"antes-de-comenzar",content:"Tú proporcionas el servidor PostgreSQL. El job de pre-install del chart se conecta con las credenciales indicadas, crea las bases de datos `pki`, `authz` y `wfx` y los schemas de los servicios, ejecuta las migraciones y aplica `services.authz.bootstrap`."},{heading:"antes-de-comenzar",content:"El chart no tiene dependencias Helm que instalen PostgreSQL, RabbitMQ, un proveedor OIDC, Envoy Gateway ni cert-manager."},{heading:"1-instala-los-requisitos-del-gateway",content:"Instala o actualiza las CRD de Envoy Gateway antes de su controlador. Estos comandos usan la misma versión que el repositorio Helm de Lamassu:"},{heading:"1-instala-los-requisitos-del-gateway",content:"Crea la `GatewayClass` predeterminada si todavía no existe. Guarda este manifiesto como `gateway-class.yaml`:"},{heading:"1-instala-los-requisitos-del-gateway",content:"Instala cert-manager por separado antes de Lamassu. El chart actual renderiza sus recursos de issuer self-signed y certificado CA incluso cuando `tls.type: external` hace que el Gateway use un Secret TLS existente. Seleccionar TLS externo no elimina por tanto el requisito de cert-manager."},{heading:"2-crea-un-archivo-de-valores",content:"Parte de los valores predeterminados del chart y sobrescribe los específicos del entorno. Este ejemplo supone que PostgreSQL, RabbitMQ y Keycloak son accesibles mediante DNS de Kubernetes y expone Keycloak en `/auth` a través del Gateway compartido:"},{heading:"2-crea-un-archivo-de-valores",content:"No añadas `gateway.addresses` por defecto. Deja la asignación de dirección a la implementación del balanceador salvo que tu diseño de red requiera una VIP concreta en Kubernetes. La IP pública de un NAT o proxy upstream no corresponde a este valor."},{heading:"2-crea-un-archivo-de-valores",content:"Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OIDC hacia él y omite la entrada `/auth` de `gateway.extraRouting`."},{heading:"tls-con-un-secret-existente",content:"Crea un Secret con `tls.crt` y `tls.key` y referéncialo:"},{heading:"provisiona-el-primer-administrador",content:"No existe un superusuario implícito. Crea en el proveedor OIDC el rol o grupo esperado por `services.authz.bootstrap` y asígnalo al menos a un administrador antes de exponer Lamassu."},{heading:"provisiona-el-primer-administrador",content:"El job de pre-install y pre-upgrade aplica el bootstrap de forma idempotente: conserva los principales existentes y añade los grants que falten."},{heading:"provisiona-el-primer-administrador",content:"Prueba una identidad autorizada y otra denegada. Si ningún token coincide con un principal activo del bootstrap, nadie podrá administrar la PKI."},{heading:"provisiona-el-primer-administrador",content:"Consulta Control de acceso para conocer el modelo de principales y políticas."},{heading:"3-instala-lamassu",content:"Para instalar un checkout local:"},{heading:"4-verifica-el-despliegue",content:"El Gateway debe mostrar `PROGRAMMED=True`. Si está programado pero no tiene una dirección utilizable, continúa con Expón el Gateway."},{heading:"4-verifica-el-despliegue",content:"El test de Helm comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y verifica la respuesta de la UI."},{heading:"decisiones-para-producción",content:"Antes de pasar a producción, revisa:"},{heading:"decisiones-para-producción",content:"backup y recuperación de PostgreSQL y volúmenes persistentes"},{heading:"decisiones-para-producción",content:"un motor KMS de producción; el motor filesystem predeterminado no ofrece alta disponibilidad"},{heading:"decisiones-para-producción",content:"almacenamiento compartido para VA antes de aumentar sus réplicas"},{heading:"decisiones-para-producción",content:"roles OIDC gestionados y eliminación de credenciales de evaluación"},{heading:"decisiones-para-producción",content:"un emisor TLS de confianza o un certificado gestionado externamente"},{heading:"decisiones-para-producción",content:"recursos, réplicas, autoscaling, disruption budgets y placement"},{heading:"decisiones-para-producción",content:"SMTP, observabilidad y entrega de alertas"},{heading:"decisiones-para-producción",content:"las guías de actualización entre versiones y las notas de `charts/lamassu/CHANGELOG/` antes de cada upgrade"},{heading:"decisiones-para-producción",content:"La referencia completa de valores se mantiene en `charts/lamassu/VALUES.md` dentro del repositorio Helm."}],headings:[{id:"instala-lamassu-con-helm",content:"Instala Lamassu con Helm"},{id:"antes-de-comenzar",content:"Antes de comenzar"},{id:"1-instala-los-requisitos-del-gateway",content:"1\\. Instala los requisitos del Gateway"},{id:"2-crea-un-archivo-de-valores",content:"2\\. Crea un archivo de valores"},{id:"tls-con-un-secret-existente",content:"TLS con un Secret existente"},{id:"provisiona-el-primer-administrador",content:"Provisiona el primer administrador"},{id:"3-instala-lamassu",content:"3\\. Instala Lamassu"},{id:"4-verifica-el-despliegue",content:"4\\. Verifica el despliegue"},{id:"decisiones-para-producción",content:"Decisiones para producción"}]};const h=[{depth:1,url:"#instala-lamassu-con-helm",title:s.jsx(s.Fragment,{children:"Instala Lamassu con Helm"})},{depth:2,url:"#antes-de-comenzar",title:s.jsx(s.Fragment,{children:"Antes de comenzar"})},{depth:2,url:"#1-instala-los-requisitos-del-gateway",title:s.jsx(s.Fragment,{children:"1. Instala los requisitos del Gateway"})},{depth:2,url:"#2-crea-un-archivo-de-valores",title:s.jsx(s.Fragment,{children:"2. Crea un archivo de valores"})},{depth:3,url:"#tls-con-un-secret-existente",title:s.jsx(s.Fragment,{children:"TLS con un Secret existente"})},{depth:3,url:"#provisiona-el-primer-administrador",title:s.jsx(s.Fragment,{children:"Provisiona el primer administrador"})},{depth:2,url:"#3-instala-lamassu",title:s.jsx(s.Fragment,{children:"3. Instala Lamassu"})},{depth:2,url:"#4-verifica-el-despliegue",title:s.jsx(s.Fragment,{children:"4. Verifica el despliegue"})},{depth:2,url:"#decisiones-para-producción",title:s.jsx(s.Fragment,{children:"Decisiones para producción"})}];function n(i){const e={a:"a",code:"code",h1:"h1",h2:"h2",h3:"h3",li:"li",p:"p",pre:"pre",span:"span",ul:"ul",...i.components},{Callout:a}=e;return a||c("Callout"),s.jsxs(s.Fragment,{children:[s.jsx(e.h1,{id:"instala-lamassu-con-helm",children:"Instala Lamassu con Helm"}),`
+`,s.jsxs(e.p,{children:["Usa Helm cuando necesites control explícito sobre identidad, bases de datos, mensajería, certificados, almacenamiento y upgrades. Para un entorno de evaluación en el que el script pueda tomar esas decisiones, usa ",s.jsx(e.a,{href:"/docs/deployment/self-hosted/fastlane",children:"Fastlane"}),"."]}),`
+`,s.jsx(e.h2,{id:"antes-de-comenzar",children:"Antes de comenzar"}),`
+`,s.jsx(e.p,{children:"Prepara los servicios de plataforma que quedan deliberadamente fuera del chart de Lamassu:"}),`
 `,s.jsxs(e.ul,{children:[`
-`,s.jsx(e.li,{children:"a Kubernetes 1.24+ cluster and Helm 3.2+"}),`
-`,s.jsx(e.li,{children:"a reachable PostgreSQL server and a role allowed to create databases and schemas"}),`
-`,s.jsx(e.li,{children:"a reachable RabbitMQ broker and credentials"}),`
-`,s.jsx(e.li,{children:"an OIDC provider, normally Keycloak, with a realm/tenant and client for Lamassu"}),`
-`,s.jsxs(e.li,{children:["Envoy Gateway 1.8+ and a ",s.jsx(e.code,{children:"GatewayClass"})]}),`
-`,s.jsx(e.li,{children:"cert-manager 1.14+; for trusted TLS, either a trusted issuer or a Kubernetes TLS Secret"}),`
-`,s.jsxs(e.li,{children:["a StorageClass and an ",s.jsx(e.a,{href:"/docs/deployment/self-hosted/networking",children:"external traffic design"})]}),`
+`,s.jsx(e.li,{children:"un clúster Kubernetes 1.24+ y Helm 3.2+"}),`
+`,s.jsx(e.li,{children:"un servidor PostgreSQL accesible y un rol autorizado para crear bases de datos y schemas"}),`
+`,s.jsx(e.li,{children:"un broker RabbitMQ accesible y sus credenciales"}),`
+`,s.jsx(e.li,{children:"un proveedor OIDC, normalmente Keycloak, con un realm/tenant y un cliente para Lamassu"}),`
+`,s.jsxs(e.li,{children:["Envoy Gateway 1.8+ y una ",s.jsx(e.code,{children:"GatewayClass"})]}),`
+`,s.jsx(e.li,{children:"cert-manager 1.14+; para TLS de confianza, un emisor de confianza o un Secret TLS de Kubernetes"}),`
+`,s.jsxs(e.li,{children:["una StorageClass y un ",s.jsx(e.a,{href:"/docs/deployment/self-hosted/networking",children:"diseño de tráfico externo"})]}),`
 `]}),`
-`,s.jsxs(e.p,{children:["The chart defaults to a ",s.jsx(e.code,{children:"GatewayClass"})," named ",s.jsx(e.code,{children:"eg"}),". Change ",s.jsx(e.code,{children:"gateway.className"})," if your platform team uses another name."]}),`
-`,s.jsx(a,{type:"info",title:"What Helm does with PostgreSQL",children:s.jsxs(e.p,{children:["You provide the PostgreSQL server. The chart's pre-install job connects with the supplied credentials, creates the required ",s.jsx(e.code,{children:"pki"}),", ",s.jsx(e.code,{children:"authz"})," and ",s.jsx(e.code,{children:"wfx"})," databases and service schemas, runs migrations, and applies ",s.jsx(e.code,{children:"services.authz.bootstrap"}),"."]})}),`
-`,s.jsx(e.p,{children:"The chart has no Helm dependencies that install PostgreSQL, RabbitMQ, an OIDC provider, Envoy Gateway or cert-manager."}),`
-`,s.jsx(e.h2,{id:"1-install-the-gateway-prerequisites",children:"1. Install the Gateway prerequisites"}),`
-`,s.jsx(e.p,{children:"Install or upgrade the Envoy Gateway CRDs before its controller. The commands below match the version used by the Lamassu Helm repository:"}),`
+`,s.jsxs(e.p,{children:["El chart usa por defecto una ",s.jsx(e.code,{children:"GatewayClass"})," llamada ",s.jsx(e.code,{children:"eg"}),". Cambia ",s.jsx(e.code,{children:"gateway.className"})," si tu equipo de plataforma utiliza otro nombre."]}),`
+`,s.jsx(a,{type:"info",title:"Qué hace Helm con PostgreSQL",children:s.jsxs(e.p,{children:["Tú proporcionas el servidor PostgreSQL. El job de pre-install del chart se conecta con las credenciales indicadas, crea las bases de datos ",s.jsx(e.code,{children:"pki"}),", ",s.jsx(e.code,{children:"authz"})," y ",s.jsx(e.code,{children:"wfx"})," y los schemas de los servicios, ejecuta las migraciones y aplica ",s.jsx(e.code,{children:"services.authz.bootstrap"}),"."]})}),`
+`,s.jsx(e.p,{children:"El chart no tiene dependencias Helm que instalen PostgreSQL, RabbitMQ, un proveedor OIDC, Envoy Gateway ni cert-manager."}),`
+`,s.jsx(e.h2,{id:"1-instala-los-requisitos-del-gateway",children:"1. Instala los requisitos del Gateway"}),`
+`,s.jsx(e.p,{children:"Instala o actualiza las CRD de Envoy Gateway antes de su controlador. Estos comandos usan la misma versión que el repositorio Helm de Lamassu:"}),`
 `,s.jsx(s.Fragment,{children:s.jsx(e.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:s.jsxs(e.code,{children:[s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:"export"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:" ENVOY_GATEWAY_VERSION"}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:"="}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"v1.8.0"})]}),`
 `,s.jsx(e.span,{className:"line"}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"helm"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" template"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" eg-crds"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" oci://docker.io/envoyproxy/gateway-crds-helm"}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" \\"})]}),`
@@ -238,7 +234,7 @@ The complete values reference is maintained in \`charts/lamassu/VALUES.md\` in t
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --version"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:' "'}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"$ENVOY_GATEWAY_VERSION"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:'"'}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" \\"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --namespace"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" envoy-gateway-system"}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" \\"})]}),`
 `,s.jsx(e.span,{className:"line",children:s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --create-namespace"})})]})})}),`
-`,s.jsxs(e.p,{children:["Create the default ",s.jsx(e.code,{children:"GatewayClass"})," if it does not already exist. Save this manifest as ",s.jsx(e.code,{children:"gateway-class.yaml"}),":"]}),`
+`,s.jsxs(e.p,{children:["Crea la ",s.jsx(e.code,{children:"GatewayClass"})," predeterminada si todavía no existe. Guarda este manifiesto como ",s.jsx(e.code,{children:"gateway-class.yaml"}),":"]}),`
 `,s.jsx(s.Fragment,{children:s.jsx(e.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z" fill="currentColor" /></svg>',children:s.jsxs(e.code,{children:[s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"apiVersion"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"gateway.networking.k8s.io/v1"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"kind"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"GatewayClass"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"metadata"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:":"})]}),`
@@ -247,9 +243,9 @@ The complete values reference is maintained in \`charts/lamassu/VALUES.md\` in t
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"  controllerName"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"gateway.envoyproxy.io/gatewayclass-controller"})]})]})})}),`
 `,s.jsx(s.Fragment,{children:s.jsx(e.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:s.jsxs(e.code,{children:[s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"kubectl"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" apply"}),s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -f"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" gateway-class.yaml"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"kubectl"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" rollout"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" status"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" deployment/envoy-gateway"}),s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -n"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" envoy-gateway-system"})]})]})})}),`
-`,s.jsxs(e.p,{children:["Install cert-manager separately before Lamassu. The current chart renders its self-signed issuer and CA certificate resources even when ",s.jsx(e.code,{children:"tls.type: external"})," makes the Gateway use an existing TLS Secret. Selecting external TLS therefore does not remove the cert-manager prerequisite."]}),`
-`,s.jsx(e.h2,{id:"2-create-a-values-file",children:"2. Create a values file"}),`
-`,s.jsxs(e.p,{children:["Start with the chart defaults and override the environment-specific values. This example assumes PostgreSQL, RabbitMQ and Keycloak are reachable through Kubernetes DNS, and exposes Keycloak at ",s.jsx(e.code,{children:"/auth"})," through the shared Lamassu Gateway:"]}),`
+`,s.jsxs(e.p,{children:["Instala cert-manager por separado antes de Lamassu. El chart actual renderiza sus recursos de issuer self-signed y certificado CA incluso cuando ",s.jsx(e.code,{children:"tls.type: external"})," hace que el Gateway use un Secret TLS existente. Seleccionar TLS externo no elimina por tanto el requisito de cert-manager."]}),`
+`,s.jsx(e.h2,{id:"2-crea-un-archivo-de-valores",children:"2. Crea un archivo de valores"}),`
+`,s.jsxs(e.p,{children:["Parte de los valores predeterminados del chart y sobrescribe los específicos del entorno. Este ejemplo supone que PostgreSQL, RabbitMQ y Keycloak son accesibles mediante DNS de Kubernetes y expone Keycloak en ",s.jsx(e.code,{children:"/auth"})," a través del Gateway compartido:"]}),`
 `,s.jsx(s.Fragment,{children:s.jsx(e.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z" fill="currentColor" /></svg>',children:s.jsxs(e.code,{children:[s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"postgres"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:":"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"  hostname"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"postgresql"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"  port"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"5432"})]}),`
@@ -289,10 +285,6 @@ The complete values reference is maintained in \`charts/lamassu/VALUES.md\` in t
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"    frontend"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:":"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"      clientId"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"frontend"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"      authority"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"https://pki.example.com/auth/realms/lamassu"})]}),`
-`,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"    apiGateway"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:":"})]}),`
-`,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"      jwks"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:":"})]}),`
-`,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"        - "}),s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"name"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"oidc-authn"})]}),`
-`,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"          uri"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs"})]}),`
 `,s.jsx(e.span,{className:"line"}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"services"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:":"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"  ca"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:":"})]}),`
@@ -311,20 +303,20 @@ The complete values reference is maintained in \`charts/lamassu/VALUES.md\` in t
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"            - "}),s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"claim"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"realm_access.roles"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"              operator"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"contains"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"              value"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"pki-admin"})]})]})})}),`
-`,s.jsxs(e.p,{children:["Do not add ",s.jsx(e.code,{children:"gateway.addresses"})," by default. Leave address assignment to the load-balancer implementation unless your network design requires a specific Kubernetes-side VIP. The public IP of an upstream NAT gateway or reverse proxy does not belong in this value."]}),`
-`,s.jsxs(e.p,{children:["If Keycloak is external and already has its own reachable URL, point the OIDC settings at it and omit the ",s.jsx(e.code,{children:"/auth"})," entry from ",s.jsx(e.code,{children:"gateway.extraRouting"}),"."]}),`
-`,s.jsx(e.h3,{id:"tls-with-an-existing-secret",children:"TLS with an existing Secret"}),`
-`,s.jsxs(e.p,{children:["Create a Secret containing ",s.jsx(e.code,{children:"tls.crt"})," and ",s.jsx(e.code,{children:"tls.key"}),", then reference it:"]}),`
+`,s.jsxs(e.p,{children:["No añadas ",s.jsx(e.code,{children:"gateway.addresses"})," por defecto. Deja la asignación de dirección a la implementación del balanceador salvo que tu diseño de red requiera una VIP concreta en Kubernetes. La IP pública de un NAT o proxy upstream no corresponde a este valor."]}),`
+`,s.jsxs(e.p,{children:["Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OIDC hacia él y omite la entrada ",s.jsx(e.code,{children:"/auth"})," de ",s.jsx(e.code,{children:"gateway.extraRouting"}),"."]}),`
+`,s.jsx(e.h3,{id:"tls-con-un-secret-existente",children:"TLS con un Secret existente"}),`
+`,s.jsxs(e.p,{children:["Crea un Secret con ",s.jsx(e.code,{children:"tls.crt"})," y ",s.jsx(e.code,{children:"tls.key"})," y referéncialo:"]}),`
 `,s.jsx(s.Fragment,{children:s.jsx(e.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z" fill="currentColor" /></svg>',children:s.jsxs(e.code,{children:[s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"tls"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:":"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"  type"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"external"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"  externalOptions"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:":"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#116329","--shiki-dark":"#7EE787"},children:"    secretName"}),s.jsx(e.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:": "}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:"lamassu-downstream-tls"})]})]})})}),`
-`,s.jsx(e.h3,{id:"provision-the-first-administrator",children:"Provision the first administrator"}),`
-`,s.jsxs(e.p,{children:["There is no implicit superuser. Create the role or group expected by ",s.jsx(e.code,{children:"services.authz.bootstrap"})," in the OIDC provider and assign it to at least one administrator before exposing Lamassu."]}),`
-`,s.jsx(e.p,{children:"The pre-install and pre-upgrade job applies the bootstrap idempotently: existing principals are preserved and missing grants are added."}),`
-`,s.jsx(a,{type:"warn",title:"Validate access before exposing the platform",children:s.jsx(e.p,{children:"Test both an authorized identity and a denied identity. If no token matches an active bootstrap principal, nobody can administer the PKI."})}),`
-`,s.jsxs(e.p,{children:["See ",s.jsx(e.a,{href:"/docs/platform/administration/access-control",children:"Access control"})," for the principal and policy model."]}),`
-`,s.jsx(e.h2,{id:"3-install-lamassu",children:"3. Install Lamassu"}),`
+`,s.jsx(e.h3,{id:"provisiona-el-primer-administrador",children:"Provisiona el primer administrador"}),`
+`,s.jsxs(e.p,{children:["No existe un superusuario implícito. Crea en el proveedor OIDC el rol o grupo esperado por ",s.jsx(e.code,{children:"services.authz.bootstrap"})," y asígnalo al menos a un administrador antes de exponer Lamassu."]}),`
+`,s.jsx(e.p,{children:"El job de pre-install y pre-upgrade aplica el bootstrap de forma idempotente: conserva los principales existentes y añade los grants que falten."}),`
+`,s.jsx(a,{type:"warn",title:"Valida el acceso antes de exponer la plataforma",children:s.jsx(e.p,{children:"Prueba una identidad autorizada y otra denegada. Si ningún token coincide con un principal activo del bootstrap, nadie podrá administrar la PKI."})}),`
+`,s.jsxs(e.p,{children:["Consulta ",s.jsx(e.a,{href:"/docs/platform/administration/access-control",children:"Control de acceso"})," para conocer el modelo de principales y políticas."]}),`
+`,s.jsx(e.h2,{id:"3-instala-lamassu",children:"3. Instala Lamassu"}),`
 `,s.jsx(s.Fragment,{children:s.jsx(e.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:s.jsxs(e.code,{children:[s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"helm"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" repo"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" add"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" lamassu"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" https://lamassuiot.github.io/lamassu-helm"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"helm"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" repo"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" update"})]}),`
 `,s.jsx(e.span,{className:"line"}),`
@@ -333,29 +325,29 @@ The complete values reference is maintained in \`charts/lamassu/VALUES.md\` in t
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --create-namespace"}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" \\"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --values"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" values.yaml"}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" \\"})]}),`
 `,s.jsx(e.span,{className:"line",children:s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --wait"})})]})})}),`
-`,s.jsx(e.p,{children:"To install a local checkout instead:"}),`
+`,s.jsx(e.p,{children:"Para instalar un checkout local:"}),`
 `,s.jsx(s.Fragment,{children:s.jsx(e.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:s.jsxs(e.code,{children:[s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"helm"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" upgrade"}),s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" --install"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" lamassu"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" ./charts/lamassu"}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" \\"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --namespace"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" lamassu"}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" \\"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --create-namespace"}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" \\"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --values"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" values.yaml"}),s.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" \\"})]}),`
 `,s.jsx(e.span,{className:"line",children:s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:"  --wait"})})]})})}),`
-`,s.jsx(e.h2,{id:"4-verify-the-deployment",children:"4. Verify the deployment"}),`
+`,s.jsx(e.h2,{id:"4-verifica-el-despliegue",children:"4. Verifica el despliegue"}),`
 `,s.jsx(s.Fragment,{children:s.jsx(e.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:s.jsxs(e.code,{children:[s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"kubectl"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" get"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" pods"}),s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -n"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" lamassu"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"kubectl"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" get"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" gateway,httproute"}),s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -n"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" lamassu"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"kubectl"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" get"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" service"}),s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -A"})]}),`
 `,s.jsxs(e.span,{className:"line",children:[s.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"helm"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" test"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" lamassu"}),s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -n"}),s.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" lamassu"}),s.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" --logs"})]})]})})}),`
-`,s.jsxs(e.p,{children:["The Gateway should report ",s.jsx(e.code,{children:"PROGRAMMED=True"}),". If it is programmed but has no usable address, continue with ",s.jsx(e.a,{href:"/docs/deployment/self-hosted/networking",children:"Expose the Gateway"}),"."]}),`
-`,s.jsx(e.p,{children:"The Helm test checks the CA, DMS Manager, Device Manager and VA health endpoints and verifies the UI response."}),`
-`,s.jsx(e.h2,{id:"production-decisions",children:"Production decisions"}),`
-`,s.jsx(e.p,{children:"Before going live, review:"}),`
+`,s.jsxs(e.p,{children:["El Gateway debe mostrar ",s.jsx(e.code,{children:"PROGRAMMED=True"}),". Si está programado pero no tiene una dirección utilizable, continúa con ",s.jsx(e.a,{href:"/docs/deployment/self-hosted/networking",children:"Expón el Gateway"}),"."]}),`
+`,s.jsx(e.p,{children:"El test de Helm comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y verifica la respuesta de la UI."}),`
+`,s.jsx(e.h2,{id:"decisiones-para-producción",children:"Decisiones para producción"}),`
+`,s.jsx(e.p,{children:"Antes de pasar a producción, revisa:"}),`
 `,s.jsxs(e.ul,{children:[`
-`,s.jsx(e.li,{children:"backup and recovery for PostgreSQL and persistent volumes"}),`
-`,s.jsx(e.li,{children:"a production KMS engine; the default filesystem engine is not an HA design"}),`
-`,s.jsx(e.li,{children:"shared VA storage before increasing VA replicas"}),`
-`,s.jsx(e.li,{children:"managed OIDC roles and removal of evaluation credentials"}),`
-`,s.jsx(e.li,{children:"a trusted TLS issuer or externally managed certificate"}),`
-`,s.jsx(e.li,{children:"resource requests, replicas, autoscaling, disruption budgets and placement"}),`
-`,s.jsx(e.li,{children:"SMTP, observability and alert delivery"}),`
-`,s.jsxs(e.li,{children:["the migration notes in ",s.jsx(e.code,{children:"charts/lamassu/CHANGELOG/"})," before every upgrade"]}),`
+`,s.jsx(e.li,{children:"backup y recuperación de PostgreSQL y volúmenes persistentes"}),`
+`,s.jsx(e.li,{children:"un motor KMS de producción; el motor filesystem predeterminado no ofrece alta disponibilidad"}),`
+`,s.jsx(e.li,{children:"almacenamiento compartido para VA antes de aumentar sus réplicas"}),`
+`,s.jsx(e.li,{children:"roles OIDC gestionados y eliminación de credenciales de evaluación"}),`
+`,s.jsx(e.li,{children:"un emisor TLS de confianza o un certificado gestionado externamente"}),`
+`,s.jsx(e.li,{children:"recursos, réplicas, autoscaling, disruption budgets y placement"}),`
+`,s.jsx(e.li,{children:"SMTP, observabilidad y entrega de alertas"}),`
+`,s.jsxs(e.li,{children:["las ",s.jsx(e.a,{href:"/docs/upgrades/3-8-0-to-4-0-0",children:"guías de actualización entre versiones"})," y las notas de ",s.jsx(e.code,{children:"charts/lamassu/CHANGELOG/"})," antes de cada upgrade"]}),`
 `]}),`
-`,s.jsxs(e.p,{children:["The complete values reference is maintained in ",s.jsx(e.code,{children:"charts/lamassu/VALUES.md"})," in the Helm repository."]})]})}function d(i={}){const{wrapper:e}=i.components||{};return e?s.jsx(e,{...i,children:s.jsx(n,{...i})}):n(i)}function c(i,e){throw new Error("Expected component `"+i+"` to be defined: you likely forgot to import, pass, or provide it.")}const o=Object.freeze(Object.defineProperty({__proto__:null,_markdown:t,default:d,frontmatter:l,structuredData:h,toc:r},Symbol.toStringTag,{value:"Module"}));export{o as _};
+`,s.jsxs(e.p,{children:["La referencia completa de valores se mantiene en ",s.jsx(e.code,{children:"charts/lamassu/VALUES.md"})," dentro del repositorio Helm."]})]})}function d(i={}){const{wrapper:e}=i.components||{};return e?s.jsx(e,{...i,children:s.jsx(n,{...i})}):n(i)}function c(i,e){throw new Error("Expected component `"+i+"` to be defined: you likely forgot to import, pass, or provide it.")}const k=Object.freeze(Object.defineProperty({__proto__:null,_markdown:l,default:d,frontmatter:r,structuredData:t,toc:h},Symbol.toStringTag,{value:"Module"}));export{k as _};

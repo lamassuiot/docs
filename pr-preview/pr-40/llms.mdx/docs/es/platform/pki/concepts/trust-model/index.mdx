@@ -39,7 +39,7 @@ CAs de enrolamiento, validación y distribución [#cas-de-enrolamiento-validaci�
 Un DMS relaciona tres conjuntos que conviene diseñar por separado:
 
 * **CA de enrolamiento:** firma las nuevas identidades.
-* **CAs de validación:** autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, <del className="lm-diff-del">Lamassu prueba primero la CA de enrolamiento y después las CAs de validación adicionales</del><ins className="lm-diff-ins">la CA de enrolamiento siempre es confiable y también se aceptan las CAs de validación de re-enrolamiento; estas son opcionales</ins>.
+* **CAs de validación:** autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, <del className="lm-diff-del">Lamassu prueba primero la CA de enrolamiento y </del><ins className="lm-diff-ins">la CA de enrolamiento siempre es confiable y Lamassu prueba </ins>después las CAs de validación configuradas en el bloque de re-enrolamiento<ins className="lm-diff-ins">; estas son opcionales</ins>.
 * **CAs distribuidas:** forman el contenido que el dispositivo obtiene mediante EST `/cacerts`. Puedes incluir el certificado TLS del servicio, la CA de enrolamiento y una lista explícita de CAs gestionadas. Incluir la CA emisora no añade automáticamente todos sus ascendientes.
 
 Esta separación permite migrar una flota: aceptas temporalmente certificados de la jerarquía anterior, emites con la nueva y distribuyes ambas cadenas durante el solapamiento.

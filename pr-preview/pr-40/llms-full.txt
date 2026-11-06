@@ -137,7 +137,8 @@ You need:
 * `kubectl` and Helm, or the MicroK8s CLI
 * `yq`
 * cert-manager
-* `jq` only when using `--sample-data`
+* `jq` only when using `--sample-data` or `--development`
+* `ssh-keygen` only when using `--with-hsm`
 * free external ports 80 and 443 on a single-node K3s host
 
 Fastlane detects MicroK8s, K3s, kind or a standard kubeconfig. Use `--context` when the intended cluster is not the current context.
@@ -182,26 +183,41 @@ See [Expose the Gateway](/docs/deployment/self-hosted/networking) for K3s port c
 
 Command-line options [#command-line-options]
 
-| Option                     | Default            | Purpose                                                                      |
-| -------------------------- | ------------------ | ---------------------------------------------------------------------------- |
-| `-h`, `--help`             | —                  | Show help                                                                    |
-| `-c`, `--context`          | current context    | Select the kubeconfig context for kubectl and Helm                           |
-| `-n`, `--non-interactive`  | false              | Skip prompts and generate dependency credentials                             |
-| `-ns`, `--namespace`       | `lamassu-dev`      | Namespace for the installation                                               |
-| `-d`, `--domain`           | `dev.lamassu.io`   | Domain used by the UI, OIDC and certificate                                  |
-| `-v`, `--version`          | latest             | Lamassu chart version                                                        |
-| `--https-port`             | `443`              | Gateway HTTPS listener port                                                  |
-| `--http-port`              | `80`               | Gateway HTTP listener port                                                   |
-| `--tls-crt`                | —                  | PEM certificate for downstream TLS                                           |
-| `--tls-key`                | —                  | PEM private key for downstream TLS                                           |
-| `-l`, `--local-chart-path` | repository chart   | Use an unpacked local Lamassu chart                                          |
-| `-ip`, `--gateway-ip`      | auto-detected      | Override the address written to `gateway.addresses`                          |
-| `--otel`                   | false              | Install Victoria Logs, VictoriaTraces, Jaeger and an OpenTelemetry Collector |
-| `--sample-data`            | false              | Create sample CAs, profiles, certificates, DMS data and devices              |
-| `--with-hsm`               | false              | Install lab HSM components and configure KMS for PKCS#11                     |
-| `--softhsm-chart-path`     | `./charts/softhsm` | Use a different local SoftHSM chart                                          |
+| Option                     | Default            | Purpose                                                                                                                                                                                                            |
+| -------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `-h`, `--help`             | —                  | Show help                                                                                                                                                                                                          |
+| `-c`, `--context`          | current context    | Select the kubeconfig context for kubectl and Helm                                                                                                                                                                 |
+| `-n`, `--non-interactive`  | false              | Skip prompts and generate dependency credentials                                                                                                                                                                   |
+| `-ns`, `--namespace`       | `lamassu-dev`      | Namespace for the installation                                                                                                                                                                                     |
+| `-d`, `--domain`           | `dev.lamassu.io`   | Domain used by the UI, OIDC and certificate                                                                                                                                                                        |
+| `-v`, `--version`          | latest             | Lamassu chart version                                                                                                                                                                                              |
+| `--https-port`             | `443`              | Gateway HTTPS listener port                                                                                                                                                                                        |
+| `--http-port`              | `80`               | Gateway HTTP listener port                                                                                                                                                                                         |
+| `--tls-crt`                | —                  | PEM certificate for downstream TLS                                                                                                                                                                                 |
+| `--tls-key`                | —                  | PEM private key for downstream TLS                                                                                                                                                                                 |
+| `-l`, `--local-chart-path` | repository chart   | Use an unpacked local Lamassu chart                                                                                                                                                                                |
+| `-ip`, `--gateway-ip`      | auto-detected      | Override the address written to `gateway.addresses`                                                                                                                                                                |
+| `--otel`                   | false              | Install Victoria Logs, VictoriaTraces, Jaeger and an OpenTelemetry Collector                                                                                                                                       |
+| `--development`            | false              | Development mode: fully provisions the Keycloak `lamassu` user (fixed `lamassu`/`lamassu` password, no first-login steps) and lets the `frontend` client accept any redirect URI or web origin. Not for production |
+| `--sample-data`            | false              | Create sample CAs, profiles, certificates, DMS data and devices                                                                                                                                                    |
+| `--with-hsm`               | false              | Install lab HSM components and configure KMS for PKCS#11                                                                                                                                                           |
+| `--softhsm-chart-path`     | `./charts/softhsm` | Use a different local SoftHSM chart                                                                                                                                                                                |
 
 Fastlane does not provide an offline mode. Use the manual Helm workflow and a prepared registry/chart mirror for disconnected environments.
+
+Development mode [#development-mode]
+
+`--development` adjusts the Keycloak `lamassu` realm generated by Fastlane for a disposable evaluation environment:
+
+* the `lamassu` user is fully provisioned (first name Lamassu, last name Admin, email `lamassu@lamassu.io`, verified): there are no profile setup or password change steps on first login
+* the well-known `lamassu`/`lamassu` password is fixed and permanent: it is never rotated and grants the `pki-admin` role, including non-interactive tokens through the `frontend` client
+* the `frontend` client accepts any redirect URI and any web origin (`*`) instead of the original `/*` patterns
+
+<Callout type="warn" title="Development mode is not for production">
+  With `--development`, the fixed `lamassu`/`lamassu` password grants `pki-admin` access to anyone who can reach the installation. Never use it on anything exposed beyond a development machine or a network-reachable host.
+</Callout>
+
+`--development` applies when the `lamassu` realm is first imported. It does not modify an existing cluster. It can be combined with `--sample-data`: the development transform runs first, then sample data is added to the same realm configuration.
 
 What the script configures [#what-the-script-configures]
 
@@ -227,7 +243,7 @@ Without them, it configures cert-manager with a self-signed issuer. This is suit
 
 Credentials and generated files [#credentials-and-generated-files]
 
-Non-interactive mode generates random PostgreSQL, RabbitMQ and Keycloak administrator passwords. The initial Lamassu login is `lamassu` / `lamassu` and requires a password change on first use.
+Non-interactive mode generates random PostgreSQL, RabbitMQ and Keycloak administrator passwords. The initial Lamassu login is `lamassu` / `lamassu` and requires a password change on first use, unless `--development` was used: in that case the password stays fixed and permanent.
 
 Fastlane writes `lamassu.yaml` in the current directory and injects credentials into it.
 
@@ -357,10 +373,6 @@ auth:
     frontend:
       clientId: frontend
       authority: https://pki.example.com/auth/realms/lamassu
-    apiGateway:
-      jwks:
-        - name: oidc-authn
-          uri: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
 
 services:
   ca:
@@ -455,7 +467,7 @@ Before going live, review:
 * a trusted TLS issuer or externally managed certificate
 * resource requests, replicas, autoscaling, disruption budgets and placement
 * SMTP, observability and alert delivery
-* the migration notes in `charts/lamassu/CHANGELOG/` before every upgrade
+* the [version upgrade guides](/docs/upgrades/3-8-0-to-4-0-0) and the notes in `charts/lamassu/CHANGELOG/` before every upgrade
 
 The complete values reference is maintained in `charts/lamassu/VALUES.md` in the Helm repository.
 
@@ -683,12 +695,14 @@ Platform requirements [#platform-requirements]
 * persistent storage suitable for the selected PostgreSQL, RabbitMQ, VA and KMS configuration
 * a load-balancer implementation or another deliberate path from clients to the Gateway
 
-KMS deployments using the native PKCS#11 sidecar require Kubernetes 1.29 or newer.
+KMS deployments using the native PKCS#11 sidecar require Kubernetes 1.29 or newer. Prebuilt Lamassu container images are published for `linux/amd64` and `linux/arm64`, and the KMS PKCS#11 client module (`p11-kit-client.so`) is installed at the target architecture's Debian library path: `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so` on amd64 and `/usr/lib/aarch64-linux-gnu/pkcs11/p11-kit-client.so` on arm64. The x86\_64 path is retained as a compatibility alias for existing configurations.
 
 Choose the next page [#choose-the-next-page]
 
 <Cards>
   <Card title="Install with Helm" description="Prepare dependencies, configure values, install and verify a controlled deployment." href="/docs/deployment/self-hosted/helm" />
+
+  <Card title="Upgrade from 3.8.0" description="Upgrade an existing Helm release to 4.0.0: architecture changes, breaking changes, migration steps and validation." href="/docs/upgrades/3-8-0-to-4-0-0" />
 
   <Card title="Expose the Gateway" description="Choose an external traffic design, understand gateway.addresses and handle multiple Gateways." href="/docs/deployment/self-hosted/networking" />
 
@@ -1129,10 +1143,6 @@ The chart includes a bootstrap principal that looks for the OIDC role `pki-admin
 
 ```yaml title="values.yaml"
 auth:
-  authorization:
-    rolesClaim: realm_access.roles
-    roles:
-      admin: pki-admin
   externalAuthorization:
     enabled: true
     failOpen: false
@@ -1166,9 +1176,11 @@ The pre-install and pre-upgrade Helm Job runs the `authz` migrations, preloads t
   </Step>
 
   <Step>
-    Configure the two JWT validations [#configure-the-two-jwt-validations]
+    Configure token validation [#configure-token-validation]
 
-    The Gateway uses `auth.authentication.apiGateway.jwks` to authenticate requests. `authz` uses `services.authz.jwkUrl` to resolve OIDC principals. Both endpoints must contain the keys of the same issuer and be reachable from their respective components.
+    `authz` validates every token against `services.authz.jwkUrl`, which is fetched from the `authz` pod. The Gateway does not validate tokens itself: Lamassu services authorize each request through `authz`, and routes labeled `auth=external`, such as the Job Manager ones, are checked by the Gateway through `authz` when `auth.externalAuthorization` is enabled. The endpoint must serve the keys of the issuer configured in `auth.oidc.frontend.authority`.
+
+    Releases upgraded from 3.8.0 must remove `auth.oidc.apiGateway` and `auth.authorization`, which the 4.0.0 chart rejects. See [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0#gateway-token-validation-removed).
   </Step>
 
   <Step>
@@ -1292,7 +1304,7 @@ The Microsoft Teams and Webhook channels accept an optional `http_client` block 
 
 * `apikey_options` requires `header` and `key`.
 * `jwt_options` requires `oidc_client_id`, `oidc_client_secret` and an absolute `http` or `https` `oidc_well_known`.
-* `mtls_options` requires the inline PEM `cert_content` and `key_content`; values that reference files on the server are rejected.
+* `mtls_options` requires `cert_content` and `key_content` as Base64-encoded PEM, like certificates elsewhere in the API; plain PEM is also accepted. Values that reference files on the server are rejected, and the pair must decode to a matching certificate and private key.
 
 The [alerts API reference](/docs/api-reference/alerts) documents the full `http_client` schema.
 
@@ -1780,7 +1792,7 @@ Webhook and combined modes also execute during re-enrollment when configured in 
 
 For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired` and `chain_level_validation`. The inspected flow receives one certificate credential; it does not guarantee forwarding every handshake intermediate to the validator. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
 
-For certificate re-enrollment, the validator uses the enrollment CA, <del className="lm-diff-del">then `additional_validation_cas`, and `enable_expired_renewal`. Do not assume copying initial `validation_cas` changes those issuers</del><ins className="lm-diff-ins">the CAs listed in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`, and `enable_expired_renewal`. That list is optional because the enrollment CA is always trusted for re-enrollment; the re-enrollment validator does not read the initial block's `validation_cas`</ins>.
+For certificate re-enrollment, the validator tries the enrollment CA first and then the CAs listed in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; those are the re-enrollment validation CAs<ins className="lm-diff-ins">. That list is optional because the enrollment CA is always trusted for re-enrollment</ins>, and each settings block consults only its own `validation_cas`. CAs listed only in the initial block's `validation_cas` do not extend re-enrollment acceptance; during a CA rotation, add the old issuance CA to the re-enrollment block's list. The re-enrollment validator compares the presented TLS leaf against those CAs; the re-enrollment block's `chain_level_validation` and `allow_expired` values are stored but not consulted, and expiry is governed by `enable_expired_renewal`.
 
 For a webhook, configure destination, Lamassu-to-service authentication, method and timeout. The [authentication contract](/docs/platform/iot-fleets/enrollment/bootstrap-identity) explains the device credential and request body. `NO_AUTH` does not establish ownership of the requested ID.
 
@@ -1788,33 +1800,35 @@ External webhook settings [#external-webhook-settings]
 
 The webhook authentication modes read `external_webhook_settings` in the same `est_rfc7030_settings` block:
 
-| `external_webhook_settings` field | Decision                                                                                                                                     |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `url`                             | Absolute `http` or `https` URL of the receiver. It must be the final URL; redirects are not followed.                                        |
-| `method`                          | `POST` or `PUT`; `POST` by default.                                                                                                          |
-| `name`                            | Label used in service logs.                                                                                                                  |
-| `config.auth_mode`                | `noauth`, `apikey`, `jwt` or `mtls`. An absent or unknown value behaves as `noauth`.                                                         |
-| `config.apikey_options`           | Required for `apikey`: `header` and `key`. Reserved header names are rejected.                                                               |
-| `config.jwt_options`              | Required for `jwt`: `oidc_client_id`, `oidc_client_secret` and an absolute `http` or `https` `oidc_well_known`.                              |
-| `config.mtls_options`             | Required for `mtls`: `cert_content` and `key_content` as inline PEM.                                                                         |
-| `config.insecure_skip_verify`     | Skips verification of the receiver certificate when `true`. Verification is on by default. Unlike alert channels, this flag is honored here. |
-| `config.call_timeout`             | Maximum duration of the authorization call (for example `10s`); 10 seconds by default.                                                       |
+| `external_webhook_settings` field | Decision                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `url`                             | Absolute `http` or `https` URL of the receiver. It must be the final URL; redirects are not followed.                                            |
+| `method`                          | `POST` or `PUT`; `POST` by default.                                                                                                              |
+| `name`                            | Label used in service logs.                                                                                                                      |
+| `config.auth_mode`                | `noauth`, `apikey`, `jwt` or `mtls`. An absent or unknown value behaves as `noauth`.                                                             |
+| `config.apikey_options`           | Required for `apikey`: `header` and `key`. Reserved header names are rejected.                                                                   |
+| `config.jwt_options`              | Required for `jwt`: `oidc_client_id`, `oidc_client_secret` and an absolute `http` or `https` `oidc_well_known`.                                  |
+| `config.mtls_options`             | Required for `mtls`: `cert_content` and `key_content` as Base64-encoded PEM, like certificates elsewhere in the API; plain PEM is also accepted. |
+| `config.insecure_skip_verify`     | Skips verification of the receiver certificate when `true`. Verification is on by default. Unlike alert channels, this flag is honored here.     |
+| `config.call_timeout`             | Maximum duration of the authorization call (for example `10s`); 10 seconds by default.                                                           |
 
 Rules for that configuration:
 
-* Creating or updating a DMS whose enrollment or reenrollment `auth_mode` uses the webhook validates the block and returns HTTP 400 — the body starts with `struct validation error:` and continues with `invalid enrollment external webhook config` or `invalid reenrollment external webhook config` — when the URL, method or options are invalid. File references (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`) are always invalid: the service does not read files, so supply the PEM as `mtls_options.cert_content` and `key_content`.
+* Creating or updating a DMS whose enrollment or reenrollment `auth_mode` uses the webhook validates the block and returns HTTP 400 — the body starts with `struct validation error:` and continues with `invalid enrollment external webhook config` or `invalid reenrollment external webhook config` — when the URL, method or options are invalid. That includes an `mtls_options.cert_content`/`key_content` pair that does not decode to a matching certificate and private key. File references (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`) are always invalid: the service does not read files, so enter the certificate and key as Base64-encoded PEM in `mtls_options.cert_content` and `key_content`, or as plain PEM.
 * A custom `apikey_options.header` may not use names that the platform or the receiving service trusts — for example `X-Principal-Id`, `X-Request-Id`, `Host`, `Content-Type` or `Forwarded` — and no name may start with `X-Forwarded-`, `X-Envoy-` or `X-Lms-` (case-insensitive). The [DMS API reference](/docs/api-reference/dms-manager) documents the `WebhookCall` and `WebhookCallHttpClient` schemas and that reserved API-key headers are rejected.
 * The nested `http_client` key exists only in alert channel configurations; in a DMS body it is ignored. The DMS key is `external_webhook_settings.config`.
-* The API ignores the legacy fields `validate_server_cert`, `apikey`, `oidc` and `mtls`. A body with `config.auth_mode` set to `apikey`, `jwt` or `mtls` that still carries only the legacy option fields (`apikey`, `oidc`, `mtls`) fails validation with 400; only legacy `noauth` bodies are accepted, and their credentials are dropped.
+* A body with `config.auth_mode` set to `apikey`, `jwt` or `mtls` must carry its corresponding option block (`apikey_options`, `jwt_options` or `mtls_options`) — and nothing else. Bodies with those auth modes carrying only `apikey`, `oidc` or `mtls` fail validation with 400, and `validate_server_cert` is always ignored: use `insecure_skip_verify`. Only bodies without option blocks are accepted as `noauth`, and their credentials are dropped.
 * The authorization response must be JSON of at most 1 MiB; a larger body fails the call.
 
 <Callout type="warn" title="Credentials over http://">
   With credentials configured, they are sent regardless of the URL scheme: an `http://` webhook receives the API key or bearer token in cleartext, and mTLS has no effect because no TLS handshake takes place, so the client certificate is never presented. Prefer `https://` for `url`, `oidc_well_known` and the token endpoint it advertises.
 </Callout>
 
-Migration `20260604110000` copies initial authentication into renewal settings if missing and the required structure exists. It preserves existing configuration. After upgrading, read both blocks; if your version’s console does not expose independent settings, use the [DMS API](/docs/api-reference/dms-manager).
+Initial authentication and renewal settings are stored independently. If a DMS only has the initial authentication block, renewal reuses it: read both blocks before editing, and if your version's console does not expose independent settings, use the [DMS API](/docs/api-reference/dms-manager).
 
-Migration `20261021120000` rewrites every stored webhook config into this layout: `validate_server_cert` becomes the negated `insecure_skip_verify` (a config where `validate_server_cert` was false keeps skipping verification), `oidc` becomes `jwt_options`, `apikey` becomes `apikey_options` and `mtls` becomes `mtls_options`. When both the legacy certificate and key are PEM, they move into `mtls_options.cert_content` and `key_content` and need no action. Otherwise, including a mixed config (PEM certificate, file-path key), both values become `mtls_options.cert_file` and `key_file`. Delivery rejects any webhook config that references files, whatever its auth mode, so every enroll and reenroll that calls that webhook fails until the certificate and key are re-entered as PEM content, or the leftover file fields are removed if the webhook does not use mTLS. If your version's console does not expose those fields, edit the DMS through the [DMS API](/docs/api-reference/dms-manager).
+Webhook credentials must be stored as PEM content. File references (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`) are never valid in a stored webhook config: delivery rejects any webhook config that references files, whatever its auth mode, so every enroll and reenroll that calls that webhook fails until the certificate and key are entered as Base64-encoded or plain PEM in `mtls_options.cert_content` and `key_content`, or the file fields are removed if the webhook does not use mTLS. If a stored config holds file paths in `mtls_options.cert_content` or `key_content`, every full settings update (`POST /v1/dms`, `PUT /v1/dms/:id`) fails validation — settings are replaced wholesale, so the stored config must be resent — until the values are replaced by PEM content or the webhook stops being used. Meanwhile, delivery of that webhook fails on every call; a metadata-only update through `PUT` or `PATCH` on `/v1/dms/:id/metadata` still succeeds. If your stored config previously relied on `validate_server_cert: false`, it now carries `insecure_skip_verify: true`: receiver-certificate verification stays skipped until you set that flag to `false`. See [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0) for the upgrade notes and the operator checklist.
+
+The re-enrollment trust set lives in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`. The flat field `reenrollment_settings.additional_validation_cas` is not part of the API: bodies that carry it are accepted but the value is silently ignored — unknown JSON fields are dropped — and GET responses do not include it. Read the DMS before sending API edits: an update body built with that flat field silently empties `validation_cas`.
 
 Issuance profile [#issuance-profile]
 
@@ -1822,15 +1836,14 @@ Issuance profile [#issuance-profile]
 
 Re-enrollment configuration [#re-enrollment-configuration]
 
-| `settings.reenrollment_settings` field                            | Purpose                                                                                                                                          |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `reenrollment_delta`                                              | Opens the window at the active certificate’s `NotAfter` minus this delta.                                                                        |
-| `preventive_delta`                                                | Preventive operational monitoring threshold.                                                                                                     |
-| `critical_delta`                                                  | Critical operational monitoring threshold.                                                                                                       |
-| `enable_expired_renewal`                                          | Accepts an expired presented certificate in the renewal mTLS validator. Does not authorize another mode or remove Gateway constraints by itself. |
-| `additional_validation_cas`                                       | Additional mTLS credential issuers during migration.                                                                                             |
-| `est_rfc7030_settings.client_certificate_settings.validation_cas` | Re-enrollment validation CAs; optional, because the enrollment CA is always trusted.                                                             |
-| `revoke_on_reenrollment`                                          | If the previous certificate is ACTIVE, attempts Superseded revocation before binding its successor.                                              |
+| `settings.reenrollment_settings` field                            | Purpose                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reenrollment_delta`                                              | Opens the window at the active certificate’s `NotAfter` minus this delta.                                                                                                                                                                                                                                                                                                             |
+| `preventive_delta`                                                | Preventive operational monitoring threshold.                                                                                                                                                                                                                                                                                                                                          |
+| `critical_delta`                                                  | Critical operational monitoring threshold.                                                                                                                                                                                                                                                                                                                                            |
+| `enable_expired_renewal`                                          | Accepts an expired presented certificate in the renewal mTLS validator. Does not authorize another mode or remove Gateway constraints by itself.                                                                                                                                                                                                                                      |
+| `est_rfc7030_settings.client_certificate_settings.validation_cas` | <del className="lm-diff-del">Additional</del><ins className="lm-diff-ins">Re-enrollment</ins> validation CAs for the renewal mTLS credential, tried after the enrollment CA; <del className="lm-diff-del">typically</del><ins className="lm-diff-ins">optional, because the enrollment CA is always trusted. Typically</ins> populated during CA rotation while old-CA cohorts renew. |
+| `revoke_on_reenrollment`                                          | If the previous certificate is ACTIVE, attempts Superseded revocation before binding its successor.                                                                                                                                                                                                                                                                                   |
 
 Monitoring does not renew: the client must schedule the request and installation. Webhook and NO\_AUTH modes do not use the same mTLS expired-credential validator; the webhook must explicitly authorize permitted recovery. Review [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for operation order and partial failures.
 
@@ -1986,7 +1999,7 @@ simplereenroll [#simplereenroll]
 
 Use the same request and certificate response formats. Authentication comes from the independent `reenrollment_settings.est_rfc7030_settings` block. With a client certificate, its CN must match the CSR CN; the subject is also checked against the current certificate.
 
-<del className="lm-diff-del">The enrollment CA or an additional CA validates the credential in mTLS mode</del><ins className="lm-diff-ins">In mTLS mode, the enrollment CA always validates the re-enrollment credential; certificates from other issuers are accepted only if they are listed as re-enrollment validation CAs</ins>. The expiry check through `enable_expired_renewal` belongs to that validator. A revoked current certificate and a request before the window are rejected. See [Renewal](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for installation and recovery.
+<del className="lm-diff-del">The enrollment CA or a validation CA configured in the re-enrollment block validates the credential in mTLS mode</del><ins className="lm-diff-ins">In mTLS mode, the enrollment CA always validates the re-enrollment credential; certificates from other issuers are accepted only if they are listed as validation CAs in the re-enrollment block</ins>. The expiry check through `enable_expired_renewal` belongs to that validator. A revoked current certificate and a request before the window are rejected. See [Renewal](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for installation and recovery.
 
 serverkeygen [#serverkeygen]
 
@@ -2145,7 +2158,7 @@ For the integrator [#for-the-integrator]
 
 Contract version [#contract-version]
 
-This block describes `main` code inspected at commit `8f42c47157f9a36bac3ed5caa3692aebebe19c4b`. The site catalog publishes `main (unstable)`; this behavior is not attributed to a stable release. Before using another version, check its contract and migrations, particularly independent re-enrollment authentication. Client checks and live-instance tests are distinguished in the revision plan.
+This block describes `main` code inspected at commit `8f42c47157f9a36bac3ed5caa3692aebebe19c4b`. The site catalog publishes `main (unstable)`; this behavior is not attributed to a stable release. Before using another version, check its contract, particularly independent re-enrollment authentication. Client checks and live-instance tests are distinguished in the revision plan.
 
 Gateway, TLS, provider and service configuration belongs to [Deployment](/docs/deployment/overview). Identity use in AWS or other destinations belongs to [Integrations](/docs/platform/iot-fleets/overview#integrations).
 
@@ -2286,31 +2299,33 @@ Error codes and diagnostics [#error-codes-and-diagnostics]
 
 The EST controller normally returns 400 when rejecting input and 500 when the service rejects or fails the operation. A 500 can also represent a policy denial; it does not mean retrying is safe. Gateway can produce its own codes and bodies. Examine the actual body and persisted result.
 
-| Symptom or message                                          | What to check                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| curl rejects TLS, name or issuer                            | URL, clock, server SAN and approved root in `est-trust.pem`. Resolve trust in [Deployment](/docs/deployment/troubleshooting); do not skip verification.                                                                                                                                                                                                                                                                        |
-| 404 or missing APS                                          | Public route `/.well-known/est/{DMS_ID}/{operation}` and existing DMS. APS is not the service name.                                                                                                                                                                                                                                                                                                                            |
-| 400, CSR or format error                                    | `Content-Type: application/pkcs10`, Base64 of DER, valid signature and a body preserved without double encoding.                                                                                                                                                                                                                                                                                                               |
-| Missing credential or invalid certificate                   | Operation mode, validating CA, dates, revocation and credential delivery by Gateway. Do not confuse server TLS trust with the bootstrap CA.                                                                                                                                                                                                                                                                                    |
-| Webhook denies, times out or responds without authorization | Configuration, connectivity and JSON response with `authorized: true`. There is no automatic fallback to `NO_AUTH`.                                                                                                                                                                                                                                                                                                            |
-| `unexpected status code: <n>: redirects are not followed`   | The webhook answered with a redirect. Configure the final absolute `http` or `https` URL in the webhook config; redirects are never followed.                                                                                                                                                                                                                                                                                  |
-| `webhook response exceeds 1048576 bytes`                    | The receiver returned more than 1 MiB of JSON. Reduce the response of the authorization webhook.                                                                                                                                                                                                                                                                                                                               |
-| `webhook config must not reference files`                   | The webhook config points to files (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`). For mTLS, enter the PEM as `cert_content` and `key_content`; remove any other file field, including `ca_cert_file`, which has no inline equivalent (the receiver certificate must chain to the system trust store). See the upgrade note in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings). |
-| 400 `struct validation error` creating or updating a DMS    | The webhook config of the operation that uses it is invalid. Review `external_webhook_settings` in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings).                                                                                                                                                                                                                                                  |
-| HTTP 500 with an `err` body on enroll or reenroll           | Service failures reach the EST client as 500 with a body of `err` plus the message; webhook authorization errors are named there.                                                                                                                                                                                                                                                                                              |
-| `device not preregistered`                                  | PRE\_REGISTRATION requires an existing inventory entry.                                                                                                                                                                                                                                                                                                                                                                        |
-| `forbiddenNewEnrollment`                                    | An existing device requires replacement to be enabled, even in No Identity. Investigate before enabling the flag.                                                                                                                                                                                                                                                                                                              |
-| Different owning DMS                                        | CN/ID, global inventory and owning DMS; do not reuse an ID from another context.                                                                                                                                                                                                                                                                                                                                               |
-| `invalid RawSubject bytes`                                  | CSR subject versus the current certificate. Preserve its attributes as well as its CN.                                                                                                                                                                                                                                                                                                                                         |
-| `invalid reenroll window`                                   | Current identity's NotAfter and reenrollment\_delta. Alert thresholds do not change that window.                                                                                                                                                                                                                                                                                                                               |
-| Current certificate revoked                                 | Renewal rejected; prepare authorized recovery according to the cause.                                                                                                                                                                                                                                                                                                                                                          |
-| CA, profile or signing error                                | Active CA, available key, selected profile and restrictions. Successful cacerts does not prove issuance.                                                                                                                                                                                                                                                                                                                       |
-| HTTP 200 without a device connection                        | Installed pair, chain, uses, consumer trust and permissions. Also check the slot and history.                                                                                                                                                                                                                                                                                                                                  |
-| Timeout or error after issuance                             | New certificates, current slot and previous identity's state before retrying.                                                                                                                                                                                                                                                                                                                                                  |
+| Symptom or message                                          | What to check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| curl rejects TLS, name or issuer                            | URL, clock, server SAN and approved root in `est-trust.pem`. Resolve trust in [Deployment](/docs/deployment/troubleshooting); do not skip verification.                                                                                                                                                                                                                                                                                                                                               |
+| 404 or missing APS                                          | Public route `/.well-known/est/{DMS_ID}/{operation}` and existing DMS. APS is not the service name.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 400, CSR or format error                                    | `Content-Type: application/pkcs10`, Base64 of DER, valid signature and a body preserved without double encoding.                                                                                                                                                                                                                                                                                                                                                                                      |
+| Missing credential or invalid certificate                   | Operation mode, validating CA, dates, revocation and credential delivery by Gateway. Do not confuse server TLS trust with the bootstrap CA.                                                                                                                                                                                                                                                                                                                                                           |
+| Webhook denies, times out or responds without authorization | Configuration, connectivity and JSON response with `authorized: true`. There is no automatic fallback to `NO_AUTH`.                                                                                                                                                                                                                                                                                                                                                                                   |
+| `unexpected status code: <n>: redirects are not followed`   | The webhook answered with a redirect. Configure the final absolute `http` or `https` URL in the webhook config; redirects are never followed.                                                                                                                                                                                                                                                                                                                                                         |
+| `webhook response exceeds 1048576 bytes`                    | The receiver returned more than 1 MiB of JSON. Reduce the response of the authorization webhook.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `webhook config must not reference files`                   | The webhook config points to files (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`). For mTLS, enter the certificate and key as Base64-encoded PEM in `cert_content` and `key_content`, or as plain PEM; remove any other file field, including `ca_cert_file`, which has no inline equivalent (the receiver certificate must chain to the system trust store). See the webhook credentials guidance in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings). |
+| `mtls_options.cert_content must be base64-encoded PEM`      | The value is neither Base64-encoded PEM nor plain PEM: it is a file path or Base64 of non-PEM data. Enter the certificate and key as Base64-encoded PEM, like certificates elsewhere in the API, or as plain PEM (see the webhook settings in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings)). The same message names `mtls_options.key_content` when the key is the offending value.                                                                                      |
+| `webhook mTLS certificate and key are invalid: …`           | The certificate and key do not form a matching pair. Enter both values from the same pair; the check runs when the DMS is saved and again on every webhook call.                                                                                                                                                                                                                                                                                                                                      |
+| 400 `struct validation error` creating or updating a DMS    | The webhook config of the operation that uses it is invalid. Review `external_webhook_settings` in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings).                                                                                                                                                                                                                                                                                                                         |
+| HTTP 500 with an `err` body on enroll or reenroll           | Service failures reach the EST client as 500 with a body of `err` plus the message; webhook authorization errors are named there.                                                                                                                                                                                                                                                                                                                                                                     |
+| `device not preregistered`                                  | PRE\_REGISTRATION requires an existing inventory entry.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `forbiddenNewEnrollment`                                    | An existing device requires replacement to be enabled, even in No Identity. Investigate before enabling the flag.                                                                                                                                                                                                                                                                                                                                                                                     |
+| Different owning DMS                                        | CN/ID, global inventory and owning DMS; do not reuse an ID from another context.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `invalid RawSubject bytes`                                  | CSR subject versus the current certificate. Preserve its attributes as well as its CN.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `invalid reenroll window`                                   | Current identity's NotAfter and reenrollment\_delta. Alert thresholds do not change that window.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Current certificate revoked                                 | Renewal rejected; prepare authorized recovery according to the cause.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| CA, profile or signing error                                | Active CA, available key, selected profile and restrictions. Successful cacerts does not prove issuance.                                                                                                                                                                                                                                                                                                                                                                                              |
+| HTTP 200 without a device connection                        | Installed pair, chain, uses, consumer trust and permissions. Also check the slot and history.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Timeout or error after issuance                             | New certificates, current slot and previous identity's state before retrying.                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 Compatibility notes [#compatibility-notes]
 
-The examples use the contract of the [examined backend](/docs/platform/iot-fleets/enrollment/overview#contract-version). Do not automatically attribute that behavior to another release. Check the saved renewal mode after migration and Gateway behavior with expired certificates and the bootstrap CA.
+The examples use the contract of the [examined backend](/docs/platform/iot-fleets/enrollment/overview#contract-version). Do not automatically attribute that behavior to another release. Check the saved renewal mode and Gateway behavior with expired certificates and the bootstrap CA.
 
 The default response is Base64-encoded DER PKCS#7; PEM through `Accept: application/x-pem-file` is a Lamassu extension. ServerKeyGen returns multipart and requires handling each part separately. See the [EST reference](/docs/platform/iot-fleets/enrollment/est-reference).
 
@@ -2363,7 +2378,7 @@ Migrate trust [#migrate-trust]
 
 Before changing Enrollment CA, inventory disconnected equipment, bootstrap and operational certificates, and consumers. Distribute the new root and required intermediates; check that a cohort accepts both old and new chains.
 
-In the DMS, separate distributed CAs from <del className="lm-diff-del">`additional_validation_cas`, used for</del><ins className="lm-diff-ins">the</ins> re-enrollment <del className="lm-diff-del">credentials. The inspected validator tries the enrollment CA followed by those CAs against the received leaf</del><ins className="lm-diff-ins">validation CAs in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; that list is optional because the enrollment CA always validates re-enrollment credentials. The validator accepts the received leaf when it chains to the enrollment CA or to one of those CAs</ins>; accepting a multilevel chain requires checking what reaches the service and which issuer is configured.
+In the DMS, separate distributed CAs from the re-enrollment validation CAs at `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`, used for re-enrollment credentials. <del className="lm-diff-del">When </del><ins className="lm-diff-ins">That list is optional because the enrollment CA always validates re-enrollment credentials, but when </ins>switching the enrollment CA, add the previous issuance CA to <del className="lm-diff-del">that list</del><ins className="lm-diff-ins">it</ins> so old-CA identities keep re-enrolling during overlap. The inspected validator tries the enrollment CA followed by those CAs against the received leaf; accepting a multilevel chain requires checking what reaches the service and which issuer is configured.
 
 Switch issuance, renew in cohorts and compare the installed serial with the active slot. Remove previous trust once no legitimate equipment needs it and policy permits ending overlap. Follow [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for the PKI operation.
 
@@ -2782,21 +2797,21 @@ Create an explicit leaf profile compatible with EC P-256, with **Honor Subject**
 
 Create the `Acme EST Evaluation` DMS with this configuration:
 
-| Setting                                                                                                                               | Evaluation value                                                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Enrollment CA                                                                                                                         | Issuing root from `device-root.pem`.                                                                                                                                                                     |
-| Issuance profile                                                                                                                      | The 1-hour leaf profile you just prepared.                                                                                                                                                               |
-| Protocol / Registration Mode                                                                                                          | `EST_RFC7030` / `JITP`.                                                                                                                                                                                  |
-| Verify CSR Signature                                                                                                                  | Enabled.                                                                                                                                                                                                 |
-| Enable Replaceable Enrollment                                                                                                         | Disabled; the ID must be new.                                                                                                                                                                            |
-| Initial authentication                                                                                                                | `CLIENT_CERTIFICATE`; Validation CAs includes the direct bootstrap issuer; no expired certificates.                                                                                                      |
-| Renewal authentication                                                                                                                | `CLIENT_CERTIFICATE`, configured in the independent re-enrollment block.                                                                                                                                 |
-| <del className="lm-diff-del">Additional</del><ins className="lm-diff-ins">Re-enrollment</ins> Validation CAs / Enable Expired Renewal | <del className="lm-diff-del">Empty list</del><ins className="lm-diff-ins">Not needed</ins> for this direct issuance<ins className="lm-diff-ins">; the Enrollment CA is always included</ins> / disabled. |
-| Re-enrollment Delta                                                                                                                   | 1 hour.                                                                                                                                                                                                  |
-| Preventive / Critical Delta                                                                                                           | 30 minutes / 10 minutes.                                                                                                                                                                                 |
-| Revoke on Re-enrollment                                                                                                               | Disabled to test the successor before retiring the previous identity.                                                                                                                                    |
-| ServerKeyGen                                                                                                                          | Disabled; the operational key is generated in the client.                                                                                                                                                |
-| CA Distribution                                                                                                                       | Include Enrollment CA enabled; Include Lamassu System CA disabled.                                                                                                                                       |
+| Setting                                               | Evaluation value                                                                                                                                                                                         |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Enrollment CA                                         | Issuing root from `device-root.pem`.                                                                                                                                                                     |
+| Issuance profile                                      | The 1-hour leaf profile you just prepared.                                                                                                                                                               |
+| Protocol / Registration Mode                          | `EST_RFC7030` / `JITP`.                                                                                                                                                                                  |
+| Verify CSR Signature                                  | Enabled.                                                                                                                                                                                                 |
+| Enable Replaceable Enrollment                         | Disabled; the ID must be new.                                                                                                                                                                            |
+| Initial authentication                                | `CLIENT_CERTIFICATE`; Validation CAs includes the direct bootstrap issuer; no expired certificates.                                                                                                      |
+| Renewal authentication                                | `CLIENT_CERTIFICATE`, configured in the independent re-enrollment block.                                                                                                                                 |
+| Re-enrollment Validation CAs / Enable Expired Renewal | <del className="lm-diff-del">Empty list</del><ins className="lm-diff-ins">Not needed</ins> for this direct issuance<ins className="lm-diff-ins">; the Enrollment CA is always included</ins> / disabled. |
+| Re-enrollment Delta                                   | 1 hour.                                                                                                                                                                                                  |
+| Preventive / Critical Delta                           | 30 minutes / 10 minutes.                                                                                                                                                                                 |
+| Revoke on Re-enrollment                               | Disabled to test the successor before retiring the previous identity.                                                                                                                                    |
+| ServerKeyGen                                          | Disabled; the operational key is generated in the client.                                                                                                                                                |
+| CA Distribution                                       | Include Enrollment CA enabled; Include Lamassu System CA disabled.                                                                                                                                       |
 
 Equal duration and window allow immediate renewal testing. These are evaluation values; size production settings according to connectivity and recovery times. Save, reread both authentication blocks and retain the DMS ID. If your console does not expose the independent block, configure and check the resource through the [DMS API](/docs/api-reference/dms-manager) and [DMS guide](/docs/platform/iot-fleets/enrollment/dms).
 
@@ -3152,7 +3167,7 @@ Key rotation procedure [#key-rotation-procedure]
   <Step>
     Switch issuance [#switch-issuance]
 
-    Update the enrollment CA and profile of the DMSs. <del className="lm-diff-del">Keep the additional validation CAs if old certificates still need to be accepted during re-enrollment</del><ins className="lm-diff-ins">While old certificates still need re-enrollment acceptance, add the previous enrollment CA as a re-enrollment validation CA: the new enrollment CA is trusted automatically, but the old one was the enrollment CA and appears in no other list, so without that entry its certificates can no longer renew</ins>.
+    Update the enrollment CA and profile of the DMSs<del className="lm-diff-del">, and add the old CA to each DMS's re-enrollment validation CAs (`reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`) while old-CA cohorts still</del><ins className="lm-diff-ins">. While old-CA cohorts still renew, add the previous enrollment CA to each DMS's re-enrollment validation CAs (`reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`): the new enrollment CA is trusted automatically, but the old one was the enrollment CA and appears in no other list, so without that entry its certificates can no longer</ins> renew. The [DMS guide](/docs/platform/iot-fleets/enrollment/dms) documents the setting.
   </Step>
 
   <Step>
@@ -3748,7 +3763,7 @@ Enrollment, validation and distribution CAs [#enrollment-validation-and-distribu
 A DMS relates three sets that are worth designing separately:
 
 * **Enrollment CA:** signs the new identities.
-* **Validation CAs:** authenticate the client certificates used for enrollment or migration. During re-enrollment, <del className="lm-diff-del">Lamassu tries </del>the enrollment CA <del className="lm-diff-del">first and then the additional validation CAs</del><ins className="lm-diff-ins">is always trusted and the re-enrollment validation CAs are also accepted; those are optional</ins>.
+* **Validation CAs:** authenticate the client certificates used for enrollment or migration. During re-enrollment, <del className="lm-diff-del">Lamassu tries </del>the enrollment CA <del className="lm-diff-del">first and then </del><ins className="lm-diff-ins">is always trusted and Lamassu then tries </ins>the validation CAs configured in the re-enrollment block<ins className="lm-diff-ins">; those are optional</ins>.
 * **Distributed CAs:** form the content the device obtains through EST `/cacerts`. You can include the service TLS certificate, the enrollment CA and an explicit list of managed CAs. Including the issuer does not automatically add all its ancestors.
 
 This separation makes it possible to migrate a fleet: you temporarily accept certificates from the old hierarchy, issue with the new one and distribute both chains during the overlap.
@@ -4540,3 +4555,518 @@ The chain validates but the connection fails [#the-chain-validates-but-the-conne
 Check expected identity, SAN, KU/EKU, matching key, presented intermediates and consumer permissions. Distinguish server TLS trust, client authentication and action authorization. Follow [Validation](/docs/platform/pki/certificate-validation) for positive and rejection tests.
 
 When escalating a problem, provide identifiers, error and relevant public evidence, including query timestamps and version. This distinguishes issuance, publication and consumer application failures.
+
+
+# 3.8.0 to 4.0.0 (/docs/pr-preview/pr-40/upgrades/3-8-0-to-4-0-0)
+
+
+
+Lamassu 4.0.0 is a major release. Storage consolidates into a single PostgreSQL database, a new `authz` service authorizes every request, the Helm chart is hardened, and several APIs and stored configurations change shape. Most data converts automatically during the upgrade, but some changes need operator action before, during or after it.
+
+This page is organized in four parts. Read them in order before you upgrade production:
+
+1. [Architecture changes](#architecture-changes): what is different in 4.0.0 and what the upgrade migrates on its own.
+2. [Breaking changes](#breaking-changes): every change that can break a 3.8.0 deployment, who it affects and what to do.
+3. [Helm migration guide](#helm-migration-guide): the step-by-step procedure for a Helm-managed release.
+4. [Validation checklist](#validation-checklist): how to confirm the upgrade worked before you remove the old data.
+
+<Callout type="warn" title="Backend migration steps are provisional">
+  The 4.0.0 release is upcoming and the backend migration steps on this page are provisional. Verify each procedure against the final release artifacts before upgrading production.
+</Callout>
+
+Architecture changes [#architecture-changes]
+
+One PostgreSQL database with schemas [#one-postgresql-database-with-schemas]
+
+3.8.0 gave each service its own database. The 4.0.0 backend connects to a single PostgreSQL database named `pki` and isolates each service in a schema: `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` and `alerts`. The `authz` service keeps its principals, grants and policies in a separate `authz` database (the development monolith uses an `authz` schema inside `pki` instead), and WFX keeps its own `wfx` database.
+
+PostgreSQL is now the only storage engine. SQLite support is removed, and the `couch_db` and `dynamo_db` engines are not registered in 4.0.0.
+
+Authorization moves into the authz service [#authorization-moves-into-the-authz-service]
+
+In 3.8.0 the API Gateway validated tokens: a JWT policy on every private route checked the signature and only let through tokens that carried the administrator role. Every route was open to any token that passed that check.
+
+4.0.0 removes the gateway policy. The `/api/*` routes reach the services directly, and each service authorizes every request through `authz`, which validates the token against the identity provider's JWKS endpoint and applies fine-grained, entity-level policies to CAs, certificates, devices, DMSs, KMS keys and VA roles. There is no implicit superuser: the first administrator comes from a bootstrap principal that you configure. The [access control](/docs/platform/administration/access-control) page documents principals, policies and the first administrator.
+
+Device events get their own store [#device-events-get-their-own-store]
+
+Historical device events move from the `devices.events` column to a dedicated `device_events` store with their own endpoints. The events endpoint can also stream events over Server-Sent Events (SSE); to fan events out across service instances, each Device Manager instance binds its own durable AMQP queue.
+
+A hardened Helm chart [#a-hardened-helm-chart]
+
+Version 4.0.0 of the chart is a security-hardening release:
+
+* **Release-scoped resource names.** Every chart-managed resource is named `<release>-lamassu-<component>` instead of the fixed names used in 3.8.0 (`kms`, `va`, `ca`, ...). With a release named `prod` the StatefulSets become `prod-lamassu-kms` and `prod-lamassu-va`. The `nameOverride` and `fullnameOverride` values change the prefix.
+* **Non-root containers.** Every workload runs as the numeric user `65532:65532` with a `RuntimeDefault` seccomp profile and dropped capabilities. Pods do not mount the service-account token by default, and the chart creates a dedicated ServiceAccount.
+* **Strict values validation.** `values.schema.json` rejects unknown keys, so leftover 3.8.0 blocks fail `helm lint` and `helm upgrade` instead of being silently ignored.
+* **No injected scheduling rules.** The chart no longer adds pod anti-affinity or topology spread constraints on its own.
+
+What the upgrade migrates automatically [#what-the-upgrade-migrates-automatically]
+
+Several migrations run without intervention when you upgrade a Helm release:
+
+* Before any service starts, the chart's pre-install/pre-upgrade job prepares PostgreSQL. It creates the `pki`, `authz` and `wfx` databases when they do not exist, creates one schema per service inside `pki`, and imports each 3.8.0 per-service database into its schema. Each import runs as a single transaction, so a failed import leaves no partial schema and a retried job imports again. The job then runs the database migrations for every schema, migrates `authz`, preloads its policies and seeds the `services.authz.bootstrap` principals. It is idempotent and requires a PostgreSQL role allowed to create databases and schemas, as described in [Install with Helm](/docs/deployment/self-hosted/helm#before-you-begin).
+* Stored DMS configuration is rewritten to the 4.0.0 layout, and historical device events are transformed into the new store.
+* When `migrations.caToKms.enabled` is set, a pre-upgrade hook registers legacy CA keys in the KMS.
+
+Two things never migrate on their own: the KMS and VA data on local volumes, which stays on volumes the upgraded pods no longer use, and the values file, which you update by hand. Deployments that do not use the Helm chart also have to move their database data themselves; see [Deployments without Helm](#deployments-without-helm).
+
+Breaking changes [#breaking-changes]
+
+| Change                                                                                | Who is affected                                                                      | Severity                                                      | Action                                                                                     |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [Release-scoped resource names](#release-scoped-resource-names)                       | Helm releases with a filesystem KMS engine or local VA CRL storage                   | High: KMS and VA start on empty volumes                       | Copy the data into the new volumes                                                         |
+| [Strict values validation](#strict-values-validation)                                 | Every Helm release                                                                   | High: `helm upgrade` fails                                    | Remove or rename legacy keys                                                               |
+| [Required authorization configuration](#required-authorization-configuration)         | Every deployment                                                                     | High: without a bootstrap principal there is no administrator | Configure `services.authz`                                                                 |
+| [Gateway token validation removed](#gateway-token-validation-removed)                 | Every Helm release                                                                   | High: `helm upgrade` fails on the old keys                    | Move JWKS and roles into `services.authz`                                                  |
+| [PostgreSQL consolidation](#postgresql-consolidation)                                 | 3.8.0 deployments with per-service databases                                         | High: services find no data, or a migration aborts            | Clean duplicate CA IDs and empty `engine_id` values first; move data manually outside Helm |
+| [SQLite storage removed](#sqlite-storage-removed)                                     | Deployments on SQLite, `couch_db` or `dynamo_db`                                     | High: the backend no longer starts with them                  | Move to PostgreSQL before upgrading                                                        |
+| [Webhooks with file references](#dms-webhooks)                                        | DMSs whose webhook mTLS certificate or key were file paths                           | High: enrollments calling the webhook fail                    | Re-enter certificate and key as PEM, or remove the file fields                             |
+| [Non-root containers](#non-root-containers)                                           | Releases with per-service identity overrides or mounted key material                 | Medium: services cannot read their files                      | Remove the overrides and fix volume ownership                                              |
+| [AMQP over TLS](#amqp-over-tls)                                                       | Releases that set `amqp.tls`                                                         | Medium: clients connect to the wrong port                     | Point `amqp.port` at the TLS listener, or disable TLS                                      |
+| [Legacy CA keys in the KMS](#legacy-ca-keys-in-the-kms)                               | Installations whose CA keys predate the KMS                                          | Medium: CA keys stay unmanaged                                | Run the CA-to-KMS migration                                                                |
+| [Receiver certificate verification](#dms-webhooks)                                    | DMSs whose webhook had `validate_server_cert: false`                                 | Medium: credentials go to an unverified receiver              | Set `insecure_skip_verify` to `false`                                                      |
+| [Re-enrollment trust set](#re-enrollment-trust-set)                                   | Scripts and consoles that edit DMSs through the API                                  | Medium: an old-layout edit silently empties `validation_cas`  | Read the DMS before editing and use the new field                                          |
+| [Device events](#device-events)                                                       | Consumers that read the device `events` field                                        | Medium: the field disappears                                  | Use the new event endpoints                                                                |
+| [Renamed and reshaped values](#renamed-and-reshaped-values)                           | Releases that override `toolbox`, `services.connectors`, ports, probes or scheduling | Low to medium: validation errors or changed defaults          | Update the values file                                                                     |
+| [DMS update API](#dms-update-api)                                                     | Clients that send the DMS ID in the update body                                      | Low: the ID in the URL wins                                   | Send the ID in the URL                                                                     |
+| [Certificate type values](#certificate-type-values)                                   | Consumers that match on certificate `type`                                           | Low: two values are renamed                                   | Adapt consumers                                                                            |
+| [Independent re-enrollment authentication](#independent-re-enrollment-authentication) | Any DMS                                                                              | Low: informational                                            | Read both blocks before editing                                                            |
+
+Helm chart and values [#helm-chart-and-values]
+
+Release-scoped resource names [#release-scoped-resource-names]
+
+Kubernetes derives a StatefulSet's PVC name from its pod name (`<volumeClaimTemplate>-<pod-name>`). Renaming the `kms` and `va` StatefulSets means `helm upgrade` binds brand-new, empty PVCs instead of the existing ones. The KMS key material and VA CRLs are not deleted — the old PVCs are orphaned, not removed — but the upgraded pods fail with `no such file or directory` (KMS) or `code=NotFound` (VA) until you copy the data across. This affects KMS when `services.kms.cryptoEngines` uses a `filesystem` engine and VA when `services.va.fileStore.type` is `local`. Every other renamed resource is stateless and is recreated without data-loss risk.
+
+[Step 4 of the migration guide](#step-4-migrate-the-kms-and-va-data) copies the data.
+
+Strict values validation [#strict-values-validation]
+
+`values.schema.json` rejects unknown keys, so every block that 4.0.0 removed or renamed — `toolbox`, `auth.oidc.apiGateway`, `auth.authorization` and others — fails `helm lint` and `helm upgrade` outright. [Step 2](#step-2-update-the-values-file) lists every change.
+
+Required authorization configuration [#required-authorization-configuration]
+
+3.8.0 had no authorization service, so a 3.8.0 values file has nothing to migrate from: you must add the `services.authz` configuration yourself. It needs the JWKS endpoint of your identity provider, the database mappings the authorization engine uses, and a bootstrap principal that matches how your provider assigns the administrator role. Without a matching principal nobody can administer the PKI.
+
+Gateway token validation removed [#gateway-token-validation-removed]
+
+`auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` and `auth.authorization.roles.admin` are removed with no compatibility aliases, and the schema rejects them. Their settings move into `services.authz`: the JWKS URL becomes `services.authz.jwkUrl`, and the role claim and administrator role become a claim rule of the bootstrap principal. `auth.oidc.frontend` is unchanged.
+
+Non-root containers [#non-root-containers]
+
+Service images run on a distroless base as the numeric user `65532`; the `authz` image is Ubuntu with a non-root user that has the same UID. The per-service overrides `services.kms.securityContext.runAsGroup: 0` and `services.authz.securityContext.runAsUser`/`runAsGroup: 999` are removed; group access to the KMS volume and PKCS#11 socket is now handled by the pod-level `fsGroup: 65532`.
+
+3.8.0 did not pin a container identity, so existing files can carry any UID. Any volume that holds keys or CRLs must be owned by `65532:65532`, or at least readable (and, where needed, writable) by that identity.
+
+AMQP over TLS [#amqp-over-tls]
+
+In 3.8.0 `amqp.tls` was not applied and event-bus clients always connected over plaintext. In 4.0.0 `amqp.tls: true` switches them to AMQPS. The default `amqp.port` stays `5672` and does not change when TLS is enabled, so a values file that already set `amqp.tls: true` must point `amqp.port` at the broker's TLS listener (`amqps`, commonly `5671`), or set `amqp.tls: false` to keep plaintext. Clients must also trust the broker's certificate.
+
+Renamed and reshaped values [#renamed-and-reshaped-values]
+
+* `toolbox` is renamed to `connectivityTest`, and the `helm test` hook uses the upstream `curlimages/curl` image pinned by digest.
+* `services.connectors` is a map keyed by connector ID instead of a list.
+* The `services.ui.port` default is `8085`, the unprivileged port of the rootless image.
+* The shared `probes:` block is replaced by independent `livenessProbe`, `readinessProbe` and `startupProbe` blocks.
+* With `tls.certManagerOptions.issuer` empty, the chart creates a release-scoped self-signed issuer, for example `lamassu-downstream-ca-selfsigned-issuer`. The legacy literal `downstream-ca-selfsigned-issuer` is still accepted and resolves to it.
+* Anti-affinity and topology spread must be configured explicitly through `affinity` and `topologySpreadConstraints`.
+
+Data and storage [#data-and-storage]
+
+PostgreSQL consolidation [#postgresql-consolidation]
+
+Every 3.8.0 per-service database must end up as a schema of `pki`, keeping its structure, indexes, constraints, data and migration history. The Helm chart does this automatically; deployments without Helm do it by hand (see [Deployments without Helm](#deployments-without-helm)).
+
+Two schema migrations abort on data that 3.8.0 allowed, so clean the data before upgrading:
+
+* The CA migration adds a UNIQUE constraint on `ca_certificates.id` and aborts if duplicate CA IDs exist. Imports already reject duplicates with `409`, so new ones cannot normally appear.
+* The KMS migration promotes the primary key to `(key_id, engine_id)` and aborts with `cannot promote (key_id, engine_id) to primary key: N row(s) have no engine_id; backfill them before migrating` when `kms_keys` rows lack `engine_id`. Backfill `engine_id` first.
+
+The same KMS migration deletes, with a `NOTICE`, aliases that equal an existing key ID, because identifiers now resolve as a key ID before an alias. Affected aliases are dropped, not redirected.
+
+SQLite storage removed [#sqlite-storage-removed]
+
+The SQLite storage engine is removed, and the `couch_db` and `dynamo_db` engines are not registered in 4.0.0: their configuration constants remain, but they select no engine. Deployments on any of them must move to PostgreSQL and consolidate their data into the `pki` schemas before upgrading.
+
+Legacy CA keys in the KMS [#legacy-ca-keys-in-the-kms]
+
+CA certificates of type `MANAGED` or `IMPORTED_WITH_KEY` whose private keys predate the KMS service have the key stored only in the crypto engine, under the certificate's `subject_key_id`, with no KMS record. The `ca-to-kms-migration` tool registers them:
+
+* The `key_id` is the certificate's `subject_key_id` (SHA-256 of the public key).
+* The tool is idempotent: keys already in the KMS are skipped, so it can be run several times.
+* Certificates that cannot be read, or lack an engine or a subject key ID, are skipped with a warning. Review the logs and resolve the affected records.
+* When CA certificates sharing a `subject_key_id` declare conflicting `engine_id`s, the tool fails that key and exits with code `1`, which fails a Helm pre-upgrade hook. Resolve the conflict manually before rerunning.
+
+With Helm, enable the hook for the upgrade in [step 2](#step-2-update-the-values-file); without Helm, run the tool by hand.
+
+APIs and stored configuration [#apis-and-stored-configuration]
+
+DMS webhooks [#dms-webhooks]
+
+Stored webhook configs are rewritten to the current layout and their fields renamed:
+
+| Field in 3.8.0         | Field in 4.0.0                         |
+| ---------------------- | -------------------------------------- |
+| `validate_server_cert` | `insecure_skip_verify` (value negated) |
+| `oidc`                 | `jwt_options`                          |
+| `apikey`               | `apikey_options`                       |
+| `mtls`                 | `mtls_options`                         |
+
+When the legacy mTLS certificate and key are both PEM, they move into `mtls_options.cert_content` and `mtls_options.key_content` and need no action. Two cases do need it.
+
+**Webhooks with file references.** A mixed config, with a PEM certificate and a file-path key, is migrated to `mtls_options.cert_file` and `mtls_options.key_file`. Webhook delivery rejects those fields on every call, whatever the configured authentication mode, so every enroll and re-enroll that calls that webhook fails until the config is fixed. If the webhook uses mTLS, re-enter the certificate and key as Base64-encoded or plain PEM; if it does not, remove the leftover file fields. Metadata-only updates keep working in the meantime (`PUT` or `PATCH` on `/v1/dms/:id/metadata`). In a variant of the same problem, a stored config with file paths inside `mtls_options.cert_content` or `mtls_options.key_content` makes every full settings update (`POST /v1/dms` or `PUT /v1/dms/:id`) fail validation; settings are replaced wholesale, so resend the config with the certificate and key as PEM.
+
+**Receiver certificate verification.** A config with `validate_server_cert: false` becomes `insecure_skip_verify: true`, so receiver verification stays skipped until that field is set to `false`. Correct it on every migrated config: the webhook authorization channel carries the API key or bearer token, and skipping verification exposes those credentials to a network-positioned attacker. Keep `insecure_skip_verify: true` only when the receiver certificate is deliberately unverifiable.
+
+Re-enrollment trust set [#re-enrollment-trust-set]
+
+The flat field `reenrollment_settings.additional_validation_cas` moves into the nested field `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`:
+
+```json
+{
+  "reenrollment_settings": {
+    "est_rfc7030_settings": {
+      "client_certificate_settings": {
+        "validation_cas": ["<CA_ID>"]
+      }
+    }
+  }
+}
+```
+
+The effective trust set does not change, because the nested value was never consulted when validating re-enrollments. If the flat list was missing or null, it becomes an empty list.
+
+What changes is how API requests are handled. Bodies that still carry `additional_validation_cas` are accepted, but the value is silently dropped because unknown JSON fields are ignored, and GET responses no longer include it. An update body built from the old layout therefore empties `validation_cas` without any error. Always read the DMS before sending an edit and reuse the layout the API returns.
+
+Independent re-enrollment authentication [#independent-re-enrollment-authentication]
+
+Re-enrollment authentication settings are now stored independently from initial authentication. Nothing needs migrating, but read both blocks before editing a DMS so that you do not modify one while believing you are editing the other. If the console version does not expose independent settings, edit them through the [DMS API](/docs/api-reference/dms-manager).
+
+DMS update API [#dms-update-api]
+
+`PUT /v1/dms/:id` takes the DMS ID from the URL and validates the request body. An ID in the body is ignored, so update clients that relied on it.
+
+Certificate type values [#certificate-type-values]
+
+Stored certificate type values are renamed: `IMPORTED` becomes `IMPORTED_WITH_KEY` and `EXTERNAL` becomes `IMPORTED_WITHOUT_KEY`. `MANAGED` is unchanged. Adapt consumers that read or match on those values.
+
+Device events [#device-events]
+
+The `events` field no longer appears in the device representation. Point consumers at the new endpoints:
+
+* `GET /v1/devices/:id/events` returns a device's events.
+* `POST /v1/devices/:id/events` creates an event.
+
+When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Each Device Manager instance binds a durable AMQP queue named after its service ID, `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until removed, so configure an expiration or cleanup policy on the broker.
+
+Helm migration guide [#helm-migration-guide]
+
+The upgrade runs in a fixed order: prepare the data and values, run `helm upgrade`, then copy the KMS and VA data into the new volumes. The copy must run after the upgrade, because the destination StatefulSets and PVCs do not exist before it. If you are not upgrading an existing release, go straight to [Install with Helm](/docs/deployment/self-hosted/helm).
+
+Step 1: Prepare [#step-1-prepare]
+
+1. Take a verifiable backup of PostgreSQL and schedule downtime. The upgrade moves every service's data into `pki`.
+2. If the deployment runs on SQLite, `couch_db` or `dynamo_db`, move it to PostgreSQL first.
+3. Resolve duplicate CA IDs and backfill `engine_id` in `kms_keys`, as described in [PostgreSQL consolidation](#postgresql-consolidation).
+4. Record the names of your local-storage PVCs:
+
+```bash
+export NAMESPACE=lamassu   # your 3.8.0 namespace
+export RELEASE=lamassu     # your Helm release name
+
+kubectl get pvc -n $NAMESPACE -l app.kubernetes.io/instance=$RELEASE
+# on a 3.8.0 install you can also list the fixed names directly:
+kubectl get pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0
+```
+
+`helm upgrade` does not touch or delete the old PVCs, but nothing references them after the upgrade. You need their names to copy the data and to clean up later.
+
+Step 2: Update the values file [#step-2-update-the-values-file]
+
+**Add `services.authz`.** Configure the JWKS endpoint, the database mappings and the bootstrap principal:
+
+```yaml
+services:
+  authz:
+    jwkUrl: https://idp.example.com/realms/lamassu/protocol/openid-connect/certs
+    credentials:
+      pki:
+        database: pki
+      authz:
+        database: authz
+    bootstrap:
+      - principal_id: "oidc:pki-admin"
+        principal_name: "PKI Admin"
+        principal_type: "oidc"
+        policy_ids: [...]   # keep the defaults from values.yaml
+        auth_config:
+          claims:
+            - claim: realm_access.roles   # was auth.authorization.rolesClaim
+              operator: contains
+              value: pki-admin            # was auth.authorization.roles.admin
+```
+
+* `jwkUrl` is fetched from the `authz` pod, not from the gateway, so a Service in the release namespace can be referenced by its short name. The default points at a Keycloak Service named `auth-keycloak`; set it explicitly if your identity provider lives anywhere else.
+* `authz` is the authorization service's own storage for principals, grants and policies. `pki` is the database the authorization engine queries when it evaluates policies against entities. Only the `database` field of each entry is read; the connection always uses the global `postgres.hostname`, `postgres.port`, `postgres.username` and `postgres.password` values.
+* If you kept the 3.8.0 role defaults (`realm_access.roles` and `pki-admin`), the default `services.authz.bootstrap` already matches them.
+
+**Delete the gateway token validation blocks.** Remove `auth.oidc.apiGateway` and `auth.authorization` once their settings are in `services.authz`:
+
+```yaml
+# REMOVE (3.8.0)
+auth:
+  oidc:
+    apiGateway:
+      jwks:
+        - name: oidc-authn
+          uri: https://idp.example.com/realms/lamassu/protocol/openid-connect/certs
+  authorization:
+    rolesClaim: realm_access.roles
+    roles:
+      admin: pki-admin
+```
+
+**Rename `toolbox` to `connectivityTest`:**
+
+```yaml
+# OLD (3.8.0)
+toolbox:
+  image: ghcr.io/lamassuiot/toolbox:2.2.0
+
+# NEW (4.0.0)
+connectivityTest:
+  image: curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+```
+
+**Remove the per-service identity overrides** `services.kms.securityContext.runAsGroup` and `services.authz.securityContext.runAsUser`/`runAsGroup`.
+
+**Convert `services.connectors` to a map** keyed by connector ID, each entry with its `type` and `image`:
+
+```yaml
+services:
+  connectors:
+    aws.myconnector:
+      type: awsiot
+      image: ghcr.io/lamassuiot/lamassu-aws-connector:dev-v4
+```
+
+**Check AMQP.** If you set `amqp.tls: true`, also set `amqp.port` to the broker's TLS listener (commonly `5671`), or set `amqp.tls: false` to stay on plaintext.
+
+**Enable the CA-to-KMS migration** if your CA keys predate the KMS:
+
+```yaml
+migrations:
+  caToKms:
+    enabled: true
+```
+
+**Review the remaining values:** overrides that pinned `services.ui.port` to `80`, the old `probes:` block, the TLS issuer, and explicit `affinity` and `topologySpreadConstraints` where your cluster needs them. [Renamed and reshaped values](#renamed-and-reshaped-values) describes each one.
+
+Run `helm lint` with the new values before upgrading; the strict schema reports any key that is still unknown.
+
+Step 3: Run the upgrade [#step-3-run-the-upgrade]
+
+```bash
+helm upgrade --install "$RELEASE" lamassu/lamassu \
+  --namespace $NAMESPACE \
+  --values values.yaml \
+  --wait
+```
+
+Helm runs the pre-upgrade hooks — the CA-to-KMS migration when enabled, and the database job — before applying any workload, so services never start against an unprepared database. If validation rejects unknown values, fix the values file and re-run.
+
+If the deployment uses local KMS or VA storage, those pods fail until you complete step 4, so `--wait` cannot succeed: Helm waits for them to become ready, times out, exits with an error and marks the release `failed`. The hooks have already run by then, and every manifest, including the new StatefulSets and their PVCs, has been applied. Helm does not roll anything back without `--atomic`. Continue with step 4, then re-run the same `helm upgrade` command so it completes and Helm records the release as `deployed`. Both hooks are idempotent, so they are safe to run again.
+
+Step 4: Migrate the KMS and VA data [#step-4-migrate-the-kms-and-va-data]
+
+Skip this step when `services.kms.cryptoEngines` never used a `filesystem` engine and `services.va.fileStore.type` was never `local`.
+
+1. **Find the new StatefulSets and PVCs.** Their names depend on the release name and any `nameOverride` or `fullnameOverride`; the PVC name is `<volumeClaimTemplate>-<StatefulSet name>-0`:
+
+```bash
+KMS_STS=$(kubectl get statefulset -n "$NAMESPACE" \
+  -l "app.kubernetes.io/instance=$RELEASE,app.kubernetes.io/component=kms" \
+  -o jsonpath='{.items[0].metadata.name}')
+VA_STS=$(kubectl get statefulset -n "$NAMESPACE" \
+  -l "app.kubernetes.io/instance=$RELEASE,app.kubernetes.io/component=va" \
+  -o jsonpath='{.items[0].metadata.name}')
+
+KMS_PVC="golang-engine-storage-${KMS_STS}-0"
+VA_PVC="local-crl-file-storage-${VA_STS}-0"
+
+# Fails if a lookup came back empty or a new claim is the old one.
+# Item 3 calls it again before creating the helper pod.
+claims_ok() {
+  local pair sts new old
+  for pair in "$KMS_STS:$KMS_PVC:golang-engine-storage-kms-0" \
+              "$VA_STS:$VA_PVC:local-crl-file-storage-va-0"; do
+    IFS=: read -r sts new old <<< "$pair"
+    if [ -z "$sts" ] || [ "$new" = "$old" ]; then
+      echo "ABORT: new claim '$new' is missing or equals the 3.8.0 claim '$old'" >&2
+      return 1
+    fi
+  done
+}
+
+claims_ok && kubectl get pvc -n "$NAMESPACE" \
+  golang-engine-storage-kms-0 "$KMS_PVC" \
+  local-crl-file-storage-va-0 "$VA_PVC"
+```
+
+With release `lamassu` and the default chart name, the new PVCs are `golang-engine-storage-lamassu-kms-0` and `local-crl-file-storage-lamassu-va-0`; with release `prod` they are `golang-engine-storage-prod-lamassu-kms-0` and `local-crl-file-storage-prod-lamassu-va-0`. Confirm both old and new PVCs exist before continuing. If `claims_ok` prints `ABORT`, the block stops before listing the claims: either a StatefulSet lookup failed, or a new claim resolves to the 3.8.0 claim. In the second case the copy would verify against itself and the final cleanup would delete the live volume. The chart always appends `-kms` and `-va` to the release-scoped name, so a collision means the claims are not what this guide expects; investigate before going on. Item 3 runs the same check and refuses to create the helper pod, so nothing touches the volumes. The check returns instead of calling `exit`, which would close your shell and lose the variables set so far. If you only migrate one of the two services, drop the other one's claims from the commands that follow.
+
+2. **Record the replica counts, scale the new StatefulSets down and wait for every pod that uses the claims to exit**, so nothing writes to either volume while you copy. Helm removes the 3.8.0 `kms` and `va` StatefulSets during the upgrade, but their pods `kms-0` and `va-0` can still be terminating and holding the old claims. While they run, the helper pod either cannot attach the claims or copies a volume that is still being written. The `wait` returns at once for pods that are already gone:
+
+```bash
+KMS_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$KMS_STS" -o jsonpath='{.spec.replicas}')
+VA_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$VA_STS" -o jsonpath='{.spec.replicas}')
+
+kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" "$VA_STS" --replicas=0
+
+kubectl wait -n "$NAMESPACE" --for=delete --timeout=300s \
+  pod/kms-0 pod/va-0 "pod/${KMS_STS}-0" "pod/${VA_STS}-0"
+```
+
+3. **Run a short-lived helper pod** that mounts all four claims. It runs as root so it can change file ownership, so pin its image by digest and do not mount the service-account token:
+
+```bash
+claims_ok && cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-migrate-helper
+  namespace: $NAMESPACE
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  containers:
+    - name: migrate
+      image: docker.io/library/alpine@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc # 3.20
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - {name: old-kms, mountPath: /old/kms}
+        - {name: new-kms, mountPath: /new/kms}
+        - {name: old-va,  mountPath: /old/va}
+        - {name: new-va,  mountPath: /new/va}
+  volumes:
+    - {name: old-kms, persistentVolumeClaim: {claimName: golang-engine-storage-kms-0}}
+    - {name: new-kms, persistentVolumeClaim: {claimName: $KMS_PVC}}
+    - {name: old-va,  persistentVolumeClaim: {claimName: local-crl-file-storage-va-0}}
+    - {name: new-va,  persistentVolumeClaim: {claimName: $VA_PVC}}
+EOF
+
+kubectl wait -n $NAMESPACE --for=condition=Ready pod/pvc-migrate-helper --timeout=60s
+```
+
+4. **Inspect before writing** so you do not clobber data the new pods may already have written:
+
+```bash
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c 'find /new/kms /new/va -type f'
+```
+
+An empty result is the common case: a StatefulSet's own pod rarely gets far enough to write anything when its dependent data is missing. If the output is not empty, record the files and confirm with the service owner that they are disposable before you run the copy; do not overlay the 3.8.0 data onto an unknown store.
+
+5. **Copy the data, align ownership and verify the copy.** The second command must print `copy verified`; any `diff` output means the copy is incomplete, so do not continue:
+
+```bash
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
+  cp -a /old/kms/. /new/kms/ &&
+  cp -a /old/va/. /new/va/ &&
+  chown -R 65532:65532 /new/kms /new/va
+'
+
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
+  diff -r /old/kms /new/kms &&
+  diff -r /old/va /new/va &&
+  echo "copy verified"
+'
+```
+
+The `chown` is required even if the old files already look non-root-owned, because 4.0.0 requires exactly `65532:65532` and does not fall back to whatever the image declares.
+
+6. **Remove the helper and restore the recorded replica counts:**
+
+```bash
+kubectl delete pod -n $NAMESPACE pvc-migrate-helper
+kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" --replicas="$KMS_REPLICAS"
+kubectl scale statefulset -n "$NAMESPACE" "$VA_STS" --replicas="$VA_REPLICAS"
+```
+
+7. **Re-run the step 3 `helm upgrade` command.** The KMS and VA pods now start against the copied data, so `--wait` succeeds and the release moves from `failed` to `deployed`.
+
+Step 5: Remove the one-off migration values [#step-5-remove-the-one-off-migration-values]
+
+After the upgrade that performed the CA-to-KMS migration succeeds, remove `migrations.caToKms.enabled` from your values (it defaults to `false`). The hook reads the legacy 3.8.0 `kms-config` ConfigMap while it still exists and falls back to the release-scoped `<release>-lamassu-kms-config` once it is gone.
+
+Then go through the [validation checklist](#validation-checklist). Keep the old PVCs until it passes.
+
+Deployments without Helm [#deployments-without-helm]
+
+Without the chart's database job, no tool moves data between databases: the migration tooling only applies migrations to a schema that already exists. Move each per-service database into its `pki` schema yourself, preserving structure, indexes, constraints, data and migration history, with writes stopped and a verified backup in hand.
+
+To apply migrations by hand, `goose-lamassu` must run against the `pki` database with `search_path=<schema>` in the connection string. The binary validates only `search_path`, not the database name, so check `dbname=pki` before running it, and repeat for `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` and `alerts`:
+
+```bash
+./goose-lamassu "host=$DB_HOST port=5432 user=$DB_USER dbname=pki search_path=kms" up
+```
+
+Run `ca-to-kms-migration` first with `--dry-run`, which reports without writing to KMS storage, and then for real:
+
+```bash
+LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration --dry-run
+LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration
+```
+
+Point the tool's `storage` configuration at the `pki` database, where the CA and KMS data now live in the `ca` and `kms` schemas. The tool's options are described in `backend/cmd/ca-to-kms-migration/README.md` in the `lamassuiot` repository.
+
+<Callout type="warn" title="The tools' READMEs are outdated">
+  The `goose-lamassu` README still shows per-database examples (`dbname=ca`, `dbname=kms`) and claims the tool validates the database name, and the `ca-to-kms-migration` README still describes the pre-4.0.0 two-database layout. Follow the `dbname=pki` form on this page instead of their examples.
+</Callout>
+
+Troubleshooting [#troubleshooting]
+
+* **KMS or VA pods crash with `no such file or directory` or `code=NotFound` right after the upgrade.** The pods are bound to the new, empty PVCs and the data migration has not run yet, or was copied into the wrong PVC. Follow [step 4](#step-4-migrate-the-kms-and-va-data) and check that all four claims exist.
+* **`helm upgrade --wait` times out and `helm status` reports the release as `failed`.** With local KMS or VA storage this is expected on the first run: the new pods cannot become ready before their data is copied. The hooks ran and the manifests and PVCs were applied, so complete [step 4](#step-4-migrate-the-kms-and-va-data) and re-run the same `helm upgrade` command. If other pods are also not ready, check their logs, because something else is wrong.
+* **The helper pod stays `Pending` or `ContainerCreating` and `kubectl wait` times out.** Another pod still holds one of the claims; on block storage `kubectl describe pod pvc-migrate-helper` shows a `Multi-Attach error`. Check with `kubectl get pods -n $NAMESPACE` that `kms-0`, `va-0` and the new KMS and VA pods are gone, then re-run the wait.
+* **`helm upgrade` fails with an unknown-key validation error.** Remove or rename the legacy values — typically `toolbox`, `auth.oidc.apiGateway` or `auth.authorization` — because the strict schema rejects keys it does not know.
+* **The upgrade fails at the database job.** The PostgreSQL role cannot create databases or schemas, or a schema migration aborted on duplicate CA IDs or missing `engine_id` values. Check the job logs, fix the privileges or the data, and re-run the upgrade.
+* **The upgrade fails at the CA-to-KMS hook.** CA certificates that share a `subject_key_id` declare conflicting `engine_id`s. Resolve the conflict and re-run.
+* **Nobody can log in after the upgrade.** Check that `services.authz.jwkUrl` is reachable from the `authz` pod, that `services.authz.bootstrap` matches a role your OIDC provider actually assigns, and that the database job completed.
+
+Validation checklist [#validation-checklist]
+
+After the upgrade, check in this order:
+
+1. **Databases.** Each service reads the `pki` database with its own schema, `authz` and `wfx` data are reachable, and the migration status is registered per schema, including the CA unique-ID and KMS composite-key migrations.
+2. **KMS and VA start cleanly.** Their logs show no `no such file or directory` or `code=NotFound` errors.
+3. **Existing KMS keys work.** Issue a certificate from a CA that existed before the upgrade. None of the other checks reads a KMS key, so this is the only one that proves the key material was copied.
+4. **Existing CRLs are served.** `GET /crl/<ca-ski>` on VA returns a previously issued CRL, and new CRLs are issued.
+5. **Legacy CA keys.** If the CA-to-KMS migration ran, review its report and warnings and confirm the expected keys appear in the KMS.
+6. **Connectivity.** `helm test "$RELEASE" -n $NAMESPACE --logs` passes; the hook checks the CA, DMS Manager, Device Manager and VA health endpoints and the UI response.
+7. **Authorization.** Sign in as the bootstrap principal and confirm administration works, check that an identity without permissions receives `403`, and review client and integration permissions.
+8. **AMQP.** The backend connects to the broker with the expected TLS settings, and the cleanup policy for SSE queues is in place.
+9. **Device events.** `GET /v1/devices/:id/events` returns the historical events of a device that had them.
+10. **Webhooks without file fields.** For each DMS that uses a webhook for enrollment or re-enrollment, the `config` block carries `insecure_skip_verify` and the expected option block (`apikey_options`, `jwt_options` or `mtls_options`), with the certificate and key as PEM and no `cert_file` or `key_file`.
+11. **Receiver verification.** `insecure_skip_verify` is `false`, unless the receiver certificate is intentionally unverified.
+12. **Webhook delivery.** One enroll or re-enroll through each migrated webhook completes its authorization call.
+13. **Trust set.** `est_rfc7030_settings.client_certificate_settings.validation_cas` holds the expected CAs, in particular those of the old CA during rotation overlaps.
+14. **API clients.** Scripts and consoles no longer use the old DMS layout (flat `additional_validation_cas`, or the legacy `mtls`, `apikey` and `oidc` fields), send DMS updates with the ID in the URL, and match on the new certificate `type` values.
+
+Delete the old volumes [#delete-the-old-volumes]
+
+Only once every check passes, delete the orphaned 3.8.0 volumes to reclaim storage. The delete is irreversible and the old KMS volume may hold the last copy of your CA key material, so take a `VolumeSnapshot` or a backup of both old PVCs first and keep it until you are confident the upgraded deployment is healthy. These are the fixed 3.8.0 names recorded in step 1; before deleting, confirm that neither is mounted by a running pod, for example with `kubectl describe pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0`, where `Used By` must be `<none>`:
+
+```bash
+kubectl delete pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0
+```
+
+The 3.8.0 per-service databases are no longer used either. Drop them only after the same checks pass and your PostgreSQL backup is verified.
+
+<Cards>
+  <Card title="Install with Helm" description="Prepare dependencies, configure values and install a controlled deployment." href="/docs/deployment/self-hosted/helm" />
+
+  <Card title="Access control" description="Principals, policies and the first administrator." href="/docs/platform/administration/access-control" />
+
+  <Card title="Configure a DMS" description="Enrollment, re-enrollment and webhook settings." href="/docs/platform/iot-fleets/enrollment/dms" />
+</Cards>

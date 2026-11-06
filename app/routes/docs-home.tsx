@@ -1,10 +1,10 @@
-import { HomeLayout } from "fumadocs-ui/layouts/home";
 import { ArrowRight } from "lucide-react";
 import { Link, useLocation } from "react-router";
+import { AppBar } from "@/components/app-bar";
 import { ScalarIcon } from "@/components/scalar-icon";
 import { asset } from "@/lib/asset";
 import { docsPath } from "@/lib/base-path";
-import { baseOptions, gitConfig } from "@/lib/layout.shared";
+import { gitConfig } from "@/lib/layout.shared";
 import { type Locale, localeFromPath } from "@/lib/locales";
 import type { Route } from "./+types/docs-home";
 
@@ -170,37 +170,14 @@ const sectionHrefs: Record<Locale, string[]> = {
   es: [docsPath("es/platform/overview"), docsPath("es/deployment/overview")],
 };
 
-const navHrefs: Record<Locale, string[]> = {
-  en: [docsPath("platform/overview"), docsPath("deployment/overview")],
-  es: [docsPath("es/platform/overview"), docsPath("es/deployment/overview")],
-};
-
-function navLinksFor(locale: Locale) {
-  return [
-    {
-      text: locale === "es" ? ES_COPY.navLinks[0] : EN_COPY.navLinks[0],
-      url: navHrefs[locale][0],
-      active: "nested-url" as const,
-    },
-    {
-      text: locale === "es" ? ES_COPY.navLinks[1] : EN_COPY.navLinks[1],
-      url: navHrefs[locale][1],
-      active: "nested-url" as const,
-    },
-    {
-      text: locale === "es" ? ES_COPY.navLinks[2] : EN_COPY.navLinks[2],
-      url: docsPath("api-reference/ca"),
-    },
-  ];
-}
-
 export default function DocsHome() {
   const { pathname } = useLocation();
   const locale: Locale = localeFromPath(pathname);
   const t = locale === "es" ? ES_COPY : EN_COPY;
 
   return (
-    <HomeLayout {...baseOptions()} links={navLinksFor(locale)}>
+    <div className="flex min-h-dvh flex-col">
+      <AppBar />
       <style>{HOME_CSS}</style>
       <div className="lm-home">
         <div className="lm-page">
@@ -345,7 +322,7 @@ export default function DocsHome() {
           </footer>
         </div>
       </div>
-    </HomeLayout>
+    </div>
   );
 }
 const WAVE_TONES = ["reg", "pqc"];

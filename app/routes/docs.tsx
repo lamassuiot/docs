@@ -7,13 +7,16 @@ import type {
 } from "fumadocs-core/page-tree";
 import { useFumadocsLoader } from "fumadocs-core/source/client";
 import { Step, Steps } from "fumadocs-ui/components/steps";
-import { DocsLayout } from "fumadocs-ui/layouts/docs";
+// Notebook layout: full-width top navbar with the section tabs underneath and
+// the sidebar below it — the Mintlify-style shell (logo · search · actions,
+// then a tab row) instead of the classic sidebar-owns-the-header layout.
+import { DocsLayout } from "fumadocs-ui/layouts/notebook";
 import {
   DocsBody,
   DocsDescription,
   DocsPage,
   DocsTitle,
-} from "fumadocs-ui/layouts/docs/page";
+} from "fumadocs-ui/layouts/notebook/page";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
@@ -28,6 +31,7 @@ import {
 import { MdxCard, MdxLink } from "@/components/mdx-link";
 import { ScalarIcon } from "@/components/scalar-icon";
 import { VersionSelector } from "@/components/version-selector";
+import { asset } from "@/lib/asset";
 import { DOCS_BASE_PATH, docsPath } from "@/lib/base-path";
 import { baseOptions, gitConfig } from "@/lib/layout.shared";
 import { DEFAULT_LOCALE, splitLocaleSlugs } from "@/lib/locales";
@@ -124,6 +128,38 @@ function mapPageTree(root: PageTreeRoot, locale: string): PageTreeRoot {
   };
 }
 
+/**
+ * Where the page sits, shown as a path above its title ("Platform / PKI /
+ * Validation"): the enclosing folders, from the tab down, followed by the
+ * nearest sidebar separator ("---Validation---") that precedes the page.
+ */
+function sectionTrail(root: PageTreeRoot, url: string): string[] {
+  const label = (name: ReactNode) =>
+    typeof name === "string" ? splitBadgeTitle(name).text : null;
+  const withSeparator = (trail: string[], separator: string | null) =>
+    separator && trail.at(-1) !== separator ? [...trail, separator] : trail;
+
+  function walk(nodes: PageTreeNode[], trail: string[]): string[] | undefined {
+    let separator: string | null = null;
+    for (const node of nodes) {
+      if (node.type === "separator") {
+        separator = label(node.name);
+      } else if (node.type === "page") {
+        if (node.url === url) return withSeparator(trail, separator);
+      } else if (node.type === "folder") {
+        // A folder's own landing page belongs to the folder's parent.
+        if (node.index?.url === url) return withSeparator(trail, separator);
+        const name = label(node.name);
+        const found = walk(node.children, name ? [...trail, name] : trail);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  }
+
+  return walk(root.children, []) ?? [];
+}
+
 export async function loader({ params }: Route.LoaderArgs) {
   const slugs = params["*"].split("/").filter((v) => v.length > 0);
   if (slugs.length === 0) throw new Response("Not found", { status: 404 });
@@ -132,12 +168,14 @@ export async function loader({ params }: Route.LoaderArgs) {
   const canonicalSlugs = canonicalDocPath(content.join("/")).split("/");
   const page = source.getPage(canonicalSlugs, locale);
   if (!page) throw new Response("Not found", { status: 404 });
-  const pageTree = mapPageTree(source.getPageTree(locale), locale);
+  const rawTree = source.getPageTree(locale);
+  const pageTree = mapPageTree(rawTree, locale);
 
   return {
     slugs: page.slugs,
     path: page.path,
     url: page.url,
+    trail: sectionTrail(rawTree, page.url),
     locale,
     affected: affectedPages(locale),
     pageTree: await source.serializePageTree(pageTree),
@@ -179,12 +217,14 @@ const clientLoader = browserCollections.docs.createClientLoader({
       slugs,
       path,
       url,
+      trail,
       locale,
       affected,
     }: {
       slugs: string[];
       path: string;
       url: string;
+      trail: string[];
       locale: string;
       affected?: AffectedPages;
     },
@@ -201,46 +241,69 @@ const clientLoader = browserCollections.docs.createClientLoader({
           enabled: false,
         }}
         toc={filteredToc}
-        tableOfContent={{
-          style: "clerk",
-        }}
-        tableOfContentPopover={{
-          style: "clerk",
-        }}
+        // Narrow, centred reading column between the sidebar and the TOC.
+        className="items-center *:w-full *:max-w-[47rem] xl:pt-12"
       >
         <title>
           {titleParts.badge
             ? `${titleParts.badge} ${titleParts.text}`
             : frontmatter.title}
         </title>
-        <DocsTitle className="text-[2.25rem] font-bold tracking-tight">
-          {diff?.title ? (
-            <DiffText diff={diff.title} />
-          ) : (
-            renderBadgeTitle(frontmatter.title)
+        {/* Page header: eyebrow, title with the page actions beside it, and
+            the description — set off by an accent rule on a soft surface. */}
+        <header className="lm-page-header @container/page-header">
+          {/* Decorative: the Lamassu mark, large and faint, cropped at the
+              card's right edge. Tinted through a mask so it follows the
+              theme's accent colour. */}
+          <span
+            aria-hidden
+            className="lm-page-mark"
+            style={{
+              WebkitMaskImage: `url(${asset("images/lamassu.svg")})`,
+              maskImage: `url(${asset("images/lamassu.svg")})`,
+            }}
+          />
+          {trail.length > 0 && (
+            <nav aria-label="Breadcrumb" className="lm-page-trail">
+              <ol>
+                {trail.map((part, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: static, ordered path
+                  <li key={i}>{part}</li>
+                ))}
+              </ol>
+            </nav>
           )}
-        </DocsTitle>
-        <DocsDescription>
-          {diff?.description ? (
-            <DiffText diff={diff.description} />
-          ) : (
-            frontmatter.description
-          )}
-        </DocsDescription>
+          <div className="flex flex-col gap-3 @[34rem]/page-header:flex-row @[34rem]/page-header:items-center">
+            <DocsTitle className="lm-page-title">
+              {diff?.title ? (
+                <DiffText diff={diff.title} />
+              ) : (
+                renderBadgeTitle(frontmatter.title)
+              )}
+            </DocsTitle>
+            <div className="lm-page-actions">
+              <LLMCopyButton markdownUrl={markdownUrl} />
+              <ViewOptions
+                markdownUrl={markdownUrl}
+                githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${path}`}
+              />
+            </div>
+          </div>
+          <DocsDescription className="lm-page-description">
+            {diff?.description ? (
+              <DiffText diff={diff.description} />
+            ) : (
+              frontmatter.description
+            )}
+          </DocsDescription>
+        </header>
         <DiffToggle
           diff={diff}
           affected={affected}
           currentUrl={url}
           locale={locale}
         />
-        <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
-          <LLMCopyButton markdownUrl={markdownUrl} />
-          <ViewOptions
-            markdownUrl={markdownUrl}
-            githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${path}`}
-          />
-        </div>
-        <DocsBody className="[&>h1:first-child]:hidden">
+        <DocsBody className="mt-4 [&>h1:first-child]:hidden">
           <Mdx
             components={{
               ...defaultMdxComponents,
@@ -282,9 +345,11 @@ export default function Page({ loaderData }: Route.ComponentProps) {
   return (
     <DocsLayout
       {...baseOptions()}
+      nav={{ ...baseOptions().nav, mode: "top" }}
+      tabMode="navbar"
       i18n
       tree={pageTree}
-      sidebar={{ banner: <VersionSelector />, tabs }}
+      sidebar={{ banner: <VersionSelector />, tabs, collapsible: false }}
     >
       {content}
     </DocsLayout>

@@ -42,8 +42,8 @@ export default defineConfig({
     remarkImageOptions: false,
     rehypeCodeOptions: {
       ...rehypeCodeDefaultOptions,
-      // Muted, low-chroma palette instead of Fumadocs' default GitHub theme.
-      themes: { light: "min-light", dark: "min-dark" },
+      // High-contrast GitHub palettes so code reads clearly in both modes.
+      themes: { light: "github-light-default", dark: "github-dark-default" },
       ...(diffBase
         ? {
             transformers: [

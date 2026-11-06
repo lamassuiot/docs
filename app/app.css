@@ -4,53 +4,266 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
-/* ── Lamassu custom theme ─────────────────────────────────────────────────
-   Overrides neutral.css with Lamassu site colors.
-   Neutral zinc surfaces + blue primary in both modes (shadcn-style tokens).
+/* ── Lamassu docs theme ───────────────────────────────────────────────────
+   Modelled on Mintlify's "aspen" look as Infisical customises it: square
+   corners, ink-on-white chrome, a full-width top bar with the section tabs
+   underneath, and an accent rule (Lamassu blue) that marks the page header.
+   Code follows Greptile: framed, high-contrast blocks and boxed inline code.
+
+   Rules below are deliberately unlayered so they win over Fumadocs' layered
+   utilities without !important.
    ──────────────────────────────────────────────────────────────────────── */
 @theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Square corners everywhere. `rounded-full` is unaffected (it does not use
+     these variables), so round toggles and avatars keep their shape. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+
   /* Light mode */
   --color-fd-background:           #ffffff;
-  --color-fd-foreground:           #09090b;
-  --color-fd-muted:                #f4f4f5;
-  --color-fd-muted-foreground:     #71717a;
+  --color-fd-foreground:           #171718;
+  --color-fd-muted:                #f7f7f6;
+  --color-fd-muted-foreground:     #6b6b6b;
   --color-fd-popover:              #ffffff;
-  --color-fd-popover-foreground:   #09090b;
+  --color-fd-popover-foreground:   #171718;
   --color-fd-card:                 #ffffff;
-  --color-fd-card-foreground:      #09090b;
-  --color-fd-border:               #e4e4e7;
-  --color-fd-primary:              #1d4ed8;
+  --color-fd-card-foreground:      #171718;
+  --color-fd-border:               #e8e8e8;
+  /* Ink, not blue: active states read as "selected", not as links. */
+  --color-fd-primary:              #26272b;
   --color-fd-primary-foreground:   #ffffff;
-  --color-fd-secondary:            #f4f4f5;
-  --color-fd-secondary-foreground: #18181b;
-  --color-fd-accent:               #f4f4f5;
-  --color-fd-accent-foreground:    #18181b;
-  --color-fd-ring:                 #1d4ed8;
+  --color-fd-secondary:            #f7f7f6;
+  --color-fd-secondary-foreground: #26272b;
+  --color-fd-accent:               #f1f1f0;
+  --color-fd-accent-foreground:    #171718;
+  --color-fd-ring:                 #0100f8;
+}
+
+:root {
+  --lm-accent: #0100f8;
+  --lm-accent-soft: rgb(1 0 248 / 0.12);
+  --lm-surface: #fbfbfa;
+  --lm-heading: #0e0f11;
+  --lm-body: #3f3f3f;
+  --lm-code-fg: #26272b;
+  --lm-code-bg: #f6f6f5;
+  --lm-code-border: #e3e3e1;
+  --lm-pre-bg: #ffffff;
+  --lm-selection: #d4d6ff;
 }
 
 .dark {
-  --color-fd-background:           #09090b;
-  --color-fd-foreground:           #fafafa;
-  --color-fd-muted:                #18181b;
-  --color-fd-muted-foreground:     #a1a1aa;
-  --color-fd-popover:              #0f0f11;
-  --color-fd-popover-foreground:   #fafafa;
-  --color-fd-card:                 #101012;
-  --color-fd-card-foreground:      #fafafa;
-  --color-fd-border:               #27272a;
-  --color-fd-primary:              #3b82f6;
-  --color-fd-primary-foreground:   #ffffff;
-  --color-fd-secondary:            #18181b;
-  --color-fd-secondary-foreground: #fafafa;
-  --color-fd-accent:               #18181b;
-  --color-fd-accent-foreground:    #fafafa;
-  --color-fd-ring:                 #3b82f6;
+  --color-fd-background:           #08090b;
+  --color-fd-foreground:           #f3f3f4;
+  --color-fd-muted:                #111215;
+  --color-fd-muted-foreground:     #9f9fa3;
+  --color-fd-popover:              #0e0f12;
+  --color-fd-popover-foreground:   #f3f3f4;
+  --color-fd-card:                 #0e0f12;
+  --color-fd-card-foreground:      #f3f3f4;
+  --color-fd-border:               #1e1f24;
+  --color-fd-primary:              #8f97ff;
+  --color-fd-primary-foreground:   #08090b;
+  --color-fd-secondary:            #111215;
+  --color-fd-secondary-foreground: #f3f3f4;
+  --color-fd-accent:               #16171b;
+  --color-fd-accent-foreground:    #f3f3f4;
+  --color-fd-ring:                 #8f97ff;
+
+  --lm-accent: #5b63ff;
+  --lm-accent-soft: rgb(143 151 255 / 0.1);
+  --lm-surface: #0e0f12;
+  --lm-heading: #f3f3f4;
+  --lm-body: #c9c9cc;
+  --lm-code-fg: #e4e4e6;
+  --lm-code-bg: rgb(255 255 255 / 0.05);
+  --lm-code-border: #26272c;
+  --lm-pre-bg: #0b0c0e;
+  --lm-selection: #2b2f8f;
 }
 
-/* Sidebar shell — standard fumadocs background, no custom gradients */
+::selection {
+  background-color: var(--lm-selection);
+}
+
+body {
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+/* ── Top bar ───────────────────────────────────────────────────────────── */
+
+/* Fluid layout: Fumadocs centres the whole grid inside a 97rem column, which
+   cuts the top bar short on wide screens. Let the grid use the full viewport
+   so the bar runs edge to edge (logo far left, actions far right) and the
+   sidebar sits under the logo. The reading column stays centred and capped. */
+#nd-notebook-layout {
+  --fd-layout-width: 100%;
+}
+
+#nd-subnav {
+  background-color: var(--color-fd-background);
+  backdrop-filter: none;
+}
+
+/* Search entry: a soft, rounded grey field. */
+#nd-subnav [data-header-body] > div > button,
+#nd-subnav [data-header-body] button[data-search-full] {
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  background-color: rgb(11 11 11 / 0.04);
+  height: 2.25rem;
+  transition: border-color 120ms, background-color 120ms;
+}
+
+#nd-subnav [data-header-body] button[data-search-full]:hover {
+  border-color: var(--color-fd-border);
+  background-color: var(--color-fd-background);
+}
+
+#nd-subnav [data-header-body] button[data-search-full] kbd {
+  border-radius: 0.375rem;
+}
+
+.dark #nd-subnav [data-header-body] > div > button,
+.dark #nd-subnav [data-header-body] button[data-search-full] {
+  background-color: rgb(255 255 255 / 0.05);
+}
+
+/* Section tabs: plain text with an ink underline on the active one. Icons are
+   for the compact mobile dropdown only. */
+#nd-subnav [data-header-tabs] {
+  gap: 1.75rem;
+}
+
+#nd-subnav [data-header-tabs] > a {
+  height: 100%;
+  padding-bottom: 0;
+  border-bottom-width: 1px;
+  color: var(--color-fd-muted-foreground);
+  font-weight: 500;
+}
+
+#nd-subnav [data-header-tabs] > a:hover {
+  color: var(--color-fd-foreground);
+}
+
+#nd-subnav [data-header-tabs] > a[class*='border-fd-primary'] {
+  color: var(--color-fd-foreground);
+  font-weight: 600;
+  border-color: var(--color-fd-foreground);
+}
+
+#nd-subnav [data-header-tabs] img,
+#nd-subnav [data-header-tabs] svg {
+  display: none;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+
+#nd-sidebar > div {
+  border-inline-end: 1px solid var(--color-fd-border);
+}
+
 #nd-sidebar,
 #nd-sidebar-mobile {
-  border-inline-end: 1px solid var(--color-fd-border);
+  font-size: 0.875rem;
+}
+
+/* Section headings ("---Validation---"): small, bold, ink, with a hairline
+   above to split the groups. */
+#nd-sidebar p,
+#nd-sidebar-mobile p {
+  display: flex;
+  position: relative;
+  margin-top: 1.75rem;
+  margin-bottom: 0.375rem;
+  padding-top: 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-fd-foreground);
+}
+
+#nd-sidebar p::before,
+#nd-sidebar-mobile p::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  inset-inline: 0.5rem;
+  height: 1px;
+  background-color: var(--color-fd-border);
+}
+
+#nd-sidebar p:first-child,
+#nd-sidebar-mobile p:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+#nd-sidebar p:first-child::before,
+#nd-sidebar-mobile p:first-child::before {
+  display: none;
+}
+
+/* Links and folder triggers: grey text, a light fill on hover. */
+#nd-sidebar a,
+#nd-sidebar button,
+#nd-sidebar-mobile a,
+#nd-sidebar-mobile button {
+  padding-block: 0.375rem;
+  color: #3f3f3f;
+}
+
+.dark #nd-sidebar a,
+.dark #nd-sidebar button,
+.dark #nd-sidebar-mobile a,
+.dark #nd-sidebar-mobile button {
+  color: #9f9fa3;
+}
+
+#nd-sidebar a:hover,
+#nd-sidebar button:hover,
+#nd-sidebar-mobile a:hover,
+#nd-sidebar-mobile button:hover {
+  color: var(--color-fd-foreground);
+  background-color: rgb(11 11 11 / 0.04);
+}
+
+.dark #nd-sidebar a:hover,
+.dark #nd-sidebar button:hover,
+.dark #nd-sidebar-mobile a:hover,
+.dark #nd-sidebar-mobile button:hover {
+  background-color: rgb(255 255 255 / 0.04);
+}
+
+/* Current page: grey block with ink text (light), tinted accent (dark). */
+#nd-sidebar a[data-active='true'],
+#nd-sidebar-mobile a[data-active='true'] {
+  color: var(--color-fd-foreground);
+  background-color: #ececeb;
+  font-weight: 500;
+}
+
+.dark #nd-sidebar a[data-active='true'],
+.dark #nd-sidebar-mobile a[data-active='true'] {
+  color: var(--color-fd-primary);
+  background-color: var(--lm-accent-soft);
+}
+
+/* No active-item marker or nested-folder guide line. */
+#nd-sidebar a[data-active='true']::before,
+#nd-sidebar-mobile a[data-active='true']::before,
+#nd-sidebar [class*='before:bg-fd-border']::before,
+#nd-sidebar-mobile [class*='before:bg-fd-border']::before {
+  display: none;
 }
 
 /* Cap icon images in sidebar tab triggers and dropdown items */
@@ -64,6 +277,172 @@
   max-height: 1.25rem !important;
   object-fit: contain;
   flex-shrink: 0;
+}
+
+/* ── Page header ───────────────────────────────────────────────────────────
+   Lamassu's own hero card: rounded and framed on a quiet surface, with the
+   Lamassu mark large and faint, cropped at the right edge. Above the title, a
+   monospace path says where the page sits. */
+
+.lm-page-header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem 1.75rem 1.625rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 1.25rem;
+  background-color: var(--lm-surface);
+}
+
+.lm-page-mark {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  right: -2.75rem;
+  width: 12.5rem;
+  aspect-ratio: 495 / 476;
+  transform: translateY(-50%);
+  background-color: var(--lm-accent);
+  opacity: 0.055;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  pointer-events: none;
+}
+
+.dark .lm-page-mark {
+  opacity: 0.09;
+}
+
+/* The Lamassu logo is a single-colour (blue) mark; turn it white in dark mode
+   wherever it is shown as an image (top bar, sidebar tab, API reference). */
+.dark img[src$='images/lamassu.svg'] {
+  filter: brightness(0) invert(1);
+}
+
+.lm-page-trail ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--color-fd-muted-foreground);
+}
+
+.lm-page-trail li + li::before {
+  content: '/';
+  margin-inline: 0.5rem;
+  color: var(--color-fd-border);
+}
+
+.dark .lm-page-trail li + li::before {
+  color: #3a3b42;
+}
+
+.lm-page-trail li:last-child {
+  color: var(--color-fd-foreground);
+  font-weight: 500;
+}
+
+.lm-page-title {
+  flex: 1;
+  min-width: 0;
+  font-size: clamp(1.875rem, 1.5rem + 1.2vw, 2.25rem);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--lm-heading);
+  overflow-wrap: anywhere;
+}
+
+.lm-page-description {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--color-fd-muted-foreground);
+}
+
+/* "Copy Markdown | Open ▾" as one joined, outlined control. */
+.lm-page-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.lm-page-actions > button {
+  height: 2.125rem;
+  border: 1px solid var(--color-fd-border);
+  background-color: var(--color-fd-background);
+  color: var(--color-fd-foreground);
+  font-weight: 500;
+}
+
+.lm-page-actions > button:first-child {
+  border-inline-end: 0;
+  border-start-start-radius: 0.625rem;
+  border-end-start-radius: 0.625rem;
+}
+
+.lm-page-actions > button:last-child {
+  border-start-end-radius: 0.625rem;
+  border-end-end-radius: 0.625rem;
+}
+
+.lm-page-actions > button:hover {
+  background-color: var(--color-fd-accent);
+}
+
+/* ── Reading column ────────────────────────────────────────────────────── */
+
+.prose {
+  --tw-prose-body: var(--lm-body);
+  --tw-prose-headings: var(--lm-heading);
+}
+
+/* The page body only — the TOC also uses .prose and keeps its small type. */
+#nd-page > .prose {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.prose :where(h1, h2, h3, h4, h5, h6):not(:where(.not-prose *)) {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--lm-heading);
+}
+
+.prose :where(h2):not(:where(.not-prose *)) {
+  font-size: 1.5rem;
+}
+
+.prose :where(h3):not(:where(.not-prose *)) {
+  font-size: 1.25rem;
+}
+
+/* Links: ink text with an accent underline. Cards and heading self-links
+   (both marked [data-card] by Fumadocs) are excluded. */
+.prose :where(a:not([data-card])):not(:where(.not-prose *)) {
+  color: var(--lm-heading);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--lm-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  border-bottom: 0;
+}
+
+.prose :where(a:not([data-card])):not(:where(.not-prose *)):hover {
+  text-decoration-thickness: 2px;
 }
 
 /* Center all images in doc content */
@@ -89,76 +468,275 @@ article td,
   text-align: start;
 }
 
-/* MDX callouts are notices, not cards: retain the severity rail and icon while
-   removing the enclosing card affordances. The muted yellow surface keeps them
-   immediately noticeable without competing with the document content. */
-.prose div[style*='--callout-color'] {
-  --lm-callout-background: #fffbeb;
-
-  border: 0;
+/* ── Inline code ───────────────────────────────────────────────────────────
+   The boxed `backtick` look: monospace on a pale fill with a hairline frame,
+   so identifiers stand out from the prose at a glance. */
+.prose :where(code):not(:where(pre *, .not-prose, .not-prose *)) {
+  padding: 0.125rem 0.375rem;
+  border: 1px solid var(--lm-code-border);
   border-radius: 0;
-  border-inline-start: 0.1875rem solid var(--callout-color);
-  background-color: var(--lm-callout-background);
-  box-shadow: none;
-  padding-inline-start: 0.75rem;
+  background-color: var(--lm-code-bg);
+  color: var(--lm-code-fg);
+  font-family: var(--font-mono);
+  font-size: 0.8125em;
+  font-weight: 500;
+  font-variant-ligatures: none;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  overflow-wrap: break-word;
 }
 
-.prose div[style*='--callout-color'] > div[role='none'] {
-  display: none;
+.prose :where(code):not(:where(pre *, .not-prose, .not-prose *))::before,
+.prose :where(code):not(:where(pre *, .not-prose, .not-prose *))::after {
+  content: none;
 }
 
-.dark .prose div[style*='--callout-color'] {
-  --lm-callout-background: hsl(48, 52%, 22%);
+.prose :where(a code, h1 code, h2 code, h3 code, h4 code):not(:where(.not-prose *)) {
+  color: inherit;
 }
 
-/* Info notices: the shared amber surface above is nearly invisible against
-   the new white background, leaving only the blue icon/rail visible — so an
-   info callout reads as "a blue thing" instead of a notice. Tint its
-   background to match its own indicator color instead; theme-adaptive via
-   color-mix so it works in light and dark without a separate override. */
-.prose div[style*='--color-fd-info'] {
-  --lm-callout-background: color-mix(in oklab, var(--color-fd-info) 12%, var(--color-fd-background));
+.prose :where(td code, th code):not(:where(.not-prose *)) {
+  font-size: 0.75rem;
 }
 
-.dark .prose div[style*='--color-fd-info'] {
-  --lm-callout-background: color-mix(in oklab, var(--color-fd-info) 16%, var(--color-fd-background));
-}
-
-/* Code blocks: flat containers instead of Fumadocs' bordered/rounded card. */
-.shiki {
-  border: 0;
+/* ── Code blocks ───────────────────────────────────────────────────────────
+   Framed blocks with their own surface, no shadow. */
+figure.shiki {
+  border: 1px solid var(--color-fd-border);
   border-radius: 0;
   box-shadow: none;
+  background-color: var(--lm-pre-bg);
 }
 
-/* MDX tables: flat enterprise data tables instead of Fumadocs' rounded card
-   table — no outer border/radius, only a shaded header and horizontal row
-   dividers. */
+figure.shiki > div:first-child:has(figcaption) {
+  background-color: var(--lm-surface);
+}
+
+figure.shiki pre {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+
+/* Tabbed code groups share the same frame. */
+.prose div:has(> [role='tablist']):has(figure.shiki) {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ── Tables ────────────────────────────────────────────────────────────────
+   Open data tables: bold header with a rule under it and hairline rows. */
 .prose table {
   background: transparent;
   border: 0;
   border-radius: 0;
   border-collapse: collapse;
   overflow: visible;
+  font-size: 0.875rem;
 }
 
 .prose th,
 .prose td {
   border: 0;
   background: transparent;
+  padding: 0.75rem 1rem 0.75rem 0;
+  vertical-align: top;
 }
 
 .prose thead {
-  background: var(--color-fd-muted);
+  background: transparent;
   border-bottom: 1px solid var(--color-fd-border);
+}
+
+.prose th {
+  font-weight: 600;
+  color: var(--lm-heading);
 }
 
 .prose tbody tr {
   border-bottom: 1px solid var(--color-fd-border);
 }
 
-.prose tbody tr:last-child {
-  border-bottom: 0;
+/* ── Callouts ──────────────────────────────────────────────────────────────
+   Boxed notices: a tinted surface with a matching hairline frame, icon in the
+   type's colour, no side rail or shadow. */
+.prose div[style*='--callout-color'] {
+  --lm-callout-tint: 6%;
+
+  gap: 0.75rem;
+  margin-block: 1.25rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid color-mix(in oklab, var(--callout-color) 30%, var(--color-fd-border));
+  border-radius: 0;
+  background-color: color-mix(in oklab, var(--callout-color) var(--lm-callout-tint), var(--color-fd-background));
+  box-shadow: none;
+  font-size: 0.9375rem;
+}
+
+.dark .prose div[style*='--callout-color'] {
+  --lm-callout-tint: 9%;
+}
+
+.prose div[style*='--callout-color'] > div[role='none'] {
+  display: none;
+}
+
+.prose div[style*='--callout-color'] > svg {
+  margin-top: 0.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.prose div[style*='--callout-color'] :where(p, li) {
+  color: var(--lm-body);
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────
+   Fumadocs also marks heading self-links with [data-card]; real cards are the
+   bordered ones. */
+.prose a[data-card][class*='border'] {
+  padding: 1.125rem 1.25rem;
+  border-radius: 0.875rem;
+  background-color: var(--color-fd-background);
+  text-decoration: none;
+  transition: border-color 120ms;
+}
+
+.prose a[data-card][class*='border']:hover {
+  border-color: var(--lm-accent);
+  background-color: var(--color-fd-background);
+}
+
+.prose a[data-card][class*='border'] > :not(.not-prose) {
+  color: var(--color-fd-muted-foreground);
+  text-decoration: none;
+}
+
+.prose a[data-card][class*='border'] > h3 {
+  margin-block: 0 0.375rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--lm-heading);
+}
+
+.prose a[data-card][class*='border'] > p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* ── Table of contents ─────────────────────────────────────────────────── */
+
+#nd-toc a[data-active='true'] {
+  color: var(--color-fd-foreground);
+  font-weight: 500;
+}
+
+.dark #nd-toc a[data-active='true'] {
+  color: var(--color-fd-primary);
+}
+
+/* ── API reference ─────────────────────────────────────────────────────────
+   Same top bar as the docs (app/components/app-bar.tsx), with the services
+   as compact pills at the end of the tab row, and Scalar re-themed with the
+   site's tokens. Scalar declares its variables on .light-mode / .dark-mode
+   inside its own layers, so these unlayered overrides win. */
+
+.lm-api-services {
+  display: flex;
+  flex-shrink: 0;
+  align-self: center;
+  align-items: center;
+  gap: 0.25rem;
+  margin-inline-start: auto;
+  padding-inline-start: 1.5rem;
+}
+
+.lm-api-services a {
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--color-fd-muted-foreground);
+  transition: background-color 120ms, color 120ms;
+}
+
+.lm-api-services a:hover {
+  color: var(--color-fd-foreground);
+  background-color: rgb(11 11 11 / 0.04);
+}
+
+.lm-api-services a.is-active {
+  color: var(--color-fd-foreground);
+  background-color: #ececeb;
+}
+
+.dark .lm-api-services a:hover {
+  background-color: rgb(255 255 255 / 0.04);
+}
+
+.dark .lm-api-services a.is-active {
+  color: var(--color-fd-primary);
+  background-color: var(--lm-accent-soft);
+}
+
+.light-mode,
+.dark-mode {
+  --scalar-font: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --scalar-font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --scalar-radius: 0.375rem;
+  --scalar-radius-lg: 0.75rem;
+  --scalar-radius-xl: 0.75rem;
+  --scalar-sidebar-font-weight-active: 500;
+}
+
+.light-mode {
+  --scalar-background-1: #ffffff;
+  --scalar-background-2: #f7f7f6;
+  --scalar-background-3: #f1f1f0;
+  --scalar-background-accent: rgb(1 0 248 / 0.07);
+  --scalar-color-1: #171718;
+  --scalar-color-2: #55565a;
+  --scalar-color-3: #8a8b8f;
+  --scalar-color-accent: #0100f8;
+  --scalar-border-color: #e8e8e8;
+
+  --scalar-sidebar-background-1: #ffffff;
+  --scalar-sidebar-border-color: #e8e8e8;
+  --scalar-sidebar-color-1: #171718;
+  --scalar-sidebar-color-2: #3f3f3f;
+  --scalar-sidebar-color-active: #171718;
+  --scalar-sidebar-item-hover-background: rgb(11 11 11 / 0.04);
+  --scalar-sidebar-item-hover-color: #171718;
+  --scalar-sidebar-item-active-background: #ececeb;
+  --scalar-sidebar-search-background: rgb(11 11 11 / 0.04);
+  --scalar-sidebar-search-border-color: transparent;
+  --scalar-sidebar-search-color: #6b6b6b;
+}
+
+.dark-mode {
+  --scalar-background-1: #08090b;
+  --scalar-background-2: #0e0f12;
+  --scalar-background-3: #16171b;
+  --scalar-background-accent: rgb(143 151 255 / 0.1);
+  --scalar-color-1: #f3f3f4;
+  --scalar-color-2: #a9a9ad;
+  --scalar-color-3: #6f7076;
+  --scalar-color-accent: #8f97ff;
+  --scalar-border-color: #1e1f24;
+
+  --scalar-sidebar-background-1: #08090b;
+  --scalar-sidebar-border-color: #1e1f24;
+  --scalar-sidebar-color-1: #f3f3f4;
+  --scalar-sidebar-color-2: #9f9fa3;
+  --scalar-sidebar-color-active: #8f97ff;
+  --scalar-sidebar-item-hover-background: rgb(255 255 255 / 0.04);
+  --scalar-sidebar-item-hover-color: #f3f3f4;
+  --scalar-sidebar-item-active-background: rgb(143 151 255 / 0.1);
+  --scalar-sidebar-search-background: rgb(255 255 255 / 0.05);
+  --scalar-sidebar-search-border-color: transparent;
+  --scalar-sidebar-search-color: #9f9fa3;
 }
 
 /* ── PR preview diff ───────────────────────────────────────────────────────

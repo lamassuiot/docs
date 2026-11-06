@@ -40,7 +40,7 @@ In mTLS mode, the enrollment CA always validates the re-enrollment credential; c
 
 The server generates a software key, rebuilds the CSR with that key and performs initial enrollment. The flag must be enabled and the algorithm permitted by the profile. This operation's key does not become a hardware key because the CA is hosted in an HSM.
 
-The code supports RSA and ECDSA with 224, 256, 384 or 521 bits. An unrecognized ECDSA size can fall back to 256; explicitly select a compatible size and check the resulting key. Do not reuse an enrolled ID to test this operation without reviewing replacement.
+The code supports RSA and ECDSA, and the `bits` value of the DMS key setting means something different for each. For ECDSA it selects the curve: 224, 256, 384 or 521 map to P-224, P-256, P-384 and P-521, and an unrecognized size falls back to P-256, so explicitly select a compatible size and check the resulting key. For RSA it is used directly as the modulus size; the console offers 2048, 3072 and 4096 bits. Do not reuse an enrolled ID to test this operation without reviewing replacement.
 
 ### Response format
 

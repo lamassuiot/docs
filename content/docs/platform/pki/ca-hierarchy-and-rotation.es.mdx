@@ -65,7 +65,7 @@ Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiraci�
   <Step>
     ### Cambia la emisión
 
-    Actualiza la CA de enrolamiento y el perfil de los DMS. Mientras sigan renovando cohortes con certificados antiguos, añade la CA de enrolamiento anterior a las CAs de validación de re-enrolamiento (`reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`) de cada DMS: la nueva CA de enrolamiento se considera confiable automáticamente, pero la antigua era la CA de enrolamiento y no figura en ninguna otra lista, así que sin esa entrada sus certificados ya no podrán renovarse. La [guía DMS](/docs/platform/iot-fleets/enrollment/dms) documenta ese ajuste.
+    Actualiza la CA de enrolamiento y el perfil de los DMS. Mientras sigan renovando cohortes con certificados antiguos, añade la CA de enrolamiento anterior a las CAs de validación de re-enrolamiento (`reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`) de cada DMS: la nueva CA de enrolamiento se considera confiable automáticamente, pero la antigua era la CA de enrolamiento y no figura en ninguna lista de confianza de re-enrolamiento, así que sin esa entrada sus certificados ya no podrán renovarse. La [guía DMS](/docs/platform/iot-fleets/enrollment/dms) documenta ese ajuste.
   </Step>
 
   <Step>

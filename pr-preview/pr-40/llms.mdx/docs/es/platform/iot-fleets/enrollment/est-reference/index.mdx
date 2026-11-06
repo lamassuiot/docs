@@ -39,7 +39,7 @@ serverkeygen [#serverkeygen]
 
 El servidor genera una clave software, reconstruye la CSR con esa clave y ejecuta el enrolamiento inicial. El flag debe estar habilitado y el algoritmo permitido por el perfil. La clave de esta operación no pasa a ser una clave hardware por utilizar una CA alojada en HSM.
 
-El código admite RSA y ECDSA de 224, 256, 384 o 521 bits. Un tamaño ECDSA no reconocido puede producir fallback a 256; elige explícitamente un tamaño compatible y comprueba la clave resultante. No reutilices un ID enrolado para probar esta operación sin revisar sustitución.
+El código admite RSA y ECDSA<del className="lm-diff-del"> de 224, 256, 384 o 521 bits. Un tamaño ECDSA no reconocido puede producir</del><ins className="lm-diff-ins">, y el valor `bits` del ajuste de clave del DMS significa algo distinto en cada caso. En ECDSA selecciona la curva: 224, 256, 384 o 521 corresponden a P-224, P-256, P-384 y P-521, y un tamaño no reconocido produce</ins> fallback a <ins className="lm-diff-ins">P-</ins>256<del className="lm-diff-del">; </del><ins className="lm-diff-ins">, así que </ins>elige explícitamente un tamaño compatible y comprueba la clave resultante<ins className="lm-diff-ins">. En RSA se usa directamente como tamaño del módulo; la consola ofrece 2048, 3072 y 4096 bits</ins>. No reutilices un ID enrolado para probar esta operación sin revisar sustitución.
 
 Formato de respuesta [#formato-de-respuesta]
 

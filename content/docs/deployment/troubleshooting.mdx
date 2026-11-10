@@ -92,6 +92,10 @@ External authorization fails closed by default. If authz is unavailable, protect
 4. Check the check route is /v1/ext_authz/check.
 5. Do not switch to <code>failOpen: true</code> as a permanent workaround: it would allow traffic without authorization during the outage.
 
+## API 500 errors
+
+A 500 indicates an internal failure, such as an unavailable database. The `{"err": ...}` body currently includes the text of the internal error, which can contain schema, table and constraint names and, on connection failures, the database host and user (not the password). Find the cause in the service log using the request time, and review the body before forwarding it to third parties. Some request errors, such as a key size the engine does not support, are also returned as 500.
+
 ## A pod is not Ready
 
 Review <code>kubectl describe pod</code> first. Common causes are:

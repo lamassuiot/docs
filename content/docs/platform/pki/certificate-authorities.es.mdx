@@ -91,7 +91,7 @@ Este flujo resulta útil cuando la clave se creó previamente en un HSM, se impo
 
 ## Importa una CA externa
 
-Necesitas el certificado de CA en PEM, su cadena hasta una raíz conocida y, si vas a importarla, una clave privada exportable. Antes de cargar el material, verifica firma, fechas, `CA:TRUE`, usos de firma y correspondencia de la clave pública. El procedimiento de [verificación de claves](/docs/platform/pki/quickstarts/issue-certificate) también sirve para comparar la clave y el certificado de una CA.
+Necesitas el certificado de CA en PEM, su cadena hasta una raíz conocida y, si vas a importarla, una clave privada exportable. Antes de cargar el material, verifica firma, fechas, `CA:TRUE`, usos de firma (incluido `cRLSign`, sin el cual la CA no puede publicar su [CRL](/docs/platform/pki/crl)) y correspondencia de la clave pública. El procedimiento de [verificación de claves](/docs/platform/pki/quickstarts/issue-certificate) también sirve para comparar la clave y el certificado de una CA.
 
 <Steps>
   <Step>
@@ -173,4 +173,10 @@ Sigue [Emite tu primer certificado](/docs/platform/pki/quickstarts/issue-certifi
   </Step>
 </Steps>
 
+## Elimina una CA
+
 La eliminación permanente solo está disponible después de revocar. Elimina el registro únicamente cuando la política de retención y auditoría lo permita.
+
+El rol VA de la CA se conserva pero deja de ser editable (consulta [CRL](/docs/platform/pki/crl)), así que ajusta antes su validez, intervalo y firmante. La clave de la CA se libera, pero el KMS la conserva mientras otros certificados la referencien.
+
+Lamassu conserva el registro del certificado de una CA eliminada. Si después se importa otra CA con un certificado distinto pero el mismo número de serie, la importación termina bien y Lamassu sigue mostrando el estado, el tipo y el emisor del certificado antiguo. Usa certificados con números de serie distintos y comprueba el resultado tras importar. La importación solo se rechaza cuando el número de serie pertenece a una CA existente.

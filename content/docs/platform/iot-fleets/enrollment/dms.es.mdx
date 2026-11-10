@@ -148,7 +148,7 @@ No se añaden todos los ascendientes automáticamente. La [distribución de conf
 
 ## Opera el inventario de DMS
 
-**Edit** cambia nombre, ajustes y metadatos. La actualización del backend sustituye esos bloques completos; al usar la API, lee el DMS antes de enviar una edición para no perder campos.
+**Edit** cambia nombre, ajustes y metadatos. Al usar la API, lee el DMS antes de editarlo: `name` y `settings` se sustituyen por completo. `metadata` omitido o `null` conserva el almacenado, y un objeto lo sustituye por completo. Si el objeto no incluye la clave del conector de AWS IoT (`lamassu.io/iot/{connector_id}`), el conector ignora los eventos siguientes del DMS.
 
 **Go to DMS owned devices** limita el inventario al propietario. **Show/Edit Metadata** contiene datos operativos y de integraciones; consulta su guía antes de alterarlos. **EST (RFC-7030)** ayuda a localizar las URLs.
 

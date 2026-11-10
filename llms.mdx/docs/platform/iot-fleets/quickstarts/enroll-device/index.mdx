@@ -40,7 +40,7 @@ Create the `Acme EST Evaluation` DMS with this configuration:
 | ServerKeyGen                                          | Disabled; the operational key is generated in the client.                                              |
 | CA Distribution                                       | Include Enrollment CA enabled; Include Lamassu System CA disabled.                                     |
 
-Equal duration and window allow immediate renewal testing. These are evaluation values; size production settings according to connectivity and recovery times. Save, reread both authentication blocks and retain the DMS ID. If your console does not expose the independent block, configure and check the resource through the [DMS API](/docs/api-reference/dms-manager) and [DMS guide](/docs/platform/iot-fleets/enrollment/dms).
+Equal duration and window allow immediate renewal testing. These are evaluation values; size production settings according to connectivity and recovery times. Save, reread both authentication blocks and retain the DMS ID. The console exposes independent editors for the enrollment and re-enrollment authentication; the [DMS guide](/docs/platform/iot-fleets/enrollment/dms) describes their fields, and you can also check the resource through the [DMS API](/docs/api-reference/dms-manager).
 
 Prepare the client and check cacerts [#prepare-the-client-and-check-cacerts]
 

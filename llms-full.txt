@@ -280,7 +280,7 @@ Prepare the platform services that are deliberately outside the Lamassu chart:
 * a reachable RabbitMQ broker and credentials
 * an OIDC provider, normally Keycloak, with a realm/tenant and client for Lamassu
 * Envoy Gateway 1.8+ and a `GatewayClass`
-* cert-manager 1.14+; for trusted TLS, either a trusted issuer or a Kubernetes TLS Secret
+* cert-manager 1.14+ (only for the default `tls.type: certManager` mode); for trusted TLS, either a trusted issuer or a Kubernetes TLS Secret
 * a StorageClass and an [external traffic design](/docs/deployment/self-hosted/networking)
 
 The chart defaults to a `GatewayClass` named `eg`. Change `gateway.className` if your platform team uses another name.
@@ -327,7 +327,7 @@ kubectl apply -f gateway-class.yaml
 kubectl rollout status deployment/envoy-gateway -n envoy-gateway-system
 ```
 
-Install cert-manager separately before Lamassu. The current chart renders its self-signed issuer and CA certificate resources even when `tls.type: external` makes the Gateway use an existing TLS Secret. Selecting external TLS therefore does not remove the cert-manager prerequisite.
+Install cert-manager separately before Lamassu, but only for the default `tls.type: certManager` mode. In that mode the chart renders its self-signed Issuer and CA Certificate resources regardless of whether `tls.certManagerOptions.clusterIssuer` is set, so cert-manager stays a prerequisite. With `tls.type: external`, the chart renders no cert-manager resources and the Gateway terminates TLS with an existing Secret you provide instead.
 
 2. Create a values file [#2-create-a-values-file]
 
@@ -399,13 +399,13 @@ If Keycloak is external and already has its own reachable URL, point the OIDC se
 
 TLS with an existing Secret [#tls-with-an-existing-secret]
 
-Create a Secret containing `tls.crt` and `tls.key`, then reference it:
+Create a Secret containing `tls.crt` and `tls.key`, then reference it. The Secret must already exist before installing: in `external` mode the chart renders no cert-manager resources and never creates this Secret.
 
 ```yaml
 tls:
   type: external
   externalOptions:
-    secretName: lamassu-downstream-tls
+    secretName: provided-tls
 ```
 
 Provision the first administrator [#provision-the-first-administrator]
@@ -645,16 +645,16 @@ What the Lamassu chart provides [#what-the-lamassu-chart-provides]
 
 The Lamassu chart is an **application chart**, not a cluster bootstrap chart. It creates the Kubernetes resources that run and configure Lamassu, but it expects the platform services those resources depend on to exist.
 
-| Area                        | The Lamassu chart provides                                                                                                              | You provide                                                                                                                              |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Lamassu applications        | Deployments and StatefulSets for the UI and APIs, internal Services, ConfigMaps, a ServiceAccount, and optional HPAs and PDBs           | A working Kubernetes cluster, compute capacity and access to the container images                                                        |
-| PostgreSQL data             | A pre-install/pre-upgrade job that creates the required databases and schemas, runs migrations and applies the authorization bootstrap  | A reachable PostgreSQL server, credentials allowed to create databases and schemas, and backup/HA operations                             |
-| Messaging                   | RabbitMQ connection configuration for the Lamassu services                                                                              | A reachable RabbitMQ broker, credentials and its lifecycle                                                                               |
-| Identity                    | OIDC/JWT and external-authorization configuration, plus initial Lamassu authorization principals                                        | An OIDC provider, realm/tenant, client, users, groups and roles                                                                          |
-| External routing            | One `Gateway`, `HTTPRoute` resources, an `EnvoyProxy` configuration and Envoy security policies                                         | Gateway API and Envoy CRDs, the Envoy Gateway controller, a `GatewayClass`, a load-balancer implementation and the external network path |
-| TLS                         | cert-manager `Issuer` and CA `Certificate` resources; either a chart-managed downstream `Certificate` or a reference to your TLS Secret | cert-manager itself; for trusted TLS, a trusted issuer or a populated TLS Secret                                                         |
-| Persistent application data | PersistentVolumeClaims required by the default local KMS and VA storage                                                                 | A StorageClass, physical storage, backups and a shared/external backend when scaling requires one                                        |
-| Optional integrations       | Configuration hooks for observability, AWS connectors and PKCS#11/HSM connectivity                                                      | The observability backends, cloud credentials and production HSM or external key service                                                 |
+| Area                        | The Lamassu chart provides                                                                                                                                                                                       | You provide                                                                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Lamassu applications        | Deployments and StatefulSets for the UI and APIs, internal Services, ConfigMaps, a ServiceAccount, and optional HPAs and PDBs                                                                                    | A working Kubernetes cluster, compute capacity and access to the container images                                                        |
+| PostgreSQL data             | A pre-install/pre-upgrade job that creates the required databases and schemas, runs migrations and applies the authorization bootstrap                                                                           | A reachable PostgreSQL server, credentials allowed to create databases and schemas, and backup/HA operations                             |
+| Messaging                   | RabbitMQ connection configuration for the Lamassu services                                                                                                                                                       | A reachable RabbitMQ broker, credentials and its lifecycle                                                                               |
+| Identity                    | OIDC/JWT and external-authorization configuration, plus initial Lamassu authorization principals                                                                                                                 | An OIDC provider, realm/tenant, client, users, groups and roles                                                                          |
+| External routing            | One `Gateway`, `HTTPRoute` resources, an `EnvoyProxy` configuration and Envoy security policies                                                                                                                  | Gateway API and Envoy CRDs, the Envoy Gateway controller, a `GatewayClass`, a load-balancer implementation and the external network path |
+| TLS                         | In the default `tls.type: certManager` mode, cert-manager `Issuer` and CA `Certificate` resources and a chart-managed downstream `Certificate`; in the `tls.type: external` mode, a reference to your TLS Secret | cert-manager only for the default `tls.type: certManager` mode; for trusted TLS, a trusted issuer or a populated TLS Secret              |
+| Persistent application data | PersistentVolumeClaims required by the default local KMS and VA storage                                                                                                                                          | A StorageClass, physical storage, backups and a shared/external backend when scaling requires one                                        |
+| Optional integrations       | Configuration hooks for observability, AWS connectors and PKCS#11/HSM connectivity                                                                                                                               | The observability backends, cloud credentials and production HSM or external key service                                                 |
 
 <Callout type="warn" title="A Gateway resource is not a load balancer">
   The chart creates Lamassu's `Gateway` and routes. It does not install the Envoy Gateway controller or make the generated `LoadBalancer` Service reachable from your network.
@@ -691,7 +691,7 @@ Platform requirements [#platform-requirements]
 * Kubernetes 1.24 or newer
 * Helm 3.2 or newer
 * Envoy Gateway 1.8 or newer and a `GatewayClass`
-* cert-manager 1.14 or newer; the current chart renders cert-manager issuer and certificate resources
+* cert-manager 1.14 or newer; required only for the default `tls.type: certManager` TLS mode, not for `tls.type: external`
 * persistent storage suitable for the selected PostgreSQL, RabbitMQ, VA and KMS configuration
 * a load-balancer implementation or another deliberate path from clients to the Gateway
 

@@ -605,6 +605,12 @@ Decision guide [#decision-guide]
 4. If data planes and TLS termination must stay independent behind one IP, add a front-door SNI passthrough layer.
 5. If none of those are possible, use different external ports or change the external network design.
 
+Egress proxy [#egress-proxy]
+
+Internal Lamassu clients — the Vault engine connection, service-to-service calls and webhook deliveries — honor the `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` environment variables. The exception is the authorization-engine connector: it uses its own transport and does not consult these proxy variables. If your deployment routes egress through a proxy, list in-cluster service names in `NO_PROXY` (for example `.svc,.cluster.local`) so internal traffic stays inside the cluster. Loopback traffic is never sent through a proxy.
+
+The default transport of these clients bounds the dial timeout (30 seconds), the TLS handshake (10 seconds) and idle connection reuse (90 seconds) so an unreachable dependency fails fast instead of hanging; these values are Go transport defaults, not Lamassu settings. HTTP/2 is negotiated when the peer supports it. The authorization-engine connector keeps its own transport without these dial and handshake timeouts; only its overall 30-second request timeout bounds each call.
+
 Verify the traffic path [#verify-the-traffic-path]
 
 ```bash
@@ -817,6 +823,8 @@ Review <code>kubectl describe pod</code> first. Common causes are:
 Generic values request 100 mCPU and 128 MiB and limit to 500 mCPU and 512 MiB. Tune per service when you see OOMKills, throttling or slow startups.
 
 Filesystem-based KMS engines and VA local storage use exclusive-access volumes. Keep a single replica or migrate to shared backends before enabling autoscaling.
+
+Internal calls now fail fast instead of hanging for the clients covered by [Egress proxy](/docs/deployment/self-hosted/networking#egress-proxy): connection attempts time out after 30 seconds and TLS handshakes after 10 seconds. The authorization-engine connector keeps its own transport without these dial and handshake timeouts; only its overall 30-second request timeout bounds each call. If an egress proxy handles the cluster's outbound traffic, check the pod's `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` environment variables and list in-cluster service names in `NO_PROXY`.
 
 Events are not arriving [#events-are-not-arriving]
 
@@ -3954,6 +3962,8 @@ Generates software keys and stores private material in files. Custody depends on
 HashiCorp Vault [#hashicorp-vault]
 
 The adapter uses KV storage for private material. This is not signing within Vault Transit: someone able to read the secret can recover the key. Review read permissions, availability and recovery with the deployment owner.
+
+The adapter reaches Vault over its configured HTTP(S) endpoint. The Vault server certificate is verified against the system trust store; a Vault signed by a private CA is trusted by adding its CA certificate to the engine's `ca_cert_file` (PEM-encoded). `insecure_skip_verify=true` disables verification and is a last resort; agree the transport settings with the deployment owner.
 
 AWS Secrets Manager [#aws-secrets-manager]
 

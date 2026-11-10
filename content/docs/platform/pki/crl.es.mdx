@@ -32,6 +32,8 @@ Al reemitir una CA, el rol sigue apuntando al certificado anterior. Las CRL sigu
   El `PUT` valida siempre el firmante, aunque la petición no lo cambie. Si el firmante guardado ya no es válido, no se puede modificar ningún campo del rol, ni siquiera la validez, hasta asignar uno válido.
 </Callout>
 
+Las CA que comparten clave comparten un rol VA y una CRL.
+
 `latest_crl` contiene versión, inicio y fin de validez. Las versiones se conservan en el almacenamiento de objetos como PEM bajo `pki/va/crl/{subject_key_id}/{version}.crl`; el endpoint público entrega DER.
 
 ## CAs que comparten clave

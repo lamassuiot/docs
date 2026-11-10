@@ -93,6 +93,8 @@ This flow is useful when the key was previously created in an HSM, imported thro
 
 You need the CA certificate in PEM, its chain to a known root and, when importing it, an exportable private key. Before uploading material, verify signature, dates, `CA:TRUE`, signing usages (including `cRLSign`, without which the CA cannot publish its [CRL](/docs/platform/pki/crl)) and public-key correspondence. The [key verification procedure](/docs/platform/pki/quickstarts/issue-certificate) also compares a CA key and certificate.
 
+The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number collides with a different existing certificate, or which is an identical duplicate CA. A deleted CA's certificate record is kept and reused on re-import, including its previous status. Deleting a CA releases its key, which the KMS keeps while other certificates still reference it.
+
 <Steps>
   <Step>
     ### Select the engine

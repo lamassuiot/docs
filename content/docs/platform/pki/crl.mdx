@@ -32,6 +32,8 @@ When a CA is reissued, the role keeps pointing at the previous certificate. CRLs
   `PUT` always validates the signer, even when the request does not change it. If the stored signer is no longer valid, no field of the role can be modified, not even the validity, until a valid one is set.
 </Callout>
 
+CAs that share a key share one VA role and one CRL.
+
 `latest_crl` contains version, validity start and end. Versions are kept as PEM in object storage at `pki/va/crl/{subject_key_id}/{version}.crl`; the public endpoint returns DER.
 
 ## CAs that share a key

@@ -41,7 +41,7 @@ Crea el DMS `Acme EST Evaluation` con esta configuración:
 | ServerKeyGen | Deshabilitado; la clave operativa se genera en el cliente. |
 | CA Distribution | Include Enrollment CA habilitado; Include Lamassu System CA deshabilitado. |
 
-La duración y ventana iguales permiten probar renovación inmediatamente. Son valores de evaluación; dimensiona producción según conectividad y tiempos de recuperación. Guarda, vuelve a leer los dos bloques de autenticación y conserva el ID del DMS. Si tu consola no expone el bloque independiente, configura y comprueba el recurso mediante la [API DMS](/docs/api-reference/dms-manager) y la [guía DMS](/docs/platform/iot-fleets/enrollment/dms).
+La duración y ventana iguales permiten probar renovación inmediatamente. Son valores de evaluación; dimensiona producción según conectividad y tiempos de recuperación. Guarda, vuelve a leer los dos bloques de autenticación y conserva el ID del DMS. La consola expone editores independientes para la autenticación de enrolamiento y de reenrolamiento; la [guía DMS](/docs/platform/iot-fleets/enrollment/dms) describe sus campos, y también puedes comprobar el recurso mediante la [API DMS](/docs/api-reference/dms-manager).
 
 ## Prepara el cliente y comprueba cacerts
 

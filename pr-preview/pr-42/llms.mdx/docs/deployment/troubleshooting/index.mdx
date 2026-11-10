@@ -96,7 +96,7 @@ External authorization fails closed by default. If authz is unavailable, protect
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  A 500 indicates an internal failure, such as an unavailable database. The `{"err": ...}` body currently includes the text of the internal error, which can contain schema, table and constraint names and, on connection failures, the database host and user (not the password). Find the cause in the service log using the request time, and review the body before forwarding it to third parties. Some request errors, such as a key size the engine does not support, are also returned as 500.
+  A 500 indicates an internal failure, such as an unavailable database. The `{"err": ...}` body currently includes the text of the internal error, which can contain schema, table and constraint names and, on connection failures, the database host and user (not the password). Find the cause in the service log using the request time, and review the body before forwarding it to third parties. The authorization connector also returns the internal error, in the `details.error` field. Some request errors, such as a key size the engine does not support, are also returned as 500.
 </div>
 
 A pod is not Ready [#a-pod-is-not-ready]
@@ -114,6 +114,8 @@ Review <code>kubectl describe pod</code> first. Common causes are:
 Generic values request 100 mCPU and 128 MiB and limit to 500 mCPU and 512 MiB. Tune per service when you see OOMKills, throttling or slow startups.
 
 Filesystem-based KMS engines and VA local storage use exclusive-access volumes. Keep a single replica or migrate to shared backends before enabling autoscaling.
+
+Internal calls now fail fast instead of hanging for the clients covered by [Egress proxy](/docs/deployment/self-hosted/networking#egress-proxy): connection attempts time out after 30 seconds and TLS handshakes after 10 seconds. The authorization-engine connector keeps its own transport without these dial and handshake timeouts; only its overall 30-second request timeout bounds each call. If an egress proxy handles the cluster's outbound traffic, check the pod's `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` environment variables and list in-cluster service names in `NO_PROXY`.
 
 Events are not arriving [#events-are-not-arriving]
 

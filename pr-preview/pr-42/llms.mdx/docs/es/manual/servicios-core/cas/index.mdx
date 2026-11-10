@@ -184,5 +184,5 @@ La eliminación permanente solo está disponible después de revocar. Elimina el
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Lamassu conserva el registro del certificado de una CA eliminada. Si después se importa otra CA con un certificado distinto pero el mismo número de serie, la importación termina bien y Lamassu sigue mostrando el estado, el tipo y el emisor del certificado antiguo. Usa certificados con números de serie distintos y comprueba el resultado tras importar. La importación solo se rechaza cuando el número de serie pertenece a una CA existente.
+  Lamassu conserva el registro del certificado de una CA eliminada. Si se importa de nuevo ese mismo certificado, la importación termina bien y reutiliza el registro: actualiza el tipo, el emisor y la clave, pero conserva el estado. Como una CA solo puede eliminarse revocada o caducada, vuelve a aparecer en ese estado. Un certificado distinto con el mismo número de serie se rechaza con error 400, y un certificado que ya pertenece a una CA existente, con error 409. Para reutilizar el material sin heredar el estado anterior, usa un certificado con otro número de serie y comprueba el resultado tras importar.
 </div>

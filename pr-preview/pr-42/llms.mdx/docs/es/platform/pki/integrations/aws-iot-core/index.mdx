@@ -330,7 +330,7 @@ Solución de problemas [#solución-de-problemas]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  **Causa:** La edición dispara un nuevo intento de crear la plantilla JITP, que ya existe en AWS. El intento falla y se omiten los pasos posteriores del conector.
+  **Causa:** La edición dispara un nuevo intento de crear la plantilla JITP, que ya existe en AWS. El intento falla y se omiten los pasos posteriores del conector. Según el código del conector, el mismo fallo puede aparecer sin editar el DMS: tras crear la plantilla, el conector escribe el ARN en el DMS, lo que genera un evento de actualización que repite la creación. Sería una entrada en `lamassu-dlq` sin efecto funcional, porque el alta ya se completó. Este caso no se ha confirmado contra AWS.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

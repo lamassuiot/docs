@@ -10,13 +10,13 @@ VA role and per-CA configuration [#va-role-and-per-ca-configuration]
 
 The VA role stores configuration and metadata for the latest list published for a CA’s SKI. Generation requires a usable issuer key; do not assume an imported CA without a key has an available CRL.
 
-| `crl_options` field                | Purpose                                                                           | Backend initial value                          |
-| ---------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `validity`                         | Time from `thisUpdate` to `nextUpdate`.                                           | 7 days.                                        |
-| `refresh_interval`                 | Time since publication that triggers scheduled renewal.                           | 6 days and 23 hours.                           |
-| `regenerate_on_revoke`             | Request regeneration on revocation or reactivation from `CertificateHold` events. | `true`.                                        |
-| `subject_key_id_signer`            | Configuration field initialized with the CA’s SKI.                                | CA SKI.                                        |
-| `signer_certificate_serial_number` | Serial number of the existing certificate that signs the CRL.                     | Serial number of the CA’s current certificate. |
+| `crl_options` field                | Purpose                                                                                                                                                                                                                                                                                                                                                                                  | Backend initial value                          |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `validity`                         | Time from `thisUpdate` to `nextUpdate`.                                                                                                                                                                                                                                                                                                                                                  | 7 days.                                        |
+| `refresh_interval`                 | <del className="lm-diff-del">Time since publication that triggers scheduled renewal</del><ins className="lm-diff-ins">Stored and returned by the API, but the VA does not use it: scheduled renewal does not depend on it (see </ins>[<ins className="lm-diff-ins">Periodic and automatic regeneration</ins>](#periodic-and-automatic-regeneration)<ins className="lm-diff-ins">)</ins>. | 6 days and 23 hours.                           |
+| `regenerate_on_revoke`             | Request regeneration on revocation or reactivation from `CertificateHold` events.                                                                                                                                                                                                                                                                                                        | `true`.                                        |
+| `subject_key_id_signer`            | Configuration field initialized with the CA’s SKI.                                                                                                                                                                                                                                                                                                                                       | CA SKI.                                        |
+| `signer_certificate_serial_number` | Serial number of the existing certificate that signs the CRL.                                                                                                                                                                                                                                                                                                                            | Serial number of the CA’s current certificate. |
 
 The <del className="lm-diff-del">generator uses the key of the CA identified by the requested SKI. Do not interpret `subject_key_id_signer` as verified support for a different delegated CA: changing that field does not change the signer in this flow</del><ins className="lm-diff-ins">signer must be an existing certificate with the `cRLSign` key usage and the same subject and public key as the CA. Certificates from before a reissue qualify. A delegated signer is not supported: a certificate with the CA’s subject but a different key is rejected</ins>.
 
@@ -26,9 +26,11 @@ The <del className="lm-diff-del">generator uses the key of the CA identified by 
 
 <div className="lm-diff-ins lm-diff-block">
   <Callout type="warn" title="Cases in which the role can no longer be edited">
-    When a CA is deleted, its VA role is kept and cannot be removed through the API: it can be read but not updated (the API returns 404). Adjust validity, interval and signer before deleting it.
+    When a CA is deleted, its VA role is kept and cannot be removed through the API: it can be read, but any `PUT` returns 404, and the renewal job logs a warning on every cycle because it no longer finds the CA. The API offers no way out; it can only be fixed by editing the database. Adjust validity, interval and signer before deleting it.
 
-    A CA whose certificate lacks `cRLSign` cannot generate its CRL or edit its role (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it.
+    A CA whose certificate lacks `cRLSign` cannot generate its CRL or edit its role (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and set it as the signer with `PUT`. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages.
+
+    `PUT` always validates the signer, even when the request does not change it. If the stored signer is no longer valid, no field of the role can be modified, not even the validity, until a valid one is set.
   </Callout>
 </div>
 
@@ -56,9 +58,13 @@ The <del className="lm-diff-del">generator uses the key of the CA identified by 
 
 Periodic and automatic regeneration [#periodic-and-automatic-regeneration]
 
-The scheduled job requests another list when `refresh_interval` is reached or when the list approaches expiration within the configured watch period. This depends on working jobs, storage and signing; it does not guarantee renewal during a service failure.
+<div className="lm-diff-ins lm-diff-block">
+  The VA scheduled job checks every role on each run and requests another list when the remaining validity of `latest_crl` is less than the interval between runs. The frequency is set in Helm with `services.va.job.crl.frequency` (default `0 * * * *`) and accepts a duration (`1h`) or a cron expression. A cron expression is converted into a constant interval equal to the time left until its next firing when the service starts, so it is not aligned with the clock. `refresh_interval` plays no part. Keep `validity` well above the interval: with a shorter validity, the list is regenerated on every cycle.
+</div>
 
-With `regenerate_on_revoke`, the event handler requests a new CRL upon revocation or reactivation from `CertificateHold` to `ACTIVE`. This happens after the status change and has its own failure paths. Confirming revocation does not establish that the new CRL is already published or that all clients have downloaded it.
+<del className="lm-diff-del">The scheduled job requests another list when `refresh_interval` is reached or when the list approaches expiration within the configured watch period. This depends on working jobs, storage and signing; it does not guarantee renewal during a service failure</del><ins className="lm-diff-ins">If generation fails (for example, because of a role without a CA or an invalid signer), the job logs the warning `something went wrong while calculating CRL for CA <ski>` and retries on the next cycle. There is no other renewal path until the cause is fixed, and the last published list keeps being served until it expires. All of this depends on working jobs, storage and signing</ins>.
+
+With `regenerate_on_revoke`, the event handler requests a new CRL upon revocation or reactivation from `CertificateHold` to `ACTIVE`. This happens after the status change and has its own failure paths<ins className="lm-diff-ins">: if it fails (missing role, invalid signer), the event is retried and, once retries are exhausted, moves to the failed-events queue</ins>. Confirming revocation does not establish that the new CRL is already published or that all clients have downloaded it.
 
 Compare CRL numbers and timestamps before and after a change. Monitor expired lists and generation failures; clients must apply policy when current evidence is unavailable.
 
@@ -117,6 +123,20 @@ The following paths are relative to the VA service; confirm the public prefix in
 You need authentication and role read or update permissions. Consult your installation’s [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract: the backend replaces `crl_options`; it does not merge omitted fields.
 
 After a change, check saved configuration and the next list actually published. Updating the role alone does not establish regeneration or client acceptance.
+
+<div className="lm-diff-ins lm-diff-block">
+  Common VA role errors [#common-va-role-errors]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Symptom                                                     | Cause                                                                                                                                             | Action                                                                                                             |
+  | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+  | `PUT /v1/roles/{ca-ski}` returns 404 and `GET` returns 200. | The role’s CA was deleted.                                                                                                                        | There is no API way out; it requires database intervention. Avoid it by adjusting the role before deleting the CA. |
+  | `PUT` returns 400.                                          | The signer lacks `cRLSign`, or its subject and key match no CA with that SKI (for example, after deleting the first of two CAs that share a key). | Use `PUT` to set the serial number of a valid certificate of the remaining CA.                                     |
+  | `PUT` returns 400 from a 3.x client.                        | `crl_options.subject_key_id_signer` was replaced by `signer_certificate_serial_number`, which is required.                                        | Update the client to send the new field.                                                                           |
+  | The CRL does not change after revoking a certificate.       | `regenerate_on_revoke` is `false`, or the event failed because of a missing role or an invalid signer.                                            | Check the VA logs and the failed-events queue; fix the signer.                                                     |
+  | A verifier rejects the CRL because of the issuer.           | Several CAs share an SKI.                                                                                                                         | See [CAs that share a key](#cas-that-share-a-key).                                                                 |
+</div>
 
 From the interface [#from-the-interface]
 

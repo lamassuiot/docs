@@ -96,7 +96,7 @@ La autorización externa falla cerrada por defecto. Si authz no está disponible
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Un 500 indica un fallo interno, como una base de datos no disponible. El cuerpo `{"err": ...}` incluye hoy el texto del error interno, que puede contener nombres de esquema, tabla y restricción y, en fallos de conexión, el host y el usuario de la base de datos (no la contraseña). Localiza la causa en el log del servicio con la hora de la petición, y revisa el cuerpo antes de reenviarlo a terceros. Algunos errores de petición, como un tamaño de clave que el motor no admite, se devuelven también como 500.
+  Un 500 indica un fallo interno, como una base de datos no disponible. El cuerpo `{"err": ...}` incluye hoy el texto del error interno, que puede contener nombres de esquema, tabla y restricción y, en fallos de conexión, el host y el usuario de la base de datos (no la contraseña). Localiza la causa en el log del servicio con la hora de la petición, y revisa el cuerpo antes de reenviarlo a terceros. El conector de autorización también devuelve el error interno, en el campo `details.error`. Algunos errores de petición, como un tamaño de clave que el motor no admite, se devuelven también como 500.
 </div>
 
 Un pod no está Ready [#un-pod-no-está-ready]
@@ -114,6 +114,8 @@ Revisa primero <code>kubectl describe pod</code>. Las causas habituales son:
 Los valores genéricos solicitan 100 mCPU y 128 MiB y limitan a 500 mCPU y 512 MiB. Ajusta por servicio cuando haya OOMKills, throttling o arranques lentos.
 
 Los motores KMS basados en filesystem y el almacenamiento local de VA utilizan volúmenes de acceso exclusivo. Mantén una réplica o migra a backends compartidos antes de habilitar autoscaling.
+
+Las llamadas internas ahora fallan rápido en lugar de bloquearse para los clientes cubiertos por [Proxy de salida](/docs/deployment/self-hosted/networking#proxy-de-salida): los intentos de conexión agotan el tiempo tras 30 segundos y los handshakes TLS tras 10 segundos. El conector del motor de autorización mantiene su propio transporte sin estos timeouts de conexión ni de handshake TLS; solo su timeout global de petición de 30 segundos acota cada llamada. Si un proxy de salida gestiona el tráfico de salida del clúster, comprueba las variables de entorno `HTTP_PROXY`, `HTTPS_PROXY` y `NO_PROXY` del pod e incluye los nombres de servicio internos en `NO_PROXY`.
 
 Los eventos no llegan [#los-eventos-no-llegan]
 

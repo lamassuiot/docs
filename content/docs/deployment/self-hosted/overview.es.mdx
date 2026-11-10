@@ -25,7 +25,7 @@ El chart de Lamassu es un **chart de aplicación**, no un chart de bootstrap del
 | Mensajería | Configuración de conexión a RabbitMQ para los servicios Lamassu | Un broker RabbitMQ accesible, credenciales y la gestión de su ciclo de vida |
 | Identidad | Configuración OIDC/JWT y de autorización externa, además de los principales iniciales de Lamassu | Un proveedor OIDC, realm/tenant, cliente, usuarios, grupos y roles |
 | Enrutamiento externo | Un `Gateway`, recursos `HTTPRoute`, una configuración `EnvoyProxy` y políticas de seguridad de Envoy | Las CRD de Gateway API y Envoy, el controlador Envoy Gateway, una `GatewayClass`, un balanceador y la ruta de red externa |
-| TLS | Recursos `Issuer` y `Certificate` CA de cert-manager; un `Certificate` downstream gestionado por el chart o una referencia a tu Secret TLS | cert-manager; para TLS de confianza, un emisor de confianza o un Secret TLS ya poblado |
+| TLS | En el modo predeterminado `tls.type: certManager`, recursos `Issuer` y `Certificate` CA de cert-manager y un `Certificate` downstream gestionado por el chart; en el modo `tls.type: external`, una referencia a tu Secret TLS | cert-manager solo para el modo predeterminado `tls.type: certManager`; para TLS de confianza, un emisor de confianza o un Secret TLS ya poblado |
 | Datos persistentes de la aplicación | PersistentVolumeClaims necesarios para el almacenamiento local predeterminado de KMS y VA | Una StorageClass, almacenamiento físico, backups y un backend compartido/externo cuando el escalado lo requiera |
 | Integraciones opcionales | Puntos de configuración para observabilidad, conectores AWS y conectividad PKCS#11/HSM | Los backends de observabilidad, credenciales cloud y un HSM de producción o servicio externo de claves |
 
@@ -64,7 +64,7 @@ El valor `gateway.addresses` solo solicita una dirección al controlador del Gat
 - Kubernetes 1.24 o posterior
 - Helm 3.2 o posterior
 - Envoy Gateway 1.8 o posterior y una `GatewayClass`
-- cert-manager 1.14 o posterior; el chart actual renderiza recursos issuer y certificate de cert-manager
+- cert-manager 1.14 o posterior; necesario solo para el modo TLS predeterminado `tls.type: certManager`, no para `tls.type: external`
 - almacenamiento persistente adecuado para la configuración elegida de PostgreSQL, RabbitMQ, VA y KMS
 - una implementación de balanceador o alguna otra ruta deliberada desde los clientes hasta el Gateway
 

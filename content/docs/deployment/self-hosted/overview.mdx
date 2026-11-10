@@ -25,7 +25,7 @@ The Lamassu chart is an **application chart**, not a cluster bootstrap chart. It
 | Messaging | RabbitMQ connection configuration for the Lamassu services | A reachable RabbitMQ broker, credentials and its lifecycle |
 | Identity | OIDC/JWT and external-authorization configuration, plus initial Lamassu authorization principals | An OIDC provider, realm/tenant, client, users, groups and roles |
 | External routing | One `Gateway`, `HTTPRoute` resources, an `EnvoyProxy` configuration and Envoy security policies | Gateway API and Envoy CRDs, the Envoy Gateway controller, a `GatewayClass`, a load-balancer implementation and the external network path |
-| TLS | cert-manager `Issuer` and CA `Certificate` resources; either a chart-managed downstream `Certificate` or a reference to your TLS Secret | cert-manager itself; for trusted TLS, a trusted issuer or a populated TLS Secret |
+| TLS | In the default `tls.type: certManager` mode, cert-manager `Issuer` and CA `Certificate` resources and a chart-managed downstream `Certificate`; in the `tls.type: external` mode, a reference to your TLS Secret | cert-manager only for the default `tls.type: certManager` mode; for trusted TLS, a trusted issuer or a populated TLS Secret |
 | Persistent application data | PersistentVolumeClaims required by the default local KMS and VA storage | A StorageClass, physical storage, backups and a shared/external backend when scaling requires one |
 | Optional integrations | Configuration hooks for observability, AWS connectors and PKCS#11/HSM connectivity | The observability backends, cloud credentials and production HSM or external key service |
 
@@ -64,7 +64,7 @@ The `gateway.addresses` value is only an address request to the Gateway controll
 - Kubernetes 1.24 or newer
 - Helm 3.2 or newer
 - Envoy Gateway 1.8 or newer and a `GatewayClass`
-- cert-manager 1.14 or newer; the current chart renders cert-manager issuer and certificate resources
+- cert-manager 1.14 or newer; required only for the default `tls.type: certManager` TLS mode, not for `tls.type: external`
 - persistent storage suitable for the selected PostgreSQL, RabbitMQ, VA and KMS configuration
 - a load-balancer implementation or another deliberate path from clients to the Gateway
 

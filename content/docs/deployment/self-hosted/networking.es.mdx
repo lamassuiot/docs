@@ -132,6 +132,12 @@ Esto requiere hostnames SNI distintos y configuración de red externa al chart d
 4. Si los data planes y la terminación TLS deben ser independientes detrás de una IP, añade un front door con TLS passthrough y SNI.
 5. Si nada de lo anterior es posible, usa puertos externos distintos o cambia el diseño de red.
 
+## Proxy de salida
+
+Los clientes internos de Lamassu — la conexión con el motor de Vault, las llamadas entre servicios y los webhooks salientes — respetan las variables de entorno `HTTP_PROXY`, `HTTPS_PROXY` y `NO_PROXY`. La excepción es el conector del motor de autorización: usa su propio transporte y no consulta estas variables de proxy. Si tu despliegue enruta el tráfico de salida por un proxy, incluye los nombres de servicio internos del clúster en `NO_PROXY` (por ejemplo `.svc,.cluster.local`) para que el tráfico interno permanezca dentro del clúster. El tráfico de loopback nunca se envía por un proxy.
+
+El transporte predeterminado de estos clientes acota el timeout de conexión (30 segundos), el handshake TLS (10 segundos) y la reutilización de conexiones inactivas (90 segundos), de modo que una dependencia inalcanzable falla rápido en lugar de bloquearse; estos valores son los predeterminados del transporte de Go, no configuración de Lamassu. HTTP/2 se negocia cuando el otro extremo lo soporta. El conector del motor de autorización mantiene su propio transporte sin estos timeouts de conexión ni de handshake TLS; solo su timeout global de petición de 30 segundos acota cada llamada.
+
 ## Verifica la ruta de tráfico
 
 ```bash

@@ -34,6 +34,8 @@ Genera claves software y almacena el material privado en archivos. Su custodia d
 
 El adaptador utiliza almacenamiento KV para el material privado. No equivale a una operación de firma dentro de Vault Transit: quien pueda leer el secreto puede recuperar la clave. Revisa los permisos de lectura, disponibilidad y recuperación con el responsable de Despliegue.
 
+El adaptador se comunica con Vault a través de su endpoint HTTP(S) configurado. El certificado del servidor de Vault se verifica contra el almacén de confianza del sistema; para confiar en un Vault con certificado emitido por una CA privada, añade ese certificado de CA al `ca_cert_file` del motor (codificado en PEM). `insecure_skip_verify=true` desactiva la verificación y es un último recurso; acuerda los ajustes de transporte con el responsable de Despliegue.
+
 ### AWS Secrets Manager
 
 Ofrece persistencia cifrada en AWS con coste asociado. Protege la clave en reposo, pero un administrador autorizado puede recuperarla; no proporciona la misma resistencia a la extracción que un KMS o HSM.

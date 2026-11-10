@@ -88,7 +88,7 @@ This flow is useful when the key was previously created in an HSM, imported thro
 
 Import an external CA [#import-an-external-ca]
 
-You need the CA certificate in PEM, its chain to a known root and, when importing it, an exportable private key. Before uploading material, verify signature, dates, `CA:TRUE`, signing usages and public-key correspondence. The [key verification procedure](/docs/platform/pki/quickstarts/issue-certificate) also compares a CA key and certificate.
+You need the CA certificate in PEM, its chain to a known root and, when importing it, an exportable private key. Before uploading material, verify signature, dates, `CA:TRUE`, signing usages <ins className="lm-diff-ins">(including `cRLSign`, without which the CA cannot publish its </ins>[<ins className="lm-diff-ins">CRL</ins>](/docs/platform/pki/crl)<ins className="lm-diff-ins">) </ins>and public-key correspondence. The [key verification procedure](/docs/platform/pki/quickstarts/issue-certificate) also compares a CA key and certificate.
 
 <Steps>
   <Step>
@@ -173,4 +173,16 @@ Revoke a CA [#revoke-a-ca]
   </Step>
 </Steps>
 
+<div className="lm-diff-ins lm-diff-block">
+  Delete a CA [#delete-a-ca]
+</div>
+
 Permanent deletion is only available after revoking. Delete the record only when your retention and audit policy allows it.
+
+<div className="lm-diff-ins lm-diff-block">
+  The CA’s VA role is kept but can no longer be edited (see [CRL](/docs/platform/pki/crl)), so adjust its validity, interval and signer beforehand. The CA’s key is released, but the KMS keeps it while other certificates still reference it.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Lamassu keeps the certificate record of a deleted CA. If another CA with a different certificate but the same serial number is imported later, the import succeeds and Lamassu keeps showing the status, type and issuer of the old certificate. Use certificates with distinct serial numbers and check the result after importing. The import is only rejected when the serial number belongs to an existing CA.
+</div>

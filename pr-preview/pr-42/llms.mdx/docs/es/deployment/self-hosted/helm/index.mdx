@@ -15,7 +15,7 @@ Prepara los servicios de plataforma que quedan deliberadamente fuera del chart d
 * un broker RabbitMQ accesible y sus credenciales
 * un proveedor OIDC, normalmente Keycloak, con un realm/tenant y un cliente para Lamassu
 * Envoy Gateway 1.8+ y una `GatewayClass`
-* cert-manager 1.14+; para TLS de confianza, un emisor de confianza o un Secret TLS de Kubernetes
+* cert-manager 1.14+ (solo para el modo predeterminado `tls.type: certManager`); para TLS de confianza, un emisor de confianza o un Secret TLS de Kubernetes
 * una StorageClass y un [diseño de tráfico externo](/docs/deployment/self-hosted/networking)
 
 El chart usa por defecto una `GatewayClass` llamada `eg`. Cambia `gateway.className` si tu equipo de plataforma utiliza otro nombre.
@@ -62,139 +62,71 @@ kubectl apply -f gateway-class.yaml
 kubectl rollout status deployment/envoy-gateway -n envoy-gateway-system
 ```
 
-Instala cert-manager por separado antes de Lamassu. El chart actual renderiza sus recursos de issuer self-signed y certificado CA incluso cuando `tls.type: external` hace que el Gateway use un Secret TLS existente. Seleccionar TLS externo no elimina por tanto el requisito de cert-manager.
+Instala cert-manager por separado antes de Lamassu, pero solo para el modo predeterminado `tls.type: certManager`. En ese modo el chart renderiza sus recursos de Issuer self-signed y Certificate CA tanto si `tls.certManagerOptions.clusterIssuer` está definido como si no, por lo que cert-manager sigue siendo un requisito. Con `tls.type: external`, el chart no renderiza recursos de cert-manager y el Gateway termina el TLS con un Secret existente que tú proporcionas.
 
 2. Crea un archivo de valores [#2-crea-un-archivo-de-valores]
 
 Parte de los valores predeterminados del chart y sobrescribe los específicos del entorno. Este ejemplo supone que PostgreSQL, RabbitMQ y Keycloak son accesibles mediante DNS de Kubernetes y expone Keycloak en `/auth` a través del Gateway compartido:
 
-<div className="lm-diff-final">
-  ```yaml
-  postgres:
-    hostname: postgresql
-    port: 5432
-    username: lamassu
-    password: change-me
+```yaml
+postgres:
+  hostname: postgresql
+  port: 5432
+  username: lamassu
+  password: change-me
 
-  amqp:
-    hostname: rabbitmq
-    port: 5672
-    username: lamassu
-    password: change-me
-    tls: false
+amqp:
+  hostname: rabbitmq
+  port: 5672
+  username: lamassu
+  password: change-me
+  tls: false
 
-  tls:
-    type: certManager
-    certManagerOptions:
-      clusterIssuer: production-issuer
-      certSpec:
-        commonName: pki.example.com
-        hostnames:
-          - pki.example.com
-
-  gateway:
-    className: eg
-    ports:
-      http: 80
-      https: 443
-    extraRouting:
-      - name: auth
-        path: /auth
-        target:
-          host: auth-keycloak
-          port: 80
-
-  auth:
-    oidc:
-      frontend:
-        clientId: frontend
-        authority: https://pki.example.com/auth/realms/lamassu
-
-  services:
-    ca:
-      domains:
+tls:
+  type: certManager
+  certManagerOptions:
+    clusterIssuer: production-issuer
+    certSpec:
+      commonName: pki.example.com
+      hostnames:
         - pki.example.com
-    authz:
-      jwkUrl: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
-      bootstrap:
-        - principal_id: "oidc:pki-admin"
-          principal_name: "PKI Admin"
-          principal_type: "oidc"
-          policy_ids:
-            - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
-          auth_config:
-            claims:
-              - claim: realm_access.roles
-                operator: contains
-                value: pki-admin
-  ```
-</div>
 
-<div className="lm-diff-merged">
-  ```yaml lmdiff="=======================================----=================="
-  postgres:
-    hostname: postgresql
-    port: 5432
-    username: lamassu
-    password: change-me
+gateway:
+  className: eg
+  ports:
+    http: 80
+    https: 443
+  extraRouting:
+    - name: auth
+      path: /auth
+      target:
+        host: auth-keycloak
+        port: 80
 
-  amqp:
-    hostname: rabbitmq
-    port: 5672
-    username: lamassu
-    password: change-me
-    tls: false
+auth:
+  oidc:
+    frontend:
+      clientId: frontend
+      authority: https://pki.example.com/auth/realms/lamassu
 
-  tls:
-    type: certManager
-    certManagerOptions:
-      clusterIssuer: production-issuer
-      certSpec:
-        commonName: pki.example.com
-        hostnames:
-          - pki.example.com
-
-  gateway:
-    className: eg
-    ports:
-      http: 80
-      https: 443
-    extraRouting:
-      - name: auth
-        path: /auth
-        target:
-          host: auth-keycloak
-          port: 80
-
-  auth:
-    oidc:
-      frontend:
-        clientId: frontend
-        authority: https://pki.example.com/auth/realms/lamassu
-      apiGateway:
-        jwks:
-          - name: oidc-authn
-            uri: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
-
-  services:
-    ca:
-      domains:
-        - pki.example.com
-    authz:
-      jwkUrl: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
-      bootstrap:
-        - principal_id: "oidc:pki-admin"
-          principal_name: "PKI Admin"
-          principal_type: "oidc"
-          policy_ids:
-            - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
-          auth_config:
-            claims:
-              - claim: realm_access.roles
-                operator: contains
-                value: pki-admin
-  ```
-</div>
+services:
+  ca:
+    domains:
+      - pki.example.com
+  authz:
+    jwkUrl: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
+    bootstrap:
+      - principal_id: "oidc:pki-admin"
+        principal_name: "PKI Admin"
+        principal_type: "oidc"
+        policy_ids:
+          - "lamassu.a6811b60-5f89-4ce7-badb-78ea234794d3"
+        auth_config:
+          claims:
+            - claim: realm_access.roles
+              operator: contains
+              value: pki-admin
+```
 
 No añadas `gateway.addresses` por defecto. Deja la asignación de dirección a la implementación del balanceador salvo que tu diseño de red requiera una VIP concreta en Kubernetes. La IP pública de un NAT o proxy upstream no corresponde a este valor.
 
@@ -206,13 +138,13 @@ Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OI
 
 TLS con un Secret existente [#tls-con-un-secret-existente]
 
-Crea un Secret con `tls.crt` y `tls.key` y referéncialo:
+Crea un Secret con `tls.crt` y `tls.key` y referéncialo. El Secret debe existir antes de instalar: en modo `external` el chart no renderiza recursos de cert-manager ni crea nunca este Secret.
 
 ```yaml
 tls:
   type: external
   externalOptions:
-    secretName: lamassu-downstream-tls
+    secretName: provided-tls
 ```
 
 <div className="lm-diff-ins lm-diff-block">
@@ -320,6 +252,6 @@ Antes de pasar a producción, revisa:
 * un emisor TLS de confianza o un certificado gestionado externamente
 * recursos, réplicas, autoscaling, disruption budgets y placement
 * SMTP, observabilidad y entrega de alertas
-* las notas de migración de `charts/lamassu/CHANGELOG/` antes de cada upgrade
+* las [guías de actualización entre versiones](/docs/upgrades/3-8-0-to-4-0-0) y las notas de `charts/lamassu/CHANGELOG/` antes de cada upgrade
 
 La referencia completa de valores se mantiene en `charts/lamassu/VALUES.md` dentro del repositorio Helm.

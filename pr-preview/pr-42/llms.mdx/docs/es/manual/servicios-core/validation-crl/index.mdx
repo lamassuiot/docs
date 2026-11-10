@@ -10,16 +10,48 @@ Rol VA y configuración por CA [#rol-va-y-configuración-por-ca]
 
 El rol VA guarda la configuración y los metadatos de la última lista publicada para el SKI de una CA. La generación requiere una clave emisora utilizable; no presupongas que una CA importada sin clave tiene una CRL disponible.
 
-| Campo de `crl_options`  | Función                                                                                  | Valor inicial del backend |
-| ----------------------- | ---------------------------------------------------------------------------------------- | ------------------------- |
-| `validity`              | Tiempo desde `thisUpdate` hasta `nextUpdate`.                                            | 7 días.                   |
-| `refresh_interval`      | Plazo desde la publicación que activa la renovación programada.                          | 6 días y 23 horas.        |
-| `regenerate_on_revoke`  | Solicitar regeneración por eventos de revocación o reactivación desde `CertificateHold`. | `true`.                   |
-| `subject_key_id_signer` | Campo de configuración inicializado con el SKI de la CA.                                 | SKI de la CA.             |
+| Campo de `crl_options`                                                                                                          | Función                                                                                                                                                                                                                                                    | Valor inicial del backend                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `validity`                                                                                                                      | Tiempo desde `thisUpdate` hasta `nextUpdate`.                                                                                                                                                                                                              | 7 días.                                                                                                                   |
+| `refresh_interval`                                                                                                              | Plazo desde la publicación que activa la renovación programada.                                                                                                                                                                                            | 6 días y 23 horas.                                                                                                        |
+| `regenerate_on_revoke`                                                                                                          | Solicitar regeneración por eventos de revocación o reactivación desde `CertificateHold`.                                                                                                                                                                   | `true`.                                                                                                                   |
+| <del className="lm-diff-del">`subject_key_id_signer`</del><ins className="lm-diff-ins">`signer_certificate_serial_number`</ins> | <del className="lm-diff-del">Campo de configuración inicializado con el SKI de</del><ins className="lm-diff-ins">Número de serie del certificado existente que firma</ins> la <del className="lm-diff-del">CA</del><ins className="lm-diff-ins">CRL</ins>. | <del className="lm-diff-del">SKI</del><ins className="lm-diff-ins">Número de serie del certificado actual</ins> de la CA. |
 
-El generador utiliza la clave de la CA identificada por el SKI solicitado. No interpretes `subject_key_id_signer` como soporte verificado de una CA delegada distinta: cambiar el campo no cambia el firmante en ese flujo.
+El <del className="lm-diff-del">generador utiliza la clave de la CA identificada por el SKI solicitado. No interpretes `subject_key_id_signer` como soporte verificado de una CA delegada distinta: cambiar el campo no cambia el firmante en ese flujo</del><ins className="lm-diff-ins">firmante debe ser un certificado existente con el uso `cRLSign`, el mismo sujeto y la misma clave pública que la CA. Quedan incluidos los certificados anteriores a una reemisión. No se admite un firmante delegado: un certificado con el sujeto de la CA pero con otra clave se rechaza</ins>.
+
+<div className="lm-diff-ins lm-diff-block">
+  Al reemitir una CA, el rol sigue apuntando al certificado anterior. Las CRL siguen siendo válidas porque ambos certificados comparten sujeto y clave, pero el certificado anterior no puede eliminarse mientras el rol lo use. Para retirarlo, actualiza el firmante del rol.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="warn" title="Casos en los que el rol deja de poder editarse">
+    Al eliminar una CA, su rol VA se conserva y no puede borrarse por API: puede consultarse, pero no actualizarse (la API devuelve 404). Ajusta validez, intervalo y firmante antes de eliminarla.
+
+    Una CA cuyo certificado no tiene `cRLSign` no puede generar su CRL ni editar su rol (error 400). Desde 4.0 la VA exige este uso. Comprueba antes de importar con `openssl x509 -noout -ext keyUsage` y, si falta, obtén un certificado de la misma CA y clave que lo incluya.
+  </Callout>
+</div>
 
 `latest_crl` contiene versión, inicio y fin de validez. Las versiones se conservan en el almacenamiento de objetos como PEM bajo `pki/va/crl/{subject_key_id}/{version}.crl`; el endpoint público entrega DER.
+
+<div className="lm-diff-ins lm-diff-block">
+  CAs que comparten clave [#cas-que-comparten-clave]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La VA identifica cada CRL por el SKI de la CA, y el SKI se deriva de su clave. Dos CAs con la misma clave tienen el mismo SKI y comparten un único rol VA y una única CRL. Ocurre al crear una CA sobre una clave ya existente del KMS, o al importar una CA cuyo certificado declara un SKI en uso. Lamassu toma el SKI del certificado importado tal cual y no comprueba que corresponda a su clave pública. El rol lo crea la primera CA y las demás lo conservan.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Los certificados de todas ellas apuntan a `/crl/{ski}`, pero la lista publicada tiene como emisor a la primera CA y solo incluye sus revocaciones. Un verificador compara el emisor de la CRL con el del certificado que valida (RFC 5280, §6.3.3) y rechaza la lista si no coinciden. Según su política, el certificado queda bloqueado (*hard-fail*) o se acepta aunque esté revocado (*soft-fail*). Las revocaciones de las CAs secundarias no aparecen en ninguna lista.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Si la primera CA se elimina, la generación de CRL de la restante falla porque el firmante configurado ya no corresponde a una CA con ese nombre. Hasta que se actualice el firmante del rol a un certificado de la CA restante, se sigue sirviendo la última lista publicada hasta que venza (7 días por defecto).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Para detectar el problema, compara el SKI de las CAs en el inventario: dos con el mismo SKI están afectadas. Para resolverlo, crea una CA con clave propia y reemite sus certificados; los ya emitidos conservan la URL antigua y no se corrigen hasta reemitirlos. Limita además el permiso de importar CAs, porque una CA importada con un SKI colisionante puede dejar sin CRL a la legítima.
+</div>
 
 Regeneración periódica y automática [#regeneración-periódica-y-automática]
 

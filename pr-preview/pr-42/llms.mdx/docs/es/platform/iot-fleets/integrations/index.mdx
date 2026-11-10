@@ -109,7 +109,15 @@ El modo `auto` delega en Lamassu el aprovisionamiento completo del dispositivo e
 
 Modo jitp [#modo-jitp]
 
-El modo Just-In-Time Provisioning (JITP) delega el aprovisionamiento en AWS en lugar de hacerlo el conector directamente. Cuando el conector detecta que el DMS está en modo `jitp`, crea una plantilla de aprovisionamiento JITP en AWS IoT Core y la adjunta al certificado de CA registrado. Esta plantilla se crea o actualiza en el momento en que el DMS se crea o actualiza en Lamassu - no en el momento del enrolamiento del dispositivo. A partir de ese momento, cuando un dispositivo con un certificado emitido por esa CA se conecta por primera vez a AWS IoT Core, AWS ejecuta la plantilla automáticamente: crea el Thing, registra el certificado y lo activa.
+El modo Just-In-Time Provisioning (JITP) delega el aprovisionamiento en AWS en lugar de hacerlo el conector directamente. Cuando el conector detecta que el DMS está en modo `jitp`, crea una plantilla de aprovisionamiento JITP en AWS IoT Core y la adjunta al certificado de CA registrado. <del className="lm-diff-del">Esta</del><ins className="lm-diff-ins">La</ins> plantilla se crea <del className="lm-diff-del">o actualiza en el momento en que</del><ins className="lm-diff-ins">cuando</ins> el DMS se crea <del className="lm-diff-del">o actualiza </del>en Lamassu<del className="lm-diff-del"> -</del><ins className="lm-diff-ins">,</ins> no en el <del className="lm-diff-del">momento del </del>enrolamiento del dispositivo<ins className="lm-diff-ins">, y no se actualiza después (ver el aviso siguiente)</ins>. A partir de ese momento, cuando un dispositivo con un certificado emitido por esa CA se conecta por primera vez a AWS IoT Core, AWS ejecuta la plantilla automáticamente: crea el Thing, registra el certificado y lo activa.
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="warn" title="Editar un DMS en modo JITP no actualiza la plantilla de AWS">
+    El conector crea la plantilla, nombrada con el ID del DMS, una sola vez. Cada edición posterior del DMS que conserve la clave del conector intenta crearla de nuevo y falla, porque el conector no actualiza plantillas existentes. Los cambios posteriores en `jitp_config.provisioning_role_arn`, `jitp_config.enable_template` o en los grupos y políticas que la plantilla referencia deben aplicarse a mano en AWS IoT Core.
+
+    El evento fallido se reintenta y termina en `lamassu-dlq`. Los grupos y las políticas se registran antes del fallo, pero se omiten la asignación de la plantilla a la CA registrada, la escritura del ARN en el DMS y la actualización de las shadows al cambiar `ManagedCAs`.
+  </Callout>
+</div>
 
 El nombre del Thing en la plantilla JITP se deriva de `AWS::IoT::Certificate::CommonName`, que corresponde al CN del certificado del dispositivo - la misma convención que el modo `auto`.
 
@@ -312,6 +320,22 @@ Solución de problemas [#solución-de-problemas]
 **Causa:** La función de shadow está desactivada en la configuración del DMS, las credenciales del conector carecen de permisos sobre la API de datos de IoT, o el firmware lee un shadow diferente al configurado.
 
 **Resolución:** Comprobar que `shadow_config.enable` está a `true` en los metadatos del conector para el DMS correspondiente. Si se usa Named Shadow, verificar que `shadow_config.shadow_name` contiene el nombre correcto y que el firmware lee ese Named Shadow y no el Classic Shadow. Confirmar que las credenciales del conector tienen permisos `iotdata:GetThingShadow` y `iotdata:UpdateThingShadow`.
+
+<div className="lm-diff-ins lm-diff-block">
+  ***
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  **Síntoma:** Tras editar un DMS en modo `jitp`, aparecen mensajes de actualización del DMS en `lamassu-dlq`, o los cambios de configuración JITP no tienen efecto en AWS.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  **Causa:** La edición dispara un nuevo intento de crear la plantilla JITP, que ya existe en AWS. El intento falla y se omiten los pasos posteriores del conector.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  **Resolución:** Comprobar que la plantilla nombrada con el ID del DMS existe en AWS IoT Core y que el enrolamiento JITP funciona. Si se cambió la configuración JITP, aplicarla a mano en la plantilla de AWS.
+</div>
 
 <Cards>
   <Card title="Configurar un DMS" href="/docs/platform/iot-fleets/enrollment/dms" />

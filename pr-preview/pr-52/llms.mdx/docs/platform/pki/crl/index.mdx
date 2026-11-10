@@ -27,7 +27,9 @@ The VA role stores configuration and metadata for the latest list published for 
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  CAs that share a key share one VA role and one CRL.
+  <Callout type="warn" title="Do not share keys between CAs">
+    Today the VA identifies the CRL by the CA's SKI, so two CAs with the same key (or a CA imported with an SKI that already exists) share a single role and a single CRL. Certificates from one of them may never appear in the list, and clients will reject it because the issuer does not match. Create each CA with its own key. If you already have CAs that share a key, review them before upgrading.
+  </Callout>
 </div>
 
 `latest_crl` contains version, validity start and end. Versions are kept as PEM in object storage at `pki/va/crl/{subject_key_id}/{version}.crl`; the public endpoint returns DER.
@@ -95,6 +97,12 @@ The following paths are relative to the VA service; confirm the public prefix in
 You need authentication and role read or update permissions. Consult your installation’s [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract: the backend replaces `crl_options`; it does not merge omitted fields.
 
 After a change, check saved configuration and the next list actually published. Updating the role alone does not establish regeneration or client acceptance.
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="warn" title="Role of a deleted CA">
+    When you delete a CA, its VA role is kept but can no longer be updated through the API (it returns 404). Adjust validity, interval and signer before deleting the CA, or do not delete it while it still publishes CRLs. A CA whose certificate lacks the `cRLSign` usage cannot generate its CRL or edit its role either.
+  </Callout>
+</div>
 
 From the interface [#from-the-interface]
 

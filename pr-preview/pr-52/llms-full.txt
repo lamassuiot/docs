@@ -3298,7 +3298,7 @@ Import an external CA [#import-an-external-ca]
 You need the CA certificate in PEM, its chain to a known root and, when importing it, an exportable private key. Before uploading material, verify signature, dates, `CA:TRUE`, signing usages and public-key correspondence. The [key verification procedure](/docs/platform/pki/quickstarts/issue-certificate) also compares a CA key and certificate.
 
 <div className="lm-diff-ins lm-diff-block">
-  The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number collides with a different existing certificate, or which is an identical duplicate CA. A deleted CA's certificate record is kept and reused on re-import, including its previous status. Deleting a CA releases its key, which the KMS keeps while other certificates still reference it.
+  The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number collides with a different existing certificate, or which is an identical duplicate CA. A deleted CA's certificate record is kept and reused on re-import, including its previous status. So if you re-import a CA with the same serial number but a different certificate, Lamassu keeps showing the old certificate's data: do not reuse serial numbers when re-importing, and check the result afterwards. Deleting a CA releases its key, which the KMS keeps while other certificates still reference it.
 </div>
 
 <Steps>
@@ -3830,7 +3830,9 @@ The VA role stores configuration and metadata for the latest list published for 
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  CAs that share a key share one VA role and one CRL.
+  <Callout type="warn" title="Do not share keys between CAs">
+    Today the VA identifies the CRL by the CA's SKI, so two CAs with the same key (or a CA imported with an SKI that already exists) share a single role and a single CRL. Certificates from one of them may never appear in the list, and clients will reject it because the issuer does not match. Create each CA with its own key. If you already have CAs that share a key, review them before upgrading.
+  </Callout>
 </div>
 
 `latest_crl` contains version, validity start and end. Versions are kept as PEM in object storage at `pki/va/crl/{subject_key_id}/{version}.crl`; the public endpoint returns DER.
@@ -3898,6 +3900,12 @@ The following paths are relative to the VA service; confirm the public prefix in
 You need authentication and role read or update permissions. Consult your installation’s [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract: the backend replaces `crl_options`; it does not merge omitted fields.
 
 After a change, check saved configuration and the next list actually published. Updating the role alone does not establish regeneration or client acceptance.
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="warn" title="Role of a deleted CA">
+    When you delete a CA, its VA role is kept but can no longer be updated through the API (it returns 404). Adjust validity, interval and signer before deleting the CA, or do not delete it while it still publishes CRLs. A CA whose certificate lacks the `cRLSign` usage cannot generate its CRL or edit its role either.
+  </Callout>
+</div>
 
 From the interface [#from-the-interface]
 

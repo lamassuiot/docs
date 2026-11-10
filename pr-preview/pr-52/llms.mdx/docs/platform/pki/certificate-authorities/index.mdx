@@ -91,7 +91,7 @@ Import an external CA [#import-an-external-ca]
 You need the CA certificate in PEM, its chain to a known root and, when importing it, an exportable private key. Before uploading material, verify signature, dates, `CA:TRUE`, signing usages and public-key correspondence. The [key verification procedure](/docs/platform/pki/quickstarts/issue-certificate) also compares a CA key and certificate.
 
 <div className="lm-diff-ins lm-diff-block">
-  The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number collides with a different existing certificate, or which is an identical duplicate CA. A deleted CA's certificate record is kept and reused on re-import, including its previous status. Deleting a CA releases its key, which the KMS keeps while other certificates still reference it.
+  The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number collides with a different existing certificate, or which is an identical duplicate CA. A deleted CA's certificate record is kept and reused on re-import, including its previous status. So if you re-import a CA with the same serial number but a different certificate, Lamassu keeps showing the old certificate's data: do not reuse serial numbers when re-importing, and check the result afterwards. Deleting a CA releases its key, which the KMS keeps while other certificates still reference it.
 </div>
 
 <Steps>

@@ -20,7 +20,9 @@ El rol VA guarda la configuración y los metadatos de la última lista publicada
 El <del className="lm-diff-del">generador utiliza la clave de la CA identificada por el SKI solicitado. No interpretes `subject_key_id_signer` como soporte verificado de una CA delegada distinta: cambiar el campo no cambia el firmante en ese flujo</del><ins className="lm-diff-ins">firmante debe ser un certificado existente con el uso de clave `cRLSign`, cuyo sujeto y clave pública coincidan con la CA del rol. Los certificados reemitidos que comparten la clave de la CA son firmantes válidos; los firmantes no relacionados se rechazan. El certificado referenciado como firmante no puede eliminarse mientras el rol lo use</ins>.
 
 <div className="lm-diff-ins lm-diff-block">
-  Las CA que comparten clave comparten un rol VA y una CRL.
+  <Callout type="warn" title="No compartas clave entre CA">
+    Hoy la VA identifica la CRL por el SKI de la CA, así que dos CA con la misma clave (o una CA importada con un SKI ya existente) comparten un único rol y una única CRL. Los certificados de una de ellas pueden no aparecer nunca en la lista, y los clientes la rechazarán porque el emisor no coincide. Crea cada CA con su propia clave. Si ya tienes CA que comparten clave, revísalas antes de actualizar.
+  </Callout>
 </div>
 
 `latest_crl` contiene versión, inicio y fin de validez. Las versiones se conservan en el almacenamiento de objetos como PEM bajo `pki/va/crl/{subject_key_id}/{version}.crl`; el endpoint público entrega DER.
@@ -88,6 +90,12 @@ Los paths siguientes son relativos al servicio VA; el prefijo público debe conf
 Necesitas autenticación y permisos de lectura o actualización del rol. Consulta la [Referencia API](/docs/api-reference) y el [control de acceso](/docs/platform/administration/access-control) de tu instalación. Lee la configuración actual antes de actualizarla y envía el objeto completo esperado por el contrato: el backend sustituye `crl_options`; no fusiona campos omitidos.
 
 Después de un cambio, comprueba la configuración guardada y la siguiente lista efectivamente publicada. Modificar el rol no prueba por sí solo regeneración ni aceptación por el cliente.
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="warn" title="Rol de una CA eliminada">
+    Al eliminar una CA, su rol VA se conserva pero ya no se puede actualizar por API (devuelve 404). Ajusta la validez, el intervalo y el firmante antes de eliminar la CA, o no la elimines mientras siga publicando CRL. Una CA cuyo certificado no tiene el uso `cRLSign` tampoco puede generar su CRL ni editar su rol.
+  </Callout>
+</div>
 
 Desde la interfaz [#desde-la-interfaz]
 

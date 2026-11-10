@@ -182,7 +182,7 @@ What changes is how API requests are handled. Bodies that still carry `additiona
 
 Independent re-enrollment authentication [#independent-re-enrollment-authentication]
 
-Re-enrollment authentication settings are now stored independently from initial authentication. Nothing needs migrating, but read both blocks before editing a DMS so that you do not modify one while believing you are editing the other. If the console version does not expose independent settings, edit them through the [DMS API](/docs/api-reference/dms-manager).
+Re-enrollment authentication settings are now stored independently from initial authentication. Nothing needs migrating, but read both blocks before editing a DMS so that you do not modify one while believing you are editing the other. <del className="lm-diff-del">If the</del><ins className="lm-diff-ins">The</ins> console <del className="lm-diff-del">version does not expose independent settings,</del><ins className="lm-diff-ins">exposes independent editors for both blocks; the </ins>[<ins className="lm-diff-ins">DMS guide</ins>](/docs/platform/iot-fleets/enrollment/dms)<ins className="lm-diff-ins"> describes their fields, and you can also</ins> edit them through the [DMS API](/docs/api-reference/dms-manager).
 
 DMS update API [#dms-update-api]
 

@@ -182,7 +182,7 @@ Lo que cambia es el tratamiento de las peticiones por API. Los cuerpos que aún 
 
 Autenticación de reenrolamiento independiente [#autenticación-de-reenrolamiento-independiente]
 
-Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma independiente de los de la autenticación inicial. No hay nada que migrar, pero lee ambos bloques antes de editar un DMS para no modificar uno creyendo que editas el otro. Si la versión de la consola no expone los ajustes independientes, edítalos mediante la [API DMS](/docs/api-reference/dms-manager).
+Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma independiente de los de la autenticación inicial. No hay nada que migrar, pero lee ambos bloques antes de editar un DMS para no modificar uno creyendo que editas el otro. <del className="lm-diff-del">Si la versión de la consola no expone los ajustes independientes, edítalos</del><ins className="lm-diff-ins">La consola expone editores independientes para ambos bloques; la </ins>[<ins className="lm-diff-ins">guía de DMS</ins>](/docs/platform/iot-fleets/enrollment/dms)<ins className="lm-diff-ins"> describe sus campos, y también puedes editarlos</ins> mediante la [API DMS](/docs/api-reference/dms-manager).
 
 API de actualización del DMS [#api-de-actualización-del-dms]
 

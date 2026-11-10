@@ -15,7 +15,7 @@ Prepara los servicios de plataforma que quedan deliberadamente fuera del chart d
 * un broker RabbitMQ accesible y sus credenciales
 * un proveedor OIDC, normalmente Keycloak, con un realm/tenant y un cliente para Lamassu
 * Envoy Gateway 1.8+ y una `GatewayClass`
-* cert-manager 1.14+; para TLS de confianza, un emisor de confianza o un Secret TLS de Kubernetes
+* cert-manager 1.14+ (solo para el modo predeterminado `tls.type: certManager`); para TLS de confianza, un emisor de confianza o un Secret TLS de Kubernetes
 * una StorageClass y un [diseño de tráfico externo](/docs/deployment/self-hosted/networking)
 
 El chart usa por defecto una `GatewayClass` llamada `eg`. Cambia `gateway.className` si tu equipo de plataforma utiliza otro nombre.
@@ -62,7 +62,7 @@ kubectl apply -f gateway-class.yaml
 kubectl rollout status deployment/envoy-gateway -n envoy-gateway-system
 ```
 
-Instala cert-manager por separado antes de Lamassu. El chart actual renderiza sus recursos de issuer self-signed y certificado CA incluso cuando `tls.type: external` hace que el Gateway use un Secret TLS existente. Seleccionar TLS externo no elimina por tanto el requisito de cert-manager.
+Instala cert-manager por separado antes de Lamassu, pero solo para el modo predeterminado `tls.type: certManager`. En ese modo el chart renderiza sus recursos de Issuer self-signed y Certificate CA tanto si `tls.certManagerOptions.clusterIssuer` está definido como si no, por lo que cert-manager sigue siendo un requisito. Con `tls.type: external`, el chart no renderiza recursos de cert-manager y el Gateway termina el TLS con un Secret existente que tú proporcionas.
 
 2. Crea un archivo de valores [#2-crea-un-archivo-de-valores]
 
@@ -134,13 +134,13 @@ Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OI
 
 TLS con un Secret existente [#tls-con-un-secret-existente]
 
-Crea un Secret con `tls.crt` y `tls.key` y referéncialo:
+Crea un Secret con `tls.crt` y `tls.key` y referéncialo. El Secret debe existir antes de instalar: en modo `external` el chart no renderiza recursos de cert-manager ni crea nunca este Secret.
 
 ```yaml
 tls:
   type: external
   externalOptions:
-    secretName: lamassu-downstream-tls
+    secretName: provided-tls
 ```
 
 Provisiona el primer administrador [#provisiona-el-primer-administrador]

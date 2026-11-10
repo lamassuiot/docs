@@ -1,0 +1,93 @@
+import{j as e}from"./index-prc0XQdj.js";let t=`
+
+<div className="lm-diff-ins lm-diff-block">
+  Found a security vulnerability in Lamassu? This page explains how to report it privately, what to include in your report and which releases receive security fixes.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Report a vulnerability [#report-a-vulnerability]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Do not report security vulnerabilities through public GitHub issues, discussions, or pull requests. Public reports disclose the problem before maintainers can fix it.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Instead, report privately using [GitHub Security Advisories](https://github.com/lamassuiot/lamassu-dashboard/security/advisories/new) for the repository. This lets maintainers assess and address the issue before it is publicly disclosed.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  If private vulnerability reporting is not enabled for that repository, report the vulnerability privately to [lamassuiot@lksnext.com](mailto:lamassuiot@lksnext.com) before disclosing any details publicly.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  What to include in a report [#what-to-include-in-a-report]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Describe the vulnerability, its potential impact, and steps to reproduce it using non-sensitive, redacted examples.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Do not include in the report:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * Credentials, tokens, or private keys
+  * Customer data or customer-identifiable information
+  * Confidential architecture or internal infrastructure details
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Supported versions [#supported-versions]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Only the latest stable release receives security support. Support for a stable release ends when the next stable release is published. Older releases and pre-releases are not supported.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  For upgrade guidance, see [Upgrades](/docs/upgrades/3-8-0-to-4-0-0).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Responsible disclosure [#responsible-disclosure]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * Give maintainers reasonable time to investigate and address a reported vulnerability before any public disclosure.
+  * Avoid privacy violations, data destruction, and service disruption while researching a vulnerability.
+  * Only interact with accounts or data you own, or for which you have explicit permission.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Maintainers acknowledge reports in a timely manner and keep you informed of remediation progress.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  This policy covers the source code, configuration, and CI/CD workflows of this repository.
+</div>
+`,r={title:"Security",description:"How to report a security vulnerability in Lamassu privately, what to include in a report and which releases receive security fixes."},l={isNew:!0,changes:16,title:void 0,description:void 0},a={contents:[{heading:void 0,content:"Found a security vulnerability in Lamassu? This page explains how to report it privately, what to include in your report and which releases receive security fixes."},{heading:"report-a-vulnerability",content:"Do not report security vulnerabilities through public GitHub issues, discussions, or pull requests. Public reports disclose the problem before maintainers can fix it."},{heading:"report-a-vulnerability",content:"Instead, report privately using GitHub Security Advisories for the repository. This lets maintainers assess and address the issue before it is publicly disclosed."},{heading:"report-a-vulnerability",content:"If private vulnerability reporting is not enabled for that repository, report the vulnerability privately to lamassuiot\\@lksnext.com before disclosing any details publicly."},{heading:"what-to-include-in-a-report",content:"Describe the vulnerability, its potential impact, and steps to reproduce it using non-sensitive, redacted examples."},{heading:"what-to-include-in-a-report",content:"Do not include in the report:"},{heading:"what-to-include-in-a-report",content:"Credentials, tokens, or private keys"},{heading:"what-to-include-in-a-report",content:"Customer data or customer-identifiable information"},{heading:"what-to-include-in-a-report",content:"Confidential architecture or internal infrastructure details"},{heading:"supported-versions",content:"Only the latest stable release receives security support. Support for a stable release ends when the next stable release is published. Older releases and pre-releases are not supported."},{heading:"supported-versions",content:"For upgrade guidance, see Upgrades."},{heading:"responsible-disclosure",content:"Give maintainers reasonable time to investigate and address a reported vulnerability before any public disclosure."},{heading:"responsible-disclosure",content:"Avoid privacy violations, data destruction, and service disruption while researching a vulnerability."},{heading:"responsible-disclosure",content:"Only interact with accounts or data you own, or for which you have explicit permission."},{heading:"responsible-disclosure",content:"Maintainers acknowledge reports in a timely manner and keep you informed of remediation progress."},{heading:"responsible-disclosure",content:"This policy covers the source code, configuration, and CI/CD workflows of this repository."}],headings:[{id:"report-a-vulnerability",content:"Report a vulnerability"},{id:"what-to-include-in-a-report",content:"What to include in a report"},{id:"supported-versions",content:"Supported versions"},{id:"responsible-disclosure",content:"Responsible disclosure"}]};const o=[{depth:2,url:"#report-a-vulnerability",title:e.jsx(e.Fragment,{children:"Report a vulnerability"})},{depth:2,url:"#what-to-include-in-a-report",title:e.jsx(e.Fragment,{children:"What to include in a report"})},{depth:2,url:"#supported-versions",title:e.jsx(e.Fragment,{children:"Supported versions"})},{depth:2,url:"#responsible-disclosure",title:e.jsx(e.Fragment,{children:"Responsible disclosure"})}];function n(s){const i={a:"a",div:"div",h2:"h2",li:"li",p:"p",ul:"ul",...s.components};return e.jsxs(e.Fragment,{children:[e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.p,{children:"Found a security vulnerability in Lamassu? This page explains how to report it privately, what to include in your report and which releases receive security fixes."})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.h2,{id:"report-a-vulnerability",children:"Report a vulnerability"})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.p,{children:"Do not report security vulnerabilities through public GitHub issues, discussions, or pull requests. Public reports disclose the problem before maintainers can fix it."})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsxs(i.p,{children:["Instead, report privately using ",e.jsx(i.a,{href:"https://github.com/lamassuiot/lamassu-dashboard/security/advisories/new",children:"GitHub Security Advisories"})," for the repository. This lets maintainers assess and address the issue before it is publicly disclosed."]})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsxs(i.p,{children:["If private vulnerability reporting is not enabled for that repository, report the vulnerability privately to ",e.jsx(i.a,{href:"mailto:lamassuiot@lksnext.com",children:"lamassuiot@lksnext.com"})," before disclosing any details publicly."]})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.h2,{id:"what-to-include-in-a-report",children:"What to include in a report"})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.p,{children:"Describe the vulnerability, its potential impact, and steps to reproduce it using non-sensitive, redacted examples."})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.p,{children:"Do not include in the report:"})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsxs(i.ul,{children:[`
+`,e.jsx(i.li,{children:"Credentials, tokens, or private keys"}),`
+`,e.jsx(i.li,{children:"Customer data or customer-identifiable information"}),`
+`,e.jsx(i.li,{children:"Confidential architecture or internal infrastructure details"}),`
+`]})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.h2,{id:"supported-versions",children:"Supported versions"})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.p,{children:"Only the latest stable release receives security support. Support for a stable release ends when the next stable release is published. Older releases and pre-releases are not supported."})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsxs(i.p,{children:["For upgrade guidance, see ",e.jsx(i.a,{href:"/docs/upgrades/3-8-0-to-4-0-0",children:"Upgrades"}),"."]})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.h2,{id:"responsible-disclosure",children:"Responsible disclosure"})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsxs(i.ul,{children:[`
+`,e.jsx(i.li,{children:"Give maintainers reasonable time to investigate and address a reported vulnerability before any public disclosure."}),`
+`,e.jsx(i.li,{children:"Avoid privacy violations, data destruction, and service disruption while researching a vulnerability."}),`
+`,e.jsx(i.li,{children:"Only interact with accounts or data you own, or for which you have explicit permission."}),`
+`]})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.p,{children:"Maintainers acknowledge reports in a timely manner and keep you informed of remediation progress."})}),`
+`,e.jsx(i.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(i.p,{children:"This policy covers the source code, configuration, and CI/CD workflows of this repository."})})]})}function d(s={}){const{wrapper:i}=s.components||{};return i?e.jsx(i,{...s,children:e.jsx(n,{...s})}):n(s)}const u=Object.freeze(Object.defineProperty({__proto__:null,_markdown:t,default:d,frontmatter:r,lmDiff:l,structuredData:a,toc:o},Symbol.toStringTag,{value:"Module"}));export{u as _};

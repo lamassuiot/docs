@@ -225,6 +225,38 @@ body {
   display: none;
 }
 
+/* A section heading that opens a folder ("PKI" → "---Getting started---") is
+   also :first-child of the folder content, so the reset above would glue it to
+   the folder trigger. Give it a little room (no hairline: the trigger is right
+   above it). */
+#nd-sidebar [data-state] > p:first-child,
+#nd-sidebar-mobile [data-state] > p:first-child {
+  margin-top: 0.5rem;
+}
+
+/* A folder that follows an expanded folder gets a hairline and room above, so
+   it reads as a new group and not as the last link of the previous one. */
+#nd-sidebar [data-state='open']:has(> button[aria-expanded]) + [data-state]:has(> button[aria-expanded]),
+#nd-sidebar [data-state='open']:has(> a > [data-icon]) + [data-state]:has(> a > [data-icon]),
+#nd-sidebar-mobile [data-state='open']:has(> button[aria-expanded]) + [data-state]:has(> button[aria-expanded]),
+#nd-sidebar-mobile [data-state='open']:has(> a > [data-icon]) + [data-state]:has(> a > [data-icon]) {
+  position: relative;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+#nd-sidebar [data-state='open']:has(> button[aria-expanded]) + [data-state]:has(> button[aria-expanded])::before,
+#nd-sidebar [data-state='open']:has(> a > [data-icon]) + [data-state]:has(> a > [data-icon])::before,
+#nd-sidebar-mobile [data-state='open']:has(> button[aria-expanded]) + [data-state]:has(> button[aria-expanded])::before,
+#nd-sidebar-mobile [data-state='open']:has(> a > [data-icon]) + [data-state]:has(> a > [data-icon])::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  inset-inline: 0.5rem;
+  height: 1px;
+  background-color: var(--color-fd-border);
+}
+
 /* Links and folder triggers: grey text, a light fill on hover. Rounded, like
    the search field. */
 #nd-sidebar a,

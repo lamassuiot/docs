@@ -94,7 +94,7 @@ La autorización externa falla cerrada por defecto. Si authz no está disponible
 
 ## Errores 500 de la API
 
-Un 500 indica un fallo interno, como una base de datos no disponible. El cuerpo `{"err": ...}` incluye hoy el texto del error interno, que puede contener nombres de esquema, tabla y restricción y, en fallos de conexión, el host y el usuario de la base de datos (no la contraseña). Localiza la causa en el log del servicio con la hora de la petición, y revisa el cuerpo antes de reenviarlo a terceros. Algunos errores de petición, como un tamaño de clave que el motor no admite, se devuelven también como 500.
+Un 500 indica un fallo interno, como una base de datos no disponible. El cuerpo `{"err": ...}` incluye hoy el texto del error interno, que puede contener nombres de esquema, tabla y restricción y, en fallos de conexión, el host y el usuario de la base de datos (no la contraseña). Localiza la causa en el log del servicio con la hora de la petición, y revisa el cuerpo antes de reenviarlo a terceros. El conector de autorización también devuelve el error interno, en el campo `details.error`. Algunos errores de petición, como un tamaño de clave que el motor no admite, se devuelven también como 500.
 
 ## Un pod no está Ready
 

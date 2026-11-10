@@ -94,7 +94,7 @@ External authorization fails closed by default. If authz is unavailable, protect
 
 ## API 500 errors
 
-A 500 indicates an internal failure, such as an unavailable database. The `{"err": ...}` body currently includes the text of the internal error, which can contain schema, table and constraint names and, on connection failures, the database host and user (not the password). Find the cause in the service log using the request time, and review the body before forwarding it to third parties. Some request errors, such as a key size the engine does not support, are also returned as 500.
+A 500 indicates an internal failure, such as an unavailable database. The `{"err": ...}` body currently includes the text of the internal error, which can contain schema, table and constraint names and, on connection failures, the database host and user (not the password). Find the cause in the service log using the request time, and review the body before forwarding it to third parties. The authorization connector also returns the internal error, in the `details.error` field. Some request errors, such as a key size the engine does not support, are also returned as 500.
 
 ## A pod is not Ready
 

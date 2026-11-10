@@ -324,7 +324,7 @@ El primer statement permite que el dispositivo se conecte usando su ThingName co
 
 **Síntoma:** Tras editar un DMS en modo `jitp`, aparecen mensajes de actualización del DMS en `lamassu-dlq`, o los cambios de configuración JITP no tienen efecto en AWS.
 
-**Causa:** La edición dispara un nuevo intento de crear la plantilla JITP, que ya existe en AWS. El intento falla y se omiten los pasos posteriores del conector.
+**Causa:** La edición dispara un nuevo intento de crear la plantilla JITP, que ya existe en AWS. El intento falla y se omiten los pasos posteriores del conector. Según el código del conector, el mismo fallo puede aparecer sin editar el DMS: tras crear la plantilla, el conector escribe el ARN en el DMS, lo que genera un evento de actualización que repite la creación. Sería una entrada en `lamassu-dlq` sin efecto funcional, porque el alta ya se completó. Este caso no se ha confirmado contra AWS.
 
 **Resolución:** Comprobar que la plantilla nombrada con el ID del DMS existe en AWS IoT Core y que el enrolamiento JITP funciona. Si se cambió la configuración JITP, aplicarla a mano en la plantilla de AWS.
 

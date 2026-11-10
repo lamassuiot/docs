@@ -16,7 +16,7 @@ El rol VA guarda la configuración y los metadatos de la última lista publicada
 | Campo de `crl_options` | Función | Valor inicial del backend |
 |---|---|---|
 | `validity` | Tiempo desde `thisUpdate` hasta `nextUpdate`. | 7 días. |
-| `refresh_interval` | Plazo desde la publicación que activa la renovación programada. | 6 días y 23 horas. |
+| `refresh_interval` | Se guarda y se devuelve por la API, pero la VA no lo utiliza: la renovación programada no depende de él (consulta [Regeneración periódica y automática](#regeneración-periódica-y-automática)). | 6 días y 23 horas. |
 | `regenerate_on_revoke` | Solicitar regeneración por eventos de revocación o reactivación desde `CertificateHold`. | `true`. |
 | `signer_certificate_serial_number` | Número de serie del certificado existente que firma la CRL. | Número de serie del certificado actual de la CA. |
 
@@ -25,9 +25,11 @@ El firmante debe ser un certificado existente con el uso `cRLSign`, el mismo suj
 Al reemitir una CA, el rol sigue apuntando al certificado anterior. Las CRL siguen siendo válidas porque ambos certificados comparten sujeto y clave, pero el certificado anterior no puede eliminarse mientras el rol lo use. Para retirarlo, actualiza el firmante del rol.
 
 <Callout type="warn" title="Casos en los que el rol deja de poder editarse">
-  Al eliminar una CA, su rol VA se conserva y no puede borrarse por API: puede consultarse, pero no actualizarse (la API devuelve 404). Ajusta validez, intervalo y firmante antes de eliminarla.
+  Al eliminar una CA, su rol VA se conserva y no puede borrarse por API: puede consultarse, pero cualquier `PUT` devuelve 404, y el trabajo de renovación registra un aviso en cada ciclo porque ya no encuentra la CA. La API no ofrece salida; solo se corrige editando la base de datos. Ajusta validez, intervalo y firmante antes de eliminarla.
 
-  Una CA cuyo certificado no tiene `cRLSign` no puede generar su CRL ni editar su rol (error 400). Desde 4.0 la VA exige este uso. Comprueba antes de importar con `openssl x509 -noout -ext keyUsage` y, si falta, obtén un certificado de la misma CA y clave que lo incluya.
+  Una CA cuyo certificado no tiene `cRLSign` no puede generar su CRL ni editar su rol (error 400). Desde 4.0 la VA exige este uso. Comprueba antes de importar con `openssl x509 -noout -ext keyUsage` y, si falta, obtén un certificado de la misma CA y clave que lo incluya y asígnalo como firmante con `PUT`. Tras reemitir una CA, comprueba también el uso de clave del certificado nuevo: puede no conservar los usos del original.
+
+  El `PUT` valida siempre el firmante, aunque la petición no lo cambie. Si el firmante guardado ya no es válido, no se puede modificar ningún campo del rol, ni siquiera la validez, hasta asignar uno válido.
 </Callout>
 
 `latest_crl` contiene versión, inicio y fin de validez. Las versiones se conservan en el almacenamiento de objetos como PEM bajo `pki/va/crl/{subject_key_id}/{version}.crl`; el endpoint público entrega DER.
@@ -44,9 +46,11 @@ Para detectar el problema, compara el SKI de las CAs en el inventario: dos con e
 
 ## Regeneración periódica y automática
 
-El trabajo programado solicita otra lista cuando se alcanza `refresh_interval` o cuando la lista está próxima a vencer según el periodo de vigilancia configurado. Esto depende de que el trabajo, almacenamiento y firma funcionen; no garantiza renovación ante un fallo del servicio.
+El trabajo programado de la VA revisa todos los roles en cada ejecución y solicita otra lista cuando a `latest_crl` le queda menos validez que el intervalo entre ejecuciones. La frecuencia se configura en Helm con `services.va.job.crl.frequency` (por defecto `0 * * * *`) y admite una duración (`1h`) o una expresión cron. Una expresión cron se convierte en un intervalo constante igual al tiempo que falta para su siguiente disparo cuando arranca el servicio, así que no se alinea con el reloj. `refresh_interval` no interviene. Mantén `validity` claramente por encima del intervalo: con una validez menor, la lista se regenera en cada ciclo.
 
-Con `regenerate_on_revoke`, el manejador de eventos solicita una nueva CRL cuando recibe una revocación o la reactivación de un certificado desde `CertificateHold` a `ACTIVE`. Es un paso posterior al cambio de estado, con sus propios posibles errores. Confirmar la revocación no demuestra que la CRL nueva ya esté publicada ni que todos los clientes la hayan descargado.
+Si la generación falla (por ejemplo, por un rol sin CA o un firmante inválido), el trabajo registra el aviso `something went wrong while calculating CRL for CA <ski>` y lo reintenta en el ciclo siguiente. No hay otra vía de renovación hasta corregir la causa, y la última lista publicada se sigue sirviendo hasta vencer. Todo ello depende de que el trabajo, el almacenamiento y la firma funcionen.
+
+Con `regenerate_on_revoke`, el manejador de eventos solicita una nueva CRL cuando recibe una revocación o la reactivación de un certificado desde `CertificateHold` a `ACTIVE`. Es un paso posterior al cambio de estado, con sus propios posibles errores: si falla (rol inexistente, firmante inválido), el evento se reintenta y, agotados los reintentos, pasa a la cola de eventos fallidos. Confirmar la revocación no demuestra que la CRL nueva ya esté publicada ni que todos los clientes la hayan descargado.
 
 Comprueba el número de CRL y sus tiempos antes y después del cambio. Supervisa listas vencidas y fallos de generación; los clientes deben aplicar su política cuando no disponen de evidencia vigente.
 
@@ -105,6 +109,16 @@ Los paths siguientes son relativos al servicio VA; el prefijo público debe conf
 Necesitas autenticación y permisos de lectura o actualización del rol. Consulta la [Referencia API](/docs/api-reference) y el [control de acceso](/docs/platform/administration/access-control) de tu instalación. Lee la configuración actual antes de actualizarla y envía el objeto completo esperado por el contrato: el backend sustituye `crl_options`; no fusiona campos omitidos.
 
 Después de un cambio, comprueba la configuración guardada y la siguiente lista efectivamente publicada. Modificar el rol no prueba por sí solo regeneración ni aceptación por el cliente.
+
+## Errores frecuentes del rol VA
+
+| Síntoma | Causa | Acción |
+|---|---|---|
+| `PUT /v1/roles/{ca-ski}` devuelve 404 y `GET` devuelve 200. | La CA del rol se eliminó. | No hay salida por API; requiere intervención en la base de datos. Evítalo ajustando el rol antes de eliminar la CA. |
+| `PUT` devuelve 400. | El firmante no tiene `cRLSign`, o su sujeto y su clave no coinciden con ninguna CA de ese SKI (por ejemplo, tras eliminar la primera de dos CAs que comparten clave). | Asigna con `PUT` el número de serie de un certificado válido de la CA restante. |
+| `PUT` devuelve 400 desde un cliente de 3.x. | `crl_options.subject_key_id_signer` se sustituyó por `signer_certificate_serial_number`, que es obligatorio. | Actualiza el cliente para enviar el campo nuevo. |
+| La CRL no cambia tras revocar un certificado. | `regenerate_on_revoke` es `false`, o el evento falló por falta de rol o por un firmante inválido. | Revisa los logs de la VA y la cola de eventos fallidos; corrige el firmante. |
+| Un verificador rechaza la CRL por el emisor. | Varias CAs comparten SKI. | Consulta [CAs que comparten clave](#cas-que-comparten-clave). |
 
 ## Desde la interfaz
 

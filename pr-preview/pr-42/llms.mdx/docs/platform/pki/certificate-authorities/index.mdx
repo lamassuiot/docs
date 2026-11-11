@@ -177,12 +177,12 @@ Revoke a CA [#revoke-a-ca]
   Delete a CA [#delete-a-ca]
 </div>
 
-Permanent deletion is only available after revoking. Delete the record only when your retention and audit policy allows it.
+Permanent deletion is only available <del className="lm-diff-del">after revoking</del><ins className="lm-diff-ins">with the CA revoked or expired; a CA imported without a key can be deleted in any state</ins>. Delete the record only when your retention and audit policy allows it.
 
 <div className="lm-diff-ins lm-diff-block">
-  The CA’s VA role is kept but can no longer be edited (see [CRL](/docs/platform/pki/crl)), so adjust its validity, interval and signer beforehand. The CA’s key is released, but the KMS keeps it while other certificates still reference it.
+  The CA’s VA role is kept. If no other CA with the same SKI remains, it can no longer be edited (see [CRL](/docs/platform/pki/crl)), so adjust its validity and signer beforehand. The CA’s key is released, but the KMS keeps it while other certificates still reference it.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Lamassu keeps the certificate record of a deleted CA. If that same certificate is imported again, the import succeeds and reuses the record: it updates the type, issuer and key but keeps the status. Because a CA can only be deleted once revoked or expired, it reappears in that state. A different certificate with the same serial number is rejected with a 400 error, and a certificate that already belongs to an existing CA with a 409 error. To reuse the material without inheriting the previous status, use a certificate with a different serial number and check the result after importing.
+  Lamassu keeps the certificate record of a deleted CA. If that same certificate is imported again, the import succeeds and reuses the record: it updates the type, issuer and key but keeps the status, so the CA reappears in the state it had when deleted (normally revoked or expired). A different certificate with the same serial number is rejected with a 400 error, and a certificate that already belongs to an existing CA with a 409 error. To avoid inheriting the previous status, use a certificate with a different serial number and check the result after importing. If the new certificate uses the same key, it shares the SKI with the retained VA role of the deleted CA, whose signer is the old certificate: check that the CRL is generated and, if it is not, use `PUT` to set a signer of the new CA (see [CRL](/docs/platform/pki/crl)).
 </div>

@@ -331,10 +331,7 @@ Troubleshooting [#troubleshooting]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  **Cause:** The edit triggers a new attempt to create the JITP template, which already exists in AWS. The attempt fails and the connector's later steps are skipped. According to the connector code, the same failure can appear without editing the DMS: after creating the template, the connector writes the ARN back to the DMS, which generates an update event that repeats the creation. That would be an entry in `lamassu-dlq` with no functional effect, because the registration had already completed. This case has not been confirmed against AWS.
-</div>
-
-<div className="lm-diff-ins lm-diff-block">
+  **Cause:** The edit triggers a new attempt to create the JITP template, which already exists in AWS. The attempt fails and the connector's later steps are skipped.
   **Resolution:** Check that the template named with the DMS ID exists in AWS IoT Core and that JITP enrollment works. If the JITP configuration was changed, apply it by hand to the AWS template.
 </div>
 

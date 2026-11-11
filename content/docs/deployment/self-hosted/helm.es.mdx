@@ -148,9 +148,9 @@ tls:
 
 ### TLS de AMQP (AMQPS)
 
-`amqp.tls: true` selecciona AMQPS en todos los bloques de configuración del event bus. El puerto por defecto sigue siendo `5672` y no cambia automáticamente al habilitar TLS, así que define `amqp.port` con el listener TLS del broker, normalmente `5671`.
+`amqp.tls: true` selecciona AMQPS en todos los bloques de configuración del bus de eventos. El puerto por defecto sigue siendo `5672` y no cambia automáticamente al habilitar TLS, así que define `amqp.port` con el listener TLS del broker, normalmente `5671`.
 
-Sin un Secret de CA configurado, los clientes del event bus usan las CA de confianza del sistema. Para confiar en una CA privada, crea un Secret en el namespace del release con el certificado de la CA en formato PEM y define `amqp.ca.secretName` (y `amqp.ca.certificateKey` si la clave de datos no es `ca.crt`).
+Sin un Secret de CA configurado, los clientes del bus de eventos usan las CA de confianza del sistema. Para confiar en una CA privada, crea un Secret en el namespace del release con el certificado de la CA en formato PEM y define `amqp.ca.secretName` (y `amqp.ca.certificateKey` si la clave de datos no es `ca.crt`).
 
 Para brokers que exijan TLS mutuo, crea un Secret con el certificado de cliente y su clave privada y define `amqp.client.secretName` (con `amqp.client.certificateKey` y `amqp.client.privateKeyKey` si las claves de datos no son `tls.crt` y `tls.key`).
 
@@ -171,7 +171,7 @@ Ambas opciones de Secret exigen `amqp.tls: true`: `values.schema.json` rechaza u
 El cliente AMQP carga los certificados al arrancar, así que reinicia los pods consumidores tras actualizar cualquiera de los dos Secrets. Cambiar cualquier valor de `amqp` reinicia las cargas de trabajo consumidoras mediante la anotación `checksum/config`, pero cambiar solo el contenido de un Secret no desencadena un rollout.
 
 <Callout type="warn" title="Define el puerto AMQP antes del upgrade">
-  Según la guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: en 3.8.0 `amqp.tls` no se aplicaba y los clientes del event bus usaban AMQP en claro; desde 4.0.0, `amqp.tls: true` los cambia a AMQPS. Define `amqp.port` con el listener TLS del broker antes del upgrade, o usa `amqp.tls: false` para mantener AMQP en claro.
+  Según la guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: en 3.8.0 `amqp.tls` no se aplicaba y los clientes del bus de eventos usaban AMQP en claro; desde 4.0.0, `amqp.tls: true` los cambia a AMQPS. Define `amqp.port` con el listener TLS del broker antes del upgrade, o usa `amqp.tls: false` para mantener AMQP en claro.
 </Callout>
 
 ### Provisiona el primer administrador

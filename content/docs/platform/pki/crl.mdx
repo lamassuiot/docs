@@ -25,7 +25,7 @@ The signer must be an existing certificate with the `cRLSign` key usage and the 
 When a CA is reissued, the role keeps pointing at the previous certificate. CRLs remain valid because both certificates share subject and key, but the previous certificate cannot be deleted while the role uses it. To retire it, update the role’s signer.
 
 <Callout type="warn" title="Cases in which the role can no longer be edited">
-  When a CA is deleted, its VA role is kept and cannot be removed through the API: it can be read, but any `PUT` returns 404, and the renewal job logs a warning on every cycle because it no longer finds the CA. The API offers no way out; it can only be fixed by editing the database. Adjust validity, interval and signer before deleting it.
+  When a CA is deleted, its VA role is kept and cannot be removed through the API. If no other CA with the same SKI remains, the role can be read but any `PUT` returns 404, and the renewal job logs a warning on every cycle because it no longer finds the CA. The API offers no way out; it can only be fixed by editing the database. If another CA with that SKI remains, the role is still editable (see [CAs that share a key](#cas-that-share-a-key)). Adjust validity and signer before deleting the CA.
 
   A CA whose certificate lacks `cRLSign` cannot generate its CRL or edit its role (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and set it as the signer with `PUT`. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages.
 
@@ -42,7 +42,7 @@ The certificates of all of them point to `/crl/{ski}`, but the published list ha
 
 If the first CA is deleted, CRL generation for the remaining one fails because the configured signer no longer matches a CA with that name. Until the role’s signer is updated to a certificate of the remaining CA, the last published list keeps being served until it expires (7 days by default).
 
-To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. Also restrict the permission to import CAs, because a CA imported with a colliding SKI can leave the legitimate one without a CRL.
+To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Restrict the permission to import CAs until a per-CA CRL exists; it is proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834).
 
 ## Periodic and automatic regeneration
 
@@ -114,7 +114,7 @@ After a change, check saved configuration and the next list actually published. 
 
 | Symptom | Cause | Action |
 |---|---|---|
-| `PUT /v1/roles/{ca-ski}` returns 404 and `GET` returns 200. | The role’s CA was deleted. | There is no API way out; it requires database intervention. Avoid it by adjusting the role before deleting the CA. |
+| `PUT /v1/roles/{ca-ski}` returns 404 and `GET` returns 200. | The role’s CA was deleted and no other CA with the same SKI remains. | There is no API way out; it requires database intervention. Avoid it by adjusting the role before deleting the CA. |
 | `PUT` returns 400. | The signer lacks `cRLSign`, or its subject and key match no CA with that SKI (for example, after deleting the first of two CAs that share a key). | Use `PUT` to set the serial number of a valid certificate of the remaining CA. |
 | `PUT` returns 400 from a 3.x client. | `crl_options.subject_key_id_signer` was replaced by `signer_certificate_serial_number`, which is required. | Update the client to send the new field. |
 | The CRL does not change after revoking a certificate. | `regenerate_on_revoke` is `false`, or the event failed because of a missing role or an invalid signer. | Check the VA logs and the failed-events queue; fix the signer. |

@@ -94,7 +94,7 @@ La autorización externa falla cerrada por defecto. Si authz no está disponible
 
 ## Errores 500 de la API
 
-Un 500 indica un fallo interno, como una base de datos no disponible. El cuerpo `{"err": ...}` incluye hoy el texto del error interno, que puede contener nombres de esquema, tabla y restricción y, en fallos de conexión, el host y el usuario de la base de datos (no la contraseña). Localiza la causa en el log del servicio con la hora de la petición, y revisa el cuerpo antes de reenviarlo a terceros. El conector de autorización también devuelve el error interno, en el campo `details.error`. Algunos errores de petición, como un tamaño de clave que el motor no admite, se devuelven también como 500.
+Un 500 indica un fallo interno, como una base de datos no disponible. El cuerpo `{"err": ...}` incluye hoy el texto del error interno, que puede contener nombres de esquema, tabla y restricción y, en fallos de conexión, el host y el usuario de la base de datos (no la contraseña). Localiza la causa en el log del servicio con la hora de la petición, y no reenvíes el cuerpo a terceros ni lo muestres a usuarios finales. Es un defecto conocido de divulgación de información: está previsto devolver un mensaje genérico en los 500 y dejar el detalle solo en el log del servicio (seguimiento en [lamassuiot#814](https://github.com/lamassuiot/lamassuiot/issues/814)). El conector de autorización también devuelve el error interno, en el campo `details.error`. Algunos errores de petición, como un tamaño de clave que el motor no admite, se devuelven también como 500.
 
 ## Un pod no está Ready
 
@@ -125,7 +125,7 @@ Los eventos de dominio y auditoría dependen del publisher del bus:
 Si `amqp.tls` está habilitado, revisa también la parte TLS:
 
 - confirma que el listener del broker hable AMQPS en el puerto configurado — el puerto por defecto sigue siendo `5672` y no cambia automáticamente al habilitar TLS;
-- confirma que el Secret de la CA exista en el namespace del release y que su clave de datos coincida con `amqp.ca.certificateKey`;
+- si defines `amqp.ca.secretName`, confirma que el Secret exista en el namespace del release y que su clave de datos coincida con `amqp.ca.certificateKey` (por defecto `ca.crt`); sin él, los clientes confían en las CA del sistema;
 - recuerda que un Secret referenciado inexistente impide arrancar los pods consumidores;
 - tras actualizar el Secret de la CA o del certificado de cliente, reinicia los pods consumidores: el cliente AMQP carga los certificados al arrancar.
 

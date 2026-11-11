@@ -326,6 +326,7 @@ The first statement lets the device connect using its ThingName as the MQTT iden
 **Symptom:** After editing a DMS in `jitp` mode, DMS update messages appear in `lamassu-dlq`, or JITP configuration changes have no effect in AWS.
 
 **Cause:** The edit triggers a new attempt to create the JITP template, which already exists in AWS. The attempt fails and the connector's later steps are skipped.
+
 **Resolution:** Check that the template named with the DMS ID exists in AWS IoT Core and that JITP enrollment works. If the JITP configuration was changed, apply it by hand to the AWS template.
 
 <Cards>

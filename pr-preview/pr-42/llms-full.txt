@@ -2826,6 +2826,9 @@ Troubleshooting [#troubleshooting]
 
 <div className="lm-diff-ins lm-diff-block">
   **Cause:** The edit triggers a new attempt to create the JITP template, which already exists in AWS. The attempt fails and the connector's later steps are skipped.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   **Resolution:** Check that the template named with the DMS ID exists in AWS IoT Core and that JITP enrollment works. If the JITP configuration was changed, apply it by hand to the AWS template.
 </div>
 
@@ -3990,7 +3993,7 @@ The <del className="lm-diff-del">generator uses the key of the CA identified by 
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Restrict the permission to import CAs until a per-CA CRL exists; it is proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834).
+  To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Restrict the permission to import CAs as an interim control. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
 </div>
 
 Periodic and automatic regeneration [#periodic-and-automatic-regeneration]

@@ -332,6 +332,9 @@ Troubleshooting [#troubleshooting]
 
 <div className="lm-diff-ins lm-diff-block">
   **Cause:** The edit triggers a new attempt to create the JITP template, which already exists in AWS. The attempt fails and the connector's later steps are skipped.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   **Resolution:** Check that the template named with the DMS ID exists in AWS IoT Core and that JITP enrollment works. If the JITP configuration was changed, apply it by hand to the AWS template.
 </div>
 

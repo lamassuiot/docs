@@ -331,6 +331,9 @@ Solución de problemas [#solución-de-problemas]
 
 <div className="lm-diff-ins lm-diff-block">
   **Causa:** La edición dispara un nuevo intento de crear la plantilla JITP, que ya existe en AWS. El intento falla y se omiten los pasos posteriores del conector.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   **Resolución:** Comprobar que la plantilla nombrada con el ID del DMS existe en AWS IoT Core y que el enrolamiento JITP funciona. Si se cambió la configuración JITP, aplicarla a mano en la plantilla de AWS.
 </div>
 

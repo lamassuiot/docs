@@ -30,6 +30,8 @@ Evita jerarquías profundas sin una necesidad concreta. Cada nivel añade distri
 
 **Reemitir una CA** crea un certificado nuevo sobre la clave existente. Lamassu genera una CSR con esa clave, autofirma si es una raíz o pide a la CA padre que firme si es subordinada. El nuevo certificado queda activo y la CA apunta a su número de serie; los certificados anterior y nuevo quedan enlazados mediante metadatos.
 
+Si un rol VA de CRL de la CA está firmado por el certificado de la CA sustituido, al reemitir el firmante se mueve al certificado nuevo y se republica la CRL. Un rol firmado por otro certificado conserva ese firmante; consulta la [guía de CRL](/docs/platform/pki/crl).
+
 **Rotar una CA** crea una clave y una autoridad sucesoras. Es la opción adecuada ante compromiso, cambio criptográfico, migración de motor o política de claves no exportables.
 
 Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiración haya pasado. Anticípate a ambas condiciones.

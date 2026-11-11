@@ -16,18 +16,18 @@ El rol VA guarda la configuración y los metadatos de la última lista publicada
 | Campo de `crl_options` | Función | Valor inicial del backend |
 |---|---|---|
 | `validity` | Tiempo desde `thisUpdate` hasta `nextUpdate`. | 7 días. |
-| `refresh_interval` | Se guarda y se devuelve por la API, pero la VA no lo utiliza: la renovación programada no depende de él (consulta [Regeneración periódica y automática](#regeneración-periódica-y-automática)). | 6 días y 23 horas. |
+| `refresh_interval` | Tiempo desde la emisión de la última CRL publicada que activa la renovación programada; `0` la desactiva (consulta [Regeneración periódica y automática](#regeneración-periódica-y-automática)). | 6 días y 23 horas. |
 | `regenerate_on_revoke` | Solicitar regeneración por eventos de revocación o reactivación desde `CertificateHold`. | `true`. |
 | `signer_certificate_serial_number` | Número de serie del certificado existente que firma la CRL. | Número de serie del certificado actual de la CA. |
 
 El firmante debe ser un certificado existente con el uso `cRLSign`, el mismo sujeto y la misma clave pública que la CA. Quedan incluidos los certificados anteriores a una reemisión. No se admite un firmante delegado: un certificado con el sujeto de la CA pero con otra clave se rechaza.
 
-Al reemitir una CA, el rol sigue apuntando al certificado anterior. Las CRL siguen siendo válidas porque ambos certificados comparten sujeto y clave, pero el certificado anterior no puede eliminarse mientras el rol lo use. Para retirarlo, actualiza el firmante del rol.
+Al reemitir una CA, si el firmante del rol es el certificado de la CA sustituido, la VA lo mueve al certificado nuevo — siempre que incluya `cRLSign` — y republica la CRL. Si el firmante es cualquier otro certificado con el sujeto y la clave de la CA, se deja deliberadamente sin cambios; en ese caso el certificado anterior no puede eliminarse mientras el rol lo use, y para retirarlo actualizas el firmante con `PUT`.
 
 <Callout type="warn" title="Casos en los que el rol deja de poder editarse">
   Al eliminar una CA, su rol VA se conserva y no puede borrarse por API. Si no queda ninguna otra CA con el mismo SKI, el rol puede consultarse pero cualquier `PUT` devuelve 404, y el trabajo de renovación registra un aviso en cada ciclo porque ya no encuentra la CA. La API no ofrece salida; solo se corrige editando la base de datos. Si queda otra CA con ese SKI, el rol sigue siendo editable (consulta [CAs que comparten clave](#cas-que-comparten-clave)). Ajusta validez y firmante antes de eliminar la CA.
 
-  Una CA cuyo certificado no tiene `cRLSign` no puede generar su CRL ni editar su rol (error 400). Desde 4.0 la VA exige este uso. Comprueba antes de importar con `openssl x509 -noout -ext keyUsage` y, si falta, obtén un certificado de la misma CA y clave que lo incluya y asígnalo como firmante con `PUT`. Tras reemitir una CA, comprueba también el uso de clave del certificado nuevo: puede no conservar los usos del original.
+  Una CA cuyo certificado no tiene `cRLSign` no puede generar su CRL ni editar su rol (error 400). Desde 4.0 la VA exige este uso. Comprueba antes de importar con `openssl x509 -noout -ext keyUsage` y, si falta, obtén un certificado de la misma CA y clave que lo incluya y asígnalo como firmante con `PUT`. Tras reemitir una CA, comprueba también el uso de clave del certificado nuevo: puede no conservar los usos del original, y sin `cRLSign` el rol conserva su firmante anterior.
 
   El `PUT` valida siempre el firmante, aunque la petición no lo cambie. Si el firmante guardado ya no es válido, no se puede modificar ningún campo del rol, ni siquiera la validez, hasta asignar uno válido.
 </Callout>
@@ -50,7 +50,7 @@ Antes de actualizar, revisa las CAs que comparten clave. Para detectar el proble
 
 ## Regeneración periódica y automática
 
-El trabajo programado de la VA revisa todos los roles en cada ejecución y solicita otra lista cuando a `latest_crl` le queda menos validez que el intervalo entre ejecuciones. La frecuencia se configura en Helm con `services.va.job.crl.frequency` (por defecto `0 * * * *`) y admite una duración (`1h`) o una expresión cron. Una expresión cron se convierte en un intervalo constante igual al tiempo que falta para su siguiente disparo cuando arranca el servicio, así que no se alinea con el reloj. `refresh_interval` no interviene. Mantén `validity` claramente por encima del intervalo: con una validez menor, la lista se regenera en cada ciclo.
+El trabajo programado de la VA revisa todos los roles en cada ejecución y solicita otra lista cuando a `latest_crl` le queda menos validez que el intervalo entre ejecuciones. La frecuencia se configura en Helm con `services.va.job.crl.frequency` (por defecto `0 * * * *`) y admite una duración (`1h`) o una expresión cron. Una expresión cron se convierte en un intervalo constante igual al tiempo que falta para su siguiente disparo cuando arranca el servicio, así que no se alinea con el reloj. También solicita otra lista cuando el tiempo transcurrido desde la emisión de la última CRL publicada alcanza `refresh_interval`; con `0` solo se desactiva este disparador. Mantén `validity` claramente por encima del intervalo: con una validez menor, la lista se regenera en cada ciclo.
 
 Si la generación falla (por ejemplo, por un rol sin CA o un firmante inválido), el trabajo registra el aviso `something went wrong while calculating CRL for CA <ski>` y lo reintenta en el ciclo siguiente. No hay otra vía de renovación hasta corregir la causa, y la última lista publicada se sigue sirviendo hasta vencer. Todo ello depende de que el trabajo, el almacenamiento y la firma funcionen.
 

@@ -39,7 +39,11 @@ const diffBase = process.env.VITE_DOCS_DIFF_BASE;
 // so they must not be imported as JS modules by the MDX compiler.
 export default defineConfig({
   mdxOptions: {
-    remarkImageOptions: false,
+    remarkImageOptions: {
+      // Local images next to the MDX (e.g. ./create-ca/*.png) compile as Vite
+      // asset imports so they are bundled and hashed in production.
+      useImport: true,
+    },
     rehypeCodeOptions: {
       ...rehypeCodeDefaultOptions,
       // High-contrast GitHub palettes so code reads clearly in both modes.

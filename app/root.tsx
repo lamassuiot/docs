@@ -61,7 +61,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function LocaleAwareApp() {
+function LocaleProviders({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const locale = localeFromPath(pathname);
 
@@ -85,13 +85,17 @@ function LocaleAwareApp() {
         },
       }}
     >
-      <Outlet />
+      {children}
     </RootProvider>
   );
 }
 
 export default function App() {
-  return <LocaleAwareApp />;
+  return (
+    <LocaleProviders>
+      <Outlet />
+    </LocaleProviders>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
@@ -100,7 +104,14 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
-    if (error.status === 404) return <NotFound />;
+    // The ErrorBoundary replaces <App />, so the providers must be re-mounted
+    // here — HomeLayout needs fumadocs' FrameworkProvider (via RootProvider).
+    if (error.status === 404)
+      return (
+        <LocaleProviders>
+          <NotFound />
+        </LocaleProviders>
+      );
     message = "Error";
     details = error.statusText;
   } else if (import.meta.env.DEV && error && error instanceof Error) {

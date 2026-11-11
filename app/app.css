@@ -498,6 +498,7 @@ article img,
   display: block;
   margin-left: auto;
   margin-right: auto;
+  border-radius: 4px;
 }
 
 /* Keep documentation copy easy to scan. Justified text creates uneven word
@@ -909,4 +910,17 @@ html[data-show-diff] .lm-diff-final {
 
 html[data-show-diff] .lm-diff-merged {
   display: block;
+}
+/* Only the numbered badge changes: square with a small radius, light in
+   dark mode and dark in light mode so it stands out without recoloring
+   the step content itself. */
+.fd-step::before {
+  background-color: #e4e4e2;
+  color: #171718;
+  border-radius: 6px;
+}
+
+.dark .fd-step::before {
+  background-color: #22232a;
+  color: var(--color-fd-foreground);
 }

@@ -264,7 +264,6 @@ export default function DocsHome() {
                     aria-hidden
                     className="lm-wave-mark"
                   />
-                  <span className="lm-wave-index">0{index + 1}</span>
                   <span className="lm-wave-label">{t.navLinks[index]}</span>
                   <h3>{t.sections[index].title}</h3>
                   <p>{t.sections[index].description}</p>
@@ -281,7 +280,6 @@ export default function DocsHome() {
                 <span className="lm-wave-mark lm-wave-mark--svg" aria-hidden>
                   <ScalarIcon />
                 </span>
-                <span className="lm-wave-index">0{sections.length + 1}</span>
                 <span className="lm-wave-label">{t.navLinks[2]}</span>
                 <h3>{t.apiReference}</h3>
                 <p>
@@ -534,13 +532,6 @@ const HOME_CSS = `
 }
 .lm-wave-mark--svg { display: grid; place-items: center; color: #4af5a8; opacity: 0.35; filter: none; }
 .lm-wave-mark--svg svg { width: 60px !important; height: 60px !important; }
-.lm-wave-index {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  font-weight: 600;
-  color: #ffffff52;
-  letter-spacing: 0.05em;
-}
 .lm-wave-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;

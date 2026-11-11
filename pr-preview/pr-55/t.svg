@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD700" />
+      <stop offset="50%" stop-color="#FF8C00" />
+      <stop offset="100%" stop-color="#FF3D00" />
+    </linearGradient>
+
+    <linearGradient id="cyanGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="100%" stop-color="#003DFF" />
+    </linearGradient>
+
+    <linearGradient id="magentaGrad" x1="100%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#FF007B" />
+      <stop offset="100%" stop-color="#6B00FF" />
+    </linearGradient>
+
+    <filter id="glowGold" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="glowCyan" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="glowMagenta" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#glowMagenta)">
+    <ellipse cx="480" cy="250" rx="200" ry="65" transform="rotate(-45 480 250)" fill="none" stroke="url(#magentaGrad)" stroke-width="16" stroke-linecap="round" />
+    <circle cx="339" cy="391" r="22" fill="url(#magentaGrad)" />
+    <circle cx="621" cy="109" r="22" fill="url(#magentaGrad)" />
+  </g>
+
+  <g filter="url(#glowGold)" fill="none" stroke="url(#goldGrad)" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
+    <polygon points="120,250 160,180 240,180 280,250 240,320 160,320" />
+    
+    <polygon points="200,215 235,250 200,285 165,250" />
+    
+    <line x1="280" y1="250" x2="700" y2="250" />
+    
+    <path d="M 530 250 L 530 330 L 580 330 L 580 250 M 620 250 L 620 350 L 680 350 L 680 250" />
+  </g>
+
+  <g filter="url(#glowCyan)">
+    <ellipse cx="480" cy="250" rx="200" ry="65" transform="rotate(45 480 250)" fill="none" stroke="url(#cyanGrad)" stroke-width="16" stroke-linecap="round" />
+    <circle cx="339" cy="109" r="22" fill="url(#cyanGrad)" />
+    <circle cx="621" cy="391" r="22" fill="url(#cyanGrad)" />
+  </g>
+
+</svg>

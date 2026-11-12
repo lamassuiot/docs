@@ -26,11 +26,9 @@ export const DOC_REDIRECTS: Readonly<Record<string, string>> = Object.freeze({
   "platform/iot-fleets/enrollment": "platform/iot-fleets/enrollment/overview",
   "platform/iot-fleets/integrations":
     "platform/iot-fleets/integrations/aws-iot-core",
-  "platform/iot-fleets/updates": "platform/iot-fleets/updates/overview",
-  "platform/iot-fleets/updates/guides":
-    "platform/iot-fleets/updates/guides/publish-and-roll-out",
-  "platform/iot-fleets/updates/reference":
-    "platform/iot-fleets/updates/reference/api",
+  "platform/updates": "platform/updates/overview",
+  "platform/updates/guides": "platform/updates/guides/publish-and-roll-out",
+  "platform/updates/reference": "platform/updates/reference/api",
   "platform/administration": "platform/administration/access-control",
   deployment: "deployment/overview",
   "deployment/self-hosted": "deployment/self-hosted/overview",

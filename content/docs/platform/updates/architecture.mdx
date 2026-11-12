@@ -1,0 +1,138 @@
+---
+title: Architecture
+description: The components of Lamassu Updates, how they connect in each backend, and what runs in the background.
+---
+
+Lamassu Updates is one process that serves the Updates API (`/updates/v1`) and, embedded in it, SymKMS (`/symkms/v1`). It also answers `GET /health`. Behind the API there are two interchangeable backends. The `mode` setting picks one when the service starts. Clients, including the Lamassu dashboard, cannot tell them apart except through [capabilities](/docs/platform/updates/reference/capabilities).
+
+## Native mode
+
+In native mode the service owns the data. Postgres holds packs, launches and device history, WFX holds one job per device, and the service drives both.
+
+```mermaid
+flowchart TB
+  clients["<b>Clients</b><br/>dashboard, curl, scripts"]
+
+  ota["<b>Lamassu Updates</b><br/>one process<br/>Updates API · SymKMS<br/>SWU builder<br/>Background work"]
+
+  lamassu["<b>Lamassu IoT</b><br/>Device Manager<br/>(groups, devices)<br/>KMS (signing keys)"]
+  storage[("<b>Storage</b><br/>Postgres: updates<br/>Blob stores:<br/>artifacts, builds, keys")]
+  wfx["<b>WFX</b><br/>one job per device<br/>own database: wfx"]
+
+  clients -- "/updates/v1<br/>/symkms/v1" --> ota
+  ota -- "groups,<br/>signing" --> lamassu
+  ota -- "data,<br/>files" --> storage
+  ota -- "create jobs" --> wfx
+  wfx -- "job events" --> ota
+```
+
+The service is one process. Its parts, and which of them use which dependency, are in [What runs inside the service](#what-runs-inside-the-service).
+
+### How devices connect
+
+A device never talks to the service except to download its package. It polls WFX for jobs and reports each state change to WFX. The service learns about the changes from WFX's event stream.
+
+```mermaid
+flowchart TB
+  dev["<b>Devices</b><br/>SWUpdate"]
+  ota["<b>Lamassu Updates</b>"]
+  wfx["<b>WFX</b>"]
+
+  dev -- "poll for jobs,<br/>report each state" --> wfx
+  dev -- "download the .swu" --> ota
+  ota -- "create jobs" --> wfx
+  wfx -- "job events" --> ota
+```
+
+The download address in each job is the pack's download route under `update_domain`, with the device ID appended so per-device packages and gateway authorization work. When the `builds` blob store is on S3 with presigned downloads enabled, a download is answered with a `302` to a short-lived signed URL of the object instead of streaming the bytes through the service. Local storage always streams. Both support `Range` requests, so an interrupted download resumes.
+
+## hawkBit mode
+
+In hawkBit mode the service is a gateway. Packs become distribution sets, launches become rollouts, and hawkBit owns that data and is read live on every request. The service keeps in Postgres only what hawkBit has no place for. See [Data model](/docs/platform/updates/data-model).
+
+```mermaid
+flowchart TB
+  clients["<b>Clients</b><br/>dashboard, curl, scripts"]
+
+  ota["<b>Lamassu Updates</b><br/>one process<br/>Updates API · SymKMS<br/>SWU builder"]
+
+  lamassu["<b>Lamassu IoT</b><br/>Device Manager<br/>(groups, optional)<br/>KMS (signing keys)"]
+  storage[("<b>Postgres</b><br/>staging, descriptors,<br/>manifests,<br/>latest versions")]
+  hb["<b>Eclipse hawkBit</b><br/>modules, sets, rollouts<br/>own database and<br/>artifact store"]
+
+  clients -- "/updates/v1<br/>/symkms/v1" --> ota
+  ota -- "groups,<br/>signing" --> lamassu
+  ota -- "what hawkBit<br/>lacks" --> storage
+  ota -- "Management API" --> hb
+```
+
+### How devices connect
+
+Devices talk to hawkBit and never to this service for polling. They poll hawkBit's DDI API and send their feedback to it. The service reads progress back from hawkBit whenever it is asked, and has no event stream to follow.
+
+```mermaid
+flowchart TB
+  dev["<b>Devices</b><br/>SWUpdate suricatta"]
+  hb["<b>Eclipse hawkBit</b>"]
+  ota["<b>Lamassu Updates</b>"]
+
+  ota -- "create sets and rollouts,<br/>read progress<br/>(Management API)" --> hb
+  dev -- "poll, send feedback<br/>(DDI API)" --> hb
+  dev -. "artifact download,<br/>when routed here" .-> ota
+```
+
+The artifact download can also go through this service. It serves hawkBit's device artifact route (`/{tenant}/controller/v1/{controllerId}/softwaremodules/{id}/artifacts/{filename}`, under the path of `hawkbit.ddi_url`) unrewritten, so a gateway in front of both keeps matching its authorization rules. The service answers only for a module assigned to, or installed on, that device, and otherwise returns `404`. With presigning enabled on `hawkbit.artifact_store` it redirects (`302`) to a signed URL of hawkBit's S3 bucket. See [Connect a device](/docs/platform/updates/guides/connect-a-device).
+
+## What runs inside the service
+
+| Part | What it does | Native | hawkBit |
+|---|---|---|---|
+| Updates API | Packs, modules, artifacts, launches, device inventory, version compliance | Yes | Yes (translated to hawkBit calls) |
+| SymKMS | Stores symmetric keys and assigns them to devices. Used by shared and per-device encryption | Yes | Yes, for shared-key encryption, when a SymKMS storage or `sym_keys_dir` is configured |
+| SWU builder | Runs `swugenerator` to assemble, sign and encrypt `.swu` packages | Yes | Yes (per module), when `swugenerator_path` is set |
+| Blob stores | Artifacts, builds and keys, on local disk or S3, optionally encrypted at rest | Yes | Keys only (artifact bytes live in hawkBit's artifact store) |
+| WFX event consumer | Reads WFX's server-sent event stream, updates each device's state in its launch, releases the next batch | Yes | No |
+| Scheduled-launch trigger | Starts launches whose `scheduled_at` has passed, polling every 30 seconds, and repairs batches whose dispatch was interrupted | Yes | No (hawkBit's own scheduler) |
+| Leader election | Makes sure one replica runs the background work | Yes | Not needed |
+| Reconciliation | Each time the event stream connects (at start-up and after an outage), replays device completions it missed, because the stream has no replay | Yes | No |
+| Presigned downloads | Answers downloads with a redirect to a signed object-store URL | Builds store | `hawkbit.artifact_store` |
+
+## Dependencies
+
+| System | Role | Needed in |
+|---|---|---|
+| Postgres | The service's own data | Both |
+| Lamassu Device Manager | Source of device groups and devices | Native. Optional in hawkBit mode: without it the service reads the `group:<id>` tags on hawkBit's own targets |
+| Lamassu KMS | Signing keys, for the package and for version manifests | When signing |
+| WFX | Job orchestration | Native |
+| Eclipse hawkBit | The update server | hawkBit |
+| swugenerator (bundled) | Builds `.swu` files | When building |
+
+## Where things are stored
+
+| Data | Native | hawkBit |
+|---|---|---|
+| Packs, versions, modules | Postgres (`updates`) | hawkBit |
+| Artifact bytes | Blob store (`artifacts`) | hawkBit's artifact store |
+| Built `.swu` and packages | Blob store (`builds`) | hawkBit (as module artifacts) |
+| sw-descriptions | Postgres (a column of the pack and of the module) | Postgres |
+| Launches and device assignments | Postgres | hawkBit rollouts and actions |
+| Device jobs | WFX | hawkBit actions |
+| Device update history | Postgres | Read from hawkBit |
+| Encryption keys | SymKMS blob store | SymKMS blob store |
+
+Native mode also uses `update_files_base_dir` as build scratch space: it stages a build's inputs there, and the built outputs are published to the `builds` store.
+
+## Running more than one replica
+
+The background work (the WFX event consumer and the scheduled-launch trigger) runs on exactly one replica at a time. Leader election picks it: Kubernetes Leases when running inside a cluster, a Postgres advisory lock elsewhere, configurable with `leader_election.mode` (`""`, `kubernetes` or `database`). Without election every replica would count the same job completions and release batches early, so a failure to configure it stops the service at start-up. Batch dispatch is also protected by a per-launch lock, so two callers never send the same batch twice.
+
+If `builds` is on local disk the service logs a warning and the deployment is limited to one replica, because other replicas could not serve the builds. Put `builds`, `artifacts` and the SymKMS store on S3 to scale out. See [Operations](/docs/platform/updates/operations).
+
+## Next steps
+
+<Cards>
+  <Card title="Flows" description="The sequence of every important operation." href="/docs/platform/updates/flows" />
+  <Card title="Data model" description="The tables the service keeps and how they relate." href="/docs/platform/updates/data-model" />
+  <Card title="Operations" description="Deploy, scale, back up and upgrade." href="/docs/platform/updates/operations" />
+</Cards>

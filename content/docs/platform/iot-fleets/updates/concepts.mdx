@@ -1,0 +1,114 @@
+---
+title: Concepts
+description: Update packs, software modules, launch campaigns, workflows and how an update reaches a device.
+---
+
+The terms Lamassu Updates uses, and how they fit together. Read this page before the guides if "update pack", "launch" or "module" is new to you.
+
+## Vocabulary
+
+The dashboard and this documentation say **update pack**. The REST API and the code say **distribution set** (`/distribution-sets/...`). They are the same thing.
+
+| Term | Meaning | API / code name |
+|---|---|---|
+| Update pack | A named, versioned deliverable you send to devices | `distribution-set` |
+| Software module | One typed, named component inside a pack, such as an application. Identified by the key `type:name`, where `type` is `os` or `application` | `softwaremodule` |
+| Artifact | A file (binary) attached to a module or pack | `artifact` |
+| Device group | A set of devices registered in Lamassu IoT. A pack belongs to a group | `groupID` |
+| Launch campaign | One rollout of one pack version to the devices of a group | `launch` |
+| Job | One device's update inside a launch | job, device assignment |
+
+## Update packs
+
+A pack has a **version** (semantic, `x.y.z`) and a **status**:
+
+| Status | Meaning |
+|---|---|
+| `draft` | Editable. Artifacts can be added or replaced. Not built yet. |
+| `built` | The deliverable exists. The version is immutable. Create a new version to change it. |
+| `build_failed` | A build was attempted and failed. Still editable and retryable. The reason is in `last_build_error`. |
+
+A pack has one **packaging**:
+
+| Packaging | Delivered as | Workflow terminal state |
+|---|---|---|
+| `swu` | A `.swu` built with swugenerator, optionally signed and encrypted | `ACTIVATED` |
+| `non-swu` | The raw artifacts. Native mode builds a `.tar.gz` package (optionally encrypted, `.tar.gz.enc`). hawkBit mode delivers a `raw` module's single file as uploaded (optionally encrypted), and archives several files as `<name>.tar.gz` | `INSTALLED` |
+
+A pack can also carry **preconditions**: rules such as "the device must already have pack X at version 1.2.0 or higher", or "the module `os:gateway-fw` at version 2.1.0 or higher". Each precondition names exactly one pack (`required_distribution_set_name`) or one module (`required_module_key`) and a semantic `min_version`. A device that fails a precondition is not deployable, unless an operator forces the launch. Each launch records which devices failed and why.
+
+## Software modules
+
+A pack is a composition of modules. A pack holds one `os` module (the mandatory anchor) and any number of `application` modules. In native mode a pack without module rows is shown with one implicit module `os:<pack name>`, and the files you upload to the pack belong to it. A module holds its own files and, optionally, release notes. You can:
+
+- create a module on its own in the **catalog** (`POST /updates/v1/softwaremodules`) and compose packs from it later,
+- add a module to a pack directly, or
+- import a module that another pack already has.
+
+A module's **delivery intent** says how it will ship: `undecided` (default), `swu-build`, `swu-prebuilt` or `raw`.
+
+How modules relate to the build differs by backend:
+
+- **native**: modules are *build inputs*. The pack builds one `.swu` from all of them, and a launch sends each device a single download address.
+- **hawkbit**: each module has its *own deliverable*, built in the module catalog before the pack exists. Only built modules can be linked into a pack, and a linked module is frozen. hawkBit hands every module's artifacts to the device, so a pack with several modules installs as several independent SWUpdate transactions. SWUpdate cannot roll back across several `.swu` files.
+
+Importing a module also differs. In hawkBit mode the import **links** it, so both packs share the module and a rebuild is seen by both. In native mode it **copies** it, so the two diverge afterwards. The listing of reusable modules tells you which one you will get (`shared`).
+
+## Launch campaigns
+
+A launch rolls one pack version out to a group's devices in **batches**.
+
+### Strategy
+
+| Field | Meaning |
+|---|---|
+| `rollout_type` | How a batch is sized. Only `percentage` makes `rollout_value` a percentage. Any other value (`fixed`, or `numeric`, which the dashboard sends) makes it a device count |
+| `rollout_value` | The percentage, or the device count. Must be greater than 0 |
+| `workflow_type` | The WFX workflow: `direct` (no confirmation), `phased` (confirmation steps) or `download-install`. Use `download-install` for `non-swu` packs. Any other value is passed to WFX as a full workflow name, such as `wfx.workflow.dau.simple`. In hawkBit mode there is no WFX: `phased` becomes a hawkBit soft action (the device confirms or postpones) and every other value a forced action |
+| `test_device_id` | A canary. The first batch is this one device, and it must succeed before anyone else is touched |
+| `auto` | Release the next batch automatically when conditions are met |
+| `approval_threshold` | % of the current batch that must succeed before the next batch starts (0 to 100). Unset, 0 or 100 means the whole batch |
+| `error_threshold` | The launch is cancelled once this % of all devices have failed (rounded up, so 10% of 100 devices cancels at the 10th failure). `0` means no limit |
+| `scheduled_at` | Planned start time (RFC 3339). Native mode starts the first batch when it passes (polled every 30 seconds); hawkBit mode hands it to hawkBit as the rollout's start time |
+| `name`, `description` | Display name (defaults to the pack name) and free-text notes |
+| `weight` | A stored priority hint, 0 to 1000. Nothing reads it |
+
+### Lifecycle
+
+A launch is `running`, `paused` (resumable), `cancelled` (terminal) or `completed` (terminal). A device inside it goes `pending` → `active` → `completed` or `failed`. You can retry only the failed devices (`retry-failed`). In native mode this also reopens a finished or cancelled launch. The operator controls are `rollout`, `pause`, `resume`, `cancel`, `complete` and `retry-failed`, and the strategy can be edited while the launch exists. Native mode supports all of them. hawkBit mode has no `complete` and no strategy edit, because a rollout's groups and thresholds are fixed at creation (see [Capabilities](/docs/platform/iot-fleets/updates/reference/capabilities)).
+
+## Versions, compliance and inventory
+
+Beyond one-off launches you can declare the **latest version** of a pack for a group. The service then reports **drift**: devices that are not on the latest version. You can force one device to the latest version, or to an exact one. See the [API reference](/docs/platform/iot-fleets/updates/reference/api).
+
+The service also keeps a **device inventory**: which pack version each device carries now, with the artifacts that version's manifest declares, and the history of update attempts. Both are filled as the service's launches run.
+
+## How an update reaches a device (native mode)
+
+```mermaid
+flowchart TB
+  op["Operator builds the pack"] --> launch["Launch creates a WFX job per device"]
+  launch --> poll["Device polls WFX"]
+  poll --> dl["Device downloads the .swu from update_domain"]
+  dl --> inst["Device installs and reports each state to WFX"]
+  inst --> cnt["Launch counters update"]
+```
+
+The device-side state machine is a WFX workflow, in `wfx/workflow/dau/` of the repository:
+
+| Workflow file | States | Use |
+|---|---|---|
+| `wfx.workflow.dau.direct.yml` | INSTALL → INSTALLING → INSTALLED → ACTIVATE → ACTIVATING → ACTIVATED | SWU packs, no confirmation |
+| `wfx.workflow.dau.phased.yml` | CREATED → DOWNLOAD → … → ACTIVATED | SWU packs, with confirmation steps |
+| `wfx.workflow.dau.download-install.yml` | DOWNLOAD → DOWNLOADING → DOWNLOADED → INSTALL → INSTALLING → INSTALLED | `non-swu` packs. Select it with `workflow_type`: a launch does not choose it for you |
+| `wfx.workflow.dau.simple.yml` | DOWNLOAD → INSTALL → INSTALLED or TERMINATED | Minimal flow |
+
+Every workflow ends in `TERMINATED` on failure. The service registers the four files at startup. `workflow_file` must name the `direct` file, and the other three are looked up next to it by replacing `direct` in the file name (see [Configuration](/docs/platform/iot-fleets/updates/reference/configuration)). In hawkBit mode there are no WFX jobs: see [hawkBit mode](/docs/platform/iot-fleets/updates/hawkbit-mode).
+
+## Next steps
+
+<Cards>
+  <Card title="Architecture" description="The components and what runs inside the service." href="/docs/platform/iot-fleets/updates/architecture" />
+  <Card title="Flows" description="Sequence diagrams of every important operation." href="/docs/platform/iot-fleets/updates/flows" />
+  <Card title="Publish and roll out an update" description="Do it end to end." href="/docs/platform/iot-fleets/updates/guides/publish-and-roll-out" />
+</Cards>

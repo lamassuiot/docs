@@ -1,0 +1,110 @@
+---
+title: Capabilities
+description: The 22 capability flags of Lamassu Updates, what each backend supports, and how a client reads them.
+---
+
+`GET /updates/v1/capabilities` tells a client which backend is active (`native` or `hawkbit`) and which of 22 features it supports. Read it once and hide what does not apply. An operation the backend does not implement answers **`501 Not Implemented`**, never `500`; a `501` is a permanent property of the deployment, so retrying will not help. The one exception is `GET /workflows`, which answers an empty list in hawkBit mode.
+
+## Read the capabilities
+
+The route takes no parameters and has no side effects. The service serves it without authentication, like `/health`; a gateway in front of it may still require a token.
+
+```bash
+curl -s https://lamassu.example.com/api/updates/v1/capabilities \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+The response has three fields:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `backend` | string | `native` or `hawkbit` |
+| `supported` | object | One boolean per flag. It always carries all 22 keys, so a missing key means a client/server version skew, not "supported" |
+| `unsupported` | array of strings | The flags that are `false`, repeated for convenience, in the order of the table below |
+
+An example for a native deployment:
+
+```json
+{
+  "backend": "native",
+  "supported": {
+    "latest_versions": true,
+    "version_compliance": true,
+    "artifact_signatures": true,
+    "artifact_encryption": true,
+    "per_device_encryption": true,
+    "artifact_download_by_name": true,
+    "workflows": true,
+    "launch_strategy_update": true,
+    "launch_complete": true,
+    "launch_device_assignment": true,
+    "scheduled_launch": true,
+    "push_events": true,
+    "launch_preconditions": true,
+    "campaigns": true,
+    "canary_device": true,
+    "device_inventory": true,
+    "artifact_catalog": true,
+    "prebuilt_deliverable": true,
+    "software_module_composition": true,
+    "software_module_deliverables": false,
+    "standalone_software_modules": true,
+    "software_module_replace": false
+  },
+  "unsupported": ["software_module_deliverables", "software_module_replace"]
+}
+```
+
+## Per-backend support
+
+"Yes" means supported. "Conditional" means it depends on configuration or on the hawkBit server; see the notes after the table.
+
+| Capability | native | hawkbit |
+|---|---|---|
+| `latest_versions`: declare the latest version per group, plus per-device drift and force-sync | Yes | Yes |
+| `version_compliance`: group-wide compliance and version-status reports | Yes | Yes |
+| `artifact_signatures`: signed version manifests and the artifacts archive | Yes | Yes |
+| `artifact_encryption`: shared-key encryption and KMS signing at build | Yes | Conditional |
+| `per_device_encryption`: one deliverable per device, each with its own key | Yes | **No** |
+| `artifact_download_by_name`: fetch a pack's staged file by file name | Yes | Yes |
+| `workflows`: choose the WFX workflow per launch | Yes | **No** |
+| `launch_strategy_update`: edit the strategy after creation | Yes | **No** |
+| `launch_complete`: mark a launch complete early | Yes | **No** |
+| `launch_device_assignment`: add devices to a launch after creation (a service operation with no HTTP route) | Yes | **No** |
+| `scheduled_launch`: start a launch at a future time | Yes (the service polls) | Yes (hawkBit's own scheduler) |
+| `push_events`: server-pushed job state | Yes | **No** (poll) |
+| `launch_preconditions`: gate the deployable devices on installed versions | Yes | Yes |
+| `campaigns`: plan, start, pause, resume, cancel, retry failed | Yes | Yes |
+| `canary_device`: the first batch is one named device | Yes | Yes |
+| `device_inventory`: which pack version a device carries, and its update history | Yes | Yes |
+| `artifact_catalog`: fleet-wide artifact catalog and per-pack listing | Yes | Yes |
+| `prebuilt_deliverable`: attach an externally built file to a pack | Yes | **No** |
+| `software_module_composition`: a pack is a composition of typed modules | Yes | Conditional |
+| `software_module_deliverables`: each module has its own deliverable | **No** | Yes |
+| `standalone_software_modules`: create a module with no pack | Yes | Conditional |
+| `software_module_replace`: swap a module for another version of itself | **No** | Conditional |
+
+### Conditional flags in hawkBit mode
+
+- **`artifact_encryption`** is reported unsupported only when none of `swugenerator_path`, `symkms_endpoint` and `kms_endpoint` is configured. Each build option still needs its own settings: see [Signing and encryption](/docs/platform/iot-fleets/updates/signing-and-encryption).
+- **`software_module_composition`, `standalone_software_modules` and `software_module_replace`** depend on the hawkBit server having the pre-seeded `os` and `application` module types and the `os_app` or `app` set type. The service probes this with a 5 second timeout, caches the result for about five minutes and assumes support when hawkBit is unreachable. When the probe fails, all three flags are reported unsupported together.
+- **`software_module_deliverables`** is always reported supported in hawkBit mode. Building a `swu-build` module still needs a `swugenerator_path`, and without one the build answers `501`.
+- **`prebuilt_deliverable`**: a hawkBit pack is never built directly. A `swu-prebuilt` catalog module accepts a finished `.swu` instead.
+
+### Flags that differ in meaning
+
+Both backends report `software_module_composition`, but importing a module **links** it in hawkBit mode (both packs share one module) and **copies** it in native mode. The reusable-modules list reports this per candidate in its `shared` field, so a client can tell the operator which one they get. See [Concepts](/docs/platform/iot-fleets/updates/concepts).
+
+In native mode a launch dispatches one job per device with a single download URI, so a module has no deliverable of its own: the pack builds one `.swu` from every module's inputs. That is why `software_module_deliverables` and `software_module_replace` are unsupported there.
+
+## What a client should do
+
+- Call `capabilities` once at start-up and before showing a feature the table marks as backend-dependent.
+- Treat a `501` on a route as authoritative: hide the action instead of retrying.
+- Do not infer the backend from the URL. Both serve the same `/updates/v1` routes; see the [API reference](/docs/platform/iot-fleets/updates/reference/api) for which routes answer `501` in which backend.
+- Re-read the capabilities after changing hawkBit's module types or the build configuration.
+
+## Next steps
+
+- [API reference](/docs/platform/iot-fleets/updates/reference/api)
+- [hawkBit mode](/docs/platform/iot-fleets/updates/hawkbit-mode)

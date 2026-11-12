@@ -1,0 +1,63 @@
+---
+title: Limitaciones y problemas conocidos
+description: Lo que Lamassu Updates no soporta o aún no hace, reunido en un solo lugar y con la página que explica cada punto.
+---
+
+Esta página reúne lo que no está soportado, está soportado en parte o resulta sorprendente, para que lo compruebes antes de diseñar un despliegue. Cada punto indica la página que lo explica.
+
+## Seguridad
+
+- El servicio no tiene autenticación, autorización, TLS ni mTLS. Usa un gateway. Consulta [Seguridad](/docs/platform/iot-fleets/updates/security).
+- Las claves `app.server.cert_file`, `key_file` y `authentication.mutual_tls.*` no tienen efecto.
+- La conexión a Postgres usa siempre `sslmode=disable`. En modo `native` el servicio no verifica el certificado TLS del KMS, y el script firmante de SWU llama a `curl -k`.
+- El servicio envía la identidad fija `X-Principal-ID: admin-mode` al Device Manager y al KMS, y sus llamadas a SymKMS no llevan credencial.
+- No hay limitación de tasa de peticiones.
+
+## Backends
+
+- Los dos backends difieren en funciones. Consulta [Capacidades](/docs/platform/iot-fleets/updates/reference/capabilities). En particular, el modo `hawkbit` no tiene cifrado por dispositivo, ni workflows personalizados, ni edición de la estrategia de un lanzamiento tras su creación, ni cierre anticipado de una campaña, ni añadir dispositivos a una campaña en curso, ni eventos push, ni subida de un precompilado a nivel de conjunto. Un módulo de catálogo `swu-prebuilt` sí acepta un `.swu` terminado. El modo `native` construye un entregable por paquete y no tiene entregables por módulo.
+- En modo `hawkbit`, un paquete con varios módulos se instala como varias transacciones SWUpdate independientes. SWUpdate no puede revertir entre varios ficheros `.swu`.
+- hawkBit reserva el nombre y la versión de un módulo que alguna vez se asignó a un dispositivo. Sube la versión.
+- En modo `hawkbit`, una construcción de módulo sustituye los ficheros de entrada del módulo por el entregable, así que un módulo no se puede construir dos veces: publica una versión nueva.
+- Los rollouts de hawkBit se crean estáticos: los dispositivos añadidos a un grupo después de crear un lanzamiento no los recoge ese lanzamiento.
+- El modo `hawkbit` lee la estrategia de un lanzamiento de los grupos del rollout, así que un lanzamiento creado con un lote fijo puede leerse como un porcentaje.
+- Un primer lanzamiento en modo `hawkbit` con un `test_device_id` falla hasta que los dispositivos del grupo existen en hawkBit. Consulta [Resolución de problemas](/docs/platform/iot-fleets/updates/troubleshooting#llamadas-a-la-api).
+- `POST /updates/v1/artifacts` en modo `hawkbit` mantiene el fichero entero en memoria y en Postgres durante 30 minutos y no se puede enlazar a un paquete. Sube por la ruta de catálogo en su lugar. Consulta [Modo hawkBit](/docs/platform/iot-fleets/updates/hawkbit-mode#qué-vive-dónde).
+- Los límites de artefactos propios de hawkBit (1 GiB por fichero, 20 GiB en total) se aplican salvo que uses la imagen de este repositorio o los subas. La imagen con el plugin S3 de artefactos se construye desde `docker/hawkbit` y no se publica en ningún registro.
+
+## Paquetes y versiones
+
+- **Una versión nueva de un paquete `native` hereda los ajustes de cifrado de la versión anterior en las construcciones de `.swu`.** `POST .../new` los copia, y una construcción de `.swu` sin campos de cifrado no los borra. Tras una construcción por dispositivo, todas las versiones posteriores de ese paquete siguen informando `per-device`, conservan los `uncovered_devices` antiguos y las descargas de los dispositivos fallan con `404` (`SWU not available for device ...`). Usa un paquete distinto para cada variante de cifrado. (Las construcciones `.../package` restablecen estos campos.)
+- `POST .../new` no arrastra la sw-description del paquete: cada versión necesita su propia subida.
+- **Los nombres de artefacto son globales.** Un nombre solo se puede reutilizar con una `version` mayor, y la API responde una infracción con `500`, no con un `4xx`.
+- Una versión construida es inmutable. Para cambiarla, crea una versión nueva.
+
+## Escalado y recursos
+
+- Con almacenamiento local en un único volumen `ReadWriteOnce`, solo puede ejecutarse una réplica `native`. Pasa `artifacts`, `builds` y `symkms` a S3 para escalar. Consulta [Operaciones](/docs/platform/iot-fleets/updates/operations#escalar-horizontalmente).
+- Las claves de SymKMS también usan almacenamiento local por defecto: apunta `symkms.storage` a S3, o comparte un volumen, o se pierden.
+- Las construcciones por dispositivo están limitadas por CPU y crecen con el número de dispositivos. Consulta [Firma y cifrado](/docs/platform/iot-fleets/updates/signing-and-encryption#configurar-el-cifrado-por-dispositivo).
+- Cifrar necesita el fichero en memoria (`swugenerator`, los paquetes AES-GCM y los módulos raw, y cualquier almacén con cifrado en reposo), así que los ficheros cifrados muy grandes necesitan memoria proporcionalmente grande. Firmar un módulo raw transmite el fichero en streaming.
+- Cada subida en curso necesita disco temporal libre del tamaño del fichero.
+
+## Firma y cifrado
+
+- La firma necesita un KMS que devuelva CMS (`PKCS7 SignedData`). El servicio rechaza una respuesta que no sea CMS cuando firma manifiestos y sumas de verificación de módulos raw, pero el script firmante de SWU no lo comprueba: con un KMS sin soporte CMS una construcción de `.swu` puede salir bien y aun así ser rechazada por un dispositivo que define `public-key-file`. Consulta [Firma y cifrado](/docs/platform/iot-fleets/updates/signing-and-encryption#firma).
+- Los paquetes `non-swu` y los módulos raw son siempre AES-GCM, sea cual sea el nombre de algoritmo que envíes, y para ellos se rechaza una clave Ascon-80pq.
+- SymKMS no aplica propósitos de clave: se acepta cualquier propósito y uno vacío es un comodín (un marcador de posición intencionado). Rechaza un IV aportado por quien llama para GCM, CTR y Ascon.
+- Los nombres de algoritmo no se normalizan de extremo a extremo: SymKMS ignora mayúsculas y `_` frente a `-`, pero `swugenerator` necesita guiones (`aes-256-gcm`), y `ascon128a` no es `ASCON-128A`.
+
+## Despliegue y configuración
+
+- `app.server.protocol`, `app.server.log_level`, `app.server.health_check` y el `health_check_logging` de los ejemplos se aceptan pero no se leen. El registro de peticiones está siempre activado.
+- La base de datos se llama siempre `updates`, y el servicio no la crea.
+- Los ficheros de configuración de ejemplo contienen valores de una máquina de desarrollo y secretos de desarrollo.
+- El valor por defecto de `config.update_domain` en el chart de Helm (`http://updates:10090/v1/`) carece del prefijo `/updates`: el valor debe ser la base completa de la API terminada en `/updates/v1/`, o las URLs de descarga no resuelven.
+- El chart de Helm declara valores `postgresql.*` e `ingress.*` pero no despliega PostgreSQL y no tiene plantilla de ingress. Usa siempre la estrategia `Recreate`, vuelca todo `config` (contraseñas incluidas) en un ConfigMap y no tiene valores para añadir variables de entorno, volúmenes ni un Secret existente.
+- La imagen de contenedor no reduce privilegios, e incluye un `config.yml` de desarrollo: monta el tuyo.
+- Para construir tú mismo la imagen Docker, el contexto de construcción debe contener los checkouts de `lamassuiot/core` y `lamassuiot/sdk` junto a `ota/`.
+- `GET /health` no comprueba la base de datos, WFX ni hawkBit.
+
+## Observabilidad
+
+- El servicio no exporta trazas, métricas ni registros, y no tiene endpoint de métricas. Consulta [Operaciones](/docs/platform/iot-fleets/updates/operations#observabilidad).

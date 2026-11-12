@@ -1,0 +1,206 @@
+---
+title: Usa el dashboard
+description: Publica, lanza y sigue una actualización desde el dashboard de Lamassu, pantalla a pantalla.
+---
+
+El dashboard de Lamassu es la interfaz web de la API de Updates. Esta guía sigue la misma actualización que las guías curl ([nativa](/docs/platform/iot-fleets/updates/guides/native-curl) y [hawkBit](/docs/platform/iot-fleets/updates/guides/hawkbit-curl)) a través de las pantallas. Los nombres en negrita son las etiquetas que muestra el dashboard.
+
+El dashboard es un proyecto aparte (`lamassu-dashboard`). Esta guía lo describe a partir de su código fuente y no tiene capturas, así que una etiqueta puede diferir en una versión más reciente. El dashboard no tiene traducciones: sus etiquetas están en inglés, y aquí se mantienen tal cual.
+
+## Antes de empezar
+
+- Lamassu Updates está en marcha y el dashboard puede alcanzarlo. Consulta [Conéctalo al servicio](#conéctalo-al-servicio).
+- Un **grupo de dispositivos** de Lamassu IoT que contenga los dispositivos que vas a actualizar (**Device Groups** dentro de **IoT**). Los miembros de un grupo son los dispositivos que cumplen sus criterios.
+- Para una construcción SWU con firma o cifrado: una clave de firma en **Asymmetric Keys** o una clave simétrica en **Symmetric Keys** (ambas en **KMS**) y, para el cifrado por dispositivo, claves asignadas a los dispositivos en **Device Key Inventory** (en **IoT**).
+
+## Conéctalo al servicio
+
+El dashboard habla con la API de Updates en la dirección indicada en `LAMASSU_UPDATES_API`, en su `public/config.js`. En la imagen de contenedor procede de la variable de entorno del mismo nombre.
+
+```js
+LAMASSU_UPDATES_API: "http://localhost:10090"
+```
+
+- El dashboard le añade `/updates/v1` y `/symkms/v1`. Se acepta y se elimina un `/updates/v1` final.
+- Si está vacía, el dashboard usa `LAMASSU_API`.
+- Cuando la autenticación está activada, cada llamada lleva el bearer token del usuario. El servicio lo ignora, así que pon delante una pasarela que lo compruebe. Consulta [Seguridad](/docs/platform/iot-fleets/updates/security).
+- Debe apuntar a la instancia del servicio que ejecuta el backend que quieres usar. Un servicio ejecuta modo nativo o modo hawkBit, nunca los dos: para usar ambos a la vez ejecutas dos instancias, cada una en su puerto, y apuntas el dashboard a una de ellas.
+
+El dashboard lee `GET /updates/v1/capabilities` una vez, después de iniciar sesión, y oculta lo que el backend no puede hacer. Por eso las mismas pantallas se ven distintas en modo nativo y en modo hawkBit. [Qué cambia según el backend](#qué-cambia-según-el-backend) enumera las diferencias. Si la petición de capacidades falla, el dashboard asume que todo está admitido y no oculta nada.
+
+Para comparar ambos backends, el menú de usuario tiene un selector **Updates backend** con las opciones **Auto**, **native** y **hawkbit**. Aparece solo en compilaciones de desarrollo, o cuando el contenedor del dashboard se ejecuta con `DEV_OPTIONS_ENABLED=true`. Elegir native o hawkbit sustituye `LAMASSU_UPDATES_API` en ese navegador, muestra un campo editable **Updates API base URL** y recarga la página. Los valores por defecto son `http://localhost:10090` (native) y `http://localhost:10091` (hawkbit) en localhost, y `<origin>/api` y `<origin>/api/hawkbit` en cualquier otro host.
+
+## Dónde está cada cosa
+
+El grupo de la barra lateral **OTA UPDATES MANAGER** tiene:
+
+| Elemento | Ruta | Qué es |
+|---|---|---|
+| **Dashboard** | `/updates/dashboard` | Título de página **OTA Dashboard**: salud de los lanzamientos, campañas que requieren atención, distribución de versiones y próxima planificación |
+| **OTA Devices** | `/updates/devices` | Todos los dispositivos con su versión instalada y su versión objetivo |
+| **OTA Device Groups** | `/updates/device-groups` | Grupos, con cuántos dispositivos van retrasados |
+| **Distribution Set** | `/package-inventory` | Los paquetes de actualización de todos los grupos |
+| **Software Modules** | `/updates/software-modules` | El catálogo de módulos |
+| **Campaigns** | `/updates` | Lanzamientos: lista, creación, ejecución |
+
+El grupo **IoT** tiene **Devices**, **Device Groups** (el registro de dispositivos de Lamassu y sus grupos), **Device Key Inventory** y **Platform Integrations**. El grupo **JOB MANAGER** (**Jobs**, **Workflows**) lista trabajos y workflows de WFX en bruto. No usa la API de Updates y no crea lanzamientos.
+
+En el dashboard, un paquete es un **distribution set** y un lanzamiento es una **campaign**.
+
+## 1. Crea un distribution set
+
+Abre **Distribution Set**. La lista muestra los paquetes de todos los grupos, con filtros de grupo de dispositivos y de estado, un cuadro de búsqueda y un botón **Refresh**. Pulsa **New Distribution Set**.
+
+| Campo | Notas |
+|---|---|
+| **Name** | Al menos 3 caracteres, sin espacios. Usa guiones bajos. El modo nativo, además, solo acepta letras, dígitos, `.`, `_` y `-` |
+| **Version** | Semver, por defecto `1.0.0` |
+| **Device Group** | Obligatorio. Un paquete pertenece a un grupo y solo se puede lanzar a sus dispositivos |
+| **Type** | **Raw File** (sin reinicio), **Firmware** (con reinicio), **Both** u **Other Type** |
+| **Driver** | Nativo: **SWU** construye una imagen firmada (la firma es opcional), **Generic** entrega los ficheros tal cual. hawkBit: **SWU** acepta solo módulos SWU, **Generic** acepta binarios y otros ficheros. No se puede cambiar tras crear el paquete |
+| **Allow previous-version download** | Permite que los dispositivos descarguen versiones anteriores de este paquete |
+| **Compatibility** | Precondiciones de lanzamiento opcionales (plegado): los dispositivos ya deben tener otro distribution set, o un módulo de software, en una versión mínima |
+
+Pulsa **Create Distribution Set**. Llegas a la página del paquete. Las precondiciones siguen siendo editables allí, en **Launch Preconditions** de la pestaña **Overview** (**Save preconditions**).
+
+En modo hawkBit el formulario tiene una sección más, **Software modules**. Un conjunto de hawkBit enlaza módulos construidos, así que marca al menos un módulo construido, y como mucho un módulo OS. La tabla lista solo los módulos que encajan con el **Driver**: un conjunto SWU oculta los módulos entregados como ficheros en bruto, y uno Generic oculta los módulos entregados como SWU prefabricado. Si no encaja ninguno, dice «No built module fits this driver», y primero construyes uno (consulta [hawkBit: construye primero un módulo](#hawkbit-construye-primero-un-módulo)).
+
+En el backend nativo, el **Driver** decide además qué workflow puede instalar el paquete: los paquetes SWU necesitan **Direct** o **Phased** y los Generic necesitan **Download-Install**. Una discrepancia deja la actualización pareciendo atascada cuando el dispositivo ya terminó.
+
+## 2. Añade ficheros y construye (nativo)
+
+En la página del paquete (`/updates/pack-details`) abre la pestaña **Software Modules**. Un paquete nativo empieza con un módulo OS con el nombre del paquete («Not composed»). Abre el menú de su fila y elige **Add files**, suelta tu fichero y súbelo. El nombre del artefacto es por defecto el del fichero sin su extensión, y la versión es opcional (semver). Para componer el paquete con más módulos, usa **Add module** (un módulo de aplicación nuevo) o **Import module** (copia uno existente); el paquete sigue construyendo un único SWU.
+
+Después pulsa **Generate SWU** en la cabecera. La hoja **SWU deliverable** tiene dos pestañas.
+
+**Build here** construye el paquete a partir de los artefactos del paquete:
+
+| Parte | Qué hacer |
+|---|---|
+| **Artifacts to include** | Casillas, todas marcadas por defecto |
+| **sw-descriptor** | Obligatorio. Carga el fichero o escríbelo en el editor. Una lista de comprobación muestra cada fichero que declara la descripción, y un fichero declarado pero no seleccionado bloquea la construcción |
+| **Signing** | **Signing key**: ninguna (sin firmar) o una clave del KMS. Con una clave, elige un **Method** y un **Certificate** |
+| **Encryption**, **Mode** | Ninguno, **Shared (one key for all devices)** o **Per-device (key per device)** |
+
+Para el cifrado compartido elige una **Symmetric key** y si cifrar el descriptor (**Encrypt the descriptor**) y todos los ficheros (**Encrypt all files**), o marca ficheros individuales. Para el cifrado por dispositivo elige un **Algorithm** (por defecto `Ascon-128a`). Cada dispositivo usa entonces su propia clave del inventario de claves de dispositivo. Si no eliges ninguna seguridad, la hoja dice «No security selected».
+
+Pulsa **Generate SWU**. La hoja sube el sw-description y después construye. La insignia pasa a **Built** y el botón de la cabecera pasa a decir **Regenerate SWU**. Junto a él aparece **Download SWU**, salvo en un paquete por dispositivo: no hay descarga del conjunto completo, y el paquete de cada dispositivo se descarga por dispositivo.
+
+**Upload pre-built** adjunta un `.swu` que construiste por tu cuenta, hasta el `max_artifact_size_mb` del servicio (10 GiB por defecto). Se guarda y se sirve sin cambios, no se firma ni se cifra nada por ti, y la versión pasa a estar construida e inmutable.
+
+Un paquete **non-swu** tiene **Generate Package** en su lugar. Construye un `.tar.gz` con los artefactos seleccionados, con firma opcional y cifrado compartido o por dispositivo opcional (el cifrado es AES-GCM), y también tiene una pestaña **Upload pre-built**. **Download Package** descarga el resultado.
+
+Para cambiar un paquete construido, crea una versión nueva: usa **New Version** en el menú de fila de la lista de paquetes (el diálogo tiene **Create Version**), o **New Version to Edit** en la pestaña **Artifacts** del paquete. La versión nueva debe ser mayor que la actual, y borra el paquete construido.
+
+### hawkBit: construye primero un módulo
+
+En modo hawkBit, los ficheros de un paquete viven en módulos, construidos en el catálogo.
+
+1. Abre **Software Modules** y pulsa **New module**. Rellena **Module name** (no puede contener `/` ni `:`), **Type** (**Application** u **OS / base image**), **Version**, el **Distribution set** (deja **Catalog only — no set** para enlazarlo más tarde) y el **Delivery intent**:
+
+   | Delivery intent | Significa |
+   |---|---|
+   | **Build SWU from inputs** | Aportas ficheros y un sw-description, y el servicio construye un `.swu` |
+   | **Upload prebuilt SWU** | Subes un `.swu` terminado |
+   | **Deliver files unchanged** | Los ficheros se entregan tal cual, y el módulo cuenta como construido tras un paso de construcción que puede cifrarlos y firmarlos de forma opcional |
+   | **Decide later** | Aún no se puede usar |
+
+2. Añade los ficheros y, para **Build SWU from inputs**, el sw-description. Las tarjetas de seguridad ofrecen firma y cifrado compartido. Para **Build SWU from inputs**, el interruptor **Build this module now** está activado por defecto: desactívalo para guardar solo los ficheros y construir más tarde desde el menú de fila **Files and build**. Para **Upload prebuilt SWU** no hay interruptor: el módulo queda construido en cuanto se guarda el `.swu`. Para **Deliver files unchanged** el interruptor es **Build now**.
+3. Pulsa **Create Module**.
+4. Crea el distribution set y marca el módulo construido.
+
+Un módulo enlazado a un conjunto queda congelado. Desenlázalo para cambiarlo, o añade una versión nueva desde **Upgrade to a new version** en el menú de su fila del catálogo. Consulta [Modo hawkBit](/docs/platform/iot-fleets/updates/hawkbit-mode).
+
+El catálogo también funciona en el backend nativo: lista los módulos de todos los paquetes, y **New module** puede dejar un módulo en **Catalog only — no set** hasta que lo añadas a un paquete con **Import module**. La importación nativa copia el módulo, mientras que el enlace de hawkBit lo comparte.
+
+## 3. Inicia una campaña
+
+Pulsa **Start Campaign** en el menú de fila del paquete en **Distribution Set** (habilitado una vez construido el paquete), o **New Campaign** en la página **Campaigns**. El formulario, **Create campaign**, está en `/updates/new`.
+
+| Sección | Campos |
+|---|---|
+| **Campaign basics** | **Campaign name (optional)**, **Distribution set**. **Device group** y **Driver** se heredan y son de solo lectura. **Workflow**: en nativo, todos los workflows de WFX registrados (Direct, Phased, Download-Install...), con un aviso cuando no encaja con el driver. En hawkBit el campo es **Install mode**: **Forced** (el dispositivo instala en cuanto consulta) o **Soft** (el dispositivo puede confirmar o posponer) |
+| **Schedule** | **Start as soon as it is executed** o **Start at a planned time** (fecha y hora, en la zona horaria de tu navegador) |
+| **Batching & rollout** | **Batch mode** (**Fixed count** o **Percentage**), el tamaño o porcentaje del lote y el interruptor **Auto rollout** |
+| **Safety controls** | Solo con Auto rollout activado: **Approval threshold** (%) y **Error threshold** (%) |
+| **Optional** | **Test device** (el canario, que se actualiza primero), las **Preconditions** del conjunto (solo lectura), **Notes**, **Weight** |
+
+No hay selector de dispositivos. Una campaña apunta a todos los dispositivos del grupo del paquete, y el panel **Campaign summary** muestra cuántos coinciden y el número estimado de lotes.
+
+Si el paquete tiene precondiciones, el dashboard ejecuta primero una simulación (dry run) y muestra **Campaign preconditions**: cuántos dispositivos cumplen, cuáles no y por qué. Marca **Force deploy to non-qualifying devices (not recommended)** para enviar también a los que no cumplen y después **Confirm campaign**.
+
+Pulsa **Create campaign**. La campaña se crea pero todavía no se envía nada: vuelves a **Campaigns**.
+
+## 4. Ejecuta y vigila la campaña
+
+En **Campaigns** (`/updates`), cada fila tiene el progreso, el estado (como **Scheduled**, **Rolling Out**, **Paused**, **Completed**, **Cancelled**) y el progreso por lotes. Las tarjetas de la parte superior (**Active campaigns**, **Scheduled**, **Rolling out**, **Requires attention**, **Completed**) filtran la lista. La página se actualiza cada cuatro segundos mientras algo se mueve.
+
+El botón principal de la fila libera un lote:
+
+- **Send to test device** envía primero el canario.
+- **Execute next batch** envía el siguiente lote.
+
+Se oculta cuando la campaña está completada o cancelada, en pausa, programada para más tarde, sin nada pendiente, o es una campaña con **Auto rollout** que ya está en marcha. Mientras se prueba el canario o ha fallado, sigue visible pero deshabilitado. Un canario fallido pausa una campaña nativa: usa **Resume** para reintentarlo. Una campaña programada empieza sola a la hora planificada.
+
+El menú de fila tiene **Open details**, **Resume**, **Pause**, **Retry N failed** y **Cancel campaign** (pregunta «Cancel Campaign?»). **Pause** detiene los lotes siguientes mientras los dispositivos que ya están en curso terminan; **Resume** continúa. No hay botón para marcar una campaña como completada: una campaña nativa se completa sola cuando no queda ningún dispositivo pendiente ni en curso.
+
+Debajo de la tabla, un panel muestra los **Batches** de la campaña seleccionada y una tabla **Device progress**. Sigue la primera fila activa hasta que seleccionas otra. Abre **View** para `/updates/details`:
+
+- **Overview**: identidad, precondiciones y la **Rollout Configuration** (workflow o install mode, tipo y valor del rollout, modo automático, dispositivo de prueba). **Edit** sobre el valor del rollout funciona solo donde el backend admite editar una estrategia en ejecución.
+- **Device Jobs**: una fila por dispositivo con el estado de su trabajo, un botón **Refresh Jobs** y, en cada fila, un botón **Workflow** que abre la línea de tiempo del dispositivo. Para el workflow Phased, un botón **Next** y una tira de transiciones te permiten confirmar pasos, que es como avanza una campaña `phased`.
+
+La cabecera de la página repite el botón principal (**Execute Campaign**, o **Send to Test Device** antes del canario) y **Retry N failed device(s)**. No tiene pausar, reanudar ni cancelar: están en el menú de fila de la lista. En hawkBit, **Pause** está oculto hasta que la campaña ha empezado a despachar.
+
+## 5. Sigue los dispositivos
+
+Abre **Devices** (en **IoT**) y elige un dispositivo. La página tiene más pestañas que las relacionadas con actualizaciones que se listan aquí:
+
+| Pestaña | Muestra |
+|---|---|
+| **Information** | Los distribution sets que lleva, y **Up to date** u **Outdated** respecto al objetivo declarado |
+| **Update Status** | Nativo: el workflow de eventos de WFX. hawkBit: la actualización en curso con los pasos Assigned, Installing e Installed |
+| **Package Inventory** | **Installed Distribution Sets** con sus artefactos, y el **Pack Update History** |
+| **Jobs** | Los trabajos de WFX del dispositivo |
+
+Usa **Launch Update...** en el menú de acciones del dispositivo para enviar una versión a un dispositivo. El diálogo **Launch update for device** pide el grupo de dispositivos (cuando el dispositivo está en varios), el distribution set, la versión y el workflow (o el install mode), y crea un trabajo. El menú de acciones del propio paquete tiene **Targeted Update**, que hace lo mismo con los dispositivos que marques en una lista, siempre con el workflow `direct`, y se habilita cuando el paquete está construido. En **OTA Devices**, selecciona dispositivos de un mismo grupo y pulsa **Update** para hacerlo con muchos dispositivos; el botón está deshabilitado cuando la selección abarca varios grupos.
+
+**OTA Dashboard**, **OTA Devices** y **OTA Device Groups** muestran el cumplimiento de versiones: qué dispositivos están al día, por detrás de un objetivo declarado o sin objetivo. La página de un grupo también lista la versión que ejecuta cada dispositivo frente a la versión publicada del grupo, con un botón **Update to vX** para los desactualizados. Sin soporte de cumplimiento de versiones en el backend, siguen listando dispositivos y campañas, pero las versiones objetivo aparecen como **No target** o con un guion largo, con la alerta «Target versions unavailable on this backend».
+
+## Qué cambia según el backend
+
+| Pantalla | Nativo | hawkBit |
+|---|---|---|
+| Lista de paquetes | Estado, empaquetado y tarjetas **Built / Not built / Build failed** | Esas tarjetas, el filtro y la columna de estado se ocultan. Un conjunto no tiene estado de construcción propio: está listo cuando todos sus módulos están construidos, y **Start Campaign** sigue deshabilitado hasta entonces |
+| Paquete nuevo | Sin sección de módulos | Sección **Software modules** obligatoria |
+| Cabecera de la página del paquete | **Generate SWU** y **Download SWU** (o **Generate Package** y **Download Package**) | Un botón **Software modules** en su lugar: se construye en el catálogo |
+| Pestañas de la página del paquete | **Overview**, **Software Modules**, **Contents**, **Manifest**, **Version History** (la composición está admitida, así que no hay pestaña **Artifacts** a nivel de paquete) | Las mismas. La pestaña **Artifacts** aparece en su lugar solo si el servidor hawkBit no tiene los tipos de módulo |
+| Seguridad | En la hoja **Generate SWU** | Por módulo |
+| Formulario de campaña | **Workflow**: Direct, Phased o cualquier workflow de WFX registrado | **Install mode**: **Forced** o **Soft** |
+| Umbral de error | La campaña se cancela cuando este % de todos sus dispositivos ha fallado | La campaña se detiene cuando falla más de este % de un lote |
+| Pestaña **Update Status** | Workflow de eventos de WFX | Pasos de la acción de hawkBit |
+| Editar un rollout en ejecución | Admitido | No admitido |
+| Catálogo de módulos | Los módulos se crean sin conjunto o se añaden a un paquete, y la importación los copia | Los módulos se construyen en el catálogo y un paquete los enlaza |
+
+La pestaña **Manifest** (el manifiesto de versión firmado) aparece solo cuando el backend admite firmas de artefactos.
+
+## Lo que no está en el dashboard
+
+Estas funciones de la API no tienen pantalla: marcar una campaña como completada (`/complete`), sincronizar de una vez todos los conjuntos de un dispositivo con las últimas versiones del grupo (`/sync-to-latest`) y declarar la última versión de un grupo. Usa la [API](/docs/platform/iot-fleets/updates/reference/api) para ellas. Para enviar un conjunto a un dispositivo, lo hacen **Launch Update...** y el botón **Update to vX** por dispositivo en la página de un grupo.
+
+## Solución de problemas
+
+| Síntoma | Causa probable |
+|---|---|
+| Faltan pantallas o botones que deberían existir | La petición de capacidades tuvo éxito y el backend no los admite. Revisa **Updates backend** en el menú de usuario (compilaciones de desarrollo) o `GET /updates/v1/capabilities` |
+| Las pantallas de actualizaciones no cargan o muestran errores | `LAMASSU_UPDATES_API` apunta al servicio o puerto equivocado, o tu pasarela no enruta `/updates/v1` |
+| **Start Campaign** está deshabilitado | El paquete no está construido (nativo), o no todos los módulos están construidos (hawkBit) |
+| Al crear un paquete no se ofrece ningún grupo de dispositivos | Aún no existe ningún grupo de dispositivos. Crea uno en **Device Groups** |
+| Una campaña parece atascada en **Rolling Out** cuando los dispositivos ya terminaron | El workflow no encaja con el driver del paquete. Los paquetes SWU necesitan **Direct** o **Phased**; los Generic necesitan **Download-Install** |
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Publica y lanza una actualización" href="/docs/platform/iot-fleets/updates/guides/publish-and-roll-out" description="El mismo flujo como peticiones a la API." />
+  <Card title="Conceptos" href="/docs/platform/iot-fleets/updates/concepts" description="Paquetes, módulos, campañas y workflows." />
+  <Card title="Capacidades" href="/docs/platform/iot-fleets/updates/reference/capabilities" description="Qué admite cada backend y qué oculta la interfaz." />
+</Cards>

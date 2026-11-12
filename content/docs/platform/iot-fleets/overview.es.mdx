@@ -45,6 +45,15 @@ Una identidad emitida necesita un consumidor que confíe en su emisor, valide el
 
 La guía de [AWS IoT Core](/docs/platform/iot-fleets/integrations/aws-iot-core) explica cómo utilizar la identidad en ese destino. El aprovisionamiento en Lamassu y el aprovisionamiento en el destino son decisiones distintas; revisa las condiciones del modo elegido antes de esperar sincronización de estados.
 
+## Actualizaciones de software
+
+Cuando los dispositivos ya tienen identidad, Lamassu Updates les entrega firmware y software por aire. Publicas un paquete, eliges los dispositivos o grupos que lo reciben y sigues el despliegue; los dispositivos lo instalan con SWUpdate y los paquetes pueden firmarse y cifrarse.
+
+<Cards>
+  <Card title="Lamassu Updates" description="Entiende el servicio, sus dos backends y el ciclo de vida de una actualización." href="/docs/platform/iot-fleets/updates/overview" />
+  <Card title="Publica y despliega una actualización" description="Crea un pack, genera el paquete y lánzalo a un grupo de dispositivos." href="/docs/platform/iot-fleets/updates/guides/publish-and-roll-out" />
+</Cards>
+
 ## Quién prepara cada parte
 
 | Participante | Responsabilidad |

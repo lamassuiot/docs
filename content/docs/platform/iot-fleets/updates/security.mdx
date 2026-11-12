@@ -1,0 +1,106 @@
+---
+title: Security
+description: What Lamassu Updates does and does not protect, and what to put around it before exposing it.
+---
+
+Lamassu Updates delegates authentication, authorization and TLS to the platform gateway in front of it. This page lists what the service itself enforces, what it does not, and what to configure around it. Read it before exposing the service beyond a trusted network.
+
+## Summary
+
+| Area | State |
+|---|---|
+| Authentication of API callers | **None in the service.** Every route is open to anyone who can reach the port. The gateway must authenticate. |
+| Authorization | **No roles or per-group permissions.** The service only does structural checks (see [What the service checks](#what-the-service-checks)). The gateway must authorize. |
+| TLS and mTLS (inbound) | **Not implemented.** The service always serves plain HTTP. |
+| TLS to other systems | Postgres: always `sslmode=disable`. KMS: not verified in `native` mode, and the SWU signer script uses `curl -k`. See [Outbound connections](#outbound-connections). |
+| CORS | Any origin and any header are allowed. |
+| Rate limiting, security headers | None added by the service. |
+| Package signing | Available, through the Lamassu KMS. See [Signing and encryption](/docs/platform/iot-fleets/updates/signing-and-encryption). |
+| Package encryption | Available: shared key or per-device key. |
+| At-rest encryption | Available for artifacts, builds and keys, through the `encryption` block of each storage block. |
+
+The `cert_file`, `key_file` and `authentication.mutual_tls.*` keys exist in the configuration structs but are not read, so setting them does nothing.
+
+## What to put in front of it
+
+Run the service behind a gateway or reverse proxy that:
+
+1. **Terminates TLS** between clients and the service.
+2. **Authenticates and authorizes** callers: operators for the API, and devices for the download routes. A device must only reach its own download paths, so match the device certificate to the `:deviceID` (or `:controllerId`) in the path.
+3. **Restricts the dangerous routes** to the callers that need them (see below).
+
+Keep the service on a private network. Devices need to reach only the download routes and, in `native` mode, the WFX **client** listener. In `hawkbit` mode they talk to hawkBit (and to the signed-URL store) and not to this service, except for the artifact download route described in [hawkBit mode](/docs/platform/iot-fleets/updates/hawkbit-mode#artifact-storage-and-downloads).
+
+WFX has a client listener (`8080` in Compose, published as `9080`) and a management listener (`8081`, published as `9081`). Lamassu Updates authenticates neither. Devices need the client listener only: do not expose the management port to devices or untrusted networks.
+
+### How the service identifies itself to others
+
+The service does not forward the caller's identity. Calls to the Lamassu Device Manager and the KMS carry the fixed header `X-Principal-ID: admin-mode`, which the platform's authorization layer accepts for internal callers and which the platform gateway strips from external traffic. The value is not configurable, so point `dms_endpoint` and `kms_endpoint` at internal service addresses, not at a public gateway path that would reject or forward it. SymKMS calls from the service carry no credential.
+
+## Routes to restrict
+
+| Route | Why |
+|---|---|
+| `GET /symkms/v1/:keyID/raw` | Returns raw key material. |
+| `GET /symkms/v1/inventory/:deviceID/key` | Returns a device's raw key material. The Updates service uses it during a per-device build. |
+| `POST /symkms/v1/`, `DELETE /symkms/v1/:keyID`, key assignment routes | Create, delete and assign encryption keys. |
+| `POST /symkms/v1/encrypt`, `/decrypt`, `/mac` | Use stored keys on arbitrary data. |
+| `PUT /updates/v1/jobs/:jobID/transition` | Forges a job state change with no ownership check. Registered only when `enable_test_endpoints` is `true`: keep it `false`. |
+| Every `POST`, `PUT` and `DELETE` of `/updates/v1` | Build, launch, cancel and delete. Restrict them to operators. |
+| `GET` of artifacts, descriptors and `artifacts-archive` | Expose firmware sources and sw-descriptions. |
+| Download routes with `:deviceID` | Per-device builds are encrypted with that device's key, but the route itself checks nothing about who asks. |
+
+## What the service checks
+
+These are defence in depth, not a substitute for the gateway:
+
+- A launch is addressed under its group: an operation on a launch through another group's path answers `404`, exactly as for a missing launch, and changes nothing.
+- Approval and error thresholds must be between 0 and 100.
+- In `native` mode, pack, group and device identifiers used in paths are validated so they cannot escape the storage directories, and a per-device pack never falls back to the shared build for a device.
+- An upload under a `.swu` name must really be a SWU: other content is refused with `400`.
+- An uploaded file larger than `max_artifact_size_mb` is refused with `413`.
+- In `hawkbit` mode the DDI artifact route serves a file only if the module is assigned to or installed on that device.
+- Anything that changes a built version is refused (`409`): versions are immutable.
+
+## Presigned download URLs
+
+With `presign.enabled`, a download is answered `302` to a short-lived URL of the S3 store. The service authorizes the caller first (the gateway for the static route and, in `hawkbit` mode, the device's assignment); the store then checks only the signature, so **the URL is a bearer capability**: whoever holds it can fetch that one object until it expires. The design keeps that acceptable:
+
+- The TTL is short (default 60 s). It bounds when a GET can **start**: a transfer in progress finishes after expiry, and a device that retries or resumes goes back to the static endpoint for a fresh URL. A URL already signed for the same object is reused while it has `min_remaining` validity left (default `min(25s, ttl/2)`); it grants no more than a fresh one.
+- The signing credential must be **read-only** and different from the storage credential. At start-up the service probes with a write and refuses to run if the credential can write, is the storage's own, or is rejected by the store. A signature covers the method and the key, so a URL cannot be turned into a `PUT` or aimed at another object.
+- The signed host is the store's **public** origin (`presign.public_endpoint`), because the signature covers the `Host` header.
+- It cannot be combined with at-rest encryption of the same store (devices would receive ciphertext).
+- Redirect responses carry `Cache-Control: no-store`. `HEAD` requests are answered by the service, not redirected. If signing fails, the service streams the file instead of failing the update.
+- Rotate the signing credential by updating the files named by `access_key_id_file` and `secret_access_key_file`: they are re-read every minute.
+
+The store itself must be reachable by devices at the public endpoint, and should accept only the read-only credential on the prefix it serves. Do not publish the store's console or S3 API with default credentials.
+
+## Outbound connections
+
+| Connection | Transport security |
+|---|---|
+| Postgres | `sslmode=disable`, not configurable. Keep the database on a private network. |
+| Lamassu Device Manager | The Lamassu platform SDK client with its default settings. |
+| Lamassu KMS | `native` mode: certificate verification is **skipped** for the service's own calls, and the SWU signer script uses `curl -k`. `hawkbit` mode: the service's calls verify the certificate, the script still does not. Use an internal address you trust. |
+| SymKMS | The scheme of `symkms_endpoint` (normally the service itself, over plain HTTP in the examples), with no credential. Raw key material crosses this connection: keep it on `localhost` or a private network. |
+| hawkBit Management API | HTTP Basic with `hawkbit.username` and `hawkbit.password`. Use HTTPS. |
+| WFX | The scheme of `wfx_endpoint` (plain HTTP in the examples), to the management listener. |
+
+## Secrets
+
+- `encryption.local_key`, S3 credentials and database passwords must come from a secret store, not from a file in the repository. The example configurations contain development values only. Prefer the `*_file` form of S3 and presign credentials, which the service re-reads every minute.
+- The Helm chart renders all of `config` into a ConfigMap. See [Operations](/docs/platform/iot-fleets/updates/operations#secrets-with-helm). Override its placeholder database password.
+- With `app.logs.level: debug` the service logs the whole configuration, secrets included, and in `native` mode it prints the `storage` block (with its password) to standard output at every start. Use `info` or higher in any environment whose logs are stored.
+- A lost `encryption.local_key` makes everything stored with it unreadable. See [Backup and restore](/docs/platform/iot-fleets/updates/operations#backup-and-restore).
+- Signing keys stay in the Lamassu KMS: the service never holds the private key. Device encryption keys do live in SymKMS (optionally encrypted at rest), because packages must be encrypted with them.
+- The container image does not drop privileges. Set a `securityContext` that suits your cluster.
+
+## hawkBit mode
+
+- The Management API user is a full administrator of hawkBit. Change the default (`admin`) credential, keep the API off the device network and serve it over HTTPS.
+- Devices authenticate to hawkBit, not to this service. hawkBit 1.1.0 has no anonymous mode: enable a target security token, a gateway token or the reverse-proxy header authenticator, and for the last restrict which addresses may set its headers. Leaving device authentication off, which is acceptable only on a throw-away test stack, lets anything that can reach hawkBit impersonate a device. See [hawkBit mode](/docs/platform/iot-fleets/updates/hawkbit-mode#device-authentication-in-production).
+- hawkBit does not encrypt artifacts at rest. Enable default encryption in the bucket, or use encrypted (shared-key) packages.
+
+## Request limits
+
+A request body can be up to `max_artifact_size_mb` plus 1 MiB (10 GiB by default), and a request can take up to 6 hours, so large uploads work. Streamed uploads use temporary disk under `TMPDIR`. Apply tighter limits at the gateway for callers that are not trusted: there is no rate limiting in the service.

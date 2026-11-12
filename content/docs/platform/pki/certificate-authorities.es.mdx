@@ -103,6 +103,8 @@ Necesitas el certificado de CA en PEM, su cadena hasta una raíz conocida y, si 
     ### Carga el material
 
     Importa el certificado y, cuando corresponda, su clave PEM. Registra las CAs de la cadena necesarias para identificar al emisor. Tener una CA en el inventario no la instala en los almacenes de confianza externos.
+
+    El backend valida antes de importar ninguna clave: se rechazan un ID de CA duplicado y un certificado que no es de CA (falta `basicConstraints` `cA=TRUE`), este último con `400` `certificate is not a CA: basicConstraints cA flag is not set`. Si ocurre un fallo después de haber importado la clave, la clave se conserva en el KMS y un aviso te pide eliminarla manualmente.
   </Step>
   <Step>
     ### Define la emisión predeterminada

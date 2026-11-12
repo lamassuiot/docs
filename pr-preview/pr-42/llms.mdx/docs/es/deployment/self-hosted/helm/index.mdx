@@ -189,7 +189,7 @@ tls:
 
 <div className="lm-diff-ins lm-diff-block">
   <Callout type="warn" title="Define el puerto AMQP antes del upgrade">
-    Según la guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: en 3.8.0 `amqp.tls` no se aplicaba y los clientes del bus de eventos usaban AMQP en claro; desde 4.0.0, `amqp.tls: true` los cambia a AMQPS. Define `amqp.port` con el listener TLS del broker antes del upgrade, o usa `amqp.tls: false` para mantener AMQP en claro.
+    Según la guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: en 3.8.0 `amqp.tls` no se aplicaba y los clientes del bus de eventos usaban AMQP en claro; desde 4.0.0, `amqp.tls: true` los cambia a AMQPS. Define `amqp.port` con el listener TLS del broker antes del upgrade, o usa `amqp.tls: false` para mantener AMQP en claro. `amqp.tls: false` envía las credenciales del broker y todo el tráfico del bus de eventos en claro.
   </Callout>
 </div>
 

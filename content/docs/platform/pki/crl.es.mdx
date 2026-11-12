@@ -33,7 +33,7 @@ Al reemitir una CA, el rol sigue apuntando al certificado anterior. Las CRL sigu
 </Callout>
 
 <Callout type="warn" title="No compartas clave entre CA">
-  Hoy la VA identifica la CRL por el SKI de la CA, así que dos CA con la misma clave (o una CA importada con un SKI ya existente) comparten un único rol y una única CRL. Los certificados de una de ellas pueden no aparecer nunca en la lista, y los clientes la rechazarán porque el emisor no coincide. Crea cada CA con su propia clave. Si ya tienes CA que comparten clave, revísalas antes de actualizar.
+  Compartir una clave entre CA puede impedir la validación de las CRL. Consulta [CAs que comparten clave](#cas-que-comparten-clave).
 </Callout>
 
 `latest_crl` contiene versión, inicio y fin de validez. Las versiones se conservan en el almacenamiento de objetos como PEM bajo `pki/va/crl/{subject_key_id}/{version}.crl`; el endpoint público entrega DER.
@@ -46,7 +46,7 @@ Los certificados de todas ellas apuntan a `/crl/{ski}`, pero la lista publicada 
 
 Si la primera CA se elimina, la generación de CRL de la restante falla porque el firmante configurado ya no corresponde a una CA con ese nombre. Hasta que se actualice el firmante del rol a un certificado de la CA restante, se sigue sirviendo la última lista publicada hasta que venza (7 días por defecto).
 
-Para detectar el problema, compara el SKI de las CAs en el inventario: dos con el mismo SKI están afectadas. Para resolverlo, crea una CA con clave propia y reemite sus certificados; los ya emitidos conservan la URL antigua y no se corrigen hasta reemitirlos. Una CA importada con un SKI ya en uso no sustituye a la existente como emisora de la CRL, porque el emisor se resuelve a partir del firmante del rol. Sin embargo, sus propios certificados apuntan a esa misma URL y sus revocaciones no se publican. Hasta que Lamassu rechace estas importaciones, limita el permiso de importar CAs como control provisional; cubre solo la vía de importación. Crear una CA con **Create New CA (Existing Key)** sobre una clave KMS que otra CA ya usa produce la misma colisión, así que tampoco reutilices claves entre CAs. Una CRL por CA y el rechazo de importaciones cuyo SKI colisiona con el de una CA existente están planteados en [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), y ninguno está implementado todavía.
+Antes de actualizar, revisa las CAs que comparten clave. Para detectar el problema, compara el SKI de las CAs en el inventario: dos con el mismo SKI están afectadas. Para resolverlo, crea una CA con clave propia y reemite sus certificados; los ya emitidos conservan la URL antigua y no se corrigen hasta reemitirlos. Una CA importada con un SKI ya en uso no sustituye a la existente como emisora de la CRL, porque el emisor se resuelve a partir del firmante del rol. Sin embargo, sus propios certificados apuntan a esa misma URL y sus revocaciones no se publican. Hasta que Lamassu rechace estas importaciones, limita el permiso de importar CAs como control provisional; cubre solo la vía de importación. Crear una CA con **Create New CA (Existing Key)** sobre una clave KMS que otra CA ya usa produce la misma colisión, así que tampoco reutilices claves entre CAs. Una CRL por CA y el rechazo de importaciones cuyo SKI colisiona con el de una CA existente están planteados en [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), y ninguno está implementado todavía.
 
 ## Regeneración periódica y automática
 

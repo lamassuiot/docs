@@ -111,7 +111,13 @@ Once provisioning completes, the connector stores the resulting certificate's AR
 
 ### `jitp` mode
 
-Just-In-Time Provisioning (JITP) mode delegates provisioning to AWS instead of the connector doing it directly. When the connector detects the DMS is in `jitp` mode, it creates a JITP provisioning template in AWS IoT Core and attaches it to the registered CA certificate. This template is created or updated at the moment the DMS is created or updated in Lamassu — not at device enrollment time. From then on, when a device with a certificate issued by that CA connects to AWS IoT Core for the first time, AWS executes the template automatically: it creates the Thing, registers the certificate and activates it.
+Just-In-Time Provisioning (JITP) mode delegates provisioning to AWS instead of the connector doing it directly. When the connector detects the DMS is in `jitp` mode, it creates a JITP provisioning template in AWS IoT Core and attaches it to the registered CA certificate. The template is created when the DMS is created in Lamassu, not at device enrollment, and it is not updated afterwards (see the notice below). From then on, when a device with a certificate issued by that CA connects to AWS IoT Core for the first time, AWS executes the template automatically: it creates the Thing, registers the certificate and activates it.
+
+<Callout type="warn" title="Editing a DMS in JITP mode does not update the AWS template">
+  The connector creates the template, named after the DMS ID, only once. Each later edit of the DMS that keeps the connector key tries to create it again and fails, because the connector does not update existing templates. Later changes to `jitp_config.provisioning_role_arn`, `jitp_config.enable_template` or to the groups and policies the template references must be applied by hand in AWS IoT Core.
+
+  The failed event is retried and ends in `lamassu-dlq`. Groups and policies are registered before the failure, but the assignment of the template to the registered CA, the write-back of the ARN to the DMS and the shadow update when `ManagedCAs` changes are skipped.
+</Callout>
 
 The Thing name in the JITP template is derived from `AWS::IoT::Certificate::CommonName`, which corresponds to the device certificate's CN — the same convention as `auto` mode.
 
@@ -314,6 +320,14 @@ The first statement lets the device connect using its ThingName as the MQTT iden
 **Cause:** The shadow feature is disabled in the DMS configuration, the connector's credentials lack IoT data-plane permissions, or the firmware reads a different shadow than the configured one.
 
 **Resolution:** Check that `shadow_config.enable` is `true` in the connector metadata for the corresponding DMS. If a Named Shadow is used, verify `shadow_config.shadow_name` holds the correct name and that the firmware reads that Named Shadow and not the Classic Shadow. Confirm the connector's credentials have `iotdata:GetThingShadow` and `iotdata:UpdateThingShadow` permissions.
+
+---
+
+**Symptom:** After editing a DMS in `jitp` mode, DMS update messages appear in `lamassu-dlq`, or JITP configuration changes have no effect in AWS.
+
+**Cause:** The edit triggers a new attempt to create the JITP template, which already exists in AWS. The attempt fails and the connector's later steps are skipped.
+
+**Resolution:** Check that the template named with the DMS ID exists in AWS IoT Core and that JITP enrollment works. If the JITP configuration was changed, apply it by hand to the AWS template.
 
 <Cards>
   <Card title="Configure a DMS" href="/docs/platform/iot-fleets/enrollment/dms" />

@@ -16,19 +16,41 @@ The VA role stores configuration and metadata for the latest list published for 
 | `crl_options` field | Purpose | Backend initial value |
 |---|---|---|
 | `validity` | Time from `thisUpdate` to `nextUpdate`. | 7 days. |
-| `refresh_interval` | Time since publication that triggers scheduled renewal. | 6 days and 23 hours. |
+| `refresh_interval` | Stored and returned by the API, but the VA does not use it: scheduled renewal does not depend on it (see [Periodic and automatic regeneration](#periodic-and-automatic-regeneration)). | 6 days and 23 hours. |
 | `regenerate_on_revoke` | Request regeneration on revocation or reactivation from `CertificateHold` events. | `true`. |
-| `subject_key_id_signer` | Configuration field initialized with the CA’s SKI. | CA SKI. |
+| `signer_certificate_serial_number` | Serial number of the existing certificate that signs the CRL. | Serial number of the CA’s current certificate. |
 
-The generator uses the key of the CA identified by the requested SKI. Do not interpret `subject_key_id_signer` as verified support for a different delegated CA: changing that field does not change the signer in this flow.
+The signer must be an existing certificate with the `cRLSign` key usage and the same subject and public key as the CA. Certificates from before a reissue qualify. A delegated signer is not supported: a certificate with the CA’s subject but a different key is rejected.
+
+When a CA is reissued, the role keeps pointing at the previous certificate. CRLs remain valid because both certificates share subject and key, but the previous certificate cannot be deleted while the role uses it. To retire it, update the role’s signer.
+
+<Callout type="warn" title="Cases in which the role can no longer be edited">
+  When a CA is deleted, its VA role is kept and cannot be removed through the API. If no other CA with the same SKI remains, the role can be read but any `PUT` returns 404, and the renewal job logs a warning on every cycle because it no longer finds the CA. The API offers no way out; it can only be fixed by editing the database. If another CA with that SKI remains, the role is still editable (see [CAs that share a key](#cas-that-share-a-key)). Adjust validity and signer before deleting the CA.
+
+  A CA whose certificate lacks `cRLSign` cannot generate its CRL or edit its role (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and set it as the signer with `PUT`. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages.
+
+  `PUT` always validates the signer, even when the request does not change it. If the stored signer is no longer valid, no field of the role can be modified, not even the validity, until a valid one is set.
+</Callout>
 
 `latest_crl` contains version, validity start and end. Versions are kept as PEM in object storage at `pki/va/crl/{subject_key_id}/{version}.crl`; the public endpoint returns DER.
 
+## CAs that share a key
+
+The VA identifies each CRL by the CA’s SKI, and the SKI is derived from its key. Two CAs with the same key have the same SKI and share a single VA role and a single CRL. This happens when a CA is created on an existing KMS key, or when a CA is imported whose certificate declares an SKI already in use. Lamassu takes the SKI of an imported certificate as-is and does not check that it corresponds to its public key. The first CA creates the role and the others keep it.
+
+The certificates of all of them point to `/crl/{ski}`, but the published list has the first CA as issuer and only includes its revocations. A verifier compares the CRL issuer with the issuer of the certificate it validates (RFC 5280, §6.3.2) and rejects the list if they differ. Depending on its policy, the certificate is blocked (*hard-fail*) or accepted even though it is revoked (*soft-fail*). Revocations of the secondary CAs do not appear in any list.
+
+If the first CA is deleted, CRL generation for the remaining one fails because the configured signer no longer matches a CA with that name. Until the role’s signer is updated to a certificate of the remaining CA, the last published list keeps being served until it expires (7 days by default).
+
+To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Until Lamassu rejects these imports, restrict the permission to import CAs as an interim control; it covers only the import path. Creating a CA with **Create New CA (Existing Key)** on a KMS key another CA already uses produces the same collision, so also avoid reusing keys across CAs. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
+
 ## Periodic and automatic regeneration
 
-The scheduled job requests another list when `refresh_interval` is reached or when the list approaches expiration within the configured watch period. This depends on working jobs, storage and signing; it does not guarantee renewal during a service failure.
+The VA scheduled job checks every role on each run and requests another list when the remaining validity of `latest_crl` is less than the interval between runs. The frequency is set in Helm with `services.va.job.crl.frequency` (default `0 * * * *`) and accepts a duration (`1h`) or a cron expression. A cron expression is converted into a constant interval equal to the time left until its next firing when the service starts, so it is not aligned with the clock. `refresh_interval` plays no part. Keep `validity` well above the interval: with a shorter validity, the list is regenerated on every cycle.
 
-With `regenerate_on_revoke`, the event handler requests a new CRL upon revocation or reactivation from `CertificateHold` to `ACTIVE`. This happens after the status change and has its own failure paths. Confirming revocation does not establish that the new CRL is already published or that all clients have downloaded it.
+If generation fails (for example, because of a role without a CA or an invalid signer), the job logs the warning `something went wrong while calculating CRL for CA <ski>` and retries on the next cycle. There is no other renewal path until the cause is fixed, and the last published list keeps being served until it expires. All of this depends on working jobs, storage and signing.
+
+With `regenerate_on_revoke`, the event handler requests a new CRL upon revocation or reactivation from `CertificateHold` to `ACTIVE`. This happens after the status change and has its own failure paths: if it fails (missing role, invalid signer), the event is retried and, once retries are exhausted, moves to the failed-events queue. Confirming revocation does not establish that the new CRL is already published or that all clients have downloaded it.
 
 Compare CRL numbers and timestamps before and after a change. Monitor expired lists and generation failures; clients must apply policy when current evidence is unavailable.
 
@@ -87,6 +109,16 @@ The following paths are relative to the VA service; confirm the public prefix in
 You need authentication and role read or update permissions. Consult your installation’s [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract: the backend replaces `crl_options`; it does not merge omitted fields.
 
 After a change, check saved configuration and the next list actually published. Updating the role alone does not establish regeneration or client acceptance.
+
+## Common VA role errors
+
+| Symptom | Cause | Action |
+|---|---|---|
+| `PUT /v1/roles/{ca-ski}` returns 404 and `GET` returns 200. | The role’s CA was deleted and no other CA with the same SKI remains. | There is no API way out; it requires database intervention. Avoid it by adjusting the role before deleting the CA. |
+| `PUT` returns 400. | The signer lacks `cRLSign`, or its subject and key match no CA with that SKI (for example, after deleting the first of two CAs that share a key). | Use `PUT` to set the serial number of a valid certificate of the remaining CA. |
+| `PUT` returns 400 from a 3.x client. | `crl_options.subject_key_id_signer` was replaced by `signer_certificate_serial_number`, which is required. | Update the client to send the new field. |
+| The CRL does not change after revoking a certificate. | `regenerate_on_revoke` is `false`, or the event failed because of a missing role or an invalid signer. | Check the VA logs and the failed-events queue; fix the signer. |
+| A verifier rejects the CRL because of the issuer. | Several CAs share an SKI. | See [CAs that share a key](#cas-that-share-a-key). |
 
 ## From the interface
 

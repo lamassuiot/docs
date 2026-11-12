@@ -187,6 +187,30 @@ body {
   display: none;
 }
 
+/* The tab row ships as max-lg:hidden, which drops it exactly on tablets.
+   Fumadocs only sets --fd-header-height for the two-row header at lg+, so
+   mirror that var in the same media query range: the tab row pushes the
+   sticky sidebar below both rows instead of under the tabs. */
+#nd-subnav [data-header-tabs] {
+  display: flex;
+}
+
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  #nd-notebook-layout {
+    --fd-header-height: 6rem;
+  }
+
+  #nd-subnav [data-header-tabs] {
+    display: flex;
+  }
+}
+
+@media (max-width: 767.98px) {
+  #nd-subnav [data-header-tabs] {
+    display: none;
+  }
+}
+
 /* ── Sidebar ───────────────────────────────────────────────────────────── */
 
 #nd-sidebar > div {
@@ -347,6 +371,170 @@ body {
   max-height: 1.25rem;
   object-fit: contain;
   flex-shrink: 0;
+}
+
+/* ── Section switcher (sidebar tabs dropdown) ───────────────────────────
+   Fumadocs renders the section switcher as a boxed control with a framed
+   icon, a description line and stacked chevrons. It runs inside the mobile
+   drawer (< lg) and next to the top tabs (md-lg once the tab row is shown
+   below), where it reads as a sidebar link instead: quiet fill on hover,
+   ink text, one small chevron, no frame around the icon. */
+#nd-sidebar-mobile button[aria-haspopup="dialog"]:has(p),
+#nd-sidebar button[aria-haspopup="dialog"]:has(p) {
+  padding: 0.375rem 0.5rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background-color: transparent;
+  color: var(--color-fd-foreground);
+}
+
+/* Drawer header: the close button and the switcher share one row instead of
+   stacking a full-width close row above the selector. */
+#nd-sidebar-mobile > div:first-child {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 0;
+}
+
+#nd-sidebar-mobile > div:first-child > button[aria-haspopup="dialog"]:has(p) {
+  flex: 1;
+  min-width: 0;
+}
+
+#nd-sidebar-mobile button[aria-haspopup="dialog"]:hover:has(p),
+#nd-sidebar button[aria-haspopup="dialog"]:hover:has(p),
+#nd-sidebar-mobile button[aria-haspopup="dialog"][data-state="open"]:has(p),
+#nd-sidebar button[aria-haspopup="dialog"][data-state="open"]:has(p) {
+  background-color: rgb(11 11 11 / 0.04);
+}
+
+.dark #nd-sidebar-mobile button[aria-haspopup="dialog"]:hover:has(p),
+.dark #nd-sidebar button[aria-haspopup="dialog"]:hover:has(p),
+.dark #nd-sidebar-mobile button[aria-haspopup="dialog"][data-state="open"]:has(p),
+.dark #nd-sidebar button[aria-haspopup="dialog"][data-state="open"]:has(p) {
+  background-color: rgb(255 255 255 / 0.04);
+}
+
+/* The description under the title belongs to the menu, not the trigger. */
+#nd-sidebar-mobile button[aria-haspopup="dialog"] p + p,
+#nd-sidebar button[aria-haspopup="dialog"] p + p {
+  display: none;
+}
+
+/* Recenter the title on the icon's line: Fumadocs' 12px type in the drawer
+   trigger rides 3px high inside its line box. */
+#nd-sidebar-mobile button[aria-haspopup="dialog"]:has(p) > div:nth-child(2) {
+  padding-block-start: 0.375rem;
+}
+
+/* Icons sit directly on the sidebar surface, without the mobile frame.
+   Fumadocs wraps them in a 2.25rem box on < md (size-9) and size-full at md;
+   fix the box at 1.25rem and center its contents so PNGs and SVGs line up. */
+#nd-sidebar-mobile button[aria-haspopup="dialog"] > div:first-child,
+#nd-sidebar button[aria-haspopup="dialog"] > div:first-child,
+[data-radix-popper-content-wrapper] > [role="dialog"] > a > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+#nd-sidebar-mobile button[aria-haspopup="dialog"] > div:first-child > div,
+#nd-sidebar button[aria-haspopup="dialog"] > div:first-child > div,
+[data-radix-popper-content-wrapper] > [role="dialog"] > a > div:first-child > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+}
+
+/* Swap the stacked chevrons for a single caret that flips when open. */
+#nd-sidebar-mobile button[aria-haspopup="dialog"]:has(p) > svg,
+#nd-sidebar button[aria-haspopup="dialog"]:has(p) > svg {
+  display: none;
+}
+
+#nd-sidebar-mobile button[aria-haspopup="dialog"]:has(p)::after,
+#nd-sidebar button[aria-haspopup="dialog"]:has(p)::after {
+  content: "";
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-inline-end: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  border-radius: 1px;
+  opacity: 0.45;
+  transform: translateY(-12.5%) rotate(45deg);
+  transition: transform 120ms;
+}
+
+#nd-sidebar-mobile button[aria-haspopup="dialog"][data-state="open"]:has(p)::after,
+#nd-sidebar button[aria-haspopup="dialog"][data-state="open"]:has(p)::after {
+  transform: translateY(-12.5%) rotate(-135deg);
+}
+
+/* The section menu: framed, softly elevated, rows like sidebar links with
+   the active one tinted and check-marked (the row's check simply loses its
+   invisible class). */
+[data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) {
+  padding: 0.375rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 0.625rem;
+  background-color: var(--color-fd-popover);
+  box-shadow:
+    0 16px 32px -12px rgb(11 11 11 / 0.2),
+    0 4px 12px -4px rgb(11 11 11 / 0.08);
+}
+
+[data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) > a {
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  color: var(--color-fd-foreground);
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+
+/* Center the 1.25rem icon on the title's line (font 14px + row padding). */
+[data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) > a > div:first-child {
+  margin-block-start: -0.1875rem;
+}
+
+[data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) > a > svg {
+  align-self: center;
+}
+
+[data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) > a:hover {
+  background-color: rgb(11 11 11 / 0.04);
+  color: var(--color-fd-foreground);
+}
+
+[data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) > a:has(> svg:not(.invisible)) {
+  background-color: rgb(11 11 11 / 0.04);
+}
+
+.dark [data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) {
+  box-shadow:
+    0 16px 32px -12px rgb(0 0 0 / 0.6),
+    0 4px 12px -4px rgb(0 0 0 / 0.4);
+}
+
+.dark [data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) > a:hover,
+.dark [data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) > a:has(> svg:not(.invisible)) {
+  background-color: rgb(255 255 255 / 0.04);
+}
+
+.dark [data-radix-popper-content-wrapper] > [role="dialog"]:has(> a) > a:has(> svg:not(.invisible)) {
+  background-color: var(--lm-accent-soft);
 }
 
 /* ── Page header ───────────────────────────────────────────────────────────
@@ -1084,5 +1272,14 @@ html[data-show-diff] .lm-diff-merged {
 
   .lb-image.lb-ready {
     animation: none;
+  }
+}
+
+/* From md up the top-bar tab row carries the section switcher, so the
+   sidebar's inline dropdown (only shipped hidden at lg) would duplicate it.
+   Keep it for the < md drawer, where the tab row does not exist. */
+@media (min-width: 768px) {
+  #nd-sidebar button[aria-haspopup="dialog"]:has(p) {
+    display: none;
   }
 }

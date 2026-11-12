@@ -147,7 +147,7 @@ Una vez registradas las claves heredadas, arrancar el KMS con la opción de conf
 
 #### Referencias entre certificados, claves y roles VA
 
-Los certificados referencian ahora su clave del KMS, y los roles VA referencian su certificado firmante, de modo que no se puede eliminar una clave o un certificado en uso. La migración del KMS descarta los metadatos de clave heredados `lamassu.io/kms/binded-resources`. La migración de CA registra las claves públicas de las CA eliminadas como claves del KMS sin clave privada; existen para satisfacer la referencia y es seguro eliminarlas.
+Los certificados referencian ahora su clave del KMS, y los roles VA referencian su certificado firmante, de modo que no se puede eliminar una clave o un certificado en uso. La migración del KMS descarta los metadatos de clave heredados `lamassu.io/kms/binded-resources`. Antes de 4.0.0, eliminar una CA podía borrar su clave y dejar referencias a ella en los registros de certificado conservados. La migración de CA registra esas claves ausentes en el KMS solo con su clave pública para satisfacer las referencias conservadas. Estas entradas no pueden eliminarse mientras los certificados conservados las referencien; no recuperan la clave privada. En 4.0.0, eliminar una CA libera las referencias de su propio certificado actual y de sus certificados reemitidos vinculados antes de intentar eliminar la clave; los demás certificados que todavía la referencien impiden su eliminación.
 
 ### APIs y configuración almacenada
 

@@ -147,7 +147,7 @@ Once legacy keys are registered, starting the KMS with the backend configuration
 
 #### References between certificates, keys and VA roles
 
-Certificates now reference their KMS key, and VA roles reference their signer certificate, so a key or certificate in use cannot be deleted. The KMS migration drops the legacy `lamassu.io/kms/binded-resources` key metadata. The CA migration registers the public keys of deleted CAs as KMS keys without a private key; they exist to satisfy the reference and are safe to delete.
+Certificates now reference their KMS key, and VA roles reference their signer certificate, so a key or certificate in use cannot be deleted. The KMS migration drops the legacy `lamassu.io/kms/binded-resources` key metadata. Before 4.0.0, deleting a CA could remove its key while leaving key references in its retained certificate records. The CA migration registers those missing keys in the KMS with only their public key to satisfy the retained references. These entries cannot be deleted while the retained certificates reference them; they do not restore the private key. In 4.0.0, deleting a CA releases the references from its own current certificate and linked reissued certificates before attempting to delete the key; other certificates that still reference it prevent deletion.
 
 ### APIs and stored configuration
 

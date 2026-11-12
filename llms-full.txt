@@ -486,6 +486,18 @@ The Gateway should report `PROGRAMMED=True`. If it is programmed but has no usab
 
 The Helm test checks the CA, DMS Manager, Device Manager and VA health endpoints and verifies the UI response.
 
+Upgrading Lamassu [#upgrading-lamassu]
+
+Version-specific upgrade steps live in `charts/lamassu/CHANGELOG/` in the Helm repository. The chart also ships an optional pre-upgrade Job that migrates existing CA private keys into the KMS engine configured for the release. It is off by default (`migrations.caToKms.enabled: false`) and is only needed when upgrading from a version prior to 3.7.0.
+
+While the flag is enabled, every `helm upgrade` creates the `<chart fullname>-ca-to-kms-migration` Job (`lamassu-ca-to-kms-migration` for release `lamassu`); a fresh install does not create it. Its hook weight is `-10`, so it runs before the other pre-upgrade hooks: the authorization bootstrap configuration (weight `-4`) and the database-migration Job (weight `-3`).
+
+The Job consumes the same KMS service configuration the chart renders into the KMS ConfigMap, including the engines from `services.kms.cryptoEngines`, and runs the migration tool defined in `migrations.caToKms.image`. It mounts that configuration read-only at `/etc/lamassuiot/config.yml` from the ConfigMap key `config`, so configure the destination engine in your values before the upgrade that performs the migration.
+
+The Job resolves its configuration through a projected volume with two optional sources: the release-scoped `<chart fullname>-kms-config` (`lamassu-kms-config` for release `lamassu`, `prod-lamassu-kms-config` for release `prod`) and the legacy unscoped `kms-config` created by chart versions before release-scoped naming. The legacy configuration remains authoritative while it is still present, and the release-scoped one is used once the legacy one is gone. Both sources are optional, so a missing ConfigMap never leaves the upgrade pod in `ContainerCreating`.
+
+Keep `migrations.caToKms.enabled: true` for the upgrade that performs the migration, then remove the flag from your values once the migration completes; it defaults to `false`.
+
 Production decisions [#production-decisions]
 
 Before going live, review:
@@ -497,7 +509,7 @@ Before going live, review:
 * a trusted TLS issuer or externally managed certificate
 * resource requests, replicas, autoscaling, disruption budgets and placement
 * SMTP, observability and alert delivery
-* the [version upgrade guides](/docs/upgrades/3-8-0-to-4-0-0) and the notes in `charts/lamassu/CHANGELOG/` before every upgrade
+* the [version upgrade guides](/docs/upgrades/3-8-0-to-4-0-0) and migration notes in `charts/lamassu/CHANGELOG/` before every upgrade, including the optional CA-to-KMS migration hook described above
 
 The complete values reference is maintained in `charts/lamassu/VALUES.md` in the Helm repository.
 

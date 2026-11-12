@@ -226,7 +226,7 @@ The Helm test checks the CA, DMS Manager, Device Manager and VA health endpoints
 
 Version-specific upgrade steps live in `charts/lamassu/CHANGELOG/` in the Helm repository. The chart also ships an optional pre-upgrade Job that migrates existing CA private keys into the KMS engine configured for the release. It is off by default (`migrations.caToKms.enabled: false`) and is only needed when upgrading from a version prior to 3.7.0.
 
-While the flag is enabled, every `helm upgrade` creates the `<chart fullname>-ca-to-kms-migration` Job (`lamassu-ca-to-kms-migration` for release `lamassu`); a fresh install does not create it. It runs before the other pre-upgrade hooks, the authorization bootstrap configuration and the database-migration Job, which use hook weights `-4` and `-3` versus its `-10`.
+While the flag is enabled, every `helm upgrade` creates the `<chart fullname>-ca-to-kms-migration` Job (`lamassu-ca-to-kms-migration` for release `lamassu`); a fresh install does not create it. Its hook weight is `-10`, so it runs before the other pre-upgrade hooks: the authorization bootstrap configuration (weight `-4`) and the database-migration Job (weight `-3`).
 
 The Job consumes the same KMS service configuration the chart renders into the KMS ConfigMap, including the engines from `services.kms.cryptoEngines`, and runs the migration tool defined in `migrations.caToKms.image`. It mounts that configuration read-only at `/etc/lamassuiot/config.yml` from the ConfigMap key `config`, so configure the destination engine in your values before the upgrade that performs the migration.
 

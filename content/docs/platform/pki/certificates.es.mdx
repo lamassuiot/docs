@@ -11,7 +11,7 @@ Filtra por `Common Name`, serie, estado y autoridad emisora. Un certificado no c
 
 - El filtro avanzado **Private Key**, disponible en la página Certificates y en la pestaña **Issued Certificates** de una CA, limita la lista a **All Certificates**, **With Private Key** o **Without Private Key**.
 - La columna ordenable **Private Key** — visible por defecto y oculta en pantallas estrechas — marca con una marca de verificación verde la clave custodiada en el KMS y muestra `-` en los demás casos.
-- En los detalles del certificado, la pestaña **Information** muestra una fila **Private Key** en la sección Key & Signature: cuando la clave está localizable en el KMS la fila muestra el identificador de la clave en el KMS como un enlace (tooltip: **Open private key in KMS**); en caso contrario, la insignia **Present** o **Not available**.
+- En los detalles del certificado, la pestaña **Information** muestra una fila **Private Key** en la sección **Key & Signature**. Cuando el certificado indica que tiene clave privada y están disponibles los identificadores de la clave y del motor del KMS, la fila enlaza a la clave (tooltip: **Open private key in KMS**). En caso contrario, muestra **Present** si el certificado indica que tiene clave privada o **Not available** si no lo indica. Esto no determina si existe una clave fuera de Lamassu.
 
 Usa **Quick Inspect** para una revisión rápida o **View Details** para sujeto, SAN, usos, cadena, fechas y metadatos.
 

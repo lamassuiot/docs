@@ -90,7 +90,7 @@ openssl crl -in ca.crl.pem -noout -text
 openssl crl -in ca.crl.pem -noout -verify -CAfile issuer.pem
 ```
 
-You need OpenSSL 3.x and `issuer.pem` containing the direct issuer’s certificate. Require a valid signature, current timestamps and the expected issuer. For a root that issues directly:
+You need OpenSSL 3.x and `issuer.pem` containing the direct issuer’s certificate. The signature check assumes the default signer, the CA's own certificate; for a non-default signer, use the signer's certificate in `-CAfile` instead. Require a valid signature, current timestamps and the expected issuer. For a root that issues directly:
 
 ```bash
 openssl verify -CAfile roots.pem -CRLfile ca.crl.pem \

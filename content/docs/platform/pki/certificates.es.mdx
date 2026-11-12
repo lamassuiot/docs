@@ -9,6 +9,8 @@ Esta guía sirve al operador PKI que necesita inspeccionar o retirar una identid
 
 Filtra por `Common Name`, serie, estado y autoridad emisora. Usa **Quick Inspect** para una revisión rápida o **View Details** para sujeto, SAN, usos, cadena, fechas y metadatos.
 
+Los registros de certificados exponen `key_id` (la clave del KMS que custodia la clave privada, vacía cuando el KMS no la custodia) y `has_private_key` (derivada al leerla desde el KMS). Los listados de certificados y CAs admiten un filtro `has_private_key`, útil, por ejemplo, para comprobar el resultado de la migración de CA a KMS de la actualización a 4.0.0.
+
 Identifica el certificado por emisor y número de serie; un nombre puede corresponder a varias renovaciones. Comprueba cuál utiliza realmente el consumidor y cuál ocupa la identidad activa del dispositivo. El [historial de identidades](/docs/platform/iot-fleets/device-management) y el inventario de certificados responden preguntas distintas.
 
 ## Descarga el certificado

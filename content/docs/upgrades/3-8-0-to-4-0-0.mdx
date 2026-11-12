@@ -49,6 +49,7 @@ Several migrations run without intervention when you upgrade a Helm release:
 
 - Before any service starts, the chart's pre-install/pre-upgrade job prepares PostgreSQL. It creates the `pki`, `authz` and `wfx` databases when they do not exist, creates one schema per service inside `pki`, and imports each 3.8.0 per-service database into its schema. Each import runs as a single transaction, so a failed import leaves no partial schema and a retried job imports again. The job then runs the database migrations for every schema, migrates `authz`, preloads its policies and seeds the `services.authz.bootstrap` principals. It is idempotent and requires a PostgreSQL role allowed to create databases and schemas, as described in [Install with Helm](/docs/deployment/self-hosted/helm#before-you-begin).
 - Stored DMS configuration is rewritten to the 4.0.0 layout, and historical device events are transformed into the new store.
+- The KMS migration removes the stale `lamassu.io/kms/binded-resources` key metadata, and the VA migration resolves each role's CRL signer (see [VA CRL signer](#va-crl-signer)).
 - When `migrations.caToKms.enabled` is set, a pre-upgrade hook registers legacy CA keys in the KMS.
 
 Two things never migrate on their own: the KMS and VA data on local volumes, which stays on volumes the upgraded pods no longer use, and the values file, which you update by hand. Deployments that do not use the Helm chart also have to move their database data themselves; see [Deployments without Helm](#deployments-without-helm).
@@ -70,6 +71,7 @@ Two things never migrate on their own: the KMS and VA data on local volumes, whi
 | [Receiver certificate verification](#dms-webhooks) | DMSs whose webhook had `validate_server_cert: false` | Medium: credentials go to an unverified receiver | Set `insecure_skip_verify` to `false` |
 | [Re-enrollment trust set](#re-enrollment-trust-set) | Scripts and consoles that edit DMSs through the API | Medium: an old-layout edit silently empties `validation_cas` | Read the DMS before editing and use the new field |
 | [Device events](#device-events) | Consumers that read the device `events` field | Medium: the field disappears | Use the new event endpoints |
+| [VA CRL signer](#va-crl-signer) | Deployments with VA roles whose signer is not in the CA inventory | Medium: the VA migration aborts | Fix the affected roles before upgrading |
 | [Renamed and reshaped values](#renamed-and-reshaped-values) | Releases that override `toolbox`, `services.connectors`, ports, probes or scheduling | Low to medium: validation errors or changed defaults | Update the values file |
 | [DMS update API](#dms-update-api) | Clients that send the DMS ID in the update body | Low: the ID in the URL wins | Send the ID in the URL |
 | [Certificate type values](#certificate-type-values) | Consumers that match on certificate `type` | Low: two values are renamed | Adapt consumers |
@@ -140,6 +142,10 @@ CA certificates of type `MANAGED` or `IMPORTED_WITH_KEY` whose private keys pred
 - Certificates that cannot be read, or lack an engine or a subject key ID, are skipped with a warning. Review the logs and resolve the affected records.
 - When CA certificates sharing a `subject_key_id` declare conflicting `engine_id`s, the tool fails that key and exits with code `1`, which fails a Helm pre-upgrade hook. Resolve the conflict manually before rerunning.
 
+Once the keys are registered, certificates reference them in the database and the KMS refuses to delete a key that a certificate still uses (`409` `key is in use`); release or delete the dependent certificates first.
+
+Optionally, installations with imported CAs from before 3.7 can start the KMS once with `crypto_engines.migrate_keys_format: true`: the KMS renames those SKI-named legacy keys to the SHA-256 digest of their public key (the old name is kept as an alias, and the certificate references follow automatically). Run it once and disable the option again; running it again is safe.
+
 With Helm, enable the hook for the upgrade in [step 2](#step-2-update-the-values-file); without Helm, run the tool by hand.
 
 ### APIs and stored configuration
@@ -201,6 +207,12 @@ The `events` field no longer appears in the device representation. Point consume
 - `POST /v1/devices/:id/events` creates an event.
 
 When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Each Device Manager instance binds a durable AMQP queue named after its service ID, `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until removed, so configure an expiration or cleanup policy on the broker.
+
+#### VA CRL signer
+
+The `crl_options.subject_key_id_signer` field of VA roles is replaced by `signer_certificate_serial_number`; update clients that send the old field ([CRL](/docs/platform/pki/crl) documents the new field). The VA migration resolves each role's signer automatically: when several CAs share the signer's key, it uses the oldest one and logs a warning, but it aborts with `cannot resolve signer certificate for VA role <ca-ski>, SKI <ski>` when no certificate with that SKI exists. Fix such roles before upgrading.
+
+If you wrote custom `authz` policies that filter VA roles on the old `crl_subject_key_id_signer` column, rewrite them against the new `crl_signer_certificate_serial_number` column.
 
 ## Helm migration guide
 
@@ -462,9 +474,13 @@ LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration
 
 Point the tool's `storage` configuration at the `pki` database, where the CA and KMS data now live in the `ca` and `kms` schemas. The tool's options are described in `backend/cmd/ca-to-kms-migration/README.md` in the `lamassuiot` repository.
 
-<Callout type="warn" title="The tools' READMEs are outdated">
-The `goose-lamassu` README still shows per-database examples (`dbname=ca`, `dbname=kms`) and claims the tool validates the database name, and the `ca-to-kms-migration` README still describes the pre-4.0.0 two-database layout. Follow the `dbname=pki` form on this page instead of their examples.
+<Callout type="info" title="Migration order and privileges">
+The `goose-lamassu` and `ca-to-kms-migration` READMEs in the `lamassuiot` repository document the 4.0.0 `pki` layout: migration order, cross-schema privileges and the tools' options. Follow the `dbname=pki` form shown above, and consult the READMEs before applying the migrations.
 </Callout>
+
+Apply the schema migrations in the order `kms` → `ca` → `va`; `devicemanager`, `dmsmanager` and `alerts` are independent and can run at any point. The `ca` migration fails with `kms schema not found: migrate the kms schema before the ca schema` while `kms` is not migrated yet, and `va` needs `ca` migrated. The `ca` and `va` migrations also read tables that belong to another schema, so the PostgreSQL role that runs them needs privileges on it: `USAGE` on the `kms` schema plus `SELECT`, `REFERENCES` and `INSERT` on `kms.kms_keys` for the `ca` migration, and `USAGE` on the `ca` schema plus `SELECT` and `REFERENCES` on `ca.certificates` and `SELECT` on `ca.ca_certificates` for the `va` migration. Without them the migration aborts; grant the missing privileges and run the failed schema again.
+
+After migrating `ca`, if the CA service runs as a different user than the migration user, grant that user `SELECT` on `ca.certificates_view` (`GRANT SELECT ON ca.certificates_view TO service_user`); the CA service reads certificates and CAs through that view, and without the grant every certificate and CA read fails with `permission denied for table certificates_view`.
 
 ### Troubleshooting
 
@@ -484,7 +500,7 @@ After the upgrade, check in this order:
 2. **KMS and VA start cleanly.** Their logs show no `no such file or directory` or `code=NotFound` errors.
 3. **Existing KMS keys work.** Issue a certificate from a CA that existed before the upgrade. None of the other checks reads a KMS key, so this is the only one that proves the key material was copied.
 4. **Existing CRLs are served.** `GET /crl/<ca-ski>` on VA returns a previously issued CRL, and new CRLs are issued.
-5. **Legacy CA keys.** If the CA-to-KMS migration ran, review its report and warnings and confirm the expected keys appear in the KMS.
+5. **Legacy CA keys.** If the CA-to-KMS migration ran, review its report and warnings and confirm the expected keys appear in the KMS. Migrated CA certificates now report `key_id` and `has_private_key`, which you can use to confirm the registration.
 6. **Connectivity.** `helm test "$RELEASE" -n $NAMESPACE --logs` passes; the hook checks the CA, DMS Manager, Device Manager and VA health endpoints and the UI response.
 7. **Authorization.** Sign in as the bootstrap principal and confirm administration works, check that an identity without permissions receives `403`, and review client and integration permissions.
 8. **AMQP.** The backend connects to the broker with the expected TLS settings, and the cleanup policy for SSE queues is in place.

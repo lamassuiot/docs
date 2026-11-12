@@ -16,18 +16,18 @@ The VA role stores configuration and metadata for the latest list published for 
 | `crl_options` field | Purpose | Backend initial value |
 |---|---|---|
 | `validity` | Time from `thisUpdate` to `nextUpdate`. | 7 days. |
-| `refresh_interval` | Stored and returned by the API, but the VA does not use it: scheduled renewal does not depend on it (see [Periodic and automatic regeneration](#periodic-and-automatic-regeneration)). | 6 days and 23 hours. |
+| `refresh_interval` | Regenerate the list when the interval elapses since the latest issuance, in addition to pre-expiry regeneration; `0` disables interval regeneration. The effective granularity is bounded by the job frequency (see [Periodic and automatic regeneration](#periodic-and-automatic-regeneration)). | 6 days and 23 hours. |
 | `regenerate_on_revoke` | Request regeneration on revocation or reactivation from `CertificateHold` events. | `true`. |
 | `signer_certificate_serial_number` | Serial number of the existing certificate that signs the CRL. | Serial number of the CA’s current certificate. |
 
 The signer must be an existing certificate with the `cRLSign` key usage and the same subject and public key as the CA. Certificates from before a reissue qualify. A delegated signer is not supported: a certificate with the CA’s subject but a different key is rejected.
 
-When a CA is reissued, the role keeps pointing at the previous certificate. CRLs remain valid because both certificates share subject and key, but the previous certificate cannot be deleted while the role uses it. To retire it, update the role’s signer.
+When a CA is reissued, the VA moves the role's signer to the reissued certificate and regenerates the CRL immediately, provided the role was signed by the superseded certificate; a signer that was deliberately set to another certificate is kept. If the reissued certificate lacks `cRLSign`, the VA keeps the previous signer and logs a warning. A certificate used as a role's signer cannot be deleted: the API rejects it with `409` `certificate is in use`.
 
 <Callout type="warn" title="Cases in which the role can no longer be edited">
   When a CA is deleted, its VA role is kept and cannot be removed through the API. If no other CA with the same SKI remains, the role can be read but any `PUT` returns 404, and the renewal job logs a warning on every cycle because it no longer finds the CA. The API offers no way out; it can only be fixed by editing the database. If another CA with that SKI remains, the role is still editable (see [CAs that share a key](#cas-that-share-a-key)). Adjust validity and signer before deleting the CA.
 
-  A CA whose certificate lacks `cRLSign` cannot generate its CRL or edit its role (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and set it as the signer with `PUT`. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages.
+  A CA whose certificate lacks `cRLSign` cannot generate its CRL or edit its role (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and set it as the signer with `PUT`. After reissuing a CA, check the key usage of the new certificate: if it lacks `cRLSign`, the VA keeps the previous signer and logs a warning, so the lists keep being signed by the superseded certificate until you fix the usage.
 
   `PUT` always validates the signer, even when the request does not change it. If the stored signer is no longer valid, no field of the role can be modified, not even the validity, until a valid one is set.
 </Callout>
@@ -46,7 +46,7 @@ To detect the problem, compare the SKI of the CAs in the inventory: two with the
 
 ## Periodic and automatic regeneration
 
-The VA scheduled job checks every role on each run and requests another list when the remaining validity of `latest_crl` is less than the interval between runs. The frequency is set in Helm with `services.va.job.crl.frequency` (default `0 * * * *`) and accepts a duration (`1h`) or a cron expression. A cron expression is converted into a constant interval equal to the time left until its next firing when the service starts, so it is not aligned with the clock. `refresh_interval` plays no part. Keep `validity` well above the interval: with a shorter validity, the list is regenerated on every cycle.
+The VA scheduled job checks every role on each run and requests another list when the remaining validity of `latest_crl` is less than the interval between runs. The frequency is set in Helm with `services.va.job.crl.frequency` (default `0 * * * *`) and accepts a duration (`1h`) or a cron expression. A cron expression is converted into a constant interval equal to the time left until its next firing when the service starts, so it is not aligned with the clock. The job also regenerates a list when the role's `refresh_interval` elapses since the latest issuance; setting `refresh_interval` to `0` disables that path. Because the job runs on its own schedule, `refresh_interval` is honored only as precisely as the job frequency allows. Keep `validity` well above the interval: with a shorter validity, the list is regenerated on every cycle.
 
 If generation fails (for example, because of a role without a CA or an invalid signer), the job logs the warning `something went wrong while calculating CRL for CA <ski>` and retries on the next cycle. There is no other renewal path until the cause is fixed, and the last published list keeps being served until it expires. All of this depends on working jobs, storage and signing.
 

@@ -201,4 +201,4 @@ Requiere el módulo, token y permisos del proveedor correspondiente. Comprueba q
 
 ## Before deleting a key
 
-Review **Related Entities** and locate CAs, certificates and validation processes that still need signatures. Revoking a CA does not remove the need to publish status during its retention period. Deleting a key does not automatically revoke its certificates either. Plan replacement and retention before using **Delete Key**; provider deletion behavior depends on the engine.
+Review **Related Entities** and locate CAs, certificates and validation processes that still need signatures. Revoking a CA does not remove the need to publish status during its retention period. Deleting a key does not automatically revoke its certificates either. Lamassu rejects deleting a key while a certificate still references it, with `409` `key is in use`; release or delete the dependent certificates first. Plan replacement and retention before using **Delete Key**; provider deletion behavior depends on the engine.

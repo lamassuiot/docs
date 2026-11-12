@@ -49,6 +49,7 @@ Al actualizar una release de Helm se ejecutan varias migraciones sin intervenci�
 
 - Antes de que arranque ningún servicio, el job de preinstalación y preactualización del chart prepara PostgreSQL. Crea las bases `pki`, `authz` y `wfx` si no existen, crea un esquema por servicio dentro de `pki` e importa cada base de datos por servicio de 3.8.0 en su esquema. Cada importación se ejecuta en una única transacción, de modo que una importación fallida no deja un esquema a medias y un reintento del job vuelve a importar. Después, el job ejecuta las migraciones de base de datos de cada esquema, migra `authz`, precarga sus políticas y da de alta los principales de `services.authz.bootstrap`. Es idempotente y necesita un rol de PostgreSQL con permiso para crear bases de datos y esquemas, como se describe en [Instalar con Helm](/docs/deployment/self-hosted/helm#antes-de-comenzar).
 - La configuración almacenada de los DMS se reescribe al formato de 4.0.0, y los eventos históricos de los dispositivos se transforman al nuevo almacenamiento.
+- La migración del KMS elimina los metadatos de clave obsoletos `lamassu.io/kms/binded-resources`, y la migración de la VA resuelve el firmante de CRL de cada rol (consulta [Firmante de CRL de la VA](#firmante-de-crl-de-la-va)).
 - Si se activa `migrations.caToKms.enabled`, un hook de preactualización registra en el KMS las claves de CA heredadas.
 
 Dos cosas nunca migran solas: los datos del KMS y de la VA en volúmenes locales, que se quedan en volúmenes que los pods actualizados ya no usan, y el archivo de values, que se actualiza a mano. Los despliegues que no usan el chart de Helm también tienen que mover ellos mismos los datos de la base de datos; consulta [Despliegues sin Helm](#despliegues-sin-helm).
@@ -70,6 +71,7 @@ Dos cosas nunca migran solas: los datos del KMS y de la VA en volúmenes locales
 | [Verificación del certificado del receptor](#webhooks-del-dms) | DMS cuyo webhook tenía `validate_server_cert: false` | Media: las credenciales viajan a un receptor sin verificar | Poner `insecure_skip_verify` a `false` |
 | [Conjunto de confianza del reenrolamiento](#conjunto-de-confianza-del-reenrolamiento) | Scripts y consolas que editan DMS por API | Media: una edición con el formato antiguo vacía `validation_cas` sin avisar | Leer el DMS antes de editarlo y usar el campo nuevo |
 | [Eventos de dispositivo](#eventos-de-dispositivo) | Consumidores que leen el campo `events` del dispositivo | Media: el campo desaparece | Usar los nuevos endpoints de eventos |
+| [Firmante de CRL de la VA](#firmante-de-crl-de-la-va) | Despliegues con roles VA cuyo firmante no está en el inventario de CAs | Media: la migración de la VA aborta | Corregir los roles afectados antes de actualizar |
 | [Values renombrados y reestructurados](#values-renombrados-y-reestructurados) | Releases que sobrescriben `toolbox`, `services.connectors`, puertos, sondas o planificación | Baja a media: errores de validación o cambios de valores por defecto | Actualizar el archivo de values |
 | [API de actualización del DMS](#api-de-actualización-del-dms) | Clientes que envían el ID del DMS en el cuerpo de la actualización | Baja: prevalece el ID de la URL | Enviar el ID en la URL |
 | [Valores de tipo de certificado](#valores-de-tipo-de-certificado) | Consumidores que comparan el `type` del certificado | Baja: dos valores cambian de nombre | Adaptar los consumidores |
@@ -140,6 +142,10 @@ Los certificados de CA de tipo `MANAGED` o `IMPORTED_WITH_KEY` cuyas claves priv
 - Los certificados que no pueden leerse, o que carecen de motor o de ID de clave de sujeto, se omiten con un aviso. Revisa los logs y resuelve los registros afectados.
 - Cuando certificados de CA que comparten un `subject_key_id` declaran `engine_id` en conflicto, la herramienta marca esa clave como fallida y sale con código `1`, lo que hace fallar un hook de preactualización de Helm. Resuelve el conflicto a mano antes de volver a ejecutarla.
 
+Una vez registradas las claves, los certificados las referencian en la base de datos y el KMS se niega a eliminar una clave que un certificado aún usa (`409` `key is in use`); libera o elimina primero los certificados dependientes.
+
+Opcionalmente, las instalaciones con CAs importadas anteriores a 3.7 pueden arrancar el KMS una vez con `crypto_engines.migrate_keys_format: true`: el KMS renombra esas claves heredadas con nombre de SKI al resumen SHA-256 de su clave pública (el nombre antiguo se conserva como alias, y las referencias de los certificados se actualizan solas). Ejecútalo una vez y vuelve a desactivar la opción; repetirla es seguro.
+
 Con Helm, activa el hook para la actualización en el [paso 2](#paso-2-actualiza-el-archivo-de-values); sin Helm, ejecuta la herramienta a mano.
 
 ### APIs y configuración almacenada
@@ -201,6 +207,12 @@ El campo `events` ya no aparece en la representación del dispositivo. Apunta lo
 - `POST /v1/devices/:id/events` crea un evento.
 
 Cuando la cabecera `Accept` de la petición incluye `text/event-stream`, el endpoint de eventos emite por SSE con un keepalive cada 15 segundos, y responde `501` cuando SSE está deshabilitado en el despliegue. Cada instancia de Device Manager enlaza una cola AMQP duradera con el nombre de su ID de servicio, `device-manager-sse-<uuid>`. Las colas de instancias caídas o reemplazadas permanecen hasta que se eliminan, así que configura en el broker una política de expiración o limpieza.
+
+#### Firmante de CRL de la VA
+
+El campo `crl_options.subject_key_id_signer` de los roles VA se sustituye por `signer_certificate_serial_number`; actualiza los clientes que envían el campo antiguo (la página de [CRL](/docs/platform/pki/crl) documenta el campo nuevo). La migración de la VA resuelve automáticamente el firmante de cada rol: cuando varias CAs comparten la clave del firmante, usa la más antigua y registra un aviso, pero aborta con `cannot resolve signer certificate for VA role <ca-ski>, SKI <ski>` cuando no existe ningún certificado con ese SKI. Corrige esos roles antes de actualizar.
+
+Si escribiste políticas `authz` propias que filtran roles VA por la columna antigua `crl_subject_key_id_signer`, reescríbelas contra la columna nueva `crl_signer_certificate_serial_number`.
 
 ## Guía de migración con Helm
 
@@ -462,9 +474,13 @@ LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration
 
 Apunta la configuración `storage` de la herramienta a la base `pki`, donde los datos de CA y del KMS viven ahora en los esquemas `ca` y `kms`. Las opciones de la herramienta se describen en `backend/cmd/ca-to-kms-migration/README.md`, en el repositorio `lamassuiot`.
 
-<Callout type="warn" title="Los README de las herramientas están desactualizados">
-El README de `goose-lamassu` aún muestra ejemplos por base de datos (`dbname=ca`, `dbname=kms`) y afirma que la herramienta valida el nombre de la base de datos, y el README de `ca-to-kms-migration` sigue describiendo el modelo de dos bases anterior a 4.0.0. Sigue la forma con `dbname=pki` de esta página en lugar de sus ejemplos.
+<Callout type="info" title="Orden de migración y privilegios">
+Los README de `goose-lamassu` y `ca-to-kms-migration` en el repositorio `lamassuiot` documentan el formato de `pki` de 4.0.0: orden de migración, privilegios entre esquemas y opciones de las herramientas. Sigue la forma con `dbname=pki` mostrada arriba y consulta los README antes de aplicar las migraciones.
 </Callout>
+
+Aplica las migraciones de esquema en el orden `kms` → `ca` → `va`; `devicemanager`, `dmsmanager` y `alerts` son independientes y pueden ejecutarse en cualquier momento. La migración de `ca` falla con `kms schema not found: migrate the kms schema before the ca schema` mientras `kms` no esté migrado, y `va` necesita `ca` migrado. Las migraciones de `ca` y `va` además leen tablas que pertenecen a otro esquema, así que el rol de PostgreSQL que las ejecuta necesita privilegios sobre él: `USAGE` sobre el esquema `kms` más `SELECT`, `REFERENCES` e `INSERT` sobre `kms.kms_keys` para la migración de `ca`, y `USAGE` sobre el esquema `ca` más `SELECT` y `REFERENCES` sobre `ca.certificates` y `SELECT` sobre `ca.ca_certificates` para la migración de `va`. Sin ellos la migración aborta; concede los privilegios que falten y vuelve a ejecutar el esquema fallido.
+
+Tras migrar `ca`, si el servicio de CA corre con un usuario distinto del usuario de migración, concédale `SELECT` sobre `ca.certificates_view` (`GRANT SELECT ON ca.certificates_view TO service_user`); el servicio de CA lee certificados y CAs a través de esa vista, y sin el permiso toda lectura de certificados y CAs falla con `permission denied for table certificates_view`.
 
 ### Solución de problemas
 
@@ -484,7 +500,7 @@ Tras la actualización, comprueba en este orden:
 2. **KMS y VA arrancan sin errores.** Sus logs no muestran errores `no such file or directory` ni `code=NotFound`.
 3. **Las claves existentes del KMS funcionan.** Emite un certificado desde una CA que ya existía antes de la actualización. Ninguna de las otras comprobaciones lee una clave del KMS, así que esta es la única que demuestra que el material de claves se ha copiado.
 4. **Las CRLs existentes se sirven.** `GET /crl/<ca-ski>` sobre la VA devuelve una CRL emitida anteriormente, y se emiten CRLs nuevas.
-5. **Claves de CA heredadas.** Si se ejecutó la migración de CA a KMS, revisa su informe y sus avisos y confirma que las claves esperadas aparecen en el KMS.
+5. **Claves de CA heredadas.** Si se ejecutó la migración de CA a KMS, revisa su informe y sus avisos y confirma que las claves esperadas aparecen en el KMS. Los certificados de CA migrados informan ahora de `key_id` y `has_private_key`, que puedes usar para confirmar el registro.
 6. **Conectividad.** `helm test "$RELEASE" -n $NAMESPACE --logs` pasa; el hook comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y la respuesta de la UI.
 7. **Autorización.** Inicia sesión con el principal de bootstrap y confirma que la administración funciona, comprueba que una identidad sin permisos recibe `403` y revisa los permisos de clientes e integraciones.
 8. **AMQP.** El backend se conecta al broker con la configuración TLS esperada, y la política de limpieza de las colas de SSE está en marcha.

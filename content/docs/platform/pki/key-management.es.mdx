@@ -187,4 +187,4 @@ Requiere el módulo, token y permisos del proveedor correspondiente. Comprueba q
 
 ## Antes de eliminar una clave
 
-Revisa **Related Entities** y localiza CAs, certificados y procesos de validación que siguen necesitando firmas. Revocar una CA no elimina la necesidad de publicar estado durante su periodo de retención. Eliminar una clave tampoco revoca automáticamente sus certificados. Planifica sustitución y retención antes de usar **Delete Key**; el efecto de borrado en el proveedor depende del motor.
+Revisa **Related Entities** y localiza CAs, certificados y procesos de validación que siguen necesitando firmas. Revocar una CA no elimina la necesidad de publicar estado durante su periodo de retención. Eliminar una clave tampoco revoca automáticamente sus certificados. Lamassu rechaza eliminar una clave mientras un certificado siga referenciándola, con `409` `key is in use`; libera o elimina antes los certificados dependientes. Planifica sustitución y retención antes de usar **Delete Key**; el efecto de borrado en el proveedor depende del motor.

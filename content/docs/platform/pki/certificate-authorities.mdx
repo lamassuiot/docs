@@ -103,6 +103,8 @@ You need the CA certificate in PEM, its chain to a known root and, when importin
     ### Load the material
 
     Import the certificate and, when applicable, its PEM key. Register the CAs needed to identify the issuer. Registering a CA does not install it in external trust stores.
+
+    The backend validates before importing any key: a duplicate CA ID and a certificate that is not a CA (missing `basicConstraints` `cA=TRUE`) are rejected, the latter with `400` `certificate is not a CA: basicConstraints cA flag is not set`. If a failure occurs after the key was imported, the key is kept in the KMS and a warning tells you to delete it manually.
   </Step>
   <Step>
     ### Define the default issuance

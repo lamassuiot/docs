@@ -9,6 +9,8 @@ This guide is for a PKI operator inspecting or retiring an issued identity. You 
 
 Filter by `Common Name`, serial, status and issuer. Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata.
 
+Certificate records expose `key_id` (the KMS key that holds the private key, empty when the KMS does not hold it) and `has_private_key` (derived at read time from the KMS). Certificate and CA listings accept a `has_private_key` filter, which is useful, for example, to check the result of the CA-to-KMS migration of the 4.0.0 upgrade.
+
 Identify a certificate by issuer and serial; a name can correspond to several renewals. Check which certificate the consumer actually uses and which occupies the device’s active identity. [Identity history](/docs/platform/iot-fleets/device-management) and the certificate inventory answer different questions.
 
 ## Download the certificate

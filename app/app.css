@@ -703,7 +703,7 @@ body {
   text-decoration-thickness: 2px;
 }
 
-/* Center all images in doc content */
+/* Center all images in doc content and hint they zoom in the lightbox */
 .prose img,
 article img,
 [class*="prose"] img {
@@ -711,6 +711,7 @@ article img,
   margin-left: auto;
   margin-right: auto;
   border-radius: 4px;
+  cursor: zoom-in;
 }
 
 /* Keep documentation copy easy to scan. Justified text creates uneven word
@@ -815,6 +816,45 @@ figure.shiki pre {
 
 .prose tbody tr {
   border-bottom: 1px solid var(--color-fd-border);
+}
+
+/* ── Wide tables ──────────────────────────────────────────────────────────
+   Data-heavy reference tables (e.g. IAM permission matrices) may spill
+   symmetrically into the page gutters. The extension is capped so the table
+   never crosses the sidebar or the TOC on any viewport: the prose column is
+   47rem, and the gutters around it are ~2rem below 1536px, so that width is
+   where the clamp kicks in. */
+.prose [data-wide-table] {
+  width: 100%;
+}
+
+@media (min-width: 1536px) {
+  .prose [data-wide-table] {
+    --lm-wide-table-ext: 4rem;
+    width: calc(100% + 2 * var(--lm-wide-table-ext));
+    margin-inline: calc(-1 * var(--lm-wide-table-ext));
+  }
+}
+
+@media (min-width: 1920px) {
+  .prose [data-wide-table] {
+    --lm-wide-table-ext: 10rem;
+  }
+}
+
+/* Full-bleed tables break out of the reading column's max-width and use
+   the whole article content box. The article acts as a container (cqw =
+   article content width); the negative margins cancel the prose centering
+   offset on each side, so the table fills the content area without ever
+   reaching the sidebars. Used only where a table needs the extra width to
+   stay readable (the connector event matrix). */
+article {
+  container-type: inline-size;
+}
+
+.prose [data-full-bleed-table] {
+  width: 100cqw;
+  margin-inline: calc(50% - 50cqw);
 }
 
 /* ── Callouts ──────────────────────────────────────────────────────────────
@@ -1207,6 +1247,62 @@ html[data-show-diff] .lm-diff-merged {
 
 #nd-lightbox[aria-hidden="true"] {
   display: none;
+}
+
+/* ── Mermaid diagrams ─────────────────────────────────────────────────────
+   Rendered client-side by <Mermaid /> into an <img> the image lightbox can
+   zoom. The frame uses the card background so diagrams sit inside the page
+   like figures, and re-colors with the theme because mermaid re-renders on
+   theme switch. */
+.mermaid-fig {
+  margin: 1.5rem 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  cursor: zoom-in;
+}
+
+.mermaid-fig img {
+  max-width: 100%;
+  cursor: zoom-in;
+}
+
+/* Fullscreen zoomed view of a mermaid diagram, opened by clicking the inline
+   figure. Closes on backdrop click, Escape or the close button. */
+.mermaid-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgb(15 23 32 / 0.82);
+  cursor: zoom-out;
+  animation: lb-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mermaid-zoom-frame {
+  width: min(96vw, 1600px);
+  max-height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 1.5rem;
+  border-radius: 4px;
+  background: var(--color-fd-card);
+  box-shadow: 0 8px 48px rgb(0 0 0 / 0.45);
+  cursor: default;
+}
+
+.mermaid-zoom-frame svg {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  margin: auto;
 }
 
 /* ── Image lightbox ──────────────────────────────────────────────────────

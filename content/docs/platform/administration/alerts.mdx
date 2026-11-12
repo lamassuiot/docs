@@ -54,6 +54,8 @@ The [alerts API reference](/docs/api-reference/alerts) documents the full `http_
     - **JavaScript** lets you express custom logic. Each filter runs for at most 100 milliseconds; a filter that exceeds this limit fails the condition and the notification is skipped with the error `javascript filter execution timed out`.
 
     For example, `function (event) { return event.data.status == "NO_IDENTITY"; }` limits a subscription to devices without an identity.
+
+    The console evaluates the filter against the JSON shown in the **Input Event** editor, which is prefilled with the latest event, and reports whether it matches. For JSON Path and JavaScript filters, it shows **The filter matches this Cloud Event** or **The filter does not match this Cloud Event**. JSON Path expressions are evaluated against the full Cloud Event, so the default `$.data` selects the event's `data` field, and the expression must start with `$`.
   </Step>
 
   <Step>

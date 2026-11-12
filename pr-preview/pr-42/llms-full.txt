@@ -901,7 +901,7 @@ Domain and audit events depend on the bus publisher:
 
 <div className="lm-diff-ins lm-diff-block">
   * confirm the broker listener speaks AMQPS on the configured port — the default port stays `5672` and does not follow TLS automatically;
-  * if you set `amqp.ca.secretName`, confirm the Secret exists in the release namespace and its data key matches `amqp.ca.certificateKey` (default `ca.crt`); without it, the clients trust the system CAs;
+  * if you set `amqp.ca.secretName`, confirm the Secret exists in the release namespace and its data key matches `amqp.ca.certificateKey` (default `ca.crt`); if `amqp.ca.secretName` is not set, the clients trust the system CAs;
   * remember that a missing referenced Secret prevents the consuming pods from starting;
   * after updating the CA or client certificate Secret, restart the consuming pods: the AMQP client loads certificates at startup.
 </div>
@@ -3985,7 +3985,7 @@ The <del className="lm-diff-del">generator uses the key of the CA identified by 
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  The certificates of all of them point to `/crl/{ski}`, but the published list has the first CA as issuer and only includes its revocations. A verifier compares the CRL issuer with the issuer of the certificate it validates (RFC 5280, §6.3.3) and rejects the list if they differ. Depending on its policy, the certificate is blocked (*hard-fail*) or accepted even though it is revoked (*soft-fail*). Revocations of the secondary CAs do not appear in any list.
+  The certificates of all of them point to `/crl/{ski}`, but the published list has the first CA as issuer and only includes its revocations. A verifier compares the CRL issuer with the issuer of the certificate it validates (RFC 5280, §6.3.2) and rejects the list if they differ. Depending on its policy, the certificate is blocked (*hard-fail*) or accepted even though it is revoked (*soft-fail*). Revocations of the secondary CAs do not appear in any list.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -3993,7 +3993,7 @@ The <del className="lm-diff-del">generator uses the key of the CA identified by 
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Restrict the permission to import CAs as an interim control. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
+  To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Until Lamassu rejects these imports, restrict the permission to import CAs as an interim control. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
 </div>
 
 Periodic and automatic regeneration [#periodic-and-automatic-regeneration]
@@ -4462,6 +4462,16 @@ Continue [#continue]
 
 
 
+
+
+
+
+
+
+
+
+
+
 You will create a root authority with a new key kept by a Lamassu engine. The result is an active CA and its public certificate in `ca.pem`, ready to verify issuance in the next path.
 
 Before you begin [#before-you-begin]
@@ -4474,23 +4484,27 @@ Use an evaluation instance or an authority intended for these tests. The example
 
 <Steps>
   <Step>
-    Open the creation wizard [#open-the-creation-wizard]
+    Open the creation wizard [!toc] [#open-the-creation-wizard-toc]
 
     In **Certification Authorities**, select **Create New CA** and choose to create a CA with a new key pair.
+
+        <img alt="Create New CA method picker" src={__img0} placeholder="blur" />
 
     The **Create New CA (Existing Key)** flow is explained in the [authorities guide](/docs/platform/pki/certificate-authorities).
   </Step>
 
   <Step>
-    Select the key [#select-the-key]
+    Select the key [!toc] [#select-the-key-toc]
 
     Choose the engine that will keep the key and an algorithm its capabilities allow. For this example, you can use **EC P-384** if available.
+
+        <img alt="Key type and curve selection" src={__img1} placeholder="blur" />
 
     The CA private key is used through the engine. In this path, you will download only the authority's public certificate.
   </Step>
 
   <Step>
-    Define the authority [#define-the-authority]
+    Define the authority [!toc] [#define-the-authority-toc]
 
     Select **Root CA** and complete:
 
@@ -4499,19 +4513,25 @@ Use an evaluation instance or an authority intended for these tests. The example
     * **CA Certificate Expiration**: for example, one year from creation.
     * **Default End-Entity Certificate Issuance Expiration**: for example, 90 days, within the CA's lifetime.
 
+        <img alt="CA name and subject details" src={__img2} placeholder="blur" />
+
     The CA name becomes its `Common Name`. Keep the CA usages needed to sign certificates and CRLs.
   </Step>
 
   <Step>
-    Review and create the CA [#review-and-create-the-ca]
+    Review and create the CA [!toc] [#review-and-create-the-ca-toc]
 
     Check the engine, algorithm, subject, root type and dates. Confirm creation and note the authority identifier so you can recognize it in the DMS or API.
+
+        <img alt="CA created successfully" src={__img3} placeholder="blur" />
   </Step>
 
   <Step>
-    Verify the result [#verify-the-result]
+    Verify the result [!toc] [#verify-the-result-toc]
 
     Open the new CA. It should appear active, show its certificate and allow access to **Issued Certificates**.
+
+        <img alt="CA detail with certificate PEM" src={__img4} placeholder="blur" />
 
     Download or copy the authority's PEM certificate and save it as `ca.pem`. Check that the file contains the complete block, including `BEGIN CERTIFICATE` and `END CERTIFICATE`.
   </Step>

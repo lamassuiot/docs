@@ -45,7 +45,7 @@ The <del className="lm-diff-del">generator uses the key of the CA identified by 
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  The certificates of all of them point to `/crl/{ski}`, but the published list has the first CA as issuer and only includes its revocations. A verifier compares the CRL issuer with the issuer of the certificate it validates (RFC 5280, §6.3.3) and rejects the list if they differ. Depending on its policy, the certificate is blocked (*hard-fail*) or accepted even though it is revoked (*soft-fail*). Revocations of the secondary CAs do not appear in any list.
+  The certificates of all of them point to `/crl/{ski}`, but the published list has the first CA as issuer and only includes its revocations. A verifier compares the CRL issuer with the issuer of the certificate it validates (RFC 5280, §6.3.2) and rejects the list if they differ. Depending on its policy, the certificate is blocked (*hard-fail*) or accepted even though it is revoked (*soft-fail*). Revocations of the secondary CAs do not appear in any list.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -53,7 +53,7 @@ The <del className="lm-diff-del">generator uses the key of the CA identified by 
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Restrict the permission to import CAs as an interim control. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
+  To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Until Lamassu rejects these imports, restrict the permission to import CAs as an interim control. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
 </div>
 
 Periodic and automatic regeneration [#periodic-and-automatic-regeneration]

@@ -133,7 +133,7 @@ Domain and audit events depend on the bus publisher:
 
 <div className="lm-diff-ins lm-diff-block">
   * confirm the broker listener speaks AMQPS on the configured port — the default port stays `5672` and does not follow TLS automatically;
-  * if you set `amqp.ca.secretName`, confirm the Secret exists in the release namespace and its data key matches `amqp.ca.certificateKey` (default `ca.crt`); without it, the clients trust the system CAs;
+  * if you set `amqp.ca.secretName`, confirm the Secret exists in the release namespace and its data key matches `amqp.ca.certificateKey` (default `ca.crt`); if `amqp.ca.secretName` is not set, the clients trust the system CAs;
   * remember that a missing referenced Secret prevents the consuming pods from starting;
   * after updating the CA or client certificate Secret, restart the consuming pods: the AMQP client loads certificates at startup.
 </div>

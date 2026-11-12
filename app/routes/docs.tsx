@@ -43,6 +43,7 @@ import {
   resolveDocRedirect,
 } from "../../lib/docs-redirects/redirects";
 import type { Route } from "./+types/docs";
+import { ImageLightbox } from "@/components/image-lightbox";
 
 function splitBadgeTitle(title: string) {
   const match = /^\[([^\]]+)\]\s*(.+)$/.exec(title.trim());
@@ -315,6 +316,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
             }}
           />
         </DocsBody>
+        <ImageLightbox />
       </DocsPage>
     );
   },

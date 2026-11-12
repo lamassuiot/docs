@@ -1,8 +1,14 @@
 /* Declare Scalar layers before Tailwind to prevent CSS conflicts */
-@layer scalar-base, scalar-theme, scalar-config, theme, base, components, utilities;
-@import 'tailwindcss';
-@import 'fumadocs-ui/css/neutral.css';
-@import 'fumadocs-ui/css/preset.css';
+@layer scalar-base,
+  scalar-theme,
+  scalar-config,
+  theme,
+  base,
+  components,
+  utilities;
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
 
 /* ── Lamassu docs theme ───────────────────────────────────────────────────
    Modelled on Mintlify's "aspen" look as Infisical customises it: square
@@ -62,22 +68,22 @@
 }
 
 .dark {
-  --color-fd-background:           #08090b;
-  --color-fd-foreground:           #f3f3f4;
-  --color-fd-muted:                #111215;
-  --color-fd-muted-foreground:     #9f9fa3;
-  --color-fd-popover:              #0e0f12;
-  --color-fd-popover-foreground:   #f3f3f4;
-  --color-fd-card:                 #0e0f12;
-  --color-fd-card-foreground:      #f3f3f4;
-  --color-fd-border:               #1e1f24;
-  --color-fd-primary:              #8f97ff;
-  --color-fd-primary-foreground:   #08090b;
-  --color-fd-secondary:            #111215;
+  --color-fd-background: #08090b;
+  --color-fd-foreground: #f3f3f4;
+  --color-fd-muted: #111215;
+  --color-fd-muted-foreground: #9f9fa3;
+  --color-fd-popover: #0e0f12;
+  --color-fd-popover-foreground: #f3f3f4;
+  --color-fd-card: #0e0f12;
+  --color-fd-card-foreground: #f3f3f4;
+  --color-fd-border: #1e1f24;
+  --color-fd-primary: #8f97ff;
+  --color-fd-primary-foreground: #08090b;
+  --color-fd-secondary: #111215;
   --color-fd-secondary-foreground: #f3f3f4;
-  --color-fd-accent:               #16171b;
-  --color-fd-accent-foreground:    #f3f3f4;
-  --color-fd-ring:                 #8f97ff;
+  --color-fd-accent: #16171b;
+  --color-fd-accent-foreground: #f3f3f4;
+  --color-fd-ring: #8f97ff;
 
   --lm-accent: #5b63ff;
   --lm-accent-soft: rgb(143 151 255 / 0.1);
@@ -96,7 +102,7 @@
 }
 
 body {
-  font-feature-settings: 'cv11', 'ss01';
+  font-feature-settings: "cv11", "ss01";
 }
 
 /* ── Top bar ───────────────────────────────────────────────────────────── */
@@ -121,7 +127,9 @@ body {
   border-radius: 0.75rem;
   background-color: rgb(11 11 11 / 0.04);
   height: 2.25rem;
-  transition: border-color 120ms, background-color 120ms;
+  transition:
+    border-color 120ms,
+    background-color 120ms;
 }
 
 #nd-subnav [data-header-body] button[data-search-full]:hover {
@@ -141,11 +149,11 @@ body {
 /* Language selector and GitHub link: same small radius. The popover is the
    only [aria-haspopup] button in the bar's body. */
 #nd-subnav [data-header-body] button[aria-haspopup],
-#nd-subnav [data-header-body] a[href*='github.com'] {
+#nd-subnav [data-header-body] a[href*="github.com"] {
   border-radius: 0.375rem;
 }
 
-[data-radix-popper-content-wrapper] > [role='dialog'] {
+[data-radix-popper-content-wrapper] > [role="dialog"] {
   overflow: hidden;
   border-radius: 0.5rem;
 }
@@ -168,7 +176,7 @@ body {
   color: var(--color-fd-foreground);
 }
 
-#nd-subnav [data-header-tabs] > a[class*='border-fd-primary'] {
+#nd-subnav [data-header-tabs] > a[class*="border-fd-primary"] {
   color: var(--color-fd-foreground);
   font-weight: 600;
   border-color: var(--color-fd-foreground);
@@ -206,7 +214,7 @@ body {
 
 #nd-sidebar p::before,
 #nd-sidebar-mobile p::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   inset-inline: 0.5rem;
@@ -236,20 +244,36 @@ body {
 
 /* A folder that follows an expanded folder gets a hairline and room above, so
    it reads as a new group and not as the last link of the previous one. */
-#nd-sidebar [data-state='open']:has(> button[aria-expanded]) + [data-state]:has(> button[aria-expanded]),
-#nd-sidebar [data-state='open']:has(> a > [data-icon]) + [data-state]:has(> a > [data-icon]),
-#nd-sidebar-mobile [data-state='open']:has(> button[aria-expanded]) + [data-state]:has(> button[aria-expanded]),
-#nd-sidebar-mobile [data-state='open']:has(> a > [data-icon]) + [data-state]:has(> a > [data-icon]) {
+#nd-sidebar
+  [data-state="open"]:has(> button[aria-expanded])
+  + [data-state]:has(> button[aria-expanded]),
+#nd-sidebar
+  [data-state="open"]:has(> a > [data-icon])
+  + [data-state]:has(> a > [data-icon]),
+#nd-sidebar-mobile
+  [data-state="open"]:has(> button[aria-expanded])
+  + [data-state]:has(> button[aria-expanded]),
+#nd-sidebar-mobile
+  [data-state="open"]:has(> a > [data-icon])
+  + [data-state]:has(> a > [data-icon]) {
   position: relative;
   margin-top: 1rem;
   padding-top: 1rem;
 }
 
-#nd-sidebar [data-state='open']:has(> button[aria-expanded]) + [data-state]:has(> button[aria-expanded])::before,
-#nd-sidebar [data-state='open']:has(> a > [data-icon]) + [data-state]:has(> a > [data-icon])::before,
-#nd-sidebar-mobile [data-state='open']:has(> button[aria-expanded]) + [data-state]:has(> button[aria-expanded])::before,
-#nd-sidebar-mobile [data-state='open']:has(> a > [data-icon]) + [data-state]:has(> a > [data-icon])::before {
-  content: '';
+#nd-sidebar
+  [data-state="open"]:has(> button[aria-expanded])
+  + [data-state]:has(> button[aria-expanded])::before,
+#nd-sidebar
+  [data-state="open"]:has(> a > [data-icon])
+  + [data-state]:has(> a > [data-icon])::before,
+#nd-sidebar-mobile
+  [data-state="open"]:has(> button[aria-expanded])
+  + [data-state]:has(> button[aria-expanded])::before,
+#nd-sidebar-mobile
+  [data-state="open"]:has(> a > [data-icon])
+  + [data-state]:has(> a > [data-icon])::before {
+  content: "";
   position: absolute;
   top: 0;
   inset-inline: 0.5rem;
@@ -291,24 +315,24 @@ body {
 }
 
 /* Current page: grey block with ink text (light), tinted accent (dark). */
-#nd-sidebar a[data-active='true'],
-#nd-sidebar-mobile a[data-active='true'] {
+#nd-sidebar a[data-active="true"],
+#nd-sidebar-mobile a[data-active="true"] {
   color: var(--color-fd-foreground);
   background-color: #ececeb;
   font-weight: 500;
 }
 
-.dark #nd-sidebar a[data-active='true'],
-.dark #nd-sidebar-mobile a[data-active='true'] {
+.dark #nd-sidebar a[data-active="true"],
+.dark #nd-sidebar-mobile a[data-active="true"] {
   color: var(--color-fd-primary);
   background-color: var(--lm-accent-soft);
 }
 
 /* No active-item marker or nested-folder guide line. */
-#nd-sidebar a[data-active='true']::before,
-#nd-sidebar-mobile a[data-active='true']::before,
-#nd-sidebar [class*='before:bg-fd-border']::before,
-#nd-sidebar-mobile [class*='before:bg-fd-border']::before {
+#nd-sidebar a[data-active="true"]::before,
+#nd-sidebar-mobile a[data-active="true"]::before,
+#nd-sidebar [class*="before:bg-fd-border"]::before,
+#nd-sidebar-mobile [class*="before:bg-fd-border"]::before {
   display: none;
 }
 
@@ -317,10 +341,10 @@ body {
 #nd-sidebar-mobile img,
 [role="option"] img,
 [data-radix-popper-content-wrapper] img {
-  width: 1.25rem !important;
-  height: 1.25rem !important;
-  max-width: 1.25rem !important;
-  max-height: 1.25rem !important;
+  width: 1.25rem;
+  height: 1.25rem;
+  max-width: 1.25rem;
+  max-height: 1.25rem;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -368,7 +392,7 @@ body {
 
 /* The Lamassu logo is a single-colour (blue) mark; turn it white in dark mode
    wherever it is shown as an image (top bar, sidebar tab, API reference). */
-.dark img[src$='images/lamassu.svg'] {
+.dark img[src$="images/lamassu.svg"] {
   filter: brightness(0) invert(1);
 }
 
@@ -386,7 +410,7 @@ body {
 }
 
 .lm-page-trail li + li::before {
-  content: '/';
+  content: "/";
   margin-inline: 0.5rem;
   color: var(--color-fd-border);
 }
@@ -494,7 +518,7 @@ body {
 /* Center all images in doc content */
 .prose img,
 article img,
-[class*='prose'] img {
+[class*="prose"] img {
   display: block;
   margin-left: auto;
   margin-right: auto;
@@ -509,9 +533,9 @@ article img,
 article p,
 article li,
 article td,
-[class*='prose'] p,
-[class*='prose'] li,
-[class*='prose'] td {
+[class*="prose"] p,
+[class*="prose"] li,
+[class*="prose"] td {
   text-align: start;
 }
 
@@ -538,7 +562,8 @@ article td,
   content: none;
 }
 
-.prose :where(a code, h1 code, h2 code, h3 code, h4 code):not(:where(.not-prose *)) {
+.prose
+  :where(a code, h1 code, h2 code, h3 code, h4 code):not(:where(.not-prose *)) {
   color: inherit;
 }
 
@@ -566,7 +591,7 @@ figure.shiki pre {
 }
 
 /* Tabbed code groups share the same frame. */
-.prose div:has(> [role='tablist']):has(figure.shiki) {
+.prose div:has(> [role="tablist"]):has(figure.shiki) {
   border-radius: 0;
   box-shadow: none;
 }
@@ -607,41 +632,46 @@ figure.shiki pre {
 /* ── Callouts ──────────────────────────────────────────────────────────────
    Boxed notices: a tinted surface with a matching hairline frame, icon in the
    type's colour, no side rail or shadow. */
-.prose div[style*='--callout-color'] {
+.prose div[style*="--callout-color"] {
   --lm-callout-tint: 6%;
 
   gap: 0.75rem;
   margin-block: 1.25rem;
   padding: 1rem 1.25rem;
-  border: 1px solid color-mix(in oklab, var(--callout-color) 30%, var(--color-fd-border));
+  border: 1px solid
+    color-mix(in oklab, var(--callout-color) 30%, var(--color-fd-border));
   border-radius: 0;
-  background-color: color-mix(in oklab, var(--callout-color) var(--lm-callout-tint), var(--color-fd-background));
+  background-color: color-mix(
+    in oklab,
+    var(--callout-color) var(--lm-callout-tint),
+    var(--color-fd-background)
+  );
   box-shadow: none;
   font-size: 0.9375rem;
 }
 
-.dark .prose div[style*='--callout-color'] {
+.dark .prose div[style*="--callout-color"] {
   --lm-callout-tint: 9%;
 }
 
-.prose div[style*='--callout-color'] > div[role='none'] {
+.prose div[style*="--callout-color"] > div[role="none"] {
   display: none;
 }
 
-.prose div[style*='--callout-color'] > svg {
+.prose div[style*="--callout-color"] > svg {
   margin-top: 0.125rem;
   width: 1.125rem;
   height: 1.125rem;
 }
 
-.prose div[style*='--callout-color'] :where(p, li) {
+.prose div[style*="--callout-color"] :where(p, li) {
   color: var(--lm-body);
 }
 
 /* ── Cards ───────────────────────────────────────────────────────────────
    Fumadocs also marks heading self-links with [data-card]; real cards are the
    bordered ones. */
-.prose a[data-card][class*='border'] {
+.prose a[data-card][class*="border"] {
   padding: 1.125rem 1.25rem;
   border-radius: 0.875rem;
   background-color: var(--color-fd-background);
@@ -649,24 +679,24 @@ figure.shiki pre {
   transition: border-color 120ms;
 }
 
-.prose a[data-card][class*='border']:hover {
+.prose a[data-card][class*="border"]:hover {
   border-color: var(--lm-accent);
   background-color: var(--color-fd-background);
 }
 
-.prose a[data-card][class*='border'] > :not(.not-prose) {
+.prose a[data-card][class*="border"] > :not(.not-prose) {
   color: var(--color-fd-muted-foreground);
   text-decoration: none;
 }
 
-.prose a[data-card][class*='border'] > h3 {
+.prose a[data-card][class*="border"] > h3 {
   margin-block: 0 0.375rem;
   font-size: 1rem;
   font-weight: 600;
   color: var(--lm-heading);
 }
 
-.prose a[data-card][class*='border'] > p {
+.prose a[data-card][class*="border"] > p {
   margin: 0;
   font-size: 0.875rem;
   line-height: 1.6;
@@ -674,12 +704,12 @@ figure.shiki pre {
 
 /* ── Table of contents ─────────────────────────────────────────────────── */
 
-#nd-toc a[data-active='true'] {
+#nd-toc a[data-active="true"] {
   color: var(--color-fd-foreground);
   font-weight: 500;
 }
 
-.dark #nd-toc a[data-active='true'] {
+.dark #nd-toc a[data-active="true"] {
   color: var(--color-fd-primary);
 }
 
@@ -706,7 +736,9 @@ figure.shiki pre {
   font-weight: 500;
   white-space: nowrap;
   color: var(--color-fd-muted-foreground);
-  transition: background-color 120ms, color 120ms;
+  transition:
+    background-color 120ms,
+    color 120ms;
 }
 
 .lm-api-services a:hover {
@@ -730,8 +762,9 @@ figure.shiki pre {
 
 .light-mode,
 .dark-mode {
-  --scalar-font: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --scalar-font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --scalar-font: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --scalar-font-code:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --scalar-radius: 0.375rem;
   --scalar-radius-lg: 0.75rem;
   --scalar-radius-xl: 0.75rem;
@@ -894,12 +927,12 @@ html[data-show-diff] .lm-diff-line::before {
 }
 
 html[data-show-diff] .lm-diff-line.lm-diff-ins::before {
-  content: '+';
+  content: "+";
   color: var(--lm-diff-ins-edge);
 }
 
 html[data-show-diff] .lm-diff-line.lm-diff-del::before {
-  content: '-';
+  content: "-";
   color: var(--lm-diff-del-edge);
 }
 
@@ -923,4 +956,133 @@ html[data-show-diff] .lm-diff-merged {
 .dark .fd-step::before {
   background-color: #22232a;
   color: var(--color-fd-foreground);
+}
+
+/* ── Lightbox ─────────────────────────────────────────────────────────────
+   Full-screen image viewer: dark with a soft border, no shadows. Close button
+   in the corner, plus the original filename in small type below the image. */
+#nd-lightbox {
+  z-index: 100;
+}
+
+#nd-lightbox:has(img) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgb(0 0 0 / 0.9);
+}
+
+#nd-lightbox img {
+  max-width: 90%;
+  max-height: 90%;
+  border-radius: 0.5rem;
+}
+
+#nd-lightbox a {
+  position: absolute;
+  z-index: 10;
+  color: var(--color-fd-muted-foreground);
+  text-decoration: none;
+  font-size: 0.875rem;
+  inset-inline-start: 1.5rem;
+  bottom: 1.5rem;
+}
+
+#nd-lightbox a:hover {
+  color: var(--color-fd-foreground);
+}
+
+#nd-lightbox button {
+  position: absolute;
+  z-index: 10;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1.5rem;
+}
+
+#nd-lightbox button:hover {
+  color: var(--color-fd-primary);
+}
+
+#nd-lightbox[aria-hidden="true"] {
+  display: none;
+}
+
+/* ── Image lightbox ──────────────────────────────────────────────────────
+   Fullscreen overlay opened by clicking any doc image. FLIP zoom: the first
+   frame reproduces the clicked thumbnail's rect exactly (--lb-start-* set by
+   the component, measured against the final layout) and the image grows to
+   its centered position; the close is instant. Reduced motion keeps the
+   backdrop fade and skips the zoom. Backdrop click, Escape or focus loss
+   closes. */
+.lb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgb(15 23 32 / 0.82);
+  cursor: zoom-out;
+  animation: lb-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes lb-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.lb-image {
+  max-width: min(92vw, 1200px);
+  max-height: 88vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 8px 48px rgb(0 0 0 / 0.45);
+  background: #fff;
+  cursor: zoom-in;
+  visibility: hidden;
+}
+
+.lb-image.lb-ready {
+  visibility: visible;
+  transform-origin: top left;
+  animation: lb-zoom 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes lb-zoom {
+  from {
+    transform: translate(var(--lb-start-x, 0px), var(--lb-start-y, 0px))
+      scale(var(--lb-start-sx, 1), var(--lb-start-sy, 1));
+  }
+  to {
+    transform: translate(0, 0) scale(1, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-overlay {
+    animation-duration: 160ms;
+    animation-timing-function: ease;
+  }
+
+  .lb-image.lb-ready {
+    animation: none;
+  }
 }

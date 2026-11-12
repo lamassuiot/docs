@@ -29,6 +29,7 @@ import {
   type PageDiff,
 } from "@/components/diff-toggle";
 import { MdxCard, MdxLink } from "@/components/mdx-link";
+import { Mermaid } from "@/components/mermaid";
 import { ScalarIcon } from "@/components/scalar-icon";
 import { VersionSelector } from "@/components/version-selector";
 import { asset } from "@/lib/asset";
@@ -313,6 +314,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               Step,
               Steps,
               ArchitectureDiagram,
+              Mermaid,
             }}
           />
         </DocsBody>

@@ -1,4 +1,4 @@
-import { rehypeCodeDefaultOptions } from "fumadocs-core/mdx-plugins";
+import { rehypeCodeDefaultOptions, remarkMdxMermaid } from "fumadocs-core/mdx-plugins";
 import {
   defineConfig,
   defineDocs,
@@ -65,6 +65,9 @@ export default defineConfig({
             [remarkDocsDiff, { base: diffBase }],
           ],
         }
-      : {}),
+      : {
+          // Turns ```mermaid blocks into <Mermaid chart="..." /> MDX elements.
+          remarkPlugins: (plugins) => [...plugins, remarkMdxMermaid],
+        }),
   },
 });

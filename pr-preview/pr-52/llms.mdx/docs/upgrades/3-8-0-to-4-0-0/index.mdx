@@ -151,7 +151,7 @@ With Helm, enable the hook for the upgrade in [step 2](#step-2-update-the-values
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Certificates now reference their KMS key, and VA roles reference their signer certificate, so a key or certificate in use cannot be deleted. The KMS migration drops the legacy `lamassu.io/kms/binded-resources` key metadata. The CA migration registers the public keys of deleted CAs as KMS keys without a private key; they exist to satisfy the reference and are safe to delete.
+  Certificates now reference their KMS key, and VA roles reference their signer certificate, so a key or certificate in use cannot be deleted. The KMS migration drops the legacy `lamassu.io/kms/binded-resources` key metadata. Before 4.0.0, deleting a CA could remove its key while leaving key references in its retained certificate records. The CA migration registers those missing keys in the KMS with only their public key to satisfy the retained references. These entries cannot be deleted while the retained certificates reference them; they do not restore the private key. In 4.0.0, deleting a CA releases the references from its own current certificate and linked reissued certificates before attempting to delete the key; other certificates that still reference it prevent deletion.
 </div>
 
 APIs and stored configuration [#apis-and-stored-configuration]
@@ -195,7 +195,7 @@ What changes is how API requests are handled. Bodies that still carry `additiona
 
 Independent re-enrollment authentication [#independent-re-enrollment-authentication]
 
-Re-enrollment authentication settings are now stored independently from initial authentication. Nothing needs migrating, but read both blocks before editing a DMS so that you do not modify one while believing you are editing the other. If the console version does not expose independent settings, edit them through the [DMS API](/docs/api-reference/dms-manager).
+Re-enrollment authentication settings are now stored independently from initial authentication. Nothing needs migrating, but read both blocks before editing a DMS so that you do not modify one while believing you are editing the other. The console exposes independent editors for both blocks; the [DMS guide](/docs/platform/iot-fleets/enrollment/dms) describes their fields, and you can also edit them through the [DMS API](/docs/api-reference/dms-manager).
 
 DMS update API [#dms-update-api]
 

@@ -151,7 +151,7 @@ Con Helm, activa el hook para la actualización en el [paso 2](#paso-2-actualiza
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Los certificados referencian ahora su clave del KMS, y los roles VA referencian su certificado firmante, de modo que no se puede eliminar una clave o un certificado en uso. La migración del KMS descarta los metadatos de clave heredados `lamassu.io/kms/binded-resources`. La migración de CA registra las claves públicas de las CA eliminadas como claves del KMS sin clave privada; existen para satisfacer la referencia y es seguro eliminarlas.
+  Los certificados referencian ahora su clave del KMS, y los roles VA referencian su certificado firmante, de modo que no se puede eliminar una clave o un certificado en uso. La migración del KMS descarta los metadatos de clave heredados `lamassu.io/kms/binded-resources`. Antes de 4.0.0, eliminar una CA podía borrar su clave y dejar referencias a ella en los registros de certificado conservados. La migración de CA registra esas claves ausentes en el KMS solo con su clave pública para satisfacer las referencias conservadas. Estas entradas no pueden eliminarse mientras los certificados conservados las referencien; no recuperan la clave privada. En 4.0.0, eliminar una CA libera las referencias de su propio certificado actual y de sus certificados reemitidos vinculados antes de intentar eliminar la clave; los demás certificados que todavía la referencien impiden su eliminación.
 </div>
 
 APIs y configuración almacenada [#apis-y-configuración-almacenada]
@@ -195,7 +195,7 @@ Lo que cambia es el tratamiento de las peticiones por API. Los cuerpos que aún 
 
 Autenticación de reenrolamiento independiente [#autenticación-de-reenrolamiento-independiente]
 
-Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma independiente de los de la autenticación inicial. No hay nada que migrar, pero lee ambos bloques antes de editar un DMS para no modificar uno creyendo que editas el otro. Si la versión de la consola no expone los ajustes independientes, edítalos mediante la [API DMS](/docs/api-reference/dms-manager).
+Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma independiente de los de la autenticación inicial. No hay nada que migrar, pero lee ambos bloques antes de editar un DMS para no modificar uno creyendo que editas el otro. La consola expone editores independientes para ambos bloques; la [guía de DMS](/docs/platform/iot-fleets/enrollment/dms) describe sus campos, y también puedes editarlos mediante la [API DMS](/docs/api-reference/dms-manager).
 
 API de actualización del DMS [#api-de-actualización-del-dms]
 

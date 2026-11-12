@@ -1,0 +1,45 @@
+# Security (/docs/pr-preview/pr-52/security)
+
+
+
+Found a security vulnerability in lamassuiot, lamassu-dashboard, or lamassu-helm? This page explains how to report it privately, what to include in your report and which releases receive security fixes.
+
+Report a vulnerability [#report-a-vulnerability]
+
+Do not report security vulnerabilities through public GitHub issues, discussions, or pull requests. Public reports disclose the problem before maintainers can fix it.
+
+Instead, report privately using GitHub Security Advisories for the affected repository:
+
+* [lamassuiot](https://github.com/lamassuiot/lamassuiot/security/advisories/new)
+* [lamassu-dashboard](https://github.com/lamassuiot/lamassu-dashboard/security/advisories/new)
+* [lamassu-helm](https://github.com/lamassuiot/lamassu-helm/security/advisories/new)
+
+This lets maintainers assess and address the issue before it is publicly disclosed.
+
+If private vulnerability reporting is not enabled for that repository, report the vulnerability privately to [lamassuiot@lksnext.com](mailto:lamassuiot@lksnext.com) before disclosing any details publicly.
+
+What to include in a report [#what-to-include-in-a-report]
+
+Describe the vulnerability, its potential impact, and steps to reproduce it using non-sensitive, redacted examples.
+
+Do not include in the report:
+
+* Credentials, tokens, or private keys
+* Customer data or customer-identifiable information
+* Confidential architecture or internal infrastructure details
+
+Supported versions [#supported-versions]
+
+Only the latest stable release receives security support. Support for a stable release ends when the next stable release is published. Older releases and pre-releases are not supported.
+
+For upgrade guidance, see [Upgrades](/docs/upgrades/3-8-0-to-4-0-0).
+
+Responsible disclosure [#responsible-disclosure]
+
+* Give maintainers reasonable time to investigate and address a reported vulnerability before any public disclosure.
+* Avoid privacy violations, data destruction, and service disruption while researching a vulnerability.
+* Only interact with accounts or data you own, or for which you have explicit permission.
+
+Maintainers acknowledge reports in a timely manner and keep you informed of remediation progress.
+
+This policy covers the source code, configuration, and CI/CD workflows of the lamassuiot, lamassu-dashboard, and lamassu-helm repositories.

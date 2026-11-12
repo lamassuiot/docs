@@ -88,10 +88,14 @@ Este flujo resulta útil cuando la clave se creó previamente en un HSM, se impo
 
 Importa una CA externa [#importa-una-ca-externa]
 
-Necesitas el certificado de CA en PEM, su cadena hasta una raíz conocida y, si vas a importarla, una clave privada exportable. Antes de cargar el material, verifica firma, fechas, `CA:TRUE`, usos de firma y correspondencia de la clave pública. El procedimiento de [verificación de claves](/docs/platform/pki/quickstarts/issue-certificate) también sirve para comparar la clave y el certificado de una CA.
+Necesitas el certificado de CA en PEM, su cadena hasta una raíz conocida y, si vas a importarla, una clave privada exportable. Antes de cargar el material, verifica firma, fechas, `CA:TRUE`, usos de firma (incluido `cRLSign`, sin el cual la CA no puede publicar su [CRL](/docs/platform/pki/crl)) y correspondencia de la clave pública. El procedimiento de [verificación de claves](/docs/platform/pki/quickstarts/issue-certificate) también sirve para comparar la clave y el certificado de una CA.
 
 <div className="lm-diff-ins lm-diff-block">
-  El backend rechaza una importación cuyo certificado carece de la restricción básica de CA (`basicConstraints cA flag is not set`), cuyo número de serie colisiona con un certificado existente distinto, o que es una CA duplicada idéntica. El registro de certificado de una CA eliminada se conserva y se reutiliza al importarla de nuevo, incluido su estado anterior. Por eso, si reimportas una CA con el mismo número de serie pero otro certificado, Lamassu sigue mostrando los datos del certificado antiguo: no reutilices números de serie al reimportar y comprueba el resultado tras la importación. Eliminar una CA libera su clave, que el KMS conserva mientras otros certificados la sigan referenciando.
+  El backend rechaza una importación cuyo certificado carece de la restricción básica de CA (`basicConstraints cA flag is not set`), cuyo número de serie coincide con el de un certificado almacenado con contenido distinto, o cuyo certificado idéntico ya pertenece a una CA existente. El registro de certificado de una CA eliminada se conserva y puede reutilizarse al reimportar el mismo certificado, incluido su estado anterior. Reimportar otro certificado con ese número de serie se rechaza; comprueba el certificado y su estado tras reimportarlo.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Eliminar una CA libera las referencias a la clave de su propio certificado actual y de sus certificados reemitidos vinculados, pero conserva esos registros para la CRL y el OCSP de su emisor. Después intenta eliminar la clave; el KMS la conserva si otros certificados todavía la referencian, como los de otra CA que comparte la clave. Revocar los certificados emitidos por la CA eliminada no libera sus propias referencias a claves.
 </div>
 
 <Steps>
@@ -177,4 +181,10 @@ Revoca una CA [#revoca-una-ca]
   </Step>
 </Steps>
 
-La eliminación permanente solo está disponible después de revocar. Elimina el registro únicamente cuando la política de retención y auditoría lo permita.
+Elimina una CA [#elimina-una-ca]
+
+La eliminación permanente solo está disponible con la CA revocada o caducada; una CA importada sin clave puede eliminarse en cualquier estado. Elimina el registro únicamente cuando la política de retención y auditoría lo permita.
+
+El rol VA de la CA se conserva. Si no queda otra CA con el mismo SKI, deja de ser editable (consulta [CRL](/docs/platform/pki/crl)), así que ajusta antes su validez y su firmante. La clave de la CA se libera, pero el KMS la conserva mientras otros certificados la referencien.
+
+Lamassu conserva el registro del certificado de una CA eliminada. Si se importa de nuevo ese mismo certificado, la importación termina bien y reutiliza el registro: actualiza el tipo, el emisor y la clave, pero conserva el estado, así que la CA reaparece con el que tenía al eliminarse (normalmente revocada o caducada). Un certificado distinto con el mismo número de serie se rechaza con error 400, y un certificado que ya pertenece a una CA existente, con error 409. Para no heredar el estado anterior, usa un certificado con otro número de serie y comprueba el resultado tras importar. Si el certificado nuevo usa la misma clave, comparte el SKI con el rol VA retenido de la CA eliminada, cuyo firmante es el certificado antiguo: comprueba que la CRL se genera y, si no es así, asigna con `PUT` un firmante de la CA nueva (consulta [CRL](/docs/platform/pki/crl)).

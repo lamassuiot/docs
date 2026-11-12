@@ -35,6 +35,8 @@ HashiCorp Vault [#hashicorp-vault]
 
 The adapter uses KV storage for private material. This is not signing within Vault Transit: someone able to read the secret can recover the key. Review read permissions, availability and recovery with the deployment owner.
 
+The adapter reaches Vault over its configured HTTP(S) endpoint. The Vault server certificate is verified against the system trust store; a Vault signed by a private CA is trusted by adding its CA certificate to the engine's `ca_cert_file` (PEM-encoded). `insecure_skip_verify=true` disables verification and is a last resort; agree the transport settings with the deployment owner.
+
 AWS Secrets Manager [#aws-secrets-manager]
 
 Offers encrypted persistence in AWS at a cost. It protects the key at rest, but an authorized administrator can recover it; it does not provide the same extraction resistance as a KMS or HSM.
@@ -206,5 +208,5 @@ Before deleting a key [#before-deleting-a-key]
 Review **Related Entities** and locate CAs, certificates and validation processes that still need signatures. Revoking a CA does not remove the need to publish status during its retention period. Deleting a key does not automatically revoke its certificates either. Plan replacement and retention before using **Delete Key**; provider deletion behavior depends on the engine.
 
 <div className="lm-diff-ins lm-diff-block">
-  Note that the KMS refuses to delete a key that certificates still reference. The reference is released when the CA that owns those certificates is deleted; alternatively, you can keep the key deliberately.
+  The KMS refuses to delete a key that certificates still reference. Deleting a CA releases the references from its own current certificate and linked reissued certificates, then attempts to delete the key. If other certificates still reference the key, such as another CA sharing it, the KMS keeps it. Revoking certificates issued by the deleted CA does not release their own key references. Legacy references retained by the upgrade migration are described in the [upgrade guide](/docs/upgrades/3-8-0-to-4-0-0#references-between-certificates-keys-and-va-roles).
 </div>

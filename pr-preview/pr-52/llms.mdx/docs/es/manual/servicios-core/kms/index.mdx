@@ -35,6 +35,8 @@ HashiCorp Vault [#hashicorp-vault]
 
 El adaptador utiliza almacenamiento KV para el material privado. No equivale a una operación de firma dentro de Vault Transit: quien pueda leer el secreto puede recuperar la clave. Revisa los permisos de lectura, disponibilidad y recuperación con el responsable de Despliegue.
 
+El adaptador se comunica con Vault a través de su endpoint HTTP(S) configurado. El certificado del servidor de Vault se verifica contra el almacén de confianza del sistema; para confiar en un Vault con certificado emitido por una CA privada, añade ese certificado de CA al `ca_cert_file` del motor (codificado en PEM). `insecure_skip_verify=true` desactiva la verificación y es un último recurso; acuerda los ajustes de transporte con el responsable de Despliegue.
+
 AWS Secrets Manager [#aws-secrets-manager]
 
 Ofrece persistencia cifrada en AWS con coste asociado. Protege la clave en reposo, pero un administrador autorizado puede recuperarla; no proporciona la misma resistencia a la extracción que un KMS o HSM.
@@ -200,5 +202,5 @@ Antes de eliminar una clave [#antes-de-eliminar-una-clave]
 Revisa **Related Entities** y localiza CAs, certificados y procesos de validación que siguen necesitando firmas. Revocar una CA no elimina la necesidad de publicar estado durante su periodo de retención. Eliminar una clave tampoco revoca automáticamente sus certificados. Planifica sustitución y retención antes de usar **Delete Key**; el efecto de borrado en el proveedor depende del motor.
 
 <div className="lm-diff-ins lm-diff-block">
-  Ten en cuenta que el KMS se niega a eliminar una clave que certificados todavía referencian. La referencia se libera cuando se elimina la CA propietaria de esos certificados; también puedes conservar la clave de forma deliberada.
+  El KMS se niega a eliminar una clave que todavía está referenciada por certificados. Eliminar una CA libera las referencias de su propio certificado actual y de sus certificados reemitidos vinculados, y después intenta eliminar la clave. Si otros certificados todavía la referencian, como los de otra CA que la comparte, el KMS la conserva. Revocar los certificados emitidos por la CA eliminada no libera sus propias referencias a claves. La [guía de actualización](/docs/upgrades/3-8-0-to-4-0-0#referencias-entre-certificados-claves-y-roles-va) describe las referencias heredadas que conserva la migración.
 </div>

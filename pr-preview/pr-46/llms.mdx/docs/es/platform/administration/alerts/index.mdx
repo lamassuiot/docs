@@ -23,7 +23,7 @@ Los canales Microsoft Teams y Webhook aceptan un bloque opcional `http_client` q
 
 * `apikey_options` necesita `header` y `key`.
 * `jwt_options` necesita `oidc_client_id`, `oidc_client_secret` y un `oidc_well_known` absoluto `http` o `https`.
-* `mtls_options` necesita el PEM en línea `cert_content` y `key_content`; los valores que referencian archivos del servidor se rechazan.
+* `mtls_options` necesita `cert_content` y `key_content` como PEM codificado en Base64, como el resto de certificados de la API; también se acepta el PEM en claro. Los valores que referencian archivos del servidor se rechazan, y el par debe corresponder a un certificado y una clave privada coincidentes.
 
 La [referencia de la API de Alerts](/docs/api-reference/alerts) documenta el esquema completo de `http_client`.
 
@@ -55,7 +55,7 @@ Crea una suscripción [#crea-una-suscripción]
     Por ejemplo, `function (event) { return event.data.status == "NO_IDENTITY"; }` limita una suscripción a dispositivos sin identidad.
 
     <div className="lm-diff-ins lm-diff-block">
-      La consola evalúa el filtro contra el JSON del editor **Input Event**, que está prellenado con el último evento, e indica si coincide (**The filter matches this Cloud Event** / **The filter does not match this Cloud Event**). Las expresiones JSON Path se evalúan sobre el Cloud Event completo, así que el valor por defecto, `$.data`, selecciona el campo `data` del evento, y la expresión debe empezar por `$`.
+      La consola evalúa el filtro contra el JSON del editor **Input Event**, que está prellenado con el último evento, e indica si coincide. Para los filtros JSON Path y JavaScript, muestra **The filter matches this Cloud Event** o **The filter does not match this Cloud Event**. Las expresiones JSON Path se evalúan sobre el Cloud Event completo, así que el valor por defecto, `$.data`, selecciona el campo `data` del evento, y la expresión debe empezar por `$`.
     </div>
   </Step>
 
@@ -65,6 +65,20 @@ Crea una suscripción [#crea-una-suscripción]
     Comprueba el evento, el canal y el filtro en el resumen. Selecciona **Confirm Subscription** para comenzar la entrega.
   </Step>
 </Steps>
+
+Configura el cliente HTTP del webhook [#configura-el-cliente-http-del-webhook]
+
+Los canales Webhook y Microsoft Teams muestran esta configuración en el formulario de suscripción, en el paso del canal, y de nuevo al editar una suscripción; Email no la utiliza. Los campos se corresponden con el bloque opcional `http_client` descrito arriba:
+
+* **Log Level** selecciona `debug`, `info`, `warn` o `error`; `info` es el valor por defecto.
+* **Call Timeout** es de 10 segundos por defecto. La consola rechaza un valor superior a 30 segundos con `Webhook timeout must be at most 30s.`; la API ajusta ese mismo valor al tope en lugar de rechazarlo (ver [Las llamadas están limitadas](#reglas-de-entrega-del-webhook)).
+* No hay interruptor de verificación TLS para estos canales, porque el servicio siempre verifica el certificado del receptor (ver [TLS siempre se verifica](#reglas-de-entrega-del-webhook)).
+* **HTTP Authentication** selecciona `No Authentication` (por defecto), `API Key` (valor de la API key y Header Name, `X-API-Key` por defecto), `OIDC Client Credentials` (Client ID, Client Secret y Well-Known URL) o `Mutual TLS` (Client Certificate y Client Private Key pegados como PEM). Una clave privada guardada permanece oculta hasta que seleccionas **Show**.
+* Una URL `http://` muestra en la consola la advertencia `Unencrypted HTTP connection` (ver la llamada [Credenciales sobre http://](#reglas-de-entrega-del-webhook) más abajo).
+
+Los campos se validan en línea con las mismas reglas de entrega: la URL del webhook y la Well-Known URL de OIDC deben ser URLs absolutas `http` o `https`, una cabecera API-key no puede usar un nombre reservado y el certificado y la clave mTLS deben ser contenido PEM, no rutas de ficheros.
+
+El resumen del paso de confirmación muestra la autenticación como `None`, `OIDC client credentials`, `API key` o `Mutual TLS`. Los detalles de la suscripción muestran la autenticación, el nombre de la cabecera API-key (nunca el valor), la URL del emisor OIDC, mTLS como `Configured` y una fila fija `TLS verification: Verified`. La API key, el client secret y la clave privada no se muestran en los detalles de la suscripción.
 
 Reglas de entrega del webhook [#reglas-de-entrega-del-webhook]
 
@@ -84,6 +98,8 @@ Las notificaciones enviadas por los canales Microsoft Teams y Webhook siguen una
 Gestiona una suscripción [#gestiona-una-suscripción]
 
 Abre una suscripción existente para consultar su destino y filtro, modificar la configuración o seleccionar **Unsubscribe**. Elimina las suscripciones que ya no tengan un propietario operativo para evitar entregas ignoradas o endpoints obsoletos.
+
+Las suscripciones creadas con versiones anteriores de la consola pueden guardar el destino del webhook en `url` y `method` en lugar de `webhook_url` y `webhook_method`. El servicio entrega solo a través de `webhook_url` y `webhook_method`, así que una suscripción así no entrega aunque los detalles de la suscripción muestren el destino guardado. Abre la suscripción y vuelve a guardarla: el formulario de edición precarga el destino guardado, y al guardar se reescribe la configuración del canal con el formato actual.
 
 Familias de eventos [#familias-de-eventos]
 

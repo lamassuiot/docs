@@ -91,11 +91,16 @@ External authorization fails closed by default. If authz is unavailable, protect
 4. Check the check route is /v1/ext\_authz/check.
 5. Do not switch to <code>failOpen: true</code> as a permanent workaround: it would allow traffic without authorization during the outage.
 
+API 500 errors [#api-500-errors]
+
+A 500 indicates an internal failure, such as an unavailable database. The `{"err": ...}` body currently includes the text of the internal error, which can contain schema, table and constraint names and, on connection failures, the database host and user (not the password). Find the cause in the service log using the request time, and do not forward the body to third parties or show it to end users. This is a known information-disclosure defect: generic messages are planned for 500 responses, keeping the detail only in the service log (tracked in [lamassuiot#814](https://github.com/lamassuiot/lamassuiot/issues/814)). The authorization connector also returns the internal error, in the `details.error` field. Some request errors, such as a key size the engine does not support, are also returned as 500.
+
 A pod is not Ready [#a-pod-is-not-ready]
 
 Review <code>kubectl describe pod</code> first. Common causes are:
 
 * wrong credentials or DNS for PostgreSQL or RabbitMQ;
+* a missing AMQP CA or client certificate Secret referenced by `amqp.ca.secretName` or `amqp.client.secretName`;
 * unbound persistent volume;
 * inaccessible image or incorrect pull policy;
 * invalid cryptographic engine configuration;
@@ -105,6 +110,8 @@ Review <code>kubectl describe pod</code> first. Common causes are:
 Generic values request 100 mCPU and 128 MiB and limit to 500 mCPU and 512 MiB. Tune per service when you see OOMKills, throttling or slow startups.
 
 Filesystem-based KMS engines and VA local storage use exclusive-access volumes. Keep a single replica or migrate to shared backends before enabling autoscaling.
+
+Internal calls now fail fast instead of hanging for the clients covered by [Egress proxy](/docs/deployment/self-hosted/networking#egress-proxy): connection attempts time out after 30 seconds and TLS handshakes after 10 seconds. The authorization-engine connector keeps its own transport without these dial and handshake timeouts; only its overall 30-second request timeout bounds each call. If an egress proxy handles the cluster's outbound traffic, check the pod's `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` environment variables and list in-cluster service names in `NO_PROXY`.
 
 Events are not arriving [#events-are-not-arriving]
 
@@ -116,11 +123,20 @@ Domain and audit events depend on the bus publisher:
 * inspect dead-letter queues;
 * alert on orphan durable queues and backlog growth.
 
+If `amqp.tls` is enabled, verify the TLS side as well:
+
+* confirm the broker listener speaks AMQPS on the configured port — the default port stays `5672` and does not follow TLS automatically;
+* if you set `amqp.ca.secretName`, confirm the Secret exists in the release namespace and its data key matches `amqp.ca.certificateKey` (default `ca.crt`); if `amqp.ca.secretName` is not set, the clients trust the system CAs;
+* remember that a missing referenced Secret prevents the consuming pods from starting;
+* after updating the CA or client certificate Secret, restart the consuming pods: the AMQP client loads certificates at startup.
+
+See [AMQP TLS (AMQPS)](/docs/deployment/self-hosted/helm#amqp-tls-amqps) for the full configuration.
+
 A consumer outage does not always prevent the main operation from completing. That is why you must monitor RabbitMQ and independently verify the persistence of [audit logs](/docs/platform/administration/audit-logs).
 
 Observability [#observability]
 
-The chart can enable OpenTelemetry instrumentation. Traces are exported over OTLP HTTP and logs can be directed to a compatible endpoint, such as VictoriaLogs. Use a correlation identifier and the same time window to join Gateway, authz, service and dependency.
+The chart can enable OpenTelemetry instrumentation for the services that support it, including authz; it does not configure OpenTelemetry for AWS Connector, wfx or the UI. Traces are exported over OTLP HTTP and logs can be directed to a compatible endpoint, such as VictoriaLogs. Use a correlation identifier and the same time window to join Gateway, service and dependency.
 
 Before closing an incident, record:
 

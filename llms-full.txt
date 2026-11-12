@@ -1932,7 +1932,7 @@ All ancestors are not added automatically. [Trust distribution](/docs/platform/i
 
 Operate the DMS inventory [#operate-the-dms-inventory]
 
-**Edit** changes name, settings and metadata. When using the API, read the DMS before editing it: `name` and `settings` are replaced entirely. Omitted or `null` `metadata` keeps the stored value, and an object replaces it entirely. If the object does not include the AWS IoT connector key (`lamassu.io/iot/{connector_id}`), the connector ignores the DMS's later events.
+**Edit** changes name, settings and metadata. Updates go through the [DMS API](/docs/api-reference/dms-manager). `PUT /v1/dms/{id}` always targets the DMS identified by the URL path: the body carries no `id` field, and any `id` or `creation_ts` in it is silently ignored — authorization is evaluated against the same URL identifier. The body must include a non-empty `name` and a `settings` object; missing either returns HTTP 400 and leaves the stored DMS unchanged. `name` and `settings` are always full replacements, so read the DMS before sending API edits to avoid losing fields. `metadata` is optional: omitting it or sending `null` keeps the stored metadata, a supplied object replaces it entirely, and `{}` clears it (a later GET returns an empty object, not `null`). Old-style bodies that carry the full DMS object keep working while they include `name` and `settings`; unknown fields are ignored. Updates reject an empty `name` with HTTP 400: a DMS whose stored name was zeroed by an earlier update must be renamed before any client round-trips it — the AWS IoT connector’s JITP writeback included. If the object does not include the AWS IoT connector key (`lamassu.io/iot/{connector_id}`), the connector ignores the DMS's later events.
 
 **Go to DMS owned devices** restricts inventory by owner. **Show/Edit Metadata** contains operational and integration data; consult the integration guide before changing it. **EST (RFC-7030)** helps locate URLs.
 
@@ -2517,6 +2517,119 @@ Configuration parameters [#configuration-parameters]
 | `device_manager_client`        | string | Yes                            | HTTP URL of Lamassu's Device Manager.                                                                          |
 | `ca_client`                    | string | Yes                            | HTTP URL of Lamassu's CA service.                                                                              |
 
+Resource state machine [#resource-state-machine]
+
+The connector owns the AWS side of four resource types — CAs, DMS provisioning templates (JITP), device certificates and Things. This section maps the bus events the connector consumes to the AWS resources they touch and to the AWS calls each transition performs. AWS resources are referenced with the notation `IoTCore/<resource>`.
+
+Events the connector handles [#events-the-connector-handles]
+
+The **CloudEvent type** column lists the event name on Lamassu's internal event bus; the **IAM actions** column lists the exact AWS SDK operations each flow invokes, so the required permissions can be derived directly from this table.
+
+<div data-full-bleed-table>
+  | CloudEvent type                                                      | Lamassu resource     | AWS Resource                                            | IAM actions                                                                                                                                                                              | AWS calls and effect                                                                                                                                                                                                                                                 | Where in this page                                            |
+  | -------------------------------------------------------------------- | -------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+  | `EventCreateCAKey` / `EventImportCAKey` / `EventUpdateCAMetadataKey` | CA                   | `IoTCore/CACertificate`                                 | `iot:GetRegistrationCode`, `iot:RegisterCACertificate`, `iot:DescribeCACertificate`, `iot:ListCACertificates`                                                                            | Loads the CA into connector state; a `registration.status = REQUESTED` write fires the registration flow (Primary with verification certificate, or SNI-only) and writes `SUCCEEDED` or `FAILED` back to the CA's metadata.                                          | [CA registration states](#ca-registration-states)             |
+  | `EventCreateDMSKey` / `EventUpdateDMSKey`                            | DMS                  | `IoTCore/ProvisioningTemplate`                          | `iot:CreateProvisioningTemplate`, `iot:UpdateCACertificate`                                                                                                                              | In `jitp` mode, attempts to create the provisioning template and attaches it to the registered CA. Non-idempotent: a `PUT /v1/dms/{id}` edit retries the creation and lands in `lamassu-dlq` after 3 retries. Idempotent for `none` and `auto` (configuration only). | [DMS registration-mode states](#dms-registration-mode-states) |
+  | `EventBindDeviceIdentityKey`                                         | Device               | `IoTCore/Policy`, `IoTCore/ThingGroup`, `IoTCore/Thing` | `iot:CreatePolicy` / `iot:DeletePolicyVersion`, `iot:GetPolicy` / `iot:ListPolicyVersions`, `iot:CreateThingGroup`, `iot:DescribeThing` / `iot:ListThingPrincipals`, `iot:RegisterThing` | In `auto` mode: creates/updates policies, ensures Thing groups, revokes stale principals and provisions the Thing via `iot:RegisterThing`. In `jitp` mode: no AWS calls; AWS runs the JITP template on first connection.                                             | [Thing lifecycle](#thing-lifecycle)                           |
+  | `EventUpdateCertificateStatusKey`                                    | Certificate          | `IoTCore/Certificate`                                   | `iot:UpdateCertificate`, `iot:Connect` (data plane)                                                                                                                                      | Maps status to AWS (`ACTIVE`, `INACTIVE`, `REVOKED`), calls `iot:UpdateCertificate` and forces an MQTT disconnect on revoke.                                                                                                                                         | [Certificate status states](#certificate-status-states)       |
+  | `EventUpdateCertificateMetadataKey` / `EventUpdateDeviceMetadataKey` | Certificate / Device | `IoTCore/Certificate`, `IoTCore/Thing`                  | —                                                                                                                                                                                        | Refreshes internal state; the connector ignores events whose CloudEvent `source` matches its own URI to avoid self-triggered loops.                                                                                                                                  | [Device Shadow and automation](#device-shadow-and-automation) |
+</div>
+
+CA registration states [#ca-registration-states]
+
+The CA registration flow is driven by the `registration.status` field of the CA's connector metadata:
+
+by the `registration.status` field of the CA's connector metadata:
+
+<Mermaid
+  chart="stateDiagram-v2
+    direction LR
+    [*] --> NotRegistered: no connector metadata
+    NotRegistered --> Requested: admin sets REQUESTED
+    Requested --> Registering: connector starts flow
+    Registering --> Succeeded: Primary verification certificate or SNI-only direct
+    Registering --> Failed: AWS rejects the call
+    Failed --> Requested: admin retries
+    Succeeded --> Requested: re-registration requested"
+/>
+
+| Transition                           | AWS calls                                                                                                               |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `NotRegistered` → `Requested`        | none (metadata write only)                                                                                              |
+| `Requested` → `Registering`          | `iot:GetRegistrationCode` (Primary Account only)                                                                        |
+| `Registering` → `Succeeded`          | `iot:RegisterCACertificate` (Primary: proof-of-possession with an ephemeral key; SNI-only: `CertificateMode: SNI_ONLY`) |
+| `Registering` → `Failed`             | failed `iot:RegisterCACertificate`; the error detail is written to the CA's metadata                                    |
+| `Failed` / `Succeeded` → `Requested` | none (a new `REQUESTED` write re-runs the flow)                                                                         |
+
+DMS registration-mode states [#dms-registration-mode-states]
+
+The DMS's `registration_mode` determines what the connector does on the AWS side when the DMS is created or fully edited:
+
+<Mermaid
+  chart="stateDiagram-v2
+    direction LR
+    [*] --> Unconfigured: DMS without connector metadata
+    Unconfigured --> None: admin sets the key with mode none
+    Unconfigured --> Auto: admin sets the key with mode auto
+    Unconfigured --> Jitp: admin sets the key with mode jitp
+    None --> Auto: mode switch on DMS edit
+    None --> Jitp: mode switch on DMS edit
+    Auto --> None: mode switch on DMS edit
+    Auto --> Jitp: mode switch on DMS edit
+    Jitp --> None: mode switch on DMS edit
+    Jitp --> Auto: mode switch on DMS edit
+    Jitp --> Jitp: full edit (PUT /v1/dms/{id}) retries template creation"
+/>
+
+| Transition                       | AWS calls                                                                                                                                      |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Unconfigured` → `None` / `Auto` | none (configuration only)                                                                                                                      |
+| `None` ↔ `Auto`                  | none (configuration only)                                                                                                                      |
+| Any → `Jitp`                     | `iot:CreateProvisioningTemplate` (non-idempotent: it fails when the template already exists; after 3 retries the event lands in `lamassu-dlq`) |
+| `Jitp` → `None` / `Auto`         | none (the template stays in the AWS account)                                                                                                   |
+
+Certificate status states [#certificate-status-states]
+
+Certificates holding the connector's metadata key sync their status; certificates provisioned via JITP have no metadata key and stay out of this machine:
+
+<Mermaid
+  chart="stateDiagram-v2
+    direction LR
+    [*] --> NotSynced: certificate without connector metadata (JITP)
+    NotSynced --> Active: status becomes Active
+    Active --> Inactive: Revoked + certificateHold
+    Active --> Revoked: Revoked (other reasons)
+    Inactive --> Active: status becomes Active
+    Revoked --> Active: status becomes Active"
+/>
+
+| Transition                                    | AWS calls                                        |
+| --------------------------------------------- | ------------------------------------------------ |
+| `NotSynced` → `Active`                        | `iot:UpdateCertificate`                          |
+| `Active` → `Inactive`                         | `iot:UpdateCertificate` + forced MQTT disconnect |
+| `Active` → `Revoked`                          | `iot:UpdateCertificate` + forced MQTT disconnect |
+| `Inactive` / `Revoked` → `Active`             | `iot:UpdateCertificate`                          |
+| `RenewalWindow` / `AboutToExpire` / `Expired` | none (these states are not synced to AWS)        |
+
+Thing lifecycle [#thing-lifecycle]
+
+Things only exist under `auto` mode; in `jitp` mode AWS creates the Thing itself when the device first connects. The Thing name is always the device certificate's CN:
+
+<Mermaid
+  chart="stateDiagram-v2
+    direction LR
+    [*] --> Absent: device not yet enrolled
+    Absent --> Provisioned: EventBindDeviceIdentityKey (auto mode)
+    Provisioned --> Provisioned: re-enrollment with same CN"
+/>
+
+| Transition                                    | AWS calls                                                                                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `Absent` → `Provisioned`                      | policies created/updated, Thing groups ensured, `iot:RegisterThing` (creates the Thing, registers the certificate, attaches policies) |
+| `Provisioned` → `Provisioned` (re-enrollment) | stale principals marked `REVOKED`, new `iot:RegisterThing` run; the new certificate ARN replaces the old one in Lamassu metadata      |
+
+In `jitp` mode the connector makes no provisioning calls: AWS executes the JITP template on the device's first connection and creates the Thing, registers the certificate and activates it on its own.
+
 CA registration in AWS IoT Core [#ca-registration-in-aws-iot-core]
 
 For devices to authenticate to AWS IoT Core with certificates issued by a Lamassu CA, that CA must first be registered in the AWS account. The connector handles this registration automatically in response to the `EventCreateCAKey`, `EventImportCAKey` and `EventUpdateCAMetadataKey` events, but the operation **only fires when the administrator explicitly requests it** through the CA metadata field.
@@ -2568,7 +2681,7 @@ Once provisioning completes, the connector stores the resulting certificate's AR
 
 jitp mode [#jitp-mode]
 
-Just-In-Time Provisioning (JITP) mode delegates provisioning to AWS instead of the connector doing it directly. When the connector detects the DMS is in `jitp` mode, it creates a JITP provisioning template in AWS IoT Core and attaches it to the registered CA certificate. The template is created when the DMS is created in Lamassu, not at device enrollment, and it is not updated afterwards (see the notice below). From then on, when a device with a certificate issued by that CA connects to AWS IoT Core for the first time, AWS executes the template automatically: it creates the Thing, registers the certificate and activates it.
+Just-In-Time Provisioning (JITP) mode delegates provisioning to AWS instead of the connector doing it directly. When the connector detects the DMS is in `jitp` mode, it creates a JITP provisioning template in AWS IoT Core and attaches it to the registered CA certificate. The connector attempts to create this template when the DMS is created and again on every full DMS edit (`PUT /v1/dms/{id}`) — not at device enrollment time. The attempt is not idempotent: when a template named after the DMS ID already exists, the creation call fails, the event is retried three times and finally lands in the `lamassu-dlq` poison queue (see [Troubleshooting](/docs/platform/iot-fleets/integrations/aws-iot-core#troubleshooting)). The template is created once; later DMS edits never update its content. A DMS update that omits `metadata` or sends `null` keeps the stored metadata, so the connector key `lamassu.io/iot/{connector_id}` remains present and the attempt is still triggered. A body that supplies a `metadata` object replaces the stored metadata entirely: if that object does not carry the connector key, the key is dropped and the connector silently skips the DMS's future events. Once the template is attached, when a device with a certificate issued by that CA connects to AWS IoT Core for the first time, AWS executes the template automatically: it creates the Thing, registers the certificate and activates it.
 
 <Callout type="warn" title="Editing a DMS in JITP mode does not update the AWS template">
   The connector creates the template, named after the DMS ID, only once. Each later edit of the DMS that keeps the connector key tries to create it again and fails, because the connector does not update existing templates. Later changes to `jitp_config.provisioning_role_arn`, `jitp_config.enable_template` or to the groups and policies the template references must be applied by hand in AWS IoT Core.
@@ -2782,7 +2895,7 @@ Troubleshooting [#troubleshooting]
 
 **Symptom:** After editing a DMS in `jitp` mode, DMS update messages appear in `lamassu-dlq`, or JITP configuration changes have no effect in AWS.
 
-**Cause:** The edit triggers a new attempt to create the JITP template, which already exists in AWS. The attempt fails and the connector's later steps are skipped.
+**Cause:** Every full DMS edit (`PUT /v1/dms/{id}`) triggers a `CreateProvisioningTemplate` attempt for the template named after the DMS ID, and the call is not idempotent: when the template already exists, it fails, the event is retried three times and finally lands in `lamassu-dlq`. The connector’s later steps are skipped.
 
 **Resolution:** Check that the template named with the DMS ID exists in AWS IoT Core and that JITP enrollment works. If the JITP configuration was changed, apply it by hand to the AWS template.
 

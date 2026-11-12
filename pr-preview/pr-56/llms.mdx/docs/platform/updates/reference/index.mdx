@@ -1,0 +1,572 @@
+# API reference (/docs/pr-preview/pr-56/platform/updates/reference/api)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  Reference for the HTTP API of Lamassu Updates, as implemented by the service in `internal/updates/httpapi` (shared by the native and hawkBit backends). Use it to look up a route, a body field or a status code. For worked examples, follow the [native](/docs/platform/updates/guides/native-curl) or [hawkBit](/docs/platform/updates/guides/hawkbit-curl) curl guide.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Conventions [#conventions]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The Updates API is served under `/updates/v1`, and SymKMS under `/symkms/v1`. Paths in this page are relative to `/updates/v1` unless they begin with `/health` or `/symkms`. Behind the Lamassu gateway the prefix is typically `/api/updates/v1`, which is what the dashboard calls.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `:groupID` is a Lamassu device group. `:name` is a pack name. `:moduleKey` is `type:name` (for example `os:water-panel`), literal or percent-encoded. In paths a pack is a `distribution-sets` resource (see [Concepts](/docs/platform/updates/concepts)).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Topic          | Behaviour                                                                                                                                                       |
+  | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Bodies         | JSON, except uploads, which are `multipart/form-data` with the file in the field `file`                                                                         |
+  | Errors         | The body is `{"err":"<message>"}`                                                                                                                               |
+  | Health         | `GET /health` returns `{"status":"ok"}`, outside `/updates/v1`                                                                                                  |
+  | Authentication | None in the service: it does not authenticate callers. In a Lamassu deployment the gateway in front of it does. See [Security](/docs/platform/updates/security) |
+  | Upload limit   | One file can be up to `max_artifact_size_mb` MiB, 10240 (10 GiB) by default. A larger file answers `413`                                                        |
+  | Timeouts       | A request can read or write for up to 6 hours; an idle connection is closed after 5 minutes. Uploads are streamed to disk, not held in memory                   |
+  | CORS           | Any origin and any request header are allowed                                                                                                                   |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The ingress or gateway in front of the service needs its own limits raised to match: see [Configuration](/docs/platform/updates/reference/configuration).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Status codes [#status-codes]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Code         | Meaning                                                                                                                                                                  |
+  | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `200`        | Success                                                                                                                                                                  |
+  | `201`        | Created: packs, modules, launches, standalone artifact uploads                                                                                                           |
+  | `202`        | Accepted: `sync-to-latest` and `force-version`                                                                                                                           |
+  | `204`        | Deleted, with no body: artifacts, staged files, latest-version records, module files                                                                                     |
+  | `206`, `416` | Partial content, or an unsatisfiable range, on downloads                                                                                                                 |
+  | `207`        | `sync-to-latest` dispatched some devices and failed others                                                                                                               |
+  | `302`        | A download redirected to a short-lived signed URL                                                                                                                        |
+  | `400`        | Invalid input, or an operation not valid in the current state (for example changing a built pack's module composition)                                                   |
+  | `403`        | Forbidden by policy (for example downloading a previous version that the pack does not allow)                                                                            |
+  | `404`        | The resource does not exist                                                                                                                                              |
+  | `409`        | Conflict: the pack version is already built (artifact upload, link or prebuilt upload), the pack name already exists, or another request is working on the same resource |
+  | `413`        | An uploaded file is over the size limit                                                                                                                                  |
+  | `501`        | The active backend does not support the operation. See [Capabilities](/docs/platform/updates/reference/capabilities)                                                     |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Downloads [#downloads]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Download routes stream the file and support resuming:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * `HEAD` works on every download route and returns the size and `Accept-Ranges: bytes`.
+  * `Range: bytes=...` with a single range answers `206` with `Content-Range`. A range that cannot be satisfied answers `416`. A request with several ranges is answered with the whole file.
+  * With S3 storage and presigning enabled, a `GET` can answer `302` to a signed URL of the object store, with `Cache-Control: no-store`. The caller is authorized first; the store then only checks the signature. A `HEAD` is never redirected. Native mode signs build outputs (`.swu` and packages); hawkBit mode signs the objects of hawkBit's S3 artifact plugin. If signing fails, the service streams the file instead.
+  * `Content-Disposition: attachment` carries the file name.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  List endpoints [#list-endpoints]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Routes that return collections share these query parameters:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Parameter              | Meaning                                                                                                  |
+  | ---------------------- | -------------------------------------------------------------------------------------------------------- |
+  | `page_size`            | Items per page. Default `25`, at most `500`                                                              |
+  | `bookmark`             | Opaque cursor from the previous page                                                                     |
+  | `sort_by`, `sort_mode` | A filterable field, and `asc` (default) or `desc`. A `sort_by` that is not a filterable field is ignored |
+  | `filter`               | `field[operand]value`, repeatable                                                                        |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Filter operands depend on the field type:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Field type | Operands                                                                                                  |
+  | ---------- | --------------------------------------------------------------------------------------------------------- |
+  | String     | `eq`, `ne`, `ct` (contains), `nc` (not contains), each with an `_ic` variant for case-insensitive matches |
+  | Date       | `bf` (before), `eq`, `af` (after)                                                                         |
+  | Number     | `eq`, `ne`, `lt`, `le`, `gt`, `ge`                                                                        |
+  | Enum       | `eq`, `ne`                                                                                                |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  For example `GET /groups/g1/distribution-sets?filter=name[ct]firmware&sort_by=name&sort_mode=desc`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Paginated lists return `{"next": "<bookmark>", "list": [...]}`. Pass `next` as `bookmark` to get the next page; `next` is empty on the last page. Filterable fields per list:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | List                                                                                                                                       | Filterable fields                                                                                                                             |
+  | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Packs: `.../distribution-sets`, `/distribution-sets`                                                                                       | `group_id`, `name`, `version`, `packaging` (enum), `created_at`                                                                               |
+  | Launches: `/groups/:groupID/launch`                                                                                                        | `group_id`, `status` (enum), `workflow_type`, `created_at`, `distribution_set_id`                                                             |
+  | Version snapshots: `.../versions`, `/distribution-sets/:id/versions`                                                                       | `version` (number), `created_at`                                                                                                              |
+  | Fleet artifact catalog: `GET /artifacts`                                                                                                   | `name`, `version`, `checksum`, `uploaded_at`                                                                                                  |
+  | Device pack versions and inventory: `/devices/distribution-sets`, `/devices/:deviceID/distribution-sets`, `.../distribution-set-inventory` | `device_id`, `distribution_set_id`, `distribution_set_name`, `group_id`, `version` (number), `packaging` (enum), `installed_at`               |
+  | Device update history: `/devices/:deviceID/distribution-set-updates`, `/devices/distribution-set-updates/latest`                           | `device_id`, `group_id`, `distribution_set_name`, `distribution_set_id`, `launch_id`, `job_id`, `status` (enum), `packaging` (enum), `source` |
+  | Latest versions: `.../latest-distribution-sets`                                                                                            | `group_id`, `distribution_set_id`, `distribution_set_name`, `version` (string), `updated_at`                                                  |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Some lists do not page or filter:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * The job lists (`/groups/:groupID/device/:deviceID/jobs`, `.../history`, `/launch/:launchID/jobs`) honour only `page_size` and `bookmark`. The bookmark is a numeric offset.
+  * The module lists, `/updatable-distribution-sets`, the pack-scoped `.../artifact-catalog`, `/version-compliance`, `/version-status` and `/workflows` return everything.
+  * `GET /devices/distribution-set-updates/latest` returns everything, after applying the filters.
+  * In hawkBit mode no list is paged (`next` is always empty). Only the fleet-wide `/devices/distribution-sets` and `/devices/distribution-set-updates/latest` apply `filter`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Some routes exist in only one backend, or behave differently. Check [Capabilities](/docs/platform/updates/reference/capabilities) first.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Capabilities and workflows [#capabilities-and-workflows]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method | Path            | Description                                                                                            |
+  | ------ | --------------- | ------------------------------------------------------------------------------------------------------ |
+  | `GET`  | `/capabilities` | Active backend and what it supports. See [Capabilities](/docs/platform/updates/reference/capabilities) |
+  | `GET`  | `/workflows`    | Workflows registered in WFX, as `{"content": [...]}`. Empty in hawkBit mode                            |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Update packs [#update-packs]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method   | Path                                           | Description                                                                                                        |
+  | -------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+  | `POST`   | `/groups/:groupID/distribution-sets`           | Create a pack                                                                                                      |
+  | `GET`    | `/groups/:groupID/distribution-sets`           | List a group's packs                                                                                               |
+  | `GET`    | `/groups/:groupID/updatable-distribution-sets` | The group's built packs, which can be launched                                                                     |
+  | `DELETE` | `/groups/:groupID/distribution-sets/:name`     | Delete a pack. Refused with `400` once a launch has dispatched it (native), or while a campaign holds it (hawkBit) |
+  | `POST`   | `/groups/:groupID/distribution-sets/:name/new` | Create a new version of a pack                                                                                     |
+  | `GET`    | `/distribution-sets`                           | Every pack across all groups, including orphaned ones                                                              |
+  | `GET`    | `/distribution-sets/:id/versions`              | Version snapshots, by unique ID                                                                                    |
+  | `DELETE` | `/distribution-sets/:id`                       | Delete a pack by unique ID. The only way to remove an orphaned pack                                                |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Descriptor, artifacts and preconditions [#descriptor-artifacts-and-preconditions]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method   | Path (after `/groups/:groupID/distribution-sets/:name`) | Description                                                                                                                                                                |
+  | -------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `POST`   | `/descriptor/upload`                                    | Upload the sw-description (file field `file`, up to 1 MiB in native mode). hawkBit mode: `400`, use the catalog route                                                      |
+  | `GET`    | `/descriptor`                                           | Read it, as `text/plain`                                                                                                                                                   |
+  | `POST`   | `/artifact/upload`                                      | Upload a global artifact and link it to the pack (fields `file`, `artifact_name`, `version`). `409` if the pack is already built, which is always the case in hawkBit mode |
+  | `POST`   | `/artifact/link`                                        | Link an already-uploaded global artifact (body `{"artifact_id":"..."}`). `409` if the pack is built                                                                        |
+  | `DELETE` | `/artifact?artifact=<file name>`                        | Delete a staged build-directory file. Does not unlink a catalog artifact. Answers `204`. hawkBit mode: `400`                                                               |
+  | `GET`    | `/artifacts`                                            | Names of the staged build-directory files, as a bare array                                                                                                                 |
+  | `GET`    | `/artifacts/:artifactName`                              | Download a staged file by name                                                                                                                                             |
+  | `GET`    | `/artifact-catalog`                                     | Artifacts the pack references                                                                                                                                              |
+  | `GET`    | `/preconditions`                                        | Read the pack's launch preconditions. Answers the whole pack, with `preconditions`                                                                                         |
+  | `PUT`    | `/preconditions`                                        | Replace the pack's launch preconditions. An empty list clears them. Answers the pack                                                                                       |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Build and download [#build-and-download]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method | Path (after `/groups/:groupID/distribution-sets/:name`) | Description                                                                                                                                                                                         |
+  | ------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `POST` | `/swu`                                                  | Build the `.swu` (body: see [Request bodies](#request-bodies)). hawkBit mode: `501`, build the modules instead                                                                                      |
+  | `POST` | `/package`                                              | Build the `.tar.gz` for a `non-swu` pack. hawkBit mode: `501`                                                                                                                                       |
+  | `POST` | `/swu/upload`, `/package/upload`                        | Attach an externally built deliverable (file field `file`, optional `user`). Both paths are one operation: the pack's packaging decides which file is expected. Native only (`501` in hawkBit mode) |
+  | `GET`  | `/swu/download`                                         | Download the current shared `.swu`. hawkBit mode: `400` for a pack with several modules, so use `/modules/:moduleKey/artifact/download`                                                             |
+  | `GET`  | `/swu/download/:deviceID`                               | Download one device's `.swu`. For a per-device encrypted pack it is that device's own file, otherwise the shared one                                                                                |
+  | `GET`  | `/swu/download/version/:version`                        | Download a previous version. Native mode: `403` unless the pack has `allow_previous_version_download`, and `404` without a recorded snapshot. hawkBit mode serves any version                       |
+  | `GET`  | `/package/download`, `/package/download/:deviceID`      | Same, for `non-swu` packs (`application/gzip`)                                                                                                                                                      |
+  | `GET`  | `/artifacts-archive`                                    | `.tar.gz` of the current version's artifacts                                                                                                                                                        |
+  | `GET`  | `/signature`                                            | Signed manifest for the current version                                                                                                                                                             |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Versions [#versions]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method | Path (after `/groups/:groupID/distribution-sets/:name`)   | Description                                           |
+  | ------ | --------------------------------------------------------- | ----------------------------------------------------- |
+  | `GET`  | `/versions`                                               | Stored version snapshots                              |
+  | `GET`  | `/versions/:version`                                      | One snapshot, with manifest metadata                  |
+  | `GET`  | `/versions/:version/signature`                            | Signed manifest, signature and certificate            |
+  | `GET`  | `/versions/:version/modules`                              | Modules of that version                               |
+  | `GET`  | `/versions/:version/modules/:moduleKey/artifact/download` | A module's deliverable at that version. Native: `501` |
+  | `GET`  | `/versions/:version/artifacts-archive`                    | `.tar.gz` of that version's artifacts                 |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Request bodies [#request-bodies]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Route                         | Body                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+  | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Create pack                   | Required: `name`, `version` (semver `x.y.z`), `group_id`. Optional: `type` (`rawfile` or `firmware`), `packaging` (`swu`, the default, or `non-swu`), `allow_previous_version_download`, `modules`, `preconditions`. Each `modules` entry is a new module (`type`, `name`, optional `version` and `delivery_intent`) or an existing one (`source_module_id`). hawkBit mode accepts only `source_module_id` entries, of **built** modules             |
+  | `POST .../new`                | `{"version":"x.y.z"}`: semver, and greater than the current version, or `400`                                                                                                                                                                                                                                                                                                                                                                        |
+  | `PUT .../preconditions`       | `{"preconditions":[{"required_distribution_set_name":"...","min_version":"1.2.0"}]}`. Use `required_module_key` (`type:name`) instead of the pack name to target a module. Exactly one of the two per entry, and `min_version` must be `x.y.z`. A device must satisfy every entry                                                                                                                                                                    |
+  | `POST .../swu`, `.../package` | `user`, `encryption_key_name`, `encryption_alg_name`, `sw_desc_encrypted`, `signature_key_id`, `signature_alg_name`, `signature_certificate` (PEM), `selected_artifact_ids`. All optional, but `user` is required with `encryption_key_name`. A body with `encryption_alg_name` only requests per-device encryption. An empty or invalid body builds without encryption. See [Signing and encryption](/docs/platform/updates/signing-and-encryption) |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Artifacts reach a build only through `selected_artifact_ids`; without them there is normally nothing staged and the build fails. A build replaces the pack's carried artifact links with the selected ones.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Responses [#responses]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * Create routes answer `201` with the object: a pack, a module, or for a launch the launch ID and the precondition outcome. `modules` is an input of pack creation and is not returned on reads.
+  * `DELETE` of a pack answers `200` with `{"message": "..."}`. `POST .../new`, `.../swu` and `.../package` answer `200` with `{"message": "..."}`.
+  * Artifact uploads answer `{"msg": "...", "artifact": {...}}`: `201` for `POST /artifacts`, `200` for the pack-scoped and module-scoped uploads.
+  * Descriptor uploads on a pack or on a module in a pack answer `{"msg": "..."}`.
+  * Module lists answer `{"modules": [...]}`. The pack-scoped `.../artifacts` list answers a bare array.
+  * A failed build leaves the pack in status `build_failed`, with the reason in `last_build_error`. It is editable and can be built again.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Objects [#objects]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The field definitions are in `pkg/models/updates.go` in the [repository](https://github.com/lamassuiot/ota). These are the fields clients read most.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Pack [#pack]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Field                                                                              | Meaning                                                                              |
+  | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+  | `id`, `name`, `version`, `group_id`                                                | Identity. The version is semver                                                      |
+  | `type`                                                                             | `rawfile` or `firmware`                                                              |
+  | `packaging`                                                                        | `swu` or `non-swu`                                                                   |
+  | `status`                                                                           | `draft`, `built` or `build_failed`                                                   |
+  | `uri`                                                                              | Download URI of the built deliverable. Empty until built                             |
+  | `sw-descriptor`                                                                    | The sw-description text (the key has a hyphen)                                       |
+  | `encryption_mode`                                                                  | Empty, `shared` or `per-device`                                                      |
+  | `encryption_key_name`, `encryption_alg_name`, `encryption_iv`, `sw_desc_encrypted` | Encryption settings of the last build                                                |
+  | `signature_key_id`, `signature_alg_name`, `signature_certificate`                  | Signing settings of the last build                                                   |
+  | `built_device_count`, `total_device_count`, `uncovered_devices`                    | Per-device builds only: coverage, and the devices without a package with a `reason`  |
+  | `allow_previous_version_download`                                                  | Whether older versions can be downloaded                                             |
+  | `preconditions`                                                                    | The pack's launch preconditions                                                      |
+  | `last_build_error`                                                                 | Why the last build failed                                                            |
+  | `locked`                                                                           | hawkBit mode: the backend froze the composition because the pack was sent to devices |
+  | `created_at`, `updated_at`                                                         | Timestamps                                                                           |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Launch [#launch]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A launch carries `id`, `group_id`, `name`, `description`, `version`, `exec_date`, `scheduled_at`, `status`, the strategy fields (`workflow_type`, `rollout_type`, `rollout_value`, `test_device_id`, `auto`, `approval_threshold`, `error_threshold`, `weight`), `distribution_set_id`, `distribution_set_name`, the counters `pending_count`, `active_count`, `completed_count`, `failed_count`, `total_devices`, `completed_in_batch`, `test_device_status`, `aborted`, `forced_preconditions` and `precondition_failures`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `status` is `running` (empty on a native launch that has not changed state yet, which also means running), `paused`, `cancelled` or `completed`. `test_device_status` is `pending`, `active`, `completed`, `failed` or `cancelled`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Software module [#software-module]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Field                                                                                                                                       | Meaning                                                                                      |
+  | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+  | `id`, `key`                                                                                                                                 | Catalog ID and `type:name` key                                                               |
+  | `type`, `name`, `version`                                                                                                                   | `type` is `os` or `application`                                                              |
+  | `delivery_intent`                                                                                                                           | `undecided`, `swu-build`, `swu-prebuilt` or `raw`                                            |
+  | `built`, `locked`                                                                                                                           | Whether its deliverable exists, and whether it is frozen because a version of it has shipped |
+  | `artifacts`                                                                                                                                 | The module's files                                                                           |
+  | `encrypted`, `encryption_mode`, `encryption_key_name`, `encryption_alg_name`, `sw_desc_encrypted`, `signature_key_id`, `signature_alg_name` | How it was built                                                                             |
+  | `release_notes`                                                                                                                             | The operator changelog                                                                       |
+  | `uri`, `created_at`, `updated_at`                                                                                                           | Download URI, timestamps                                                                     |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Artifact [#artifact]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `id`, `name`, `version`, `filename`, `checksum` (SHA-256 of the file), `size` in bytes and `uploaded_at`. The fleet-wide list adds `distribution_sets`: the packs that reference it, each with `distribution_set_id`, `distribution_set_name`, `distribution_set_version` and `group_id`. A file whose name ends in `.swu` or `.tar.gz` must look like one, or the upload answers `400`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Modules inside a pack [#modules-inside-a-pack]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method   | Path (after `/groups/:groupID/distribution-sets/:name`) | Description                                                                                                                                      |
+  | -------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `GET`    | `/modules`                                              | List the pack's modules                                                                                                                          |
+  | `POST`   | `/modules`                                              | Add a module (body: `type`, `name`, optional `version`, `delivery_intent`). Answers `201`. hawkBit mode: `400`, create the module in the catalog |
+  | `GET`    | `/modules/reusable`                                     | Modules on other packs, offered for import. Each reports `shared` and its source pack                                                            |
+  | `POST`   | `/modules/import`                                       | Compose from an existing module. Answers `201`                                                                                                   |
+  | `PUT`    | `/modules/:moduleKey`                                   | Swap the module for another version of itself (body `{"source_module_id":"<catalog id>"}`). Native: `501`                                        |
+  | `DELETE` | `/modules/:moduleKey`                                   | Remove a module from the pack                                                                                                                    |
+  | `PUT`    | `/modules/:moduleKey/release-notes`                     | Set the operator changelog (body `{"notes":"..."}`, empty clears it). Allowed on built versions                                                  |
+  | `POST`   | `/modules/:moduleKey/artifact/upload`                   | Upload a binary onto a module (fields `file`, `artifact_name`, `version`). hawkBit mode: refused, a linked module is frozen                      |
+  | `POST`   | `/modules/:moduleKey/artifact/link`                     | Link a global artifact to the module (body `{"artifact_id":"..."}`). hawkBit mode: refused                                                       |
+  | `POST`   | `/modules/:moduleKey/descriptor/upload`                 | A module's own sw-description. Native: `501`. hawkBit mode: `400`, use `POST /softwaremodules/by-id/:moduleID/descriptor`                        |
+  | `POST`   | `/modules/:moduleKey/build`                             | Pack-scoped module build. Always refused: `501` in native mode and `400` in hawkBit mode. Use `POST /softwaremodules/by-id/:moduleID/build`      |
+  | `GET`    | `/modules/:moduleKey/artifact/download`                 | Download a module's deliverable. Native: `501`                                                                                                   |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Import body: `source_module_id`, or `source_distribution_set_name` and `module_key` (with optional `source_group_id` and `source_distribution_set_version`). A module's delivery intent must be decided and compatible with the pack's packaging before it can be imported.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Software module catalog [#software-module-catalog]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Modules that exist independently of any pack. Create one with `POST /softwaremodules`, giving `type`, `name`, `version` and optionally `delivery_intent` (default `undecided`). Use the returned `id` for the `by-id` routes.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method   | Path                                                              | Description                                                                                                                                                                                                                                                                               |
+  | -------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `GET`    | `/softwaremodules`                                                | Fleet-wide catalog, with the source pack                                                                                                                                                                                                                                                  |
+  | `POST`   | `/softwaremodules`                                                | Declare a module with no pack yet. Answers `201`. `type`, `name` and `version` are required                                                                                                                                                                                               |
+  | `DELETE` | `/softwaremodules/:moduleKey/versions/:version`                   | Delete a module that no pack holds. `400` if a pack still holds it                                                                                                                                                                                                                        |
+  | `GET`    | `/softwaremodules/by-id/:moduleID`                                | Read one module                                                                                                                                                                                                                                                                           |
+  | `PUT`    | `/softwaremodules/by-id/:moduleID`                                | Update `delivery_intent` and `release_notes`. Send at least one                                                                                                                                                                                                                           |
+  | `POST`   | `/softwaremodules/by-id/:moduleID/artifacts`                      | Upload a file (field `file`). Answers `201` with the artifact                                                                                                                                                                                                                             |
+  | `GET`    | `/softwaremodules/by-id/:moduleID/artifacts/:artifactID/download` | Download a stored file                                                                                                                                                                                                                                                                    |
+  | `DELETE` | `/softwaremodules/by-id/:moduleID/artifacts/:artifactID`          | Remove a file. Answers `204`                                                                                                                                                                                                                                                              |
+  | `POST`   | `/softwaremodules/by-id/:moduleID/descriptor`                     | Upload the sw-description the build reads (field `file`). Answers the module                                                                                                                                                                                                              |
+  | `POST`   | `/softwaremodules/by-id/:moduleID/build`                          | Build this module's deliverable. hawkBit mode only (`501` in native). Behaviour depends on `delivery_intent`. The body is optional and takes `user`, `encryption_key_name`, `encryption_alg_name`, `sw_desc_encrypted`, `signature_key_id`, `signature_alg_name`, `signature_certificate` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Files are accepted while the delivery is `undecided`. A `swu-build` module takes build inputs and refuses a `.swu`; a `swu-prebuilt` module takes exactly one `.swu`. Choose a compatible delivery intent before importing the module with `source_module_id`. Once a module has shipped (a released pack version holds it, or hawkBit locked it) it is locked: its content is protected, while release notes stay editable. In native mode the pack builds one `.swu` from every module's inputs, and a prebuilt SWU is uploaded to the whole pack rather than imported as a module input.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Request bodies [#request-bodies-1]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Route                                       | Body                                                                                                                                                                                                                                                                                                       |
+  | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `POST .../modules`, `POST /softwaremodules` | `type` (`os` or `application`), `name` (no `/` or `:`), `version`, `delivery_intent`                                                                                                                                                                                                                       |
+  | `POST .../modules/import`                   | `source_module_id`, or `source_distribution_set_name` and `module_key`                                                                                                                                                                                                                                     |
+  | `PUT /softwaremodules/by-id/:moduleID`      | `delivery_intent` and/or `release_notes`                                                                                                                                                                                                                                                                   |
+  | Uploads                                     | `multipart/form-data` with the file in `file`. Pack-scoped artifact uploads (`.../artifact/upload`, `.../modules/:moduleKey/artifact/upload`) also take `artifact_name` and `version`. `POST /artifacts` takes `name` and `version`. `POST /softwaremodules/by-id/:moduleID/artifacts` takes only the file |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Global artifacts [#global-artifacts]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method   | Path                      | Description                                                                                                                                                                                                                              |
+  | -------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `POST`   | `/artifacts`              | Upload a standalone artifact (fields `file`, `name`, `version`). hawkBit mode: only staged (discarded after 30 minutes, at the next upload) and cannot be attached to a module, so use `POST /softwaremodules/by-id/:moduleID/artifacts` |
+  | `GET`    | `/artifacts`              | Fleet-wide catalog, with pack references                                                                                                                                                                                                 |
+  | `GET`    | `/artifacts/:id`          | One artifact                                                                                                                                                                                                                             |
+  | `GET`    | `/artifacts/:id/download` | Download the binary                                                                                                                                                                                                                      |
+  | `DELETE` | `/artifacts/:id`          | Delete. Answers `204`                                                                                                                                                                                                                    |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Both `name` and `version` are optional on upload. `name` defaults to the file name without its extension. A `version`, when given, must be `x.y.z` and higher than every existing version of that name, or the upload answers `400`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Launch campaigns [#launch-campaigns]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method         | Path                                       | Description                                                                   |
+  | -------------- | ------------------------------------------ | ----------------------------------------------------------------------------- |
+  | `POST`         | `/groups/:groupID/launch`                  | Create a launch. With `?dry_run=true`, evaluate only                          |
+  | `GET`          | `/groups/:groupID/launch`                  | Launch history                                                                |
+  | `POST`         | `/groups/:groupID/launch/:id/rollout`      | Dispatch the next batch                                                       |
+  | `POST`         | `/groups/:groupID/launch/:id/pause`        | Pause. The batch in flight finishes                                           |
+  | `POST`         | `/groups/:groupID/launch/:id/resume`       | Resume a paused launch                                                        |
+  | `POST`         | `/groups/:groupID/launch/:id/retry-failed` | Re-queue the failed devices and roll out. `400` when nothing failed           |
+  | `POST`         | `/groups/:groupID/launch/:id/cancel`       | Cancel permanently                                                            |
+  | `POST`         | `/groups/:groupID/launch/:id/complete`     | Mark complete. hawkBit mode: `501`                                            |
+  | `GET`          | `/groups/:groupID/launch/:id/strategy`     | Read the strategy                                                             |
+  | `POST` / `PUT` | `/groups/:groupID/launch/:id/strategy`     | Update the strategy. hawkBit mode: `501`. The launched pack cannot be changed |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A launch in another group answers `404`, as if it did not exist.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Create body:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Field                   | Required | Meaning                                                                                                                                                   |
+  | ----------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `distribution_set_name` | Yes      | The pack to launch. It must be built                                                                                                                      |
+  | `workflow_type`         | Yes      | `direct` or `phased`. The full WFX names (`wfx.workflow.dau.direct`) are accepted. hawkBit mode: `phased` makes a soft action, anything else a forced one |
+  | `rollout_type`          | Yes      | `fixed` (a device count) or `percentage`                                                                                                                  |
+  | `rollout_value`         | Yes      | Greater than 0                                                                                                                                            |
+  | `test_device_id`        | No       | The canary: it goes alone first and must succeed before the rest                                                                                          |
+  | `auto`                  | No       | Release the next batch automatically. Default `false`                                                                                                     |
+  | `approval_threshold`    | No       | Percent of a batch that must succeed before the next one, 0 to 100. 0 means all of it                                                                     |
+  | `error_threshold`       | No       | Percent of all devices allowed to fail before the launch is cancelled, 0 to 100. 0 means no limit                                                         |
+  | `force_preconditions`   | No       | Deploy to every device even when preconditions fail. The failures are still recorded                                                                      |
+  | `scheduled_at`          | No       | RFC 3339 start time. Native: the service starts the launch within about 30 seconds of it. hawkBit mode: hawkBit's scheduler starts it                     |
+  | `name`, `description`   | No       | Display name (defaults to the pack name) and operator notes                                                                                               |
+  | `weight`                | No       | A stored priority hint, 0 to 1000. Nothing enforces it                                                                                                    |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The strategy update body takes `workflow_type`, `rollout_type`, `rollout_value` (greater than 0), `test_device_id`, `auto`, `approval_threshold` and `error_threshold`. It replaces all of them: an omitted field resets to its zero value, so send the whole strategy.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A create answers `201` with `launch_id`, `precondition_failures`, `forced`, `superseded_devices` and `never_seen_devices`. A dry run answers `200` with `qualifying_devices`, `precondition_failures`, `superseded_devices` and `never_seen_devices`. The last two are filled only in hawkBit mode: devices with an update in flight, which creating the launch cancels, and devices that have never contacted hawkBit.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A launch is refused with `400` when the pack is not built, or when a per-device encrypted pack has devices without a package (dry runs included, and `force_preconditions` does not override it).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Jobs [#jobs]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method | Path                                        | Description                                                                                                                                                                          |
+  | ------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `GET`  | `/groups/:groupID/device/:deviceID/jobs`    | A device's jobs. `404` if the device is not in the group                                                                                                                             |
+  | `GET`  | `/groups/:groupID/device/:deviceID/history` | A device's job history. `404` if there is none                                                                                                                                       |
+  | `GET`  | `/launch/:launchID/jobs`                    | All jobs of a launch                                                                                                                                                                 |
+  | `PUT`  | `/jobs/:jobID/transition`                   | Force a job into a state (body `state`, optional `message`, `progress`, `context`). Registered only when `enable_test_endpoints` is true. For tests only: it does no ownership check |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Device inventory [#device-inventory]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method | Path                                            | Description                                                                                                                                                                            |
+  | ------ | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `GET`  | `/devices/distribution-sets`                    | Pack versions across all devices, filterable                                                                                                                                           |
+  | `GET`  | `/devices/:deviceID/distribution-sets`          | Pack versions on one device                                                                                                                                                            |
+  | `GET`  | `/devices/:deviceID/distribution-set-inventory` | The device's packs, each with its artifacts                                                                                                                                            |
+  | `GET`  | `/devices/:deviceID/distribution-set-updates`   | Update history of the device, newest first                                                                                                                                             |
+  | `GET`  | `/devices/distribution-set-updates/latest`      | The newest update attempt for each device and pack, including attempts outside any launch. Filters apply to that attempt, so `status[eq]failed` lists devices whose last update failed |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Version compliance and latest versions [#version-compliance-and-latest-versions]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Declare the version devices should be on, then report and correct drift.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method   | Path                                                           | Description                                                                          |
+  | -------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+  | `GET`    | `/groups/:groupID/latest-distribution-sets`                    | A group's declared latest versions                                                   |
+  | `PUT`    | `/groups/:groupID/latest-distribution-sets/:distributionSetID` | Declare a pack's latest version (body `{"version":"1.2.0"}`)                         |
+  | `DELETE` | `/groups/:groupID/latest-distribution-sets/:distributionSetID` | Remove the declaration. Answers `204`                                                |
+  | `GET`    | `/devices/:deviceID/latest-drift`                              | A device's drift from its group's latest versions. Optional `?groupID=`              |
+  | `POST`   | `/devices/:deviceID/sync-to-latest`                            | Force the device to match. Answers `202` with the drift                              |
+  | `POST`   | `/devices/:deviceID/force-version`                             | Launch one device to a version. Answers `202`                                        |
+  | `GET`    | `/groups/:groupID/version-compliance`                          | Devices not on the latest version, as `{"group_id", "devices": [...]}`               |
+  | `GET`    | `/groups/:groupID/version-status`                              | The full per-device matrix, compliant and outdated, as `{"group_id", "rows": [...]}` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `sync-to-latest` takes an optional body with `groupID` (also accepted as `?groupID=`), `distribution_set_ids` to limit the packs and `workflow`. If some devices could not be dispatched it answers `207`, or `400` when none were, with `{"err": "...", "drift": {...}}`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `force-version` takes `distribution_set_id` and `version` (required), `group_id` and `workflow`. The device must be a member of the pack's group. For a `swu` pack `workflow` defaults to `phased`, and for a `non-swu` pack to `download-install`. Native mode accepts only the pack's current version unless the pack has `allow_previous_version_download`, and `sync-to-latest` has the same limit. hawkBit mode ignores `workflow` in both routes.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A drift entry has `distribution_set_id`, `distribution_set_name`, `current_version`, `latest_version`, `in_sync` and `missing`. A `version-status` row has `device_id`, `distribution_set_id`, `distribution_set_name`, `current_version`, `latest_version`, `in_sync` and, when newer than the declared one, `newest_version`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Device artifact download, hawkBit mode [#device-artifact-download-hawkbit-mode]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  In hawkBit mode the service also serves hawkBit's device artifact URL, so a gateway can publish it on the same host as the rest of the API:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method        | Path                                                                                                 | Description                                                   |
+  | ------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+  | `GET`, `HEAD` | `<prefix>/:tenant/controller/v1/:controllerId/softwaremodules/:softwareModuleId/artifacts/:filename` | A module's artifact, or its `.MD5SUM` sidecar as `text/plain` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `<prefix>` is the path of `hawkbit.ddi_url`, for example `/api/hawkbit-ddi`. The route is registered only in hawkBit mode. It answers only for modules in the device's assigned or installed set, and `404` otherwise, and `:tenant` must be the configured tenant. With presigning enabled it answers `302` like the other downloads.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  SymKMS [#symkms]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Served at `/symkms/v1` by the same process when SymKMS is configured. It stores symmetric keys and binds them to devices. The encrypt, decrypt and MAC bodies and formats are in [Signing and encryption](/docs/platform/updates/signing-and-encryption). Errors use the same `{"err":"..."}` body.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Method   | Path                                          | Description                                                                                                                                   |
+  | -------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `POST`   | `/symkms/v1/`                                 | Store a key. Body `user_id`, `algorithm`, `key` (hex or Base64), optional `id`. Answers `201` with `id`, `user_id`, `algorithm`, `created_at` |
+  | `GET`    | `/symkms/v1/?user_id=`                        | List a user's keys. `user_id` is required. Paginated, filterable by `user_id`, `algorithm`, `created_at`                                      |
+  | `DELETE` | `/symkms/v1/:keyID?user_id=`                  | Delete a key. `user_id` is required and must own it                                                                                           |
+  | `GET`    | `/symkms/v1/:keyID/raw?user_id=`              | Raw key material (`key_id`, `key_hex`, `algorithm`). Privileged                                                                               |
+  | `POST`   | `/symkms/v1/encrypt`, `/decrypt`              | Encrypt or decrypt with a stored key                                                                                                          |
+  | `POST`   | `/symkms/v1/mac`, `/mac/verify`               | Compute or verify a MAC (JSON body)                                                                                                           |
+  | `POST`   | `/symkms/v1/mac/file`, `/mac/verify/file`     | The same, with the data as an uploaded `file`                                                                                                 |
+  | `POST`   | `/symkms/v1/inventory/:deviceID/keys/:keyID`  | Assign a key to a device. Optional body `purpose`, `expires_at` (RFC 3339). Answers `201` with the binding                                    |
+  | `DELETE` | `/symkms/v1/inventory/:deviceID/keys/:keyID`  | Revoke a key from a device                                                                                                                    |
+  | `GET`    | `/symkms/v1/inventory/:deviceID`              | A device's key bindings. Paginated, filterable by `purpose`, `status`, `assigned_at`                                                          |
+  | `GET`    | `/symkms/v1/inventory/by-key/:keyID`          | The devices a key is assigned to, as `key_id` and `device_ids`                                                                                |
+  | `GET`    | `/symkms/v1/inventory/:deviceID/key?purpose=` | The device's raw key for a purpose, default `firmware-encryption`. Privileged. `404` without a binding                                        |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  An empty `purpose` is a wildcard that matches any lookup, and a specific purpose is matched exactly. The routes that return raw key material trust the gateway to authenticate callers: do not expose them without mTLS or scoped tokens. See [Security](/docs/platform/updates/security).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Next steps [#next-steps]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * [Capabilities](/docs/platform/updates/reference/capabilities) for what each backend supports
+  * [Update flow with curl, native backend](/docs/platform/updates/guides/native-curl)
+  * [Update flow with curl, hawkBit backend](/docs/platform/updates/guides/hawkbit-curl)
+</div>

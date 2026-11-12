@@ -1,0 +1,195 @@
+# Arquitectura (/docs/pr-preview/pr-56/es/platform/updates/architecture)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  Lamassu Updates es un único proceso que sirve la API de Updates (`/updates/v1`) y, embebido en ella, SymKMS (`/symkms/v1`). También responde a `GET /health`. Detrás de la API hay dos backends intercambiables. El ajuste `mode` elige uno al arrancar el servicio. Los clientes, incluido el dashboard de Lamassu, no pueden distinguirlos salvo a través de las [capacidades](/docs/platform/updates/reference/capabilities).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Modo nativo [#modo-nativo]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  En modo nativo el servicio es dueño de los datos. Postgres guarda paquetes, lanzamientos e historial de dispositivos, WFX guarda un job por dispositivo, y el servicio gobierna ambos.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  flowchart TB
+    clients["<b>Clientes</b><br/>dashboard, curl, scripts"]
+
+    ota["<b>Lamassu Updates</b><br/>un proceso<br/>API Updates · SymKMS<br/>Constructor SWU<br/>Tareas en segundo plano"]
+
+    lamassu["<b>Lamassu IoT</b><br/>Device Manager<br/>(grupos, dispositivos)<br/>KMS (claves de firma)"]
+    storage[("<b>Almacenamiento</b><br/>Postgres: updates<br/>Almacenes de blobs:<br/>artifacts, builds, keys")]
+    wfx["<b>WFX</b><br/>un job por dispositivo<br/>base de datos propia: wfx"]
+
+    clients -- "/updates/v1<br/>/symkms/v1" --> ota
+    ota -- "grupos,<br/>firma" --> lamassu
+    ota -- "datos,<br/>ficheros" --> storage
+    ota -- "crear jobs" --> wfx
+    wfx -- "eventos de jobs" --> ota
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El servicio es un único proceso. Sus partes, y cuáles usan cada dependencia, están en [Qué se ejecuta dentro del servicio](#qué-se-ejecuta-dentro-del-servicio).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Cómo se conectan los dispositivos [#cómo-se-conectan-los-dispositivos]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Un dispositivo nunca habla con el servicio salvo para descargar su paquete. Consulta a WFX los jobs y le notifica cada cambio de estado. El servicio se entera de los cambios por el flujo de eventos de WFX.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  flowchart TB
+    dev["<b>Dispositivos</b><br/>SWUpdate"]
+    ota["<b>Lamassu Updates</b>"]
+    wfx["<b>WFX</b>"]
+
+    dev -- "consultar jobs,<br/>notificar cada estado" --> wfx
+    dev -- "descargar el .swu" --> ota
+    ota -- "crear jobs" --> wfx
+    wfx -- "eventos de jobs" --> ota
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La dirección de descarga de cada job es la ruta de descarga del paquete bajo `update_domain`, con el ID del dispositivo añadido para que funcionen los paquetes por dispositivo y la autorización en el gateway. Cuando el almacén de blobs `builds` está en S3 con las descargas prefirmadas activadas, una descarga se responde con un `302` a una URL firmada de corta duración del objeto, en lugar de transmitir los bytes a través del servicio. El almacenamiento local siempre transmite. Ambos admiten peticiones `Range`, así que una descarga interrumpida se reanuda.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Modo hawkBit [#modo-hawkbit]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  En modo hawkBit el servicio es un gateway. Los paquetes se convierten en distribution sets, los lanzamientos en rollouts, y hawkBit es dueño de esos datos y se lee en vivo en cada petición. El servicio guarda en Postgres solo lo que hawkBit no tiene dónde almacenar. Consulta el [Modelo de datos](/docs/platform/updates/data-model).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  flowchart TB
+    clients["<b>Clientes</b><br/>dashboard, curl, scripts"]
+
+    ota["<b>Lamassu Updates</b><br/>un proceso<br/>API Updates · SymKMS<br/>Constructor SWU"]
+
+    lamassu["<b>Lamassu IoT</b><br/>Device Manager<br/>(grupos, opcional)<br/>KMS (claves de firma)"]
+    storage[("<b>Postgres</b><br/>staging, descriptores,<br/>manifiestos,<br/>últimas versiones")]
+    hb["<b>Eclipse hawkBit</b><br/>módulos, sets, rollouts<br/>base de datos y<br/>almacén de artefactos propios"]
+
+    clients -- "/updates/v1<br/>/symkms/v1" --> ota
+    ota -- "grupos,<br/>firma" --> lamassu
+    ota -- "lo que hawkBit<br/>no tiene" --> storage
+    ota -- "API de gestión" --> hb
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Cómo se conectan los dispositivos [#cómo-se-conectan-los-dispositivos-1]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Los dispositivos hablan con hawkBit y nunca con este servicio para consultar. Consultan la API DDI de hawkBit y le envían su feedback. El servicio lee el progreso de hawkBit cada vez que se le pide, y no tiene ningún flujo de eventos que seguir.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  flowchart TB
+    dev["<b>Dispositivos</b><br/>SWUpdate suricatta"]
+    hb["<b>Eclipse hawkBit</b>"]
+    ota["<b>Lamassu Updates</b>"]
+
+    ota -- "crear sets y rollouts,<br/>leer el progreso<br/>(API de gestión)" --> hb
+    dev -- "consultar, enviar feedback<br/>(API DDI)" --> hb
+    dev -. "descarga del artefacto,<br/>si se enruta aquí" .-> ota
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La descarga del artefacto también puede pasar por este servicio. Sirve la ruta de artefactos de dispositivo de hawkBit (`/{tenant}/controller/v1/{controllerId}/softwaremodules/{id}/artifacts/{filename}`, bajo la ruta de `hawkbit.ddi_url`) sin reescribirla, de modo que un gateway delante de ambos siga aplicando sus reglas de autorización. El servicio solo responde por un módulo asignado o instalado en ese dispositivo, y en caso contrario devuelve `404`. Con el prefirmado activado en `hawkbit.artifact_store`, redirige (`302`) a una URL firmada del bucket S3 de hawkBit. Consulta [Conectar un dispositivo](/docs/platform/updates/guides/connect-a-device).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Qué se ejecuta dentro del servicio [#qué-se-ejecuta-dentro-del-servicio]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Parte                                  | Qué hace                                                                                                                                                                    | Nativo           | hawkBit                                                                                             |
+  | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------- |
+  | API de Updates                         | Paquetes, módulos, artefactos, lanzamientos, inventario de dispositivos, cumplimiento de versiones                                                                          | Sí               | Sí (traducida a llamadas a hawkBit)                                                                 |
+  | SymKMS                                 | Almacena claves simétricas y las asigna a dispositivos. Se usa en el cifrado compartido y por dispositivo                                                                   | Sí               | Sí, para cifrado con clave compartida, si hay un almacenamiento SymKMS o `sym_keys_dir` configurado |
+  | Constructor SWU                        | Ejecuta `swugenerator` para ensamblar, firmar y cifrar paquetes `.swu`                                                                                                      | Sí               | Sí (por módulo), si `swugenerator_path` está definido                                               |
+  | Almacenes de blobs                     | Artefactos, builds y claves, en disco local o S3, opcionalmente cifrados en reposo                                                                                          | Sí               | Solo claves (los bytes de los artefactos viven en el almacén de artefactos de hawkBit)              |
+  | Consumidor de eventos de WFX           | Lee el flujo de eventos server-sent de WFX, actualiza el estado de cada dispositivo en su lanzamiento y libera el siguiente lote                                            | Sí               | No                                                                                                  |
+  | Disparador de lanzamientos programados | Inicia los lanzamientos cuyo `scheduled_at` ha pasado, consultando cada 30 segundos, y repara los lotes cuyo envío se interrumpió                                           | Sí               | No (el planificador propio de hawkBit)                                                              |
+  | Elección de líder                      | Garantiza que una sola réplica ejecute el trabajo en segundo plano                                                                                                          | Sí               | No es necesaria                                                                                     |
+  | Reconciliación                         | Cada vez que se conecta el flujo de eventos (al arrancar y tras una caída), reproduce las finalizaciones de dispositivos que se perdió, porque el flujo no tiene repetición | Sí               | No                                                                                                  |
+  | Descargas prefirmadas                  | Responden las descargas con una redirección a una URL firmada del almacén de objetos                                                                                        | Almacén `builds` | `hawkbit.artifact_store`                                                                            |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Dependencias [#dependencias]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Sistema                 | Función                                                            | Necesario en                                                                                                           |
+  | ----------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+  | Postgres                | Los datos propios del servicio                                     | Ambos                                                                                                                  |
+  | Lamassu Device Manager  | Fuente de grupos de dispositivos y dispositivos                    | Nativo. Opcional en modo hawkBit: sin él, el servicio lee las etiquetas `group:<id>` de los targets del propio hawkBit |
+  | Lamassu KMS             | Claves de firma, para el paquete y para los manifiestos de versión | Al firmar                                                                                                              |
+  | WFX                     | Orquestación de jobs                                               | Nativo                                                                                                                 |
+  | Eclipse hawkBit         | El servidor de actualizaciones                                     | hawkBit                                                                                                                |
+  | swugenerator (incluido) | Construye ficheros `.swu`                                          | Al construir                                                                                                           |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Dónde se almacena cada cosa [#dónde-se-almacena-cada-cosa]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Dato                                        | Nativo                                          | hawkBit                             |
+  | ------------------------------------------- | ----------------------------------------------- | ----------------------------------- |
+  | Paquetes, versiones, módulos                | Postgres (`updates`)                            | hawkBit                             |
+  | Bytes de los artefactos                     | Almacén de blobs (`artifacts`)                  | Almacén de artefactos de hawkBit    |
+  | `.swu` y paquetes construidos               | Almacén de blobs (`builds`)                     | hawkBit (como artefactos de módulo) |
+  | sw-descriptions                             | Postgres (una columna del paquete y del módulo) | Postgres                            |
+  | Lanzamientos y asignaciones de dispositivos | Postgres                                        | Rollouts y actions de hawkBit       |
+  | Jobs de dispositivo                         | WFX                                             | Actions de hawkBit                  |
+  | Historial de actualizaciones de dispositivo | Postgres                                        | Se lee de hawkBit                   |
+  | Claves de cifrado                           | Almacén de blobs de SymKMS                      | Almacén de blobs de SymKMS          |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El modo nativo también usa `update_files_base_dir` como espacio temporal de construcción: ahí prepara las entradas de un build, y las salidas construidas se publican en el almacén `builds`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Ejecutar más de una réplica [#ejecutar-más-de-una-réplica]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El trabajo en segundo plano (el consumidor de eventos de WFX y el disparador de lanzamientos programados) se ejecuta en exactamente una réplica a la vez. La elección de líder la decide: Leases de Kubernetes cuando se ejecuta dentro de un clúster, un advisory lock de Postgres en cualquier otro caso, configurable con `leader_election.mode` (`""`, `kubernetes` o `database`). Sin elección, cada réplica contaría las mismas finalizaciones de jobs y liberaría lotes antes de tiempo, por lo que un fallo al configurarla detiene el servicio al arrancar. El envío de un lote también está protegido por un lock por lanzamiento, de modo que dos llamadas nunca envían el mismo lote dos veces.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Si `builds` está en disco local, el servicio registra una advertencia y el despliegue queda limitado a una réplica, porque otras réplicas no podrían servir los builds. Pon `builds`, `artifacts` y el almacén de SymKMS en S3 para escalar horizontalmente. Consulta [Operaciones](/docs/platform/updates/operations).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Siguientes pasos [#siguientes-pasos]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="Flujos" description="La secuencia de cada operación importante." href="/docs/platform/updates/flows" />
+
+    <Card title="Modelo de datos" description="Las tablas que guarda el servicio y cómo se relacionan." href="/docs/platform/updates/data-model" />
+
+    <Card title="Operaciones" description="Despliega, escala, respalda y actualiza." href="/docs/platform/updates/operations" />
+  </Cards>
+</div>

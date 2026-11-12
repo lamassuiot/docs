@@ -1,0 +1,383 @@
+# Flows (/docs/pr-preview/pr-56/platform/updates/flows)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  These diagrams follow what the service does, step by step. Routes are relative to `/updates/v1`. For runnable commands see the [native](/docs/platform/updates/guides/native-curl) and [hawkBit](/docs/platform/updates/guides/hawkbit-curl) curl guides, and the [API reference](/docs/platform/updates/reference/api) for every route and body.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Native mode [#native-mode]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  1. Publish and build a pack [#1-publish-and-build-a-pack]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Building turns the uploaded artifacts and the sw-description into one `.swu`. Nothing is signed or encrypted unless the build request asks for it.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  sequenceDiagram
+    actor Op as Operator
+    participant API as Updates API
+    participant DB as Postgres
+    participant FS as Blob stores and scratch dir
+    participant SWG as swugenerator
+    participant KMS as Lamassu KMS
+
+    Op->>API: POST /groups/{g}/distribution-sets
+    API->>DB: insert pack (status draft)
+    API-->>Op: 201 pack
+    Op->>API: POST .../descriptor/upload (sw-description)
+    API->>DB: store the sw-description
+    Op->>API: POST .../artifact/upload (file, artifact_name, version)
+    API->>FS: store artifact bytes in the artifacts store
+    API->>DB: insert artifact and link it to the pack
+    API-->>Op: artifact id
+    Op->>API: POST .../swu {selected_artifact_ids, encryption, signature}
+    API->>FS: stage the descriptor and the selected artifacts in a build directory
+    opt shared or per-device encryption
+      API->>API: fetch the key from SymKMS
+    end
+    API->>SWG: build the .swu
+    opt signing requested
+      SWG->>KMS: sign the sw-description
+      KMS-->>SWG: signature
+    end
+    SWG-->>API: .swu file
+    API->>FS: publish the build to the builds store
+    API->>DB: snapshot the version and its manifest
+    opt signing requested
+      API->>KMS: sign the version manifest
+      KMS-->>API: signature
+    end
+    API->>DB: set status built and uri
+    API-->>Op: 200 Update pack executed successfully
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Things to know about the build:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * The pack is created with a name, a semantic `version`, a `group_id`, a `type` and an optional `packaging`. A duplicate name in the group is a `409`.
+  * Uploading an artifact (or a prebuilt deliverable) to a version that is already built is refused with `409`: create a new version first. A build or change that collides with another one on the same pack answers `409` too.
+  * A file larger than `max_artifact_size_mb` (10240 MiB by default) is refused with `413`.
+  * Encryption is chosen by the build body: `user` plus `encryption_key_name` is shared-key encryption, and `encryption_alg_name` alone is per-device encryption (flow 5).
+  * If the build fails, the pack becomes `build_failed`, `last_build_error` says why, and the pack stays editable. The selected artifacts replace the pack version's earlier artifact links.
+  * Without signing fields the manifest is stored unsigned. If a signing key is given but no certificate, the build fails instead.
+  * A `non-swu` pack is built with `POST .../package` into a `.tar.gz`, and a deliverable built elsewhere is attached with `POST .../swu/upload` or `.../package/upload`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  2. Create a launch [#2-create-a-launch]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Creating a launch decides who is targeted, and checks the pack is deliverable. Nothing is sent to a device yet.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  sequenceDiagram
+    actor Op as Operator
+    participant API as Updates API
+    participant DMS as Lamassu Device Manager
+    participant DB as Postgres
+
+    Op->>API: POST /groups/{g}/launch {pack name, strategy, test_device_id}
+    API->>DB: load the pack by group and name
+    alt pack is not built
+      API-->>Op: 400 build the pack first
+    else per-device pack with uncovered devices
+      API-->>Op: 400 devices without a package
+    else
+      API->>DMS: list the devices of the group
+      DMS-->>API: device ids
+      API->>API: evaluate the pack's preconditions per device
+      alt no device to target
+        API-->>Op: 500 the group has no devices to launch to
+      else canary not in the group, or not qualifying
+        API-->>Op: 400 test device is not a qualifying member
+      else
+        API->>DB: insert the launch and one pending assignment per device
+        API-->>Op: 201 launch_id, precondition_failures, forced
+      end
+    end
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `?dry_run=true` stops after the precondition check and answers `200` with `qualifying_devices`, `precondition_failures`, `superseded_devices` and `never_seen_devices`. `force_preconditions` targets every device of the group and still records who failed. `distribution_set_name`, `workflow_type` and `rollout_type` are required, and so is a `rollout_value` above zero. `approval_threshold` and `error_threshold` must be between 0 and 100, and each violation is a `400`. A launch can also carry `auto`, `scheduled_at`, `name`, `description` and `weight` (see [Concepts](/docs/platform/updates/concepts#launch-campaigns)).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  3. Roll out a batch and update a device [#3-roll-out-a-batch-and-update-a-device]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  One `rollout` call sends the next batch. The canary goes alone first, then batches of the configured size, chosen at random from the devices still pending. The device side below is the `direct` workflow, where a job starts in `INSTALL`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  sequenceDiagram
+    actor Op as Operator
+    participant API as Updates API
+    participant DB as Postgres
+    participant WFX as WFX
+    participant Dev as Device (SWUpdate)
+
+    Op->>API: POST /groups/{g}/launch/{id}/rollout
+    API->>DB: claim the next batch index (atomic, one dispatcher per launch)
+    loop each device in the batch
+      API->>WFX: create job (workflow, uri, algorithm, iv, version)
+      WFX-->>API: job id
+      API->>DB: record a pending update-history row
+      API->>DB: mark the device's assignment active
+    end
+    API-->>Op: 200
+
+    Dev->>WFX: poll for jobs of this client
+    WFX-->>Dev: job in state INSTALL
+    Dev->>API: GET .../swu/download/{deviceId}
+    API-->>Dev: the .swu
+    Dev->>WFX: PUT status INSTALLING
+    Dev->>WFX: PUT status INSTALLED
+    WFX->>WFX: automatic transition to ACTIVATE
+    Dev->>WFX: PUT status ACTIVATING
+    Dev->>WFX: PUT status ACTIVATED
+    WFX-->>API: event stream: every job state change
+    Note over API,DB: Flow 4 handles each event
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  With the `phased` workflow a job starts in `CREATED`, and some transitions need a person or system to confirm them in WFX. This service does not advance them. The `download-install` workflow, used by `non-swu` packs, runs `DOWNLOAD → DOWNLOADING → DOWNLOADED → INSTALL → INSTALLING → INSTALLED`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  With `auto` on, one `rollout` call starts the launch and the following batches are released by flow 4. A launch with `scheduled_at` is started by the scheduled-launch trigger on the leader replica once that time passes.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The `rollout` call is not always a plain `200`:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * It is refused with `400` when the launch is paused, cancelled, completed or aborted, and on an `auto` launch once any batch has gone out.
+  * It does nothing and answers `200` while `scheduled_at` is still in the future, and while the canary is still active. It returns an error if the canary failed.
+  * If some jobs cannot be created, those devices stay `pending` and the call returns a "partial rollout" error (`500`).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  4. React to a device finishing [#4-react-to-a-device-finishing]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Every state change WFX reports runs the same logic. This is what makes automatic batching, the canary gate and the error threshold work.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  On **every** event the service updates the device's update history and writes the event to the device's metadata in Lamassu. Then, only if the state is a terminal one of the workflow, it runs these checks in order, and the first one that applies decides what happens:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | # | Check                                                                                       | If it applies                                                                                  |
+  | - | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+  | 1 | Is the state terminal in the workflow?                                                      | If not, nothing more happens                                                                   |
+  | 2 | (always)                                                                                    | Mark the device's assignment `completed` or `failed`. On success, record the installed version |
+  | 3 | Did the canary device fail?                                                                 | Pause the launch. Resume to retry                                                              |
+  | 4 | Is the launch paused, cancelled or completed?                                               | Stop: no further batches                                                                       |
+  | 5 | Is `error_threshold` set, and have failures reached that share of all devices (rounded up)? | Cancel the launch. Pending devices are not sent                                                |
+  | 6 | Is nothing pending and nothing active?                                                      | Mark the launch `completed`                                                                    |
+  | 7 | Is `auto` off, or is nothing left to send?                                                  | Wait for the operator's next `rollout` call, or for the devices still in flight                |
+  | 8 | Did at least `approval_threshold` of this batch succeed? (0 or 100 or more means all of it) | Dispatch the next batch. Otherwise wait for more results                                       |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Only devices dispatched in the current batch count toward its approval: a straggler from an earlier batch never does. The checks move the launch between these states:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  stateDiagram-v2
+    direction LR
+    [*] --> running: launch created
+    running --> paused: operator pauses, or the canary fails
+    paused --> running: resume
+    running --> cancelled: operator cancels, or error_threshold reached
+    paused --> cancelled: operator cancels
+    running --> completed: nothing pending and nothing active, or operator completes
+    paused --> completed: operator completes
+    completed --> running: retry-failed
+    cancelled --> running: retry-failed
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A new launch is stored with an empty status, which means `running`. Resuming after a failed canary re-queues the canary so it is tried again. Cancelling stops further batches but does not recall jobs that are already running on devices.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  5. Build a per-device encrypted pack [#5-build-a-per-device-encrypted-pack]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Each device gets its own package, encrypted with its own key. The build first resolves every device's key, then builds. A device without a key is skipped, and a launch on a pack with skipped devices is refused.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  sequenceDiagram
+    actor Op as Operator
+    participant API as Updates API
+    participant SYM as SymKMS
+    participant DMS as Lamassu Device Manager
+    participant SWG as swugenerator
+
+    loop each device
+      Op->>SYM: POST /symkms/v1/ create key
+      Op->>SYM: POST /symkms/v1/inventory/{device}/keys/{key} {purpose: firmware-encryption}
+    end
+    Op->>API: POST .../swu {encryption_alg_name, selected_artifact_ids}
+    API->>DMS: list the group's devices
+    Note over API: build fails if the group has no devices, or the sw-description marks no file encrypted = true
+    par each device, concurrently
+      API->>SYM: GET /symkms/v1/inventory/{device}/key
+    end
+    Note over API: build fails if no device has a key
+    par each device with a key, concurrently
+      API->>SWG: build a .swu encrypted with that key
+    end
+    API->>API: record built_device_count, total_device_count, uncovered_devices
+    API-->>Op: 200
+    Note over Op,API: Launch creation returns 400 while uncovered_devices is not empty
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `uncovered_devices` lists devices without a key and also devices whose own build failed. A build where no device got a package leaves the pack `build_failed`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  hawkBit mode [#hawkbit-mode]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  6. Build a module and create a pack [#6-build-a-module-and-create-a-pack]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  hawkBit itself has no notion of a built module, and this service links only built modules into a hawkBit distribution set. A set is never built directly: `POST .../swu` and `.../package` answer `501` in this mode. The module is built first, in the catalog, and the pack is created from it. The diagram shows the `swu-build` intent.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  sequenceDiagram
+    actor Op as Operator
+    participant API as Updates API
+    participant DB as Postgres
+    participant SWG as swugenerator
+    participant HB as hawkBit
+
+    Op->>API: POST /softwaremodules {type, name, version, delivery_intent}
+    API->>HB: create software module
+    API-->>Op: module id
+    Op->>API: POST /softwaremodules/by-id/{id}/artifacts (file)
+    API->>HB: upload the artifact to the module
+    Op->>API: POST /softwaremodules/by-id/{id}/descriptor (sw-description)
+    API->>DB: store the sw-description
+    Op->>API: POST /softwaremodules/by-id/{id}/build
+    API->>HB: read the module's input files
+    API->>SWG: build the .swu
+    SWG-->>API: .swu file
+    API->>HB: upload the .swu, then remove the module's input artifacts
+    API-->>Op: module built
+    Op->>API: POST /groups/{g}/distribution-sets {modules: [{source_module_id}]}
+    API->>HB: create the distribution set linking the built module
+    API->>HB: tag it with the group
+    opt the modules were signed
+      API->>DB: store the signed set manifest
+    end
+    API-->>Op: 201 pack (already built)
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The other delivery intents skip steps: `swu-prebuilt` only uploads the finished `.swu`, which is what builds the module, and `raw` only encrypts or signs the files, with no swugenerator and no sw-description (signing adds a `.sha256` checksum document and its detached signature as extra artifacts). A build can sign through the KMS and encrypt with a shared SymKMS key. Per-device encryption is refused in hawkBit mode. A linked module is frozen: to change it, edit and build it in the catalog, then link it again.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  7. Launch and device update [#7-launch-and-device-update]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The device talks to hawkBit, not to this service. The service reads progress back from hawkBit whenever it is asked.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  sequenceDiagram
+    actor Op as Operator
+    participant API as Updates API
+    participant DMS as Lamassu Device Manager
+    participant HB as hawkBit
+    participant Dev as Device (SWUpdate suricatta)
+
+    Op->>API: POST /groups/{g}/launch {pack, strategy}
+    API->>DMS: list the devices of the group
+    API->>HB: create the missing targets and tag them group:{g}
+    API->>API: check the canary, the pack's group and the preconditions
+    API->>HB: create a rollout (optional canary group, then batches, then the rest)
+    API-->>Op: 201 launch_id, never_seen_devices
+    Op->>API: POST .../rollout
+    API->>HB: start the rollout, or release the next group
+    Dev->>HB: DDI poll, authenticated per the tenant's settings
+    HB-->>Dev: deploymentBase with the module's artifact
+    Dev->>HB: download the .swu
+    Dev->>HB: feedback proceeding, then closed with result success
+    HB->>HB: rollout group counters, success and error conditions
+    Op->>API: GET /groups/{g}/launch
+    API->>HB: read the rollout and its groups
+    API-->>Op: status and counters
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A canary group exists only when `test_device_id` is given. hawkBit decides when a group succeeds and the next group starts, using the approval and error thresholds the service gave it. With `auto` off, hawkBit pauses after each group and the next `rollout` call releases the following one. The launch response also lists `superseded_devices` (devices whose in-flight update the new rollout replaces) and `never_seen_devices` (devices that have never polled, which can stall a group that must reach its success threshold).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The `rollout` call depends on the rollout's state:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * A `ready` rollout is started, and nothing happens while its start time is in the future.
+  * A paused rollout is resumed only if it is paused between batches. An operator pause needs `resume`, and a rollout stopped by its error threshold cannot be resumed.
+  * A running manual rollout releases its next group.
+  * An `auto` rollout that is already running is refused with `400`.
+  * A second `rollout` on the same launch while one is in progress answers `409`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Device authentication is a hawkBit tenant setting. Target security tokens are off by default. See [Connect a device](/docs/platform/updates/guides/connect-a-device).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Next steps [#next-steps]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="Publish and roll out an update" description="Run flows 1 to 4 end to end." href="/docs/platform/updates/guides/publish-and-roll-out" />
+
+    <Card title="Data model" description="The tables behind these flows." href="/docs/platform/updates/data-model" />
+
+    <Card title="Signing and encryption" description="Keys, signatures and the manifest." href="/docs/platform/updates/signing-and-encryption" />
+  </Cards>
+</div>

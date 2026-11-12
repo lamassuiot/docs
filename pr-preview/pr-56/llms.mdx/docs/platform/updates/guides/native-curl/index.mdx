@@ -1,0 +1,705 @@
+# Update flow with curl, native backend (/docs/pr-preview/pr-56/platform/updates/guides/native-curl)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  A complete update, request by request: create a pack, build it, send it to a group in batches, play the device, and follow progress. Every command was run against a native-mode stack, and the responses are real, trimmed where long, except where a section says it was not run: those examples were checked against the code only.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  If you use the [hawkBit backend](/docs/platform/updates/guides/hawkbit-curl) the flow differs, mainly in how a pack is built and how devices report. For the screens that do the same, see the [dashboard guide](/docs/platform/updates/guides/dashboard).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Before you begin [#before-you-begin]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * The [stack is running](/docs/platform/updates/getting-started) in native mode: the service, Postgres, WFX and the Lamassu device manager.
+  * A device group exists in Lamassu with devices in it. This guide uses the group `fleet-a` with the devices `dev-001` to `dev-004`.
+  * `curl` and `jq` are installed. `jq` is only used to pull values out of responses.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  API=http://localhost:10090/updates/v1
+  WFX=http://localhost:9080/api/wfx/v1      # WFX client API: what a device talks to
+  GROUP=fleet-a
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  These are the addresses of the Docker Compose stack in the repository. Through a Lamassu gateway the API is usually `https://lamassu.example.com/api/updates/v1`, and every call then needs the credential your gateway requires, for example `-H "Authorization: Bearer $TOKEN"`. The service itself does no authentication. See [Security](/docs/platform/updates/security).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  1. Check the backend [#1-check-the-backend]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s $API/capabilities | jq -c '{backend, unsupported}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"backend":"native","unsupported":["software_module_deliverables","software_module_replace"]}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  2. Create the pack [#2-create-the-pack]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/distribution-sets \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"water-panel","version":"1.0.0","group_id":"fleet-a","type":"rawfile","packaging":"swu"}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"id":"bb74c7e1-ae3d-450b-bc73-6ed2d761934f","name":"water-panel","version":"1.0.0","group_id":"fleet-a",
+   "type":"rawfile","packaging":"swu","status":"draft","uri":"", ...}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The pack is `draft`. It stays editable until it is built. `name`, `version` (semver) and `group_id` are required; the name must be unique in the group, or the request answers `409`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  3. Upload the sw-description and the artifact [#3-upload-the-sw-description-and-the-artifact]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The sw-description tells SWUpdate what to install. This minimal one installs a web page. See the sw-description rules in [Publish and roll out an update](/docs/platform/updates/guides/publish-and-roll-out).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  cat > sw-description <<'EOD'
+  software =
+  {
+  	version = "1.0.0";
+  	description = "Water panel";
+  	hardware-compatibility: [ "1.0" ];
+  	images: (
+  		{
+  			filename = "index.html";
+  			path = "/web/index.html";
+  			type = "rawfile";
+  			compressed = "zlib";
+  			properties: {
+  				decompressed-size = "52";
+  			};
+  		}
+  	);
+  }
+  EOD
+  printf '<html><body><h1>Water panel v1.0</h1></body></html>\n' > index.html
+
+  P=$API/groups/$GROUP/distribution-sets/water-panel
+
+  curl -s -X POST $P/descriptor/upload -F file=@sw-description
+  # {"msg":"Descriptor uploaded successfully"}
+
+  ART=$(curl -s -X POST $P/artifact/upload \
+    -F file=@index.html -F artifact_name=index.html -F version=1.0.0 | jq -r .artifact.id)
+  echo $ART
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```text
+  31e034d1-9dfa-43d9-ac6b-45fa79e2d51d
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The artifact name is global: all packs share one catalog, and a name can only be reused with a **higher** `version`. Uploading `index.html` again as `1.0.0` fails with `version 1.0.0 must be greater than the current latest version`. A file named `.swu` or `.tar.gz` must really be one, or the upload answers `400`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  4. Build the .swu [#4-build-the-swu]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `selected_artifact_ids` is what puts artifacts into the build. Without it the build fails.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $P/swu -H 'Content-Type: application/json' \
+    -d "{\"selected_artifact_ids\":[\"$ART\"]}"
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"message":"Update pack executed successfully"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s $API/groups/$GROUP/distribution-sets | jq -c '.list[] | {name,version,status,uri}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"name":"water-panel","version":"1.0.0","status":"built","uri":"http://updates:10090/updates/v1/groups/fleet-a/distribution-sets/water-panel/swu/download"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The `uri` starts with the service's `update_domain`. In the Compose stack that is `http://updates:10090/updates/v1/` (`config-docker.yml`), a name that resolves only inside the Compose network, because it is the address devices use. From your host, call the same path on `localhost:10090`, as the next command does.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The pack is now `built`: artifacts can no longer be added or linked to it. You can fetch the shared package (this one is not encrypted):
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -o water.swu -w '%{http_code} %{size_download} bytes\n' $P/swu/download
+  # 200 1024 bytes
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Downloads support `Range` and `HEAD`, so a client can learn the size first and resume an interrupted transfer, for example with `curl -C - -o water.swu $P/swu/download`. With S3 storage and presigning enabled, the same request can answer `302` to a short-lived signed URL, which `curl -L` follows.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  If the build fails, the pack gets the status `build_failed` and `last_build_error` holds the reason. It stays editable: fix the cause and build again.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  5. Preview, then create the launch [#5-preview-then-create-the-launch]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A dry run shows who would receive the update, without creating anything:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST "$API/groups/$GROUP/launch?dry_run=true" \
+    -H 'Content-Type: application/json' \
+    -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2,"test_device_id":"dev-001"}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"never_seen_devices":null,"precondition_failures":[],
+   "qualifying_devices":["dev-001","dev-002","dev-003","dev-004"],"superseded_devices":null}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Create it. `test_device_id` is the canary: it goes alone first and must succeed before anyone else is touched. `rollout_value` 2 means batches of two devices.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  LAUNCH=$(curl -s -X POST $API/groups/$GROUP/launch -H 'Content-Type: application/json' \
+    -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2,"test_device_id":"dev-001","name":"water-panel 1.0.0 wave 1"}' \
+    | jq -r .launch_id)
+  echo $LAUNCH
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```text
+  98af8db7-b3a0-4802-8cde-269d88e6723e
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A small helper makes the launch easy to follow in the next steps:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  status() {
+    curl -s $API/groups/$GROUP/launch | jq -c --arg id "$LAUNCH" \
+      '.list[] | select(.id==$id) | {status,pending_count,active_count,completed_count,failed_count,test_device_status}'
+  }
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  6. Roll out the canary [#6-roll-out-the-canary]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/rollout
+  # {"message":"Launch history executed successfully"}
+
+  status
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"status":"","pending_count":3,"active_count":1,"completed_count":0,"failed_count":0,"test_device_status":"active"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  An empty `status` means running. Only the canary is active. The service created one WFX job for `dev-001`:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s $API/launch/$LAUNCH/jobs | jq -r '.list[] | "\(.clientId) \(.status.state)"'
+  # dev-001 INSTALL
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  7. Play the device [#7-play-the-device]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A real device does this by itself. These commands are what it sends to WFX, so you can drive a test device by hand. First the device asks WFX for its job:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s "$WFX/jobs?clientId=dev-001&state=INSTALL" | jq '.content[0] | {id, state: .status.state, definition}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {
+    "id": "35bf5512-1aa3-46e6-9a72-2096560e8bf0",
+    "state": "INSTALL",
+    "definition": {
+      "artifacts": [
+        {"name": "water-panel",
+         "uri": "http://updates:10090/updates/v1/groups/fleet-a/distribution-sets/water-panel/swu/download/dev-001"}
+      ],
+      "groupID": "fleet-a",
+      "launchID": "98af8db7-b3a0-4802-8cde-269d88e6723e",
+      "type": ["rawfile"],
+      "version": "1.0.0"
+    }
+  }
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The device downloads the `uri`, installs it, and reports each step:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  JOB=$(curl -s "$WFX/jobs?clientId=dev-001&state=INSTALL" | jq -r '.content[0].id')
+  # A device resolves "updates" itself; from the host, swap in localhost
+  curl -s -o water-dev-001.swu "$(curl -s $WFX/jobs/$JOB | jq -r '.definition.artifacts[0].uri' | sed 's#//updates:#//localhost:#')"
+
+  for state in INSTALLING INSTALLED; do
+    curl -s -X PUT $WFX/jobs/$JOB/status -H 'Content-Type: application/json' -d "{\"state\":\"$state\"}"
+  done
+  curl -s $WFX/jobs/$JOB | jq -r .status.state      # ACTIVATE: WFX moved it on by itself
+
+  for state in ACTIVATING ACTIVATED; do
+    curl -s -X PUT $WFX/jobs/$JOB/status -H 'Content-Type: application/json' -d "{\"state\":\"$state\"}"
+  done
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The `direct` workflow is `INSTALL → INSTALLING → INSTALLED → ACTIVATE → ACTIVATING → ACTIVATED`. WFX itself makes the `INSTALLED → ACTIVATE` step. To report a failure, move a job to `TERMINATED`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The service hears about every change from WFX through its event stream and updates the launch. This takes a moment, so if `status` still shows the device as active, run it again after a second:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  sleep 2; status
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"status":"","pending_count":3,"active_count":0,"completed_count":1,"failed_count":0,"test_device_status":"completed"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  8. Roll out the rest [#8-roll-out-the-rest]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The canary passed. Each `rollout` call now sends the next batch of two:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/rollout
+  curl -s $API/launch/$LAUNCH/jobs | jq -r '.list[] | select(.status.state=="INSTALL") | .clientId'
+  # dev-003
+  # dev-004
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Walk those devices through steps like in step 7, then call `rollout` again for the last device. When nothing is pending or active the launch completes by itself:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"status":"completed","pending_count":0,"active_count":0,"completed_count":4,"failed_count":0}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `completed_count` counts only successes: a failed device is counted in `failed_count`. A launch is marked `completed` once nothing is pending or active, even if some devices failed, so check `failed_count` before you call the update a success.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  9. Check the result [#9-check-the-result]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  # What a device carries now, with its artifacts
+  curl -s $API/devices/dev-001/distribution-set-inventory | jq -c '.list[] | {distribution_set_name,version,installed_at}'
+  # {"distribution_set_name":"water-panel","version":"1.0.0","installed_at":"2026-10-21T07:35:49.434581+02:00"}
+
+  # The history of update attempts
+  curl -s $API/devices/dev-001/distribution-set-updates | jq -c '.list[] | {version_from,version_to,status}'
+  # {"version_from":"","version_to":"1.0.0","status":"success"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  To track drift, declare the version devices should be on, then read compliance:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  PACK=$(curl -s $API/groups/$GROUP/distribution-sets | jq -r '.list[] | select(.name=="water-panel") | .id')
+  curl -s -X PUT $API/groups/$GROUP/latest-distribution-sets/$PACK \
+    -H 'Content-Type: application/json' -d '{"version":"1.0.0"}'
+  curl -s $API/groups/$GROUP/version-status | jq -c '.rows[] | {device_id,current_version,latest_version,in_sync}'
+  curl -s $API/groups/$GROUP/version-compliance
+  # {"group_id":"fleet-a","devices":[]}      no device is out of date
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The fleet-wide view of the last attempt per device and pack, including attempts outside any launch, is one call. Not run here; the brackets of a filter need `curl -g`:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -sg "$API/devices/distribution-set-updates/latest?filter=status[eq]failed" | jq -c '.list[] | {device_id,distribution_set_name,version_to,status}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Variations [#variations]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Let the service release the batches [#let-the-service-release-the-batches]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  With `auto` on, the service sends the next batch itself once enough of the current one succeeded. `approval_threshold` is the percentage of the batch that must succeed (0 or 100 mean all of it). `error_threshold` applies to every launch, `auto` or not: the launch is cancelled once the number of failed devices reaches that percentage of **all** devices, rounded up. With 4 devices at 75%, the third failure cancels it.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  This example uses a second pack, `valve-panel`, created and built like `water-panel` (steps 2 to 4). Artifact names are global and a name that already exists must get a higher version, so give this one its own file name:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  PV=$API/groups/$GROUP/distribution-sets/valve-panel
+  curl -s -o /dev/null -X POST $API/groups/$GROUP/distribution-sets -H 'Content-Type: application/json' \
+    -d '{"name":"valve-panel","version":"1.0.0","group_id":"'$GROUP'","type":"rawfile","packaging":"swu"}'
+  cp index.html valve.html
+  sed 's/index.html/valve.html/' sw-description > sw-valve
+  curl -s -o /dev/null -X POST $PV/descriptor/upload -F file=@sw-valve
+  AV=$(curl -s -X POST $PV/artifact/upload -F file=@valve.html -F artifact_name=valve.html -F version=1.0.0 | jq -r .artifact.id)
+  curl -s -X POST $PV/swu -H 'Content-Type: application/json' -d "{\"selected_artifact_ids\":[\"$AV\"]}"
+
+  LAUNCH=$(curl -s -X POST $API/groups/$GROUP/launch -H 'Content-Type: application/json' \
+    -d '{"distribution_set_name":"valve-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2,
+         "auto":true,"approval_threshold":50,"error_threshold":75,"name":"valve auto"}' | jq -r .launch_id)
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Call `rollout` once to start. A second call is refused:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/rollout
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```text
+  {"err":"Failed to execute launch history: operation not valid in the current state: launch 72afe5f7-... rolls out automatically: its next batch is released once the current one meets the approval threshold"}   [400]
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  If one device of the first batch fails (`TERMINATED`) and the other succeeds, 50% succeeded meets the threshold and the next batch is dispatched on its own.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Pause, resume, retry and cancel [#pause-resume-retry-and-cancel]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/pause     # {"message":"Launch paused","status":"paused"}
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/resume    # {"message":"Launch resumed","status":"running"}
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/retry-failed
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/cancel    # {"message":"Launch cancelled","status":"cancelled"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A pause lets the batch in flight finish and holds the next one. `retry-failed` puts the failed devices back in the pending pool and releases the next batch. That batch is drawn at random from all pending devices, so it can also contain devices that were never sent, and if more devices failed than fit in a batch only one batch goes out. It answers `400` when nothing failed, and it re-opens a completed or cancelled launch (`"status":"running"`). A failed canary pauses the launch by itself, and `resume` then sends the canary again. A cancelled launch cannot be resumed, and in-flight devices finish their current job.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Schedule a launch [#schedule-a-launch]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Not run here. `scheduled_at` (RFC 3339) delays the first batch. The service checks for due launches about every 30 seconds, so the start can be up to that late. A `rollout` call before the time does nothing.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/launch -H 'Content-Type: application/json' \
+    -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2,
+         "scheduled_at":"2026-12-01T03:00:00Z","name":"night wave"}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The schedule survives a restart and runs on whichever replica currently holds the leader role, so a scheduled launch is dispatched once even with several replicas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Require a version before updating [#require-a-version-before-updating]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Not run here. A pack can require that a device already carries another pack, or a module, at a minimum version. The rule lives on the pack you launch. Devices that fail it are left out, and the dry run lists them:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X PUT $P/preconditions -H 'Content-Type: application/json' \
+    -d '{"preconditions":[{"required_distribution_set_name":"base-os","min_version":"1.0.0"}]}'
+  curl -s -X POST "$API/groups/$GROUP/launch?dry_run=true" -H 'Content-Type: application/json' \
+    -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2}' | jq -c .precondition_failures
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Each failure names the `device_id`, the `distribution_set_name` (and `module_key` for a module rule), the `current_version` the device has (empty if none) and the `required` constraint, for example `>=1.0.0`. Use `required_module_key` with a `type:name` value to require a module instead. `force_preconditions: true` in the launch body deploys to every device anyway and records the failures.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Update one device to a version [#update-one-device-to-a-version]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Not run here. `force-version` launches a single device to an exact pack version, outside any campaign, and answers `202`. The device must be a member of the pack's group:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/devices/dev-002/force-version -H 'Content-Type: application/json' \
+    -d "{\"distribution_set_id\":\"$PACK\",\"version\":\"1.0.0\",\"group_id\":\"$GROUP\",\"workflow\":\"direct\"}"
+  # {"status":"dispatched","device_id":"dev-002","distribution_set_id":"...","version":"1.0.0"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Without `workflow`, a `swu` pack uses `phased`. Only the pack's current version can be forced, unless the pack was created with `allow_previous_version_download`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A new version [#a-new-version]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $P/new -H 'Content-Type: application/json' -d '{"version":"1.1.0"}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The version must be higher than the current one, and the pack keeps its id. The new version starts as `draft`. The artifact links and the module composition carry over, but the sw-description does not: upload it again. Then build with `selected_artifact_ids` (a build replaces the carried links with the ones you select), after uploading a new artifact version if the file changed.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Encrypt with a shared key [#encrypt-with-a-shared-key]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  One key encrypts the `.swu` for every device. The sw-description must mark the files to encrypt with `encrypted = true;`. Use a separate pack for each encryption variant: a new version inherits the previous version's encryption settings, and a plain build does not clear them. Rebuilding an already built pack with other settings leaves stale fields too. See [Limitations](/docs/platform/updates/limitations).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  This helper creates a pack, uploads a sw-description that marks its file `encrypted = true;`, and uploads the artifact. It prints the artifact id.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  new_enc_pack() {
+    local name=$1 p=$API/groups/$GROUP/distribution-sets/$1
+    curl -s -o /dev/null -X POST $API/groups/$GROUP/distribution-sets -H 'Content-Type: application/json' \
+      -d "{\"name\":\"$name\",\"version\":\"1.0.0\",\"group_id\":\"$GROUP\",\"type\":\"rawfile\",\"packaging\":\"swu\"}"
+    sed "s/index.html/$name.html/; s/compressed = \"zlib\";/&\n\t\t\tencrypted = true;/" sw-description > sw-$name
+    curl -s -o /dev/null -X POST $p/descriptor/upload -F file=@sw-$name
+    cp index.html $name.html
+    curl -s -X POST $p/artifact/upload -F file=@$name.html -F artifact_name=$name.html -F version=1.0.0 | jq -r .artifact.id
+  }
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  SK=http://localhost:10090/symkms/v1
+  ARTE=$(new_enc_pack water-panel-enc)
+  PE=$API/groups/$GROUP/distribution-sets/water-panel-enc
+
+  KEY=$(openssl rand -hex 32)
+  curl -s -X POST $SK/ -H 'Content-Type: application/json' \
+    -d "{\"user_id\":\"ops\",\"algorithm\":\"AES-256-GCM\",\"key\":\"$KEY\",\"id\":\"fleet-a-shared\"}"
+  # {"id":"fleet-a-shared","user_id":"ops","algorithm":"AES-256-GCM","created_at":"..."}
+
+  curl -s -X POST $PE/swu -H 'Content-Type: application/json' \
+    -d "{\"user\":\"ops\",\"encryption_key_name\":\"fleet-a-shared\",\"encryption_alg_name\":\"AES-256-GCM\",\"selected_artifact_ids\":[\"$ARTE\"]}"
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The pack then reports `"encryption_mode":"shared"`. The device needs the same key and algorithm. See [Signing and encryption](/docs/platform/updates/signing-and-encryption).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Encrypt per device [#encrypt-per-device]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Each device gets its own package and key. This is another pack, built with the same helper. The sw-description must mark a file `encrypted = true;`, or the build is refused.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  ARTP=$(new_enc_pack water-panel-pd)
+  PP=$API/groups/$GROUP/distribution-sets/water-panel-pd
+
+  for d in dev-001 dev-002 dev-003 dev-004; do
+    curl -s -X POST $SK/ -H 'Content-Type: application/json' \
+      -d "{\"user_id\":\"ops\",\"algorithm\":\"AES-256-GCM\",\"key\":\"$(openssl rand -hex 32)\",\"id\":\"pd-$d\"}"
+    curl -s -X POST $SK/inventory/$d/keys/pd-$d -H 'Content-Type: application/json' \
+      -d '{"purpose":"firmware-encryption"}'
+  done
+
+  curl -s -X POST $PP/swu -H 'Content-Type: application/json' \
+    -d "{\"encryption_alg_name\":\"AES-256-GCM\",\"selected_artifact_ids\":[\"$ARTP\"]}"
+  curl -s $API/groups/$GROUP/distribution-sets | jq -c '.list[] | select(.name=="water-panel-pd") | {status,encryption_mode,built_device_count,total_device_count}'
+  # {"status":"built","encryption_mode":"per-device","built_device_count":4,"total_device_count":4}
+
+  curl -s -o dev-001.swu $PP/swu/download/dev-001     # each device downloads its own file
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  If a device has no key at build time, the build still succeeds and the pack records the gap. If **no** device has a key, the build fails instead.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"encryption_mode":"per-device","built_device_count":3,"total_device_count":4,
+   "uncovered_devices":[{"device_id":"dev-004","reason":"no firmware-encryption key assigned"}]}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A launch on that pack is refused, dry runs included, and `force_preconditions` does not override it:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```text
+  {"err":"Cannot create launch: update pack \"water-panel\" is per-device encrypted and only 3 of 4 devices have a package. The rest would fail to download. Missing: dev-004 (no firmware-encryption key assigned). Fix those devices and regenerate the SWU."}   [400]
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Coverage is recorded when the pack is built, so assigning the missing key is not enough. Build the pack again (a new version) with a key for every device.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Sign the package [#sign-the-package]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Add the KMS signing fields to the build body. They need a signing key and certificate in the Lamassu KMS, with `kms_endpoint` and `sign_script_path` set. This request was not run here, because it needs a KMS. See [Signing and encryption](/docs/platform/updates/signing-and-encryption).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  jq -n --arg art "$ART" --arg cert "$(cat signer.pem)" '{
+      selected_artifact_ids: [$art],
+      signature_key_id: "<kms key id>",
+      signature_alg_name: "RSASSA_PSS_SHA_256",
+      signature_certificate: $cert }' \
+    | curl -s -X POST $P/swu -H 'Content-Type: application/json' -d @-
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Troubleshooting [#troubleshooting]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Symptom                                                                  | Cause and fix                                                                                                                 |
+  | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+  | `409` on `artifact/upload` or `artifact/link`                            | The pack version is already `built`. Create a new version with `POST .../new`                                                 |
+  | `409` on `POST .../distribution-sets`                                    | A pack with that name already exists in the group                                                                             |
+  | `400 version ... must be greater than the current latest version`        | An artifact name is global and its version must increase. Upload with a higher `version`                                      |
+  | The build fails with an empty binaries directory                         | The build received no `selected_artifact_ids`                                                                                 |
+  | `400` creating a launch: pack has not been built                         | Build it first. A pack in `build_failed` is not launchable either                                                             |
+  | `400 ... is per-device encrypted and only N of M devices have a package` | Some devices have no `firmware-encryption` key. Assign keys and build a new version                                           |
+  | `rollout` answers `400` with `rolls out automatically`                   | The launch has `auto` on and already started. Wait for the approval threshold, or pause it                                    |
+  | `rollout` answers `400` with `test device ... failed`                    | The canary failed. Resume the launch to retry it, or cancel                                                                   |
+  | `413` on an upload                                                       | The file is over `max_artifact_size_mb` (10 GiB by default), or the gateway or ingress limit in front of the service is lower |
+  | `501` on a module route                                                  | Native mode has no per-module deliverables. Build the pack instead                                                            |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Next steps [#next-steps]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * [Update flow with curl, hawkBit backend](/docs/platform/updates/guides/hawkbit-curl)
+  * [Connect a device](/docs/platform/updates/guides/connect-a-device) for what a real device must implement
+  * [API reference](/docs/platform/updates/reference/api)
+  * [Troubleshooting](/docs/platform/updates/troubleshooting)
+</div>

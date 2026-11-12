@@ -1,0 +1,513 @@
+# 3.8.0 a 4.0.0 (/docs/pr-preview/pr-56/es/upgrades/3-8-0-to-4-0-0)
+
+
+
+Lamassu 4.0.0 es una versión mayor. El almacenamiento se consolida en una única base de datos PostgreSQL, un nuevo servicio `authz` autoriza cada petición, el chart de Helm se refuerza y varias APIs y configuraciones almacenadas cambian de forma. La mayoría de los datos se convierten automáticamente durante la actualización, pero algunos cambios requieren acción del operador antes, durante o después.
+
+La página se organiza en cuatro partes. Léelas en orden antes de actualizar producción:
+
+1. [Cambios de arquitectura](#cambios-de-arquitectura): qué es distinto en 4.0.0 y qué migra la actualización por sí sola.
+2. [Breaking changes](#breaking-changes): cada cambio que puede romper un despliegue 3.8.0, a quién afecta y qué hacer.
+3. [Guía de migración con Helm](#guía-de-migración-con-helm): el procedimiento paso a paso para una release gestionada con Helm.
+4. [Checklist de validación](#checklist-de-validación): cómo confirmar que la actualización ha funcionado antes de eliminar los datos antiguos.
+
+<Callout type="warn" title="Los pasos de migración del backend son provisionales">
+  La versión 4.0.0 está próxima y los pasos de migración del backend de esta página son provisionales. Verifica cada procedimiento con los artefactos definitivos de la versión antes de actualizar producción.
+</Callout>
+
+Cambios de arquitectura [#cambios-de-arquitectura]
+
+Una única base de datos PostgreSQL con esquemas [#una-única-base-de-datos-postgresql-con-esquemas]
+
+En 3.8.0 cada servicio tenía su propia base de datos. El backend de 4.0.0 se conecta a una única base de datos PostgreSQL llamada `pki` y aísla cada servicio en un esquema: `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` y `alerts`. El servicio `authz` guarda sus principales, permisos y políticas en una base de datos `authz` separada (el monolítico de desarrollo usa en su lugar un esquema `authz` dentro de `pki`), y WFX conserva su propia base `wfx`.
+
+PostgreSQL pasa a ser el único motor de almacenamiento. Se elimina el soporte de SQLite, y los motores `couch_db` y `dynamo_db` no están registrados en 4.0.0.
+
+La autorización pasa al servicio authz [#la-autorización-pasa-al-servicio-authz]
+
+En 3.8.0 el API Gateway validaba los tokens: una política JWT en cada ruta privada comprobaba la firma y solo dejaba pasar los tokens con el rol de administrador. Cualquier token que superase esa comprobación tenía acceso a todas las rutas.
+
+4.0.0 elimina la política del gateway. Las rutas `/api/*` llegan directamente a los servicios, y cada servicio autoriza cada petición a través de `authz`, que valida el token contra el endpoint JWKS del proveedor de identidad y aplica políticas de grano fino, a nivel de entidad, sobre CAs, certificados, dispositivos, DMS, claves del KMS y roles de la VA. No existe un superusuario implícito: el primer administrador sale de un principal de bootstrap que configuras tú. La página de [control de acceso](/docs/platform/administration/access-control) documenta los principales, las políticas y el primer administrador.
+
+Los eventos de dispositivo tienen almacenamiento propio [#los-eventos-de-dispositivo-tienen-almacenamiento-propio]
+
+Los eventos históricos de los dispositivos pasan de la columna `devices.events` a un almacenamiento dedicado, `device_events`, con sus propios endpoints. El endpoint de eventos también puede emitirlos mediante Server-Sent Events (SSE); para difundirlos entre las instancias del servicio, cada instancia de Device Manager enlaza su propia cola AMQP duradera.
+
+Un chart de Helm reforzado [#un-chart-de-helm-reforzado]
+
+La versión 4.0.0 del chart refuerza la seguridad:
+
+* **Nombres de recursos con ámbito de release.** Cada recurso gestionado por el chart se llama `<release>-lamassu-<componente>` en lugar de los nombres fijos de 3.8.0 (`kms`, `va`, `ca`...). Con una release llamada `prod`, los StatefulSets pasan a ser `prod-lamassu-kms` y `prod-lamassu-va`. Los values `nameOverride` y `fullnameOverride` cambian el prefijo.
+* **Contenedores sin root.** Todas las cargas se ejecutan con el usuario numérico `65532:65532`, con un perfil seccomp `RuntimeDefault` y sin capabilities. Los pods no montan el token de la service account por defecto, y el chart crea una ServiceAccount dedicada.
+* **Validación estricta de values.** `values.schema.json` rechaza las claves desconocidas, así que los bloques sobrantes de 3.8.0 hacen fallar `helm lint` y `helm upgrade` en lugar de ignorarse en silencio.
+* **Sin reglas de planificación inyectadas.** El chart ya no añade por su cuenta reglas de anti-afinidad ni de topology spread.
+
+Qué migra automáticamente la actualización [#qué-migra-automáticamente-la-actualización]
+
+Al actualizar una release de Helm se ejecutan varias migraciones sin intervención:
+
+* Antes de que arranque ningún servicio, el job de preinstalación y preactualización del chart prepara PostgreSQL. Crea las bases `pki`, `authz` y `wfx` si no existen, crea un esquema por servicio dentro de `pki` e importa cada base de datos por servicio de 3.8.0 en su esquema. Cada importación se ejecuta en una única transacción, de modo que una importación fallida no deja un esquema a medias y un reintento del job vuelve a importar. Después, el job ejecuta las migraciones de base de datos de cada esquema, migra `authz`, precarga sus políticas y da de alta los principales de `services.authz.bootstrap`. Es idempotente y necesita un rol de PostgreSQL con permiso para crear bases de datos y esquemas, como se describe en [Instalar con Helm](/docs/deployment/self-hosted/helm#antes-de-comenzar).
+* La configuración almacenada de los DMS se reescribe al formato de 4.0.0, y los eventos históricos de los dispositivos se transforman al nuevo almacenamiento.
+* Si se activa `migrations.caToKms.enabled`, un hook de preactualización registra en el KMS las claves de CA heredadas.
+
+Dos cosas nunca migran solas: los datos del KMS y de la VA en volúmenes locales, que se quedan en volúmenes que los pods actualizados ya no usan, y el archivo de values, que se actualiza a mano. Los despliegues que no usan el chart de Helm también tienen que mover ellos mismos los datos de la base de datos; consulta [Despliegues sin Helm](#despliegues-sin-helm).
+
+Breaking changes [#breaking-changes]
+
+| Cambio                                                                                                  | A quién afecta                                                                                   | Gravedad                                                                    | Acción                                                                                         |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [Nombres de recursos con ámbito de release](#nombres-de-recursos-con-ámbito-de-release)                 | Releases de Helm con motor de KMS en sistema de archivos o CRLs de la VA en almacenamiento local | Alta: KMS y VA arrancan con volúmenes vacíos                                | Copiar los datos a los volúmenes nuevos                                                        |
+| [Validación estricta de values](#validación-estricta-de-values)                                         | Todas las releases de Helm                                                                       | Alta: `helm upgrade` falla                                                  | Eliminar o renombrar las claves heredadas                                                      |
+| [Configuración de autorización obligatoria](#configuración-de-autorización-obligatoria)                 | Todos los despliegues                                                                            | Alta: sin principal de bootstrap no hay administrador                       | Configurar `services.authz`                                                                    |
+| [Retirada de la validación de tokens en el gateway](#retirada-de-la-validación-de-tokens-en-el-gateway) | Todas las releases de Helm                                                                       | Alta: `helm upgrade` falla con las claves antiguas                          | Mover JWKS y roles a `services.authz`                                                          |
+| [Consolidación en PostgreSQL](#consolidación-en-postgresql)                                             | Despliegues 3.8.0 con bases de datos por servicio                                                | Alta: los servicios no encuentran datos, o una migración aborta             | Limpiar antes IDs de CA duplicados y `engine_id` vacíos; fuera de Helm, mover los datos a mano |
+| [Retirada de SQLite](#retirada-de-sqlite)                                                               | Despliegues sobre SQLite, `couch_db` o `dynamo_db`                                               | Alta: el backend ya no arranca con ellos                                    | Pasar a PostgreSQL antes de actualizar                                                         |
+| [Webhooks con referencias a archivos](#webhooks-del-dms)                                                | DMS cuyo certificado o clave mTLS del webhook eran rutas de archivo                              | Alta: los enrolamientos que llaman al webhook fallan                        | Volver a introducir certificado y clave como PEM, o eliminar los campos de archivo             |
+| [Contenedores sin root](#contenedores-sin-root)                                                         | Releases con identidades por servicio o material de claves montado                               | Media: los servicios no pueden leer sus archivos                            | Eliminar las sobrescrituras y corregir la propiedad de los volúmenes                           |
+| [AMQP sobre TLS](#amqp-sobre-tls)                                                                       | Releases que definen `amqp.tls`                                                                  | Media: los clientes se conectan al puerto equivocado                        | Apuntar `amqp.port` al listener TLS, o desactivar TLS                                          |
+| [Claves de CA heredadas en el KMS](#claves-de-ca-heredadas-en-el-kms)                                   | Instalaciones cuyas claves de CA son anteriores al KMS                                           | Media: las claves de CA quedan sin gestionar                                | Ejecutar la migración de CA a KMS                                                              |
+| [Verificación del certificado del receptor](#webhooks-del-dms)                                          | DMS cuyo webhook tenía `validate_server_cert: false`                                             | Media: las credenciales viajan a un receptor sin verificar                  | Poner `insecure_skip_verify` a `false`                                                         |
+| [Conjunto de confianza del reenrolamiento](#conjunto-de-confianza-del-reenrolamiento)                   | Scripts y consolas que editan DMS por API                                                        | Media: una edición con el formato antiguo vacía `validation_cas` sin avisar | Leer el DMS antes de editarlo y usar el campo nuevo                                            |
+| [Eventos de dispositivo](#eventos-de-dispositivo)                                                       | Consumidores que leen el campo `events` del dispositivo                                          | Media: el campo desaparece                                                  | Usar los nuevos endpoints de eventos                                                           |
+| [Values renombrados y reestructurados](#values-renombrados-y-reestructurados)                           | Releases que sobrescriben `toolbox`, `services.connectors`, puertos, sondas o planificación      | Baja a media: errores de validación o cambios de valores por defecto        | Actualizar el archivo de values                                                                |
+| [API de actualización del DMS](#api-de-actualización-del-dms)                                           | Clientes que envían el ID del DMS en el cuerpo de la actualización                               | Baja: prevalece el ID de la URL                                             | Enviar el ID en la URL                                                                         |
+| [Valores de tipo de certificado](#valores-de-tipo-de-certificado)                                       | Consumidores que comparan el `type` del certificado                                              | Baja: dos valores cambian de nombre                                         | Adaptar los consumidores                                                                       |
+| [Autenticación de reenrolamiento independiente](#autenticación-de-reenrolamiento-independiente)         | Cualquier DMS                                                                                    | Baja: solo informativo                                                      | Revisar ambos bloques antes de editar                                                          |
+
+Chart de Helm y values [#chart-de-helm-y-values]
+
+Nombres de recursos con ámbito de release [#nombres-de-recursos-con-ámbito-de-release]
+
+Kubernetes deriva el nombre del PVC de un StatefulSet a partir del nombre de su pod (`<volumeClaimTemplate>-<nombre-del-pod>`). Al renombrar los StatefulSets `kms` y `va`, `helm upgrade` enlaza PVC nuevos y vacíos en lugar de los existentes. El material de claves del KMS y las CRLs de la VA no se borran —los PVC antiguos quedan huérfanos, no eliminados—, pero los pods actualizados fallan con `no such file or directory` (KMS) o `code=NotFound` (VA) hasta que copies los datos. Afecta al KMS cuando `services.kms.cryptoEngines` usa un motor `filesystem` y a la VA cuando `services.va.fileStore.type` es `local`. El resto de recursos renombrados no tienen estado y se recrean sin riesgo de pérdida de datos.
+
+El [paso 4 de la guía de migración](#paso-4-migra-los-datos-del-kms-y-la-va) copia los datos.
+
+Validación estricta de values [#validación-estricta-de-values]
+
+`values.schema.json` rechaza las claves desconocidas, así que cualquier bloque que 4.0.0 haya eliminado o renombrado —`toolbox`, `auth.oidc.apiGateway`, `auth.authorization` y otros— hace fallar directamente `helm lint` y `helm upgrade`. El [paso 2](#paso-2-actualiza-el-archivo-de-values) recoge todos los cambios.
+
+Configuración de autorización obligatoria [#configuración-de-autorización-obligatoria]
+
+3.8.0 no tenía servicio de autorización, así que un archivo de values de 3.8.0 no tiene nada desde lo que migrar: hay que añadir la configuración de `services.authz` a mano. Necesita el endpoint JWKS del proveedor de identidad, las bases de datos que usa el motor de autorización y un principal de bootstrap que coincida con la forma en que el proveedor asigna el rol de administrador. Sin un principal coincidente nadie puede administrar la PKI.
+
+Retirada de la validación de tokens en el gateway [#retirada-de-la-validación-de-tokens-en-el-gateway]
+
+`auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` y `auth.authorization.roles.admin` se eliminan sin alias de compatibilidad, y el schema los rechaza. Su configuración pasa a `services.authz`: la URL de JWKS se convierte en `services.authz.jwkUrl`, y el claim de roles y el rol de administrador pasan a ser una regla de claims del principal de bootstrap. `auth.oidc.frontend` no cambia.
+
+Contenedores sin root [#contenedores-sin-root]
+
+Las imágenes de servicio se basan en distroless y se ejecutan con el usuario numérico `65532`; la imagen de `authz` es Ubuntu con un usuario sin root que tiene el mismo UID. Se eliminan las sobrescrituras por servicio `services.kms.securityContext.runAsGroup: 0` y `services.authz.securityContext.runAsUser`/`runAsGroup: 999`; el acceso de grupo al volumen del KMS y al socket PKCS#11 lo gestiona ahora el `fsGroup: 65532` del pod.
+
+3.8.0 no fijaba la identidad del contenedor, por lo que los archivos existentes pueden tener cualquier UID. Todo volumen con claves o CRLs debe pertenecer a `65532:65532`, o al menos ser legible (y, si hace falta, escribible) por esa identidad.
+
+AMQP sobre TLS [#amqp-sobre-tls]
+
+En 3.8.0 `amqp.tls` no se aplicaba y los clientes del bus de eventos se conectaban siempre en texto plano. En 4.0.0, `amqp.tls: true` los pasa a AMQPS. El valor por defecto de `amqp.port` sigue siendo `5672` y no cambia al activar TLS, así que un archivo de values que ya tuviera `amqp.tls: true` debe apuntar `amqp.port` al listener TLS del broker (`amqps`, habitualmente `5671`), o poner `amqp.tls: false` para seguir en texto plano. Los clientes deben además confiar en el certificado del broker.
+
+Values renombrados y reestructurados [#values-renombrados-y-reestructurados]
+
+* `toolbox` pasa a llamarse `connectivityTest`, y el hook de `helm test` usa la imagen upstream `curlimages/curl` fijada por digest.
+* `services.connectors` pasa a ser un mapa indexado por ID de conector en lugar de una lista.
+* El valor por defecto de `services.ui.port` es `8085`, el puerto sin privilegios de la imagen sin root.
+* El bloque compartido `probes:` se sustituye por los bloques independientes `livenessProbe`, `readinessProbe` y `startupProbe`.
+* Con `tls.certManagerOptions.issuer` vacío, el chart crea un issuer autofirmado con ámbito de release, por ejemplo `lamassu-downstream-ca-selfsigned-issuer`. El literal heredado `downstream-ca-selfsigned-issuer` se sigue aceptando y se resuelve a ese issuer.
+* La anti-afinidad y el topology spread deben configurarse explícitamente con `affinity` y `topologySpreadConstraints`.
+
+Datos y almacenamiento [#datos-y-almacenamiento]
+
+Consolidación en PostgreSQL [#consolidación-en-postgresql]
+
+Cada base de datos por servicio de 3.8.0 debe acabar como un esquema de `pki`, conservando su estructura, índices, restricciones, datos e historial de migraciones. El chart de Helm lo hace automáticamente; los despliegues sin Helm lo hacen a mano (consulta [Despliegues sin Helm](#despliegues-sin-helm)).
+
+Dos migraciones de esquema abortan con datos que 3.8.0 permitía, así que limpia los datos antes de actualizar:
+
+* La migración de CA añade una restricción UNIQUE sobre `ca_certificates.id` y aborta si existen IDs de CA duplicados. Las importaciones ya rechazan los duplicados con `409`, así que normalmente no aparecen duplicados nuevos.
+* La migración del KMS convierte la clave primaria en `(key_id, engine_id)` y aborta con `cannot promote (key_id, engine_id) to primary key: N row(s) have no engine_id; backfill them before migrating` cuando hay filas de `kms_keys` sin `engine_id`. Rellena antes `engine_id`.
+
+Esa misma migración del KMS elimina, con un `NOTICE`, los alias iguales a un ID de clave existente, porque los identificadores se resuelven ahora como ID de clave antes que como alias. Los alias afectados se descartan, no se redirigen.
+
+Retirada de SQLite [#retirada-de-sqlite]
+
+Se elimina el motor de almacenamiento SQLite, y los motores `couch_db` y `dynamo_db` no están registrados en 4.0.0: sus constantes de configuración siguen existiendo, pero no seleccionan ningún motor. Los despliegues sobre cualquiera de ellos deben pasar a PostgreSQL y consolidar sus datos en los esquemas de `pki` antes de actualizar.
+
+Claves de CA heredadas en el KMS [#claves-de-ca-heredadas-en-el-kms]
+
+Los certificados de CA de tipo `MANAGED` o `IMPORTED_WITH_KEY` cuyas claves privadas son anteriores al servicio KMS tienen la clave guardada solo en el motor criptográfico, bajo el `subject_key_id` del certificado, sin registro en el KMS. La herramienta `ca-to-kms-migration` los registra:
+
+* El `key_id` es el `subject_key_id` del certificado (SHA-256 de la clave pública).
+* La herramienta es idempotente: las claves que ya están en el KMS se omiten, así que puede ejecutarse varias veces.
+* Los certificados que no pueden leerse, o que carecen de motor o de ID de clave de sujeto, se omiten con un aviso. Revisa los logs y resuelve los registros afectados.
+* Cuando certificados de CA que comparten un `subject_key_id` declaran `engine_id` en conflicto, la herramienta marca esa clave como fallida y sale con código `1`, lo que hace fallar un hook de preactualización de Helm. Resuelve el conflicto a mano antes de volver a ejecutarla.
+
+Con Helm, activa el hook para la actualización en el [paso 2](#paso-2-actualiza-el-archivo-de-values); sin Helm, ejecuta la herramienta a mano.
+
+APIs y configuración almacenada [#apis-y-configuración-almacenada]
+
+Webhooks del DMS [#webhooks-del-dms]
+
+Las configuraciones de webhook almacenadas se reescriben al formato actual y sus campos se renombran:
+
+| Campo en 3.8.0         | Campo en 4.0.0                               |
+| ---------------------- | -------------------------------------------- |
+| `validate_server_cert` | `insecure_skip_verify` (con el valor negado) |
+| `oidc`                 | `jwt_options`                                |
+| `apikey`               | `apikey_options`                             |
+| `mtls`                 | `mtls_options`                               |
+
+Cuando el certificado y la clave mTLS heredados son ambos PEM, se trasladan a `mtls_options.cert_content` y `mtls_options.key_content` y no requieren acción. Hay dos casos que sí la requieren.
+
+**Webhooks con referencias a archivos.** Una configuración mixta, con el certificado en PEM y la clave como ruta de archivo, se migra a `mtls_options.cert_file` y `mtls_options.key_file`. La entrega del webhook rechaza esos campos en cada llamada, sea cual sea el modo de autenticación configurado, de modo que todos los enrolamientos y reenrolamientos que llaman a ese webhook fallan hasta corregir la configuración. Si el webhook usa mTLS, vuelve a introducir el certificado y la clave como PEM, en Base64 o en texto plano; si no lo usa, elimina los campos de archivo sobrantes. Mientras tanto, las actualizaciones de solo metadatos siguen funcionando (`PUT` o `PATCH` sobre `/v1/dms/:id/metadata`). En una variante del mismo problema, una configuración almacenada con rutas de archivo dentro de `mtls_options.cert_content` o `mtls_options.key_content` hace fallar la validación de toda actualización completa de ajustes (`POST /v1/dms` o `PUT /v1/dms/:id`); los ajustes se sustituyen al completo, así que reenvía la configuración con el certificado y la clave como PEM.
+
+**Verificación del certificado del receptor.** Una configuración con `validate_server_cert: false` pasa a `insecure_skip_verify: true`, así que la verificación del receptor sigue sin realizarse hasta que ese campo se ponga a `false`. Corrígelo en cada configuración migrada: el canal de autorización del webhook transporta la API key o el bearer token, y saltarse la verificación expone esas credenciales a un atacante con posición de red. Mantén `insecure_skip_verify: true` solo si el certificado del receptor no es verificable de forma deliberada.
+
+Conjunto de confianza del reenrolamiento [#conjunto-de-confianza-del-reenrolamiento]
+
+El campo plano `reenrollment_settings.additional_validation_cas` se traslada al campo anidado `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`:
+
+```json
+{
+  "reenrollment_settings": {
+    "est_rfc7030_settings": {
+      "client_certificate_settings": {
+        "validation_cas": ["<CA_ID>"]
+      }
+    }
+  }
+}
+```
+
+El conjunto de confianza efectivo no cambia, porque el valor anidado nunca se consultó al validar reenrolamientos. Si la lista plana estaba ausente o era nula, pasa a ser una lista vacía.
+
+Lo que cambia es el tratamiento de las peticiones por API. Los cuerpos que aún contienen `additional_validation_cas` se aceptan, pero su valor se descarta en silencio porque los campos JSON desconocidos se ignoran, y las respuestas GET ya no lo incluyen. Por tanto, un cuerpo de actualización construido con el formato antiguo vacía `validation_cas` sin ningún error. Lee siempre el DMS antes de enviar una edición y reutiliza el formato que devuelve la API.
+
+Autenticación de reenrolamiento independiente [#autenticación-de-reenrolamiento-independiente]
+
+Los ajustes de autenticación del reenrolamiento se almacenan ahora de forma independiente de los de la autenticación inicial. No hay nada que migrar, pero lee ambos bloques antes de editar un DMS para no modificar uno creyendo que editas el otro. La consola expone editores independientes para ambos bloques; la [guía de DMS](/docs/platform/iot-fleets/enrollment/dms) describe sus campos, y también puedes editarlos mediante la [API DMS](/docs/api-reference/dms-manager).
+
+API de actualización del DMS [#api-de-actualización-del-dms]
+
+`PUT /v1/dms/:id` toma el ID del DMS de la URL y valida el cuerpo de la petición. Un ID en el cuerpo se ignora, así que actualiza los clientes que dependían de él.
+
+Valores de tipo de certificado [#valores-de-tipo-de-certificado]
+
+Los valores de tipo de certificado almacenados cambian de nombre: `IMPORTED` pasa a `IMPORTED_WITH_KEY` y `EXTERNAL` pasa a `IMPORTED_WITHOUT_KEY`. `MANAGED` no cambia. Adapta los consumidores que leen o comparan esos valores.
+
+Eventos de dispositivo [#eventos-de-dispositivo]
+
+El campo `events` ya no aparece en la representación del dispositivo. Apunta los consumidores a los nuevos endpoints:
+
+* `GET /v1/devices/:id/events` devuelve los eventos de un dispositivo.
+* `POST /v1/devices/:id/events` crea un evento.
+
+Cuando la cabecera `Accept` de la petición incluye `text/event-stream`, el endpoint de eventos emite por SSE con un keepalive cada 15 segundos, y responde `501` cuando SSE está deshabilitado en el despliegue. Cada instancia de Device Manager enlaza una cola AMQP duradera con el nombre de su ID de servicio, `device-manager-sse-<uuid>`. Las colas de instancias caídas o reemplazadas permanecen hasta que se eliminan, así que configura en el broker una política de expiración o limpieza.
+
+Guía de migración con Helm [#guía-de-migración-con-helm]
+
+La actualización sigue un orden fijo: preparar los datos y los values, ejecutar `helm upgrade` y después copiar los datos del KMS y la VA a los volúmenes nuevos. La copia debe hacerse después de la actualización, porque los StatefulSets y PVC de destino no existen antes. Si no estás actualizando una release existente, ve directamente a [Instalar con Helm](/docs/deployment/self-hosted/helm).
+
+Paso 1: Prepara [#paso-1-prepara]
+
+1. Haz una copia de seguridad verificable de PostgreSQL y programa una parada de servicio. La actualización mueve los datos de todos los servicios a `pki`.
+2. Si el despliegue usa SQLite, `couch_db` o `dynamo_db`, pásalo antes a PostgreSQL.
+3. Resuelve los IDs de CA duplicados y rellena `engine_id` en `kms_keys`, como se describe en [Consolidación en PostgreSQL](#consolidación-en-postgresql).
+4. Anota los nombres de tus PVC de almacenamiento local:
+
+```bash
+export NAMESPACE=lamassu   # tu namespace de 3.8.0
+export RELEASE=lamassu     # el nombre de tu release de Helm
+
+kubectl get pvc -n $NAMESPACE -l app.kubernetes.io/instance=$RELEASE
+# en una instalación 3.8.0 también puedes listar directamente los nombres fijos:
+kubectl get pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0
+```
+
+`helm upgrade` no toca ni borra los PVC antiguos, pero tras la actualización nada los referencia. Necesitas sus nombres para copiar los datos y para limpiar más tarde.
+
+Paso 2: Actualiza el archivo de values [#paso-2-actualiza-el-archivo-de-values]
+
+**Añade `services.authz`.** Configura el endpoint JWKS, las bases de datos y el principal de bootstrap:
+
+```yaml
+services:
+  authz:
+    jwkUrl: https://idp.example.com/realms/lamassu/protocol/openid-connect/certs
+    credentials:
+      pki:
+        database: pki
+      authz:
+        database: authz
+    bootstrap:
+      - principal_id: "oidc:pki-admin"
+        principal_name: "PKI Admin"
+        principal_type: "oidc"
+        policy_ids: [...]   # conserva los valores por defecto de values.yaml
+        auth_config:
+          claims:
+            - claim: realm_access.roles   # antes auth.authorization.rolesClaim
+              operator: contains
+              value: pki-admin            # antes auth.authorization.roles.admin
+```
+
+* `jwkUrl` se consulta desde el pod de `authz`, no desde el gateway, así que un Service del namespace de la release puede referenciarse por su nombre corto. El valor por defecto apunta a un Service de Keycloak llamado `auth-keycloak`; defínelo explícitamente si tu proveedor de identidad está en otro sitio.
+* `authz` es el almacenamiento propio del servicio de autorización para principales, permisos y políticas. `pki` es la base de datos que consulta el motor de autorización al evaluar las políticas sobre las entidades. Solo se lee el campo `database` de cada entrada; la conexión usa siempre los values globales `postgres.hostname`, `postgres.port`, `postgres.username` y `postgres.password`.
+* Si mantuviste los roles por defecto de 3.8.0 (`realm_access.roles` y `pki-admin`), el `services.authz.bootstrap` por defecto ya coincide con ellos.
+
+**Elimina los bloques de validación de tokens del gateway.** Quita `auth.oidc.apiGateway` y `auth.authorization` una vez que su configuración esté en `services.authz`:
+
+```yaml
+# ELIMINAR (3.8.0)
+auth:
+  oidc:
+    apiGateway:
+      jwks:
+        - name: oidc-authn
+          uri: https://idp.example.com/realms/lamassu/protocol/openid-connect/certs
+  authorization:
+    rolesClaim: realm_access.roles
+    roles:
+      admin: pki-admin
+```
+
+**Renombra `toolbox` a `connectivityTest`:**
+
+```yaml
+# ANTES (3.8.0)
+toolbox:
+  image: ghcr.io/lamassuiot/toolbox:2.2.0
+
+# AHORA (4.0.0)
+connectivityTest:
+  image: curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+```
+
+**Elimina las sobrescrituras de identidad por servicio** `services.kms.securityContext.runAsGroup` y `services.authz.securityContext.runAsUser`/`runAsGroup`.
+
+**Convierte `services.connectors` en un mapa** indexado por ID de conector, con el `type` y la `image` de cada entrada:
+
+```yaml
+services:
+  connectors:
+    aws.myconnector:
+      type: awsiot
+      image: ghcr.io/lamassuiot/lamassu-aws-connector:dev-v4
+```
+
+**Revisa AMQP.** Si defines `amqp.tls: true`, define también `amqp.port` con el listener TLS del broker (habitualmente `5671`), o pon `amqp.tls: false` para seguir en texto plano.
+
+**Activa la migración de CA a KMS** si tus claves de CA son anteriores al KMS:
+
+```yaml
+migrations:
+  caToKms:
+    enabled: true
+```
+
+**Revisa el resto de values:** sobrescrituras que fijaban `services.ui.port` a `80`, el antiguo bloque `probes:`, el issuer de TLS, y `affinity` y `topologySpreadConstraints` explícitos donde tu clúster los necesite. [Values renombrados y reestructurados](#values-renombrados-y-reestructurados) describe cada uno.
+
+Ejecuta `helm lint` con los values nuevos antes de actualizar; el schema estricto informa de cualquier clave que siga siendo desconocida.
+
+Paso 3: Ejecuta la actualización [#paso-3-ejecuta-la-actualización]
+
+```bash
+helm upgrade --install "$RELEASE" lamassu/lamassu \
+  --namespace $NAMESPACE \
+  --values values.yaml \
+  --wait
+```
+
+Helm ejecuta los hooks de preactualización —la migración de CA a KMS si está activada y el job de base de datos— antes de aplicar ninguna carga, así que los servicios nunca arrancan contra una base de datos sin preparar. Si la validación rechaza values desconocidos, corrige el archivo y vuelve a ejecutar.
+
+Si el despliegue usa almacenamiento local en el KMS o la VA, esos pods fallan hasta que completes el paso 4, así que `--wait` no puede terminar bien: Helm espera a que estén listos, agota el tiempo, sale con error y marca la release como `failed`. Para entonces los hooks ya se han ejecutado y se han aplicado todos los manifiestos, incluidos los nuevos StatefulSets y sus PVC. Sin `--atomic`, Helm no revierte nada. Continúa con el paso 4 y después vuelve a lanzar el mismo comando `helm upgrade` para que termine y Helm registre la release como `deployed`. Los dos hooks son idempotentes, así que es seguro volver a ejecutarlos.
+
+Paso 4: Migra los datos del KMS y la VA [#paso-4-migra-los-datos-del-kms-y-la-va]
+
+Omite este paso si `services.kms.cryptoEngines` nunca usó un motor `filesystem` y `services.va.fileStore.type` nunca fue `local`.
+
+1. **Localiza los nuevos StatefulSets y PVC.** Sus nombres dependen del nombre de la release y de cualquier `nameOverride` o `fullnameOverride`; el nombre del PVC es `<volumeClaimTemplate>-<nombre del StatefulSet>-0`:
+
+```bash
+KMS_STS=$(kubectl get statefulset -n "$NAMESPACE" \
+  -l "app.kubernetes.io/instance=$RELEASE,app.kubernetes.io/component=kms" \
+  -o jsonpath='{.items[0].metadata.name}')
+VA_STS=$(kubectl get statefulset -n "$NAMESPACE" \
+  -l "app.kubernetes.io/instance=$RELEASE,app.kubernetes.io/component=va" \
+  -o jsonpath='{.items[0].metadata.name}')
+
+KMS_PVC="golang-engine-storage-${KMS_STS}-0"
+VA_PVC="local-crl-file-storage-${VA_STS}-0"
+
+# Falla si una búsqueda vino vacía o una PVC nueva es la antigua.
+# El punto 3 la vuelve a llamar antes de crear el pod auxiliar.
+claims_ok() {
+  local pair sts new old
+  for pair in "$KMS_STS:$KMS_PVC:golang-engine-storage-kms-0" \
+              "$VA_STS:$VA_PVC:local-crl-file-storage-va-0"; do
+    IFS=: read -r sts new old <<< "$pair"
+    if [ -z "$sts" ] || [ "$new" = "$old" ]; then
+      echo "ABORT: new claim '$new' is missing or equals the 3.8.0 claim '$old'" >&2
+      return 1
+    fi
+  done
+}
+
+claims_ok && kubectl get pvc -n "$NAMESPACE" \
+  golang-engine-storage-kms-0 "$KMS_PVC" \
+  local-crl-file-storage-va-0 "$VA_PVC"
+```
+
+Con la release `lamassu` y el nombre de chart por defecto, los nuevos PVC son `golang-engine-storage-lamassu-kms-0` y `local-crl-file-storage-lamassu-va-0`; con la release `prod` son `golang-engine-storage-prod-lamassu-kms-0` y `local-crl-file-storage-prod-lamassu-va-0`. Comprueba que existen los PVC antiguos y nuevos antes de continuar. Si `claims_ok` imprime `ABORT`, el bloque se detiene antes de listar las PVC: o falló la búsqueda de un StatefulSet, o una PVC nueva resuelve a la PVC de 3.8.0. En el segundo caso la copia se verificaría contra sí misma y la limpieza final borraría el volumen en uso. El chart siempre añade `-kms` y `-va` al nombre con ámbito de release, así que una colisión indica que las PVC no son las que esta guía espera; investiga antes de seguir. El punto 3 repite la comprobación y no crea el pod auxiliar, así que nada toca los volúmenes. La comprobación devuelve un error en lugar de llamar a `exit`, que cerraría tu shell y perdería las variables definidas hasta ahora. Si solo migras uno de los dos servicios, quita las PVC del otro de los comandos siguientes.
+
+2. **Anota el número de réplicas, reduce a cero los nuevos StatefulSets y espera a que terminen todos los pods que usan las PVC**, para que nada escriba en ninguno de los volúmenes mientras copias. Helm elimina los StatefulSets `kms` y `va` de 3.8.0 durante la actualización, pero sus pods `kms-0` y `va-0` pueden seguir terminando y reteniendo las PVC antiguas. Mientras sigan en marcha, el pod auxiliar no puede montar las PVC o copia un volumen en el que aún se escribe. El `wait` termina al instante para los pods que ya no existen:
+
+```bash
+KMS_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$KMS_STS" -o jsonpath='{.spec.replicas}')
+VA_REPLICAS=$(kubectl get statefulset -n "$NAMESPACE" "$VA_STS" -o jsonpath='{.spec.replicas}')
+
+kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" "$VA_STS" --replicas=0
+
+kubectl wait -n "$NAMESPACE" --for=delete --timeout=300s \
+  pod/kms-0 pod/va-0 "pod/${KMS_STS}-0" "pod/${VA_STS}-0"
+```
+
+3. **Arranca un pod auxiliar efímero** que monte las cuatro PVC. Se ejecuta como root para poder cambiar la propiedad de los archivos, así que fija su imagen por digest y no montes el token de la service account:
+
+```bash
+claims_ok && cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-migrate-helper
+  namespace: $NAMESPACE
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  containers:
+    - name: migrate
+      image: docker.io/library/alpine@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc # 3.20
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - {name: old-kms, mountPath: /old/kms}
+        - {name: new-kms, mountPath: /new/kms}
+        - {name: old-va,  mountPath: /old/va}
+        - {name: new-va,  mountPath: /new/va}
+  volumes:
+    - {name: old-kms, persistentVolumeClaim: {claimName: golang-engine-storage-kms-0}}
+    - {name: new-kms, persistentVolumeClaim: {claimName: $KMS_PVC}}
+    - {name: old-va,  persistentVolumeClaim: {claimName: local-crl-file-storage-va-0}}
+    - {name: new-va,  persistentVolumeClaim: {claimName: $VA_PVC}}
+EOF
+
+kubectl wait -n $NAMESPACE --for=condition=Ready pod/pvc-migrate-helper --timeout=60s
+```
+
+4. **Inspecciona antes de escribir** para no machacar datos que los pods nuevos pudieran haber escrito ya:
+
+```bash
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c 'find /new/kms /new/va -type f'
+```
+
+Un resultado vacío es lo habitual: el pod propio de un StatefulSet rara vez llega a escribir nada cuando le faltan sus datos. Si la salida no está vacía, anota los archivos y confirma con el responsable del servicio que se pueden descartar antes de copiar; no superpongas los datos de 3.8.0 sobre un almacén desconocido.
+
+5. **Copia los datos, ajusta la propiedad y verifica la copia.** El segundo comando debe imprimir `copy verified`; cualquier salida de `diff` indica que la copia está incompleta, así que no continúes:
+
+```bash
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
+  cp -a /old/kms/. /new/kms/ &&
+  cp -a /old/va/. /new/va/ &&
+  chown -R 65532:65532 /new/kms /new/va
+'
+
+kubectl exec -n $NAMESPACE pvc-migrate-helper -- sh -c '
+  diff -r /old/kms /new/kms &&
+  diff -r /old/va /new/va &&
+  echo "copy verified"
+'
+```
+
+El `chown` es obligatorio aunque los archivos antiguos ya parezcan pertenecer a un usuario sin root, porque 4.0.0 exige exactamente `65532:65532` y no recurre a lo que declare la imagen.
+
+6. **Elimina el auxiliar y restaura el número de réplicas anotado:**
+
+```bash
+kubectl delete pod -n $NAMESPACE pvc-migrate-helper
+kubectl scale statefulset -n "$NAMESPACE" "$KMS_STS" --replicas="$KMS_REPLICAS"
+kubectl scale statefulset -n "$NAMESPACE" "$VA_STS" --replicas="$VA_REPLICAS"
+```
+
+7. **Vuelve a lanzar el comando `helm upgrade` del paso 3.** Los pods del KMS y la VA arrancan ahora con los datos copiados, así que `--wait` termina bien y la release pasa de `failed` a `deployed`.
+
+Paso 5: Elimina los values de migración puntual [#paso-5-elimina-los-values-de-migración-puntual]
+
+Cuando la actualización que realizó la migración de CA a KMS termine correctamente, quita `migrations.caToKms.enabled` de tus values (su valor por defecto es `false`). El hook lee el ConfigMap heredado `kms-config` de 3.8.0 mientras existe y, cuando desaparece, recurre al ConfigMap con ámbito de release `<release>-lamassu-kms-config`.
+
+Después recorre el [checklist de validación](#checklist-de-validación). Conserva los PVC antiguos hasta que lo superes.
+
+Despliegues sin Helm [#despliegues-sin-helm]
+
+Sin el job de base de datos del chart, ninguna herramienta mueve datos entre bases de datos: las herramientas de migración solo aplican migraciones sobre un esquema que ya existe. Traslada tú cada base de datos por servicio a su esquema de `pki`, conservando estructura, índices, restricciones, datos e historial de migraciones, con las escrituras detenidas y una copia de seguridad verificada.
+
+Para aplicar las migraciones a mano, `goose-lamassu` debe ejecutarse contra la base `pki` con `search_path=<esquema>` en la cadena de conexión. El binario solo valida `search_path`, no el nombre de la base de datos, así que comprueba `dbname=pki` antes de ejecutarlo, y repítelo para `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` y `alerts`:
+
+```bash
+./goose-lamassu "host=$DB_HOST port=5432 user=$DB_USER dbname=pki search_path=kms" up
+```
+
+Ejecuta `ca-to-kms-migration` primero con `--dry-run`, que informa sin escribir en el almacenamiento del KMS, y después de forma real:
+
+```bash
+LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration --dry-run
+LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration
+```
+
+Apunta la configuración `storage` de la herramienta a la base `pki`, donde los datos de CA y del KMS viven ahora en los esquemas `ca` y `kms`. Las opciones de la herramienta se describen en `backend/cmd/ca-to-kms-migration/README.md`, en el repositorio `lamassuiot`.
+
+<Callout type="warn" title="Los README de las herramientas están desactualizados">
+  El README de `goose-lamassu` aún muestra ejemplos por base de datos (`dbname=ca`, `dbname=kms`) y afirma que la herramienta valida el nombre de la base de datos, y el README de `ca-to-kms-migration` sigue describiendo el modelo de dos bases anterior a 4.0.0. Sigue la forma con `dbname=pki` de esta página en lugar de sus ejemplos.
+</Callout>
+
+Solución de problemas [#solución-de-problemas]
+
+* **Los pods del KMS o la VA fallan con `no such file or directory` o `code=NotFound` justo después de actualizar.** Los pods están enlazados a los PVC nuevos y vacíos y la migración de datos aún no se ha hecho, o se copió en el PVC equivocado. Sigue el [paso 4](#paso-4-migra-los-datos-del-kms-y-la-va) y comprueba que existen las cuatro PVC.
+* **`helm upgrade --wait` agota el tiempo y `helm status` muestra la release como `failed`.** Con almacenamiento local en el KMS o la VA es lo esperado en la primera ejecución: los nuevos pods no pueden estar listos hasta que se copien sus datos. Los hooks se ejecutaron y los manifiestos y PVC se aplicaron, así que completa el [paso 4](#paso-4-migra-los-datos-del-kms-y-la-va) y vuelve a lanzar el mismo comando `helm upgrade`. Si otros pods tampoco están listos, revisa sus logs, porque falla algo más.
+* **El pod auxiliar se queda en `Pending` o `ContainerCreating` y `kubectl wait` agota el tiempo.** Otro pod sigue reteniendo alguna de las PVC; en almacenamiento de bloque, `kubectl describe pod pvc-migrate-helper` muestra un `Multi-Attach error`. Comprueba con `kubectl get pods -n $NAMESPACE` que `kms-0`, `va-0` y los nuevos pods del KMS y la VA han desaparecido, y vuelve a ejecutar el wait.
+* **`helm upgrade` falla con un error de validación por clave desconocida.** Elimina o renombra los values heredados —normalmente `toolbox`, `auth.oidc.apiGateway` o `auth.authorization`—, porque el schema estricto rechaza las claves que no conoce.
+* **La actualización falla en el job de base de datos.** El rol de PostgreSQL no puede crear bases de datos o esquemas, o una migración de esquema abortó por IDs de CA duplicados o por valores de `engine_id` vacíos. Revisa los logs del job, corrige los permisos o los datos y vuelve a ejecutar la actualización.
+* **La actualización falla en el hook de CA a KMS.** Hay certificados de CA que comparten un `subject_key_id` y declaran `engine_id` en conflicto. Resuelve el conflicto y vuelve a ejecutar.
+* **Nadie puede iniciar sesión tras la actualización.** Comprueba que `services.authz.jwkUrl` es accesible desde el pod de `authz`, que `services.authz.bootstrap` coincide con un rol que tu proveedor OIDC asigna realmente y que el job de base de datos terminó.
+
+Checklist de validación [#checklist-de-validación]
+
+Tras la actualización, comprueba en este orden:
+
+1. **Bases de datos.** Cada servicio lee la base `pki` con su propio esquema, los datos de `authz` y `wfx` son accesibles y el estado de las migraciones está registrado por esquema, incluidas las migraciones del ID único de CA y de la clave compuesta del KMS.
+2. **KMS y VA arrancan sin errores.** Sus logs no muestran errores `no such file or directory` ni `code=NotFound`.
+3. **Las claves existentes del KMS funcionan.** Emite un certificado desde una CA que ya existía antes de la actualización. Ninguna de las otras comprobaciones lee una clave del KMS, así que esta es la única que demuestra que el material de claves se ha copiado.
+4. **Las CRLs existentes se sirven.** `GET /crl/<ca-ski>` sobre la VA devuelve una CRL emitida anteriormente, y se emiten CRLs nuevas.
+5. **Claves de CA heredadas.** Si se ejecutó la migración de CA a KMS, revisa su informe y sus avisos y confirma que las claves esperadas aparecen en el KMS.
+6. **Conectividad.** `helm test "$RELEASE" -n $NAMESPACE --logs` pasa; el hook comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y la respuesta de la UI.
+7. **Autorización.** Inicia sesión con el principal de bootstrap y confirma que la administración funciona, comprueba que una identidad sin permisos recibe `403` y revisa los permisos de clientes e integraciones.
+8. **AMQP.** El backend se conecta al broker con la configuración TLS esperada, y la política de limpieza de las colas de SSE está en marcha.
+9. **Eventos de dispositivo.** `GET /v1/devices/:id/events` devuelve los eventos históricos de un dispositivo que los tenía.
+10. **Webhooks sin campos de archivo.** En cada DMS que usa webhook en enrolamiento o reenrolamiento, el bloque `config` incluye `insecure_skip_verify` y el bloque de opciones esperado (`apikey_options`, `jwt_options` o `mtls_options`), con el certificado y la clave en PEM y sin `cert_file` ni `key_file`.
+11. **Verificación del receptor.** `insecure_skip_verify` es `false`, salvo que el certificado del receptor no sea verificable de forma intencionada.
+12. **Entrega de webhooks.** Un enrolamiento o reenrolamiento a través de cada webhook migrado completa su llamada de autorización.
+13. **Conjunto de confianza.** `est_rfc7030_settings.client_certificate_settings.validation_cas` contiene las CAs esperadas, en particular las de la CA antigua durante los solapamientos de rotación.
+14. **Clientes de la API.** Los scripts y consolas ya no usan el formato antiguo del DMS (`additional_validation_cas` plano, o los campos heredados `mtls`, `apikey` y `oidc`), envían las actualizaciones del DMS con el ID en la URL y comparan con los nuevos valores de `type` del certificado.
+
+Elimina los volúmenes antiguos [#elimina-los-volúmenes-antiguos]
+
+Solo cuando pasen todas las comprobaciones, elimina los volúmenes huérfanos de 3.8.0 para recuperar almacenamiento. El borrado es irreversible y el volumen antiguo del KMS puede contener la última copia del material de claves de tus CA, así que antes haz un `VolumeSnapshot` o una copia de seguridad de ambos PVC antiguos y consérvala hasta que confíes en que el despliegue actualizado funciona correctamente. Son los nombres fijos de 3.8.0 que anotaste en el paso 1; antes de borrarlos, confirma que ningún pod en marcha los monta, por ejemplo con `kubectl describe pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0`, donde `Used By` debe ser `<none>`:
+
+```bash
+kubectl delete pvc -n $NAMESPACE golang-engine-storage-kms-0 local-crl-file-storage-va-0
+```
+
+Las bases de datos por servicio de 3.8.0 tampoco se usan ya. Elimínalas solo cuando pasen las mismas comprobaciones y tengas verificada la copia de seguridad de PostgreSQL.
+
+<Cards>
+  <Card title="Instalar con Helm" description="Prepara las dependencias, configura los values e instala un despliegue controlado." href="/docs/deployment/self-hosted/helm" />
+
+  <Card title="Control de acceso" description="Principales, políticas y el primer administrador." href="/docs/platform/administration/access-control" />
+
+  <Card title="Configurar un DMS" description="Ajustes de enrolamiento, reenrolamiento y webhooks." href="/docs/platform/iot-fleets/enrollment/dms" />
+</Cards>

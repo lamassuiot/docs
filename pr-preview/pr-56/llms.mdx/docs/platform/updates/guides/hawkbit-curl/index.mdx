@@ -1,0 +1,467 @@
+# Update flow with curl, hawkBit backend (/docs/pr-preview/pr-56/platform/updates/guides/hawkbit-curl)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  The same update as in the [native guide](/docs/platform/updates/guides/native-curl), against the service in hawkBit mode. The management requests go to Lamassu Updates. The device side is a different protocol: devices poll hawkBit's DDI API, not this service and not WFX. The commands were run against a real hawkBit 1.1.0, and the responses are real, trimmed where long. Examples that say they were not run were checked against the code only.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The differences from native mode, in short:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  |                            | Native                                                                 | hawkBit                                                               |
+  | -------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
+  | Build                      | Upload artifacts and a sw-description to the pack, then build the pack | Build a **module** in the catalog first, then create the pack from it |
+  | Pack after creation        | `draft`                                                                | Already `built`                                                       |
+  | Who tells the device       | WFX job                                                                | hawkBit action, read over DDI                                         |
+  | Device reports to          | WFX                                                                    | hawkBit (DDI feedback)                                                |
+  | Next batch, with `auto` on | The service, from WFX events                                           | hawkBit, from its rollout groups                                      |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Before you begin [#before-you-begin]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * The [stack is running](/docs/platform/updates/hawkbit-mode) in hawkBit mode: this service, its Postgres, hawkBit and the Lamassu device manager.
+  * A device group in Lamassu with devices in it. This guide uses `fleet-a` with `dev-001` to `dev-004`.
+  * `curl` and `jq`.
+  * A SWU builder configured (`swugenerator_path`), to build a `swu-build` module. Without one, `POST .../build` on such a module answers `501`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  API=http://localhost:10090/updates/v1
+  HB=http://localhost:8090                                  # hawkBit
+  HB_AUTH="admin:${HAWKBIT_ADMIN_PASSWORD:-admin}"          # hawkBit Management API login
+  GROUP=fleet-a
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="info" title="Ports and gateways">
+    `config-hawkbit.yml` in the repository serves the API on port `10090`, like the native stack, so run one backend at a time on that port. `config-hawkbit-demo.yml` serves it on `10091`, which the repository's dashboard development setup points at for the hawkBit backend. Set `API` to wherever your instance listens. Through a Lamassu gateway the API is usually `https://lamassu.example.com/api/updates/v1` and each call needs your gateway credential, for example `-H "Authorization: Bearer $TOKEN"`.
+  </Callout>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  1. Check the backend [#1-check-the-backend]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s $API/capabilities | jq -c '{backend, unsupported}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"backend":"hawkbit","unsupported":["per_device_encryption","workflows","launch_strategy_update","launch_complete","launch_device_assignment","push_events","prebuilt_deliverable"]}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `artifact_encryption`, `software_module_composition`, `standalone_software_modules` and `software_module_replace` appear in that list too if the build settings or hawkBit's module types are missing. See [Capabilities](/docs/platform/updates/reference/capabilities).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  2. Create a module in the catalog [#2-create-a-module-in-the-catalog]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A hawkBit distribution set can only link **built** modules, so the module comes first. `delivery_intent` says how it ships: `swu-build` builds a `.swu` from your files and a sw-description. See [hawkBit mode](/docs/platform/updates/hawkbit-mode) for the other intents (`swu-prebuilt`, `raw`).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  MID=$(curl -s -X POST $API/softwaremodules -H 'Content-Type: application/json' \
+    -d '{"type":"os","name":"water-panel","version":"1.0.0","delivery_intent":"swu-build"}' | jq -r .id)
+  curl -s $API/softwaremodules/by-id/$MID | jq -c '{id,key,built,delivery_intent}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"id":"1","key":"os:water-panel","built":false,"delivery_intent":"swu-build"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `type` is `os` or `application`, and `type`, `name` and `version` are required. Without a `delivery_intent` the module is `undecided`, which accepts files but cannot be built or linked until you choose one with `PUT /softwaremodules/by-id/$MID`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  3. Upload the file and the sw-description [#3-upload-the-file-and-the-sw-description]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Use the same `index.html` and `sw-description` as in the [native guide](/docs/platform/updates/guides/native-curl).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/softwaremodules/by-id/$MID/artifacts -F file=@index.html
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"id":"hb:1:1","name":"water-panel","version":"1.0.0","filename":"index.html","checksum":"c400a4f1...","size":52}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/softwaremodules/by-id/$MID/descriptor -F file=@sw-description | jq -c '{id,built,artifacts: [.artifacts[].filename]}'
+  # {"id":"1","built":false,"artifacts":["index.html"]}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A `swu-build` module refuses a finished `.swu` as input, and a `swu-prebuilt` module takes exactly one `.swu`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  4. Build the module [#4-build-the-module]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/softwaremodules/by-id/$MID/build -H 'Content-Type: application/json' -d '{}'
+  # {"msg":"Software module built"}
+
+  curl -s $API/softwaremodules/by-id/$MID | jq -c '{built, locked, files: [.artifacts[] | {filename,size}]}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"built":true,"locked":false,"files":[{"filename":"water-panel.swu","size":1024}]}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Building replaced the module's input files with the finished `.swu`. The build body is optional. To encrypt or sign, send `user`, `encryption_key_name`, `encryption_alg_name`, `signature_key_id`, `signature_alg_name` and `signature_certificate`, as in the [signing and encryption](/docs/platform/updates/signing-and-encryption) page. A module can be built once: to change it, release a new version of the module.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  5. Create the pack from the built module [#5-create-the-pack-from-the-built-module]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/distribution-sets -H 'Content-Type: application/json' \
+    -d "{\"name\":\"water-panel\",\"version\":\"1.0.0\",\"group_id\":\"fleet-a\",\"type\":\"rawfile\",\"packaging\":\"swu\",\"modules\":[{\"source_module_id\":\"$MID\"}]}" \
+    | jq -c '{id,name,version,status}'
+  # {"id":"1","name":"water-panel","version":"1.0.0","status":"built"}
+
+  curl -s $API/groups/$GROUP/distribution-sets | jq -r '.list[0].uri'
+  # http://localhost:8090/DEFAULT/controller/v1/{controllerId}/softwaremodules/1/artifacts/water-panel.swu
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The pack is built from the start. Its `uri` is a hawkBit download address that devices resolve themselves. In hawkBit mode `modules` takes only `source_module_id` entries, and each module must be built and compatible with the pack's packaging. Several entries make a multi-module pack, and then `GET .../swu/download` answers `400`: download each module's deliverable with `GET .../modules/:moduleKey/artifact/download`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  6. Preview the launch, then create it [#6-preview-the-launch-then-create-it]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A group's devices only exist in hawkBit once the service has registered them. The service does that whenever it lists the group's devices, which a launch, a dry run, a job listing or a compliance read all do. The canary check runs **before** that, so on the first launch of a group that has not been listed yet, a `test_device_id` fails:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST "$API/groups/$GROUP/launch?dry_run=true" -H 'Content-Type: application/json' \
+    -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2,"test_device_id":"dev-001"}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"err":"Failed to create launch history: test device dev-001 cannot act as this group's canary: device dev-001 does not exist"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Run the dry run without a canary first. It registers the group's devices in hawkBit as targets and tags them `group:fleet-a`:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST "$API/groups/$GROUP/launch?dry_run=true" -H 'Content-Type: application/json' \
+    -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2}' | jq -c .
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"never_seen_devices":["dev-001","dev-002","dev-003","dev-004"],"precondition_failures":[],"qualifying_devices":["dev-001","dev-002","dev-003","dev-004"],"superseded_devices":null}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `never_seen_devices` lists targets that have not contacted hawkBit yet. A rollout group cannot finish while its devices never poll, so check this list. `superseded_devices` lists devices that already have an update in flight: creating the launch **cancels** those actions, because hawkBit replaces a target's unfinished actions with the new one. Now create the launch with the canary:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  LAUNCH=$(curl -s -X POST $API/groups/$GROUP/launch -H 'Content-Type: application/json' \
+    -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2,"test_device_id":"dev-001","name":"water-panel 1.0.0 wave 1"}' \
+    | jq -r .launch_id)
+  echo $LAUNCH     # 1: the id of the hawkBit rollout
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  `workflow_type` has no WFX meaning here: `phased` makes a hawkBit `soft` action (the device decides when to install) and anything else a `forced` one. Define a helper to follow the launch:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  status() {
+    curl -s $API/groups/$GROUP/launch | jq -c --arg id "$LAUNCH" \
+      '.list[] | select(.id==$id) | {status,pending_count,active_count,completed_count,failed_count}'
+  }
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  To start the rollout later, add `scheduled_at` (RFC 3339) to the create body. hawkBit's own scheduler then starts it, and a `rollout` call before that time leaves the schedule alone. Not run here.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  7. Start the rollout [#7-start-the-rollout]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/rollout
+  # {"message":"Launch history executed successfully"}
+  status
+  # {"status":"running","pending_count":3,"active_count":1,"completed_count":0,"failed_count":0}
+
+  curl -s -u "$HB_AUTH" $HB/rest/v1/rollouts | jq -c '.content[] | {id,name,status,totalTargets,type}'
+  # {"id":1,"name":"water-panel 1.0.0 wave 1","status":"running","totalTargets":4,"type":"forced"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The service started a hawkBit rollout: the canary in the first group and the rest after it.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  8. Play the device (DDI) [#8-play-the-device-ddi]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A real device runs SWUpdate's `suricatta`, which does this itself. These are the requests it makes.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  First, devices must authenticate. hawkBit's default is to refuse them. Enable security tokens for the tenant once, and read the target's token:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -u "$HB_AUTH" -X PUT $HB/rest/v1/system/configs/authentication.targettoken.enabled \
+    -H 'Content-Type: application/json' -d '{"value":true}'
+  TOKEN=$(curl -s -u "$HB_AUTH" $HB/rest/v1/targets/dev-001 | jq -r .securityToken)
+  AUTH="Authorization: TargetToken $TOKEN"
+  DDI=$HB/DEFAULT/controller/v1
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  This is the local setup. In a deployment where devices reach hawkBit through the Lamassu gateway, `hawkbit.ddi_url` is the gateway path (for example `https://lamassu.example.com/api/hawkbit-ddi`) and devices authenticate as the gateway requires, typically with their client certificate. See [Connect a device](/docs/platform/updates/guides/connect-a-device).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Poll. When there is work, the answer links to a `deploymentBase`:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -H "$AUTH" $DDI/dev-001 | jq
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {
+    "config": {"polling": {"sleep": "00:05:00"}},
+    "_links": {
+      "deploymentBase": {"href": "http://localhost:8090/DEFAULT/controller/v1/dev-001/deploymentBase/1?c=411629670"},
+      "configData": {"href": "http://localhost:8090/DEFAULT/controller/v1/dev-001/configData"}
+    }
+  }
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Read the deployment and download its artifact:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  DEP=$(curl -s -H "$AUTH" $DDI/dev-001 | jq -r '._links.deploymentBase.href')
+  curl -s -H "$AUTH" "$DEP" | jq -c '{action: .id, download: .deployment.download, update: .deployment.update,
+    chunks: [.deployment.chunks[] | {part,name,version, artifacts: [.artifacts[] | {filename,size}]}]}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"action":"1","download":"forced","update":"forced","chunks":[{"part":"os","name":"water-panel","version":"1.0.0","artifacts":[{"filename":"water-panel.swu","size":1024}]}]}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  ACTION=$(curl -s -H "$AUTH" "$DEP" | jq -r .id)
+  curl -s -H "$AUTH" -o water.swu -w '%{http_code} %{size_download} bytes\n' \
+    $DDI/dev-001/softwaremodules/1/artifacts/water-panel.swu
+  # 200 1024 bytes
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  When the service publishes the device artifact URL (the `ddi_url` path), it serves that same route itself, for modules in the device's assigned or installed set only, and with S3 presigning enabled it answers `302` to a short-lived signed URL. A device does not need to know the difference: it follows the redirect.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Report progress and the result. `closed` with `finished: success` is the end:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -H "$AUTH" -X POST $DDI/dev-001/deploymentBase/$ACTION/feedback -H 'Content-Type: application/json' \
+    -d '{"status":{"execution":"proceeding","result":{"finished":"none"},"details":["installing"]}}'
+  curl -s -H "$AUTH" -X POST $DDI/dev-001/deploymentBase/$ACTION/feedback -H 'Content-Type: application/json' \
+    -d '{"status":{"execution":"closed","result":{"finished":"success"},"details":["installed"]}}'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The service reads hawkBit when you ask, so the launch is up to date:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  status
+  # {"status":"running","pending_count":3,"active_count":0,"completed_count":1,"failed_count":0}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  To report a failure, send `"finished":"failure"` in the `closed` feedback.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  9. Release the next batches [#9-release-the-next-batches]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  With `auto` off, hawkBit pauses after each group. Each `rollout` call releases the next one:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/rollout
+  curl -s $API/launch/$LAUNCH/jobs | jq -r '.list[] | "\(.clientId) \(.status.state)"'
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```text
+  dev-001 ACTIVATED
+  dev-002 DOWNLOADING
+  dev-003 DOWNLOADING
+  dev-004 CREATED
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Here a hawkBit action is shown as a workflow state: a scheduled action is `CREATED`, a running one `DOWNLOADING` (hawkBit does not report finer steps), a finished one (or one that finished with a warning) `ACTIVATED`, and a failed, cancelled or cancelling one `TERMINATED`. Repeat step 8 for `dev-002` and `dev-003` (the token comes from each target), then call `rollout` once more for `dev-004`. When every action is finished:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```json
+  {"status":"completed","pending_count":0,"active_count":0,"completed_count":4,"failed_count":0}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  hawkBit decides when a batch is finished. After the last device of a batch reports, hawkBit pauses the rollout, and for a moment its group still reads `running`. The service cannot tell that pause from one an operator made, so a `rollout` call in that window answers `400` with `rollout 1 is paused; resume it first`. Call `resume` and hawkBit releases the next batch itself:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/resume
+  # {"message":"Launch resumed","status":"running"}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  10. Check the result [#10-check-the-result]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  curl -s $API/devices/dev-001/distribution-set-inventory | jq -c '.list[] | {distribution_set_name,version,installed_at,artifacts: [.artifacts[].artifact_name]}'
+  # {"distribution_set_name":"water-panel","version":"1.0.0","installed_at":"2026-10-21T07:39:23.345+02:00","artifacts":["water-panel.swu"]}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Things that behave differently [#things-that-behave-differently]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * **Automatic rollout.** With `auto: true`, hawkBit advances the groups itself once `approval_threshold` is met. The service does not run an event consumer in this mode. The thresholds are set on every rollout group, and hawkBit evaluates both percentages **per group**, not against all devices as native does. An unset or `0` threshold becomes 100, so an unset `error_threshold` never trips. The canary group always needs 100%. They apply with `auto` off too.
+  * **A tripped error threshold.** hawkBit then pauses the rollout, and the service reports the launch as `cancelled`. `resume` and `rollout` both answer `400` for it.
+  * **Pause and resume.** `pause` and `resume` map to hawkBit's rollout pause and resume, but only a pause an operator made can be resumed. hawkBit already holds the rollout between groups when `auto` is off, so `pause` then answers `400` ("Rollout can only be paused in state running but current state is paused") and `resume` answers `400` ("not paused; use Execute to release the next batch"). Use `rollout` to release the next group.
+  * **Strategy read-back.** The strategy shown for a launch is derived from the hawkBit rollout's groups, not stored. A launch created with a fixed batch of 2 for 4 devices reads back as `percentage` 50.
+  * **Static membership.** A rollout is built from the devices of the group when the launch is created. Devices added to the group later are not picked up (`launch_device_assignment` is unsupported).
+  * **Not available.** Per-device encryption, custom workflows (`GET /workflows` returns an empty list), editing a running strategy, marking a launch complete, pushed job events (progress is polled), set-level prebuilt upload, and building a pack directly. `POST .../swu` answers `501`:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```text
+  {"err":"Failed to execute update pack: operation not supported by the active updates backend: hawkbit mode: a distribution set is not built directly — build each software module in the Software Modules catalog, then link the built modules into the ..."}
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Troubleshooting [#troubleshooting]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Symptom                                                                               | Cause and fix                                                                                                             |
+  | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+  | `501` building a module: no SWU builder                                               | `swugenerator_path` is not configured. Configure it, or upload a prebuilt `.swu` with intent `swu-prebuilt`               |
+  | `501` building a module: no SymKMS or no KMS endpoint                                 | Encryption needs `symkms_endpoint` and signing needs `kms_endpoint`. Build without those fields, or configure them        |
+  | `400 ... is not built` creating a pack                                                | A module linked into a pack must be built first. Build it in the catalog                                                  |
+  | `400 ... incompatible with distribution set packaging`                                | A `raw` module cannot go into a `swu` pack, and a `swu-prebuilt` module cannot go into a `non-swu` pack                   |
+  | `400 ... frozen` changing a module                                                    | A module linked to a pack is frozen. Edit and build it in the catalog, then link it again                                 |
+  | `400 ... already built`                                                               | A module is built once. Release a new version of the module                                                               |
+  | `409 ... being built or changed by another request`                                   | Another request holds the module. Retry when it finishes                                                                  |
+  | Creating a module answers `400` mentioning that hawkBit reserves the name and version | hawkBit keeps the name and version of a module that was assigned to a device, even after it is deleted. Use a new version |
+  | The canary fails with `device ... does not exist`                                     | The group's devices are not in hawkBit yet. Run a dry run without `test_device_id` first                                  |
+  | A launch never advances                                                               | Check `never_seen_devices`: a device that never polls blocks its rollout group                                            |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Next steps [#next-steps]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * [hawkBit mode](/docs/platform/updates/hawkbit-mode) for modules, delivery intents and what lives where
+  * [Connect a device](/docs/platform/updates/guides/connect-a-device) for the device-side setup
+  * [API reference](/docs/platform/updates/reference/api)
+  * [Troubleshooting](/docs/platform/updates/troubleshooting)
+</div>

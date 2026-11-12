@@ -244,61 +244,41 @@ Secondary Account (SNI-only) [#secondary-account-sni-only]
 
 Cuando `primary_account` es `false`, el conector registra la CA usando el modo `CertificateMode: SNI_ONLY`. Este modo no requiere código de verificación ni acceso a la clave privada de la CA, por lo que es la opción adecuada cuando la CA se gestiona desde otra cuenta de AWS o cuando el administrador no dispone de la clave privada. Es el método habitual para registrar la misma CA en varias cuentas de AWS simultáneamente.
 
-<div className="lm-diff-del lm-diff-block">
-  Configuración del DMS
-</div>
+Configuración del DMS [#configuración-del-dms]
 
-<div className="lm-diff-del lm-diff-block">
-  Cada DMS que participe en la integración con AWS IoT Core debe tener configurada la clave de metadatos `lamassu.io/iot/{connector_id}`. El campo más importante de esa configuración es `registration_mode`, que determina cómo se aprovisionan los dispositivos en AWS.
-</div>
+Cada DMS que participe en la integración con AWS IoT Core debe tener configurada la clave de metadatos `lamassu.io/iot/{connector_id}`. El campo más importante de esa configuración es `registration_mode`, que determina cómo se aprovisionan los dispositivos en AWS.
 
-<div className="lm-diff-del lm-diff-block">
-  Existen tres modos de registro, y la elección entre ellos depende de la estrategia de aprovisionamiento de la flota.
-</div>
+Existen tres modos de registro, y la elección entre ellos depende de la estrategia de aprovisionamiento de la flota.
 
-<div className="lm-diff-del lm-diff-block">
-  Modo none
-</div>
+Modo none [#modo-none]
 
-<div className="lm-diff-del lm-diff-block">
-  En este modo el conector **no crea Things, grupos ni políticas** en AWS IoT Core. Se limita a sincronizar el estado de los certificados (activo, revocado, suspendido) a medida que cambian en Lamassu. Es el modo adecuado cuando el aprovisionamiento de Things en AWS se gestiona por un sistema externo y solo se necesita que Lamassu mantenga el estado de los certificados actualizado.
-</div>
+En este modo el conector **no crea Things, grupos ni políticas** en AWS IoT Core. Se limita a sincronizar el estado de los certificados (activo, revocado, suspendido) a medida que cambian en Lamassu. Es el modo adecuado cuando el aprovisionamiento de Things en AWS se gestiona por un sistema externo y solo se necesita que Lamassu mantenga el estado de los certificados actualizado.
 
-<div className="lm-diff-del lm-diff-block">
-  Modo auto
-</div>
+Modo auto [#modo-auto]
 
-<div className="lm-diff-del lm-diff-block">
-  El modo `auto` delega en Lamassu el aprovisionamiento completo del dispositivo en AWS en el momento del enrolamiento. Cuando el dispositivo completa con éxito su enrolamiento EST y Lamassu emite el evento `EventBindDeviceIdentityKey`, el conector ejecuta automáticamente la siguiente secuencia:
-</div>
+El modo `auto` delega en Lamassu el aprovisionamiento completo del dispositivo en AWS en el momento del enrolamiento. Cuando el dispositivo completa con éxito su enrolamiento EST y Lamassu emite el evento `EventBindDeviceIdentityKey`, el conector ejecuta automáticamente la siguiente secuencia:
 
-<div className="lm-diff-del lm-diff-block">
-  1. Crea o actualiza las políticas IoT configuradas en el DMS.
-  2. Crea el grupo raíz `LAMASSU` en la cuenta AWS (si no existe) y los grupos hijos configurados en el DMS como subgrupos de `LAMASSU`. Si los grupos ya existen, el error `ResourceAlreadyExistsException` se ignora, por lo que la operación es idempotente.
-  3. Si el Thing ya existía en AWS IoT Core, el conector itera todos los certificados (principals) actualmente adjuntos a ese Thing y los marca como `REVOKED` en AWS, para garantizar que los certificados anteriores no puedan seguir siendo usados para autenticarse.
-  4. Llama a `iot:RegisterThing` con una plantilla de aprovisionamiento de estilo CloudFormation que crea el Thing, registra el certificado del dispositivo (PEM del certificado del dispositivo y del certificado de la CA emisora) y adjunta las políticas configuradas.
-     Una vez completado el aprovisionamiento, el conector almacena el ARN del certificado resultante en los metadatos del certificado de Lamassu bajo la clave `lamassu.io/iot/{connector_id}` y marca el dispositivo como `Registered: true` en Device Manager.
-</div>
+1. Crea o actualiza las políticas IoT configuradas en el DMS.
+2. Crea el grupo raíz `LAMASSU` en la cuenta AWS (si no existe) y los grupos hijos configurados en el DMS como subgrupos de `LAMASSU`. Si los grupos ya existen, el error `ResourceAlreadyExistsException` se ignora, por lo que la operación es idempotente.
+3. Si el Thing ya existía en AWS IoT Core, el conector itera todos los certificados (principals) actualmente adjuntos a ese Thing y los marca como `REVOKED` en AWS, para garantizar que los certificados anteriores no puedan seguir siendo usados para autenticarse.
+4. Llama a `iot:RegisterThing` con una plantilla de aprovisionamiento de estilo CloudFormation que crea el Thing, registra el certificado del dispositivo (PEM del certificado del dispositivo y del certificado de la CA emisora) y adjunta las políticas configuradas.
+   Una vez completado el aprovisionamiento, el conector almacena el ARN del certificado resultante en los metadatos del certificado de Lamassu bajo la clave `lamassu.io/iot/{connector_id}` y marca el dispositivo como `Registered: true` en Device Manager.
 
-<div className="lm-diff-del lm-diff-block">
-  **El nombre del Thing en AWS es el Common Name (CN) del certificado del dispositivo.** Esta convención es fundamental para el desarrollador de firmware: el valor `/CN=` que el dispositivo incluye en su CSR al enrolarse se convierte en el ThingName con el que deberá identificarse en todas las operaciones MQTT contra AWS IoT Core.
-</div>
+**El nombre del Thing en AWS es el Common Name (CN) del certificado del dispositivo.** Esta convención es fundamental para el desarrollador de firmware: el valor `/CN=` que el dispositivo incluye en su CSR al enrolarse se convierte en el ThingName con el que deberá identificarse en todas las operaciones MQTT contra AWS IoT Core.
 
-<div className="lm-diff-del lm-diff-block">
-  Modo jitp
-</div>
+Modo jitp [#modo-jitp]
 
-<div className="lm-diff-del lm-diff-block">
-  El modo Just-In-Time Provisioning (JITP) delega el aprovisionamiento en AWS en lugar de hacerlo el conector directamente. Cuando el conector detecta que el DMS está en modo `jitp`, crea una plantilla de aprovisionamiento JITP en AWS IoT Core y la adjunta al certificado de CA registrado. Esta plantilla se crea o actualiza en el momento en que el DMS se crea o actualiza en Lamassu - no en el momento del enrolamiento del dispositivo. A partir de ese momento, cuando un dispositivo con un certificado emitido por esa CA se conecta por primera vez a AWS IoT Core, AWS ejecuta la plantilla automáticamente: crea el Thing, registra el certificado y lo activa.
-</div>
+El modo Just-In-Time Provisioning (JITP) delega el aprovisionamiento en AWS en lugar de hacerlo el conector directamente. Cuando el conector detecta que el DMS está en modo `jitp`, crea una plantilla de aprovisionamiento JITP en AWS IoT Core y la adjunta al certificado de CA registrado. <del className="lm-diff-del">La plantilla se crea cuando el DMS se crea en Lamassu, no en el enrolamiento del dispositivo, y no se actualiza después (ver el aviso siguiente). A partir de ese momento</del><ins className="lm-diff-ins">El conector intenta crear esta plantilla cuando el DMS se crea y de nuevo en cada edición completa del DMS (`PUT /v1/dms/{id}`) - no en el momento del enrolamiento del dispositivo. El intento no es idempotente: cuando ya existe una plantilla nombrada con el ID del DMS, la llamada de creación falla, el evento se reintenta tres veces y acaba en la cola de mensajes fallidos `lamassu-dlq` (ver </ins>[<ins className="lm-diff-ins">Solución de problemas</ins>](/docs/platform/iot-fleets/integrations/aws-iot-core#solución-de-problemas)<ins className="lm-diff-ins">). La plantilla se crea una sola vez; las ediciones posteriores nunca actualizan su contenido. Una actualización del DMS que omite `metadata` o envía `null` conserva los metadatos almacenados, así que la clave del conector `lamassu.io/iot/{connector_id}` sigue presente y el intento se sigue disparando. Un cuerpo que suministra un objeto `metadata` sustituye por completo los metadatos almacenados: si ese objeto no lleva la clave del conector, la clave se elimina y el conector omite silenciosamente los eventos futuros del DMS. Una vez adjuntada la plantilla</ins>, cuando un dispositivo con un certificado emitido por esa CA se conecta por primera vez a AWS IoT Core, AWS ejecuta la plantilla automáticamente: crea el Thing, registra el certificado y lo activa.
 
-<div className="lm-diff-del lm-diff-block">
-  El nombre del Thing en la plantilla JITP se deriva de `AWS::IoT::Certificate::CommonName`, que corresponde al CN del certificado del dispositivo - la misma convención que el modo `auto`.
-</div>
+<Callout type="warn" title="Editar un DMS en modo JITP no actualiza la plantilla de AWS">
+  El conector crea la plantilla, nombrada con el ID del DMS, una sola vez. Cada edición posterior del DMS que conserve la clave del conector intenta crearla de nuevo y falla, porque el conector no actualiza plantillas existentes. Los cambios posteriores en `jitp_config.provisioning_role_arn`, `jitp_config.enable_template` o en los grupos y políticas que la plantilla referencia deben aplicarse a mano en AWS IoT Core.
 
-<div className="lm-diff-del lm-diff-block">
-  Este modo requiere que se configure el campo `jitp_config.provisioning_role_arn` con el ARN de un rol IAM que AWS IoT Core pueda asumir para ejecutar la plantilla. Si no se configura, el conector utiliza el valor por defecto `arn:aws:iam::{account}:role/JITPRole` y registra un aviso en el log. El administrador debe asegurarse de que ese rol existe en la cuenta y tiene los permisos necesarios antes de activar el modo JITP.
-</div>
+  El evento fallido se reintenta y termina en `lamassu-dlq`. Los grupos y las políticas se registran antes del fallo, pero se omiten la asignación de la plantilla a la CA registrada, la escritura del ARN en el DMS y la actualización de las shadows al cambiar `ManagedCAs`.
+</Callout>
+
+El nombre del Thing en la plantilla JITP se deriva de `AWS::IoT::Certificate::CommonName`, que corresponde al CN del certificado del dispositivo - la misma convención que el modo `auto`.
+
+Este modo requiere que se configure el campo `jitp_config.provisioning_role_arn` con el ARN de un rol IAM que AWS IoT Core pueda asumir para ejecutar la plantilla. Si no se configura, el conector utiliza el valor por defecto `arn:aws:iam::{account}:role/JITPRole` y registra un aviso en el log. El administrador debe asegurarse de que ese rol existe en la cuenta y tiene los permisos necesarios antes de activar el modo JITP.
 
 Aprovisionamiento de dispositivos (modo automático) [#aprovisionamiento-de-dispositivos-modo-automático]
 
@@ -498,21 +478,13 @@ Solución de problemas [#solución-de-problemas]
 
 **Resolución:** Comprobar que `shadow_config.enable` está a `true` en los metadatos del conector para el DMS correspondiente. Si se usa Named Shadow, verificar que `shadow_config.shadow_name` contiene el nombre correcto y que el firmware lee ese Named Shadow y no el Classic Shadow. Confirmar que las credenciales del conector tienen permisos `iotdata:GetThingShadow` y `iotdata:UpdateThingShadow`.
 
-<div className="lm-diff-ins lm-diff-block">
-  ***
-</div>
+***
 
-<div className="lm-diff-ins lm-diff-block">
-  **Síntoma:** Tras editar un DMS en modo `jitp`, aparecen mensajes de actualización del DMS en la cola de mensajes fallidos `lamassu-dlq`.
-</div>
+**Síntoma:** Tras editar un DMS en modo `jitp`, aparecen mensajes de actualización del DMS en `lamassu-dlq`, o los cambios de configuración JITP no tienen efecto en AWS.
 
-<div className="lm-diff-ins lm-diff-block">
-  **Causa:** Cada edición completa del DMS (`PUT /v1/dms/{id}`) dispara un nuevo intento de `CreateProvisioningTemplate` para la plantilla nombrada con el ID del DMS, y la llamada no es idempotente: cuando la plantilla ya existe, falla, el evento se reintenta tres veces y acaba en `lamassu-dlq`.
-</div>
+**Causa:** <del className="lm-diff-del">La</del><ins className="lm-diff-ins">Cada</ins> edición <ins className="lm-diff-ins">completa del DMS (`PUT /v1/dms/{id}`) </ins>dispara un nuevo intento de <del className="lm-diff-del">crear </del><ins className="lm-diff-ins">`CreateProvisioningTemplate` para </ins>la plantilla <del className="lm-diff-del">JITP, que ya existe en AWS. El intento falla y se</del><ins className="lm-diff-ins">nombrada con el ID del DMS, y la llamada no es idempotente: cuando la plantilla ya existe, falla, el evento se reintenta tres veces y acaba en `lamassu-dlq`. Se</ins> omiten los pasos posteriores del conector.
 
-<div className="lm-diff-ins lm-diff-block">
-  **Resolución:** Verificar que la plantilla nombrada con el ID del DMS sigue existiendo en AWS IoT Core y que el enrolamiento JITP funciona. El mensaje de `lamassu-dlq` refleja el intento de recreación fallido, no un flujo JITP roto.
-</div>
+**Resolución:** Comprobar que la plantilla nombrada con el ID del DMS existe en AWS IoT Core y que el enrolamiento JITP funciona. Si se cambió la configuración JITP, aplicarla a mano en la plantilla de AWS.
 
 <Cards>
   <Card title="Configurar un DMS" href="/docs/platform/iot-fleets/enrollment/dms" />

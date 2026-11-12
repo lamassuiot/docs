@@ -171,7 +171,7 @@ Both Secret options require `amqp.tls: true`: `values.schema.json` rejects a non
 The AMQP client loads certificates at startup, so restart the consuming pods after updating either Secret. Changing any `amqp` value rolls the consuming pods through the `checksum/config` annotation, but a change to Secret content alone does not trigger a rollout.
 
 <Callout type="warn" title="Set the AMQP port before upgrading">
-  Per the migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: in 3.8.0 `amqp.tls` was not applied and event-bus clients used plaintext AMQP; from 4.0.0, `amqp.tls: true` switches them to AMQPS. Set `amqp.port` to the broker TLS listener before upgrading, or set `amqp.tls: false` to keep plaintext AMQP.
+  Per the migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: in 3.8.0 `amqp.tls` was not applied and event-bus clients used plaintext AMQP; from 4.0.0, `amqp.tls: true` switches them to AMQPS. Set `amqp.port` to the broker TLS listener before upgrading, or set `amqp.tls: false` to keep plaintext AMQP. `amqp.tls: false` sends the broker credentials and all event-bus traffic in cleartext.
 </Callout>
 
 ### Provision the first administrator

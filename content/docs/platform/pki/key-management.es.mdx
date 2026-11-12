@@ -10,6 +10,7 @@ El servicio de Gestión de Claves Criptográficas (KMS) de Lamassu IoT centraliz
 En la configuración actual, Lamassu IoT trabaja exclusivamente con claves asimétricas, como RSA y curvas elípticas. Estas claves se usan para emitir certificados X.509, firmar solicitudes y realizar operaciones de autenticación y validación dentro del sistema.
 
 ## Qué resuelve el KMS
+
 El KMS unifica la gestión del ciclo de vida de las claves y evita que cada servicio tenga que integrarse directamente con un proveedor criptográfico concreto.
 
 En la práctica, permite:
@@ -20,6 +21,7 @@ En la práctica, permite:
 - Reutilizar claves ya existentes para CAs, CSR y tareas de firma o verificación.
 
 ## Motores criptográficos
+
 Lamassu puede trabajar con distintos motores criptográficos según los requisitos del despliegue. En algunos entornos bastará con un motor software; en otros será necesario delegar la custodia en un HSM, en un servicio cloud o en una plataforma especializada.
 
 Una misma instancia puede tener varios motores configurados al mismo tiempo, incluso varias instancias del mismo tipo. Esto permite adaptar la operación a distintos niveles de seguridad, coste y requisitos regulatorios.
@@ -59,6 +61,7 @@ Cada motor define qué algoritmos soporta, como RSA o ECC/ECDSA, y qué tamaños
 Revisa con el operador de Despliegue qué motor está definido como predeterminado. Ese motor se utilizará cuando un proceso necesite crear o persistir una clave y el usuario no haya seleccionado uno específico, por ejemplo al crear o importar una CA.
 
 ## Inventario de claves
+
 La pantalla principal de KMS muestra el inventario completo de claves registradas en el sistema. Es la vista de referencia para revisar qué claves existen, dónde están custodiadas y con qué entidades están relacionadas.
 
 La tabla incluye los siguientes campos:
@@ -80,9 +83,11 @@ Desde esta vista también se accede a las acciones más habituales:
 - **Delete Key** para eliminar la clave del sistema.
 
 ## Crear o importar claves
+
 Necesitas permisos de administración de claves y un motor accesible. El perfil de emisión debe admitir el algoritmo que eliges si la clave va a utilizarse en una CA o CSR. Abre **Create New Key** y elige generación o importación.
 
 ### Generar un nuevo par de claves
+
 Si la clave va a nacer dentro de Lamassu, el flujo recomendado es generar un nuevo par gestionado directamente por uno de los motores configurados.
 
 En la primera pantalla del asistente, elige **Generate New Key Pair** y después define los parámetros principales:
@@ -94,6 +99,7 @@ En la primera pantalla del asistente, elige **Generate New Key Pair** y después
 - **Metadata**: información adicional para usos avanzados.
 
 ### Importar un par existente
+
 La importación permite registrar en Lamassu una clave generada fuera de la plataforma. Es el flujo habitual en escenarios BYOK, migraciones o integración con material criptográfico que ya está en producción.
 
 - Cuando tienes una clave privada exportable y el motor de destino admite su importación.
@@ -111,9 +117,11 @@ En el asistente, elige **Import Existing Key Pair** y completa los campos solici
 Si la importación termina correctamente, abre el registro, comprueba motor y clave pública y realiza una firma de prueba. Una clave no exportable en un HSM no puede cargarse mediante este formulario PEM: configura el acceso al motor y comprueba cómo se registra la clave existente. Revisa dependencias y recursos que puedan haberse creado en el proveedor si una operación falla a mitad.
 
 ## Operaciones sobre una clave
+
 Cada clave registrada dispone de una vista de detalle y de varias acciones operativas.
 
 ### Ver detalles
+
 La pantalla **View Details** concentra la información técnica y administrativa de la clave.
 
 En la pestaña **Overview** se muestran, entre otros, estos campos:
@@ -130,6 +138,7 @@ La sección **Related Entities** muestra qué objetos de Lamassu dependen de esa
 La pestaña **Public Key** muestra el material público en PEM. El identificador y la URI del registro sirven para localizar la clave; una URI con formato PKCS#11 no demuestra que el motor sea un HSM ni que exista un módulo local para acceder a ella.
 
 ### Firmar y verificar
+
 La acción **Sign / Verify** sirve para validar que la clave y el motor criptográfico funcionan correctamente.
 
 Firma un mensaje de prueba, guarda la firma y verifícala con la misma clave pública, algoritmo y codificación. Cambia después el mensaje: la verificación debe fallar. Esto comprueba una operación concreta; no certifica todas las capacidades del motor ni la cadena de una CA.
@@ -137,6 +146,7 @@ Firma un mensaje de prueba, guarda la firma y verifícala con la misma clave pú
 Al abrirla aparecen dos áreas: **Sign** y **Verify**.
 
 #### Sign
+
 Esta pestaña usa la clave privada para generar una firma digital sobre un mensaje o sobre un *digest* ya calculado.
 
 Campos principales:
@@ -148,6 +158,7 @@ Campos principales:
 - **Signature**: resultado de la operación, mostrado en hexadecimal.
 
 #### Verify
+
 Esta pestaña comprueba si una firma corresponde a la clave pública asociada.
 
 Campos principales:
@@ -160,6 +171,7 @@ Campos principales:
 - **Result**: indicador del resultado de la validación.
 
 ### Generar un CSR
+
 La acción **Generate CSR** crea una solicitud PKCS#10 firmada con la clave privada custodiada en Lamassu, sin exponerla fuera del motor criptográfico.
 
 Este flujo es útil para:
@@ -181,6 +193,7 @@ Al abrir el formulario se solicitan los datos del sujeto y los atributos princip
 Descarga la CSR y ejecuta `openssl req -in request.csr -noout -verify -text`. Comprueba firma, sujeto y SAN antes de enviarla. La CSR no determina por sí sola el certificado final: la [política de emisión](/docs/platform/pki/certificate-profiles) puede sustituir sus campos.
 
 ### Firma local con PKCS#11
+
 Lamassu también ofrece una ayuda específica para integraciones locales mediante **Sign locally with OpenSSL & PKCS11 tools**.
 
 Requiere el módulo, token y permisos del proveedor correspondiente. Comprueba que el identificador de Lamassu se corresponde con el objeto accesible desde ese módulo. La configuración del módulo pertenece al entorno del cliente o al [Despliegue](/docs/deployment/self-hosted/helm).
@@ -188,3 +201,5 @@ Requiere el módulo, token y permisos del proveedor correspondiente. Comprueba q
 ## Antes de eliminar una clave
 
 Revisa **Related Entities** y localiza CAs, certificados y procesos de validación que siguen necesitando firmas. Revocar una CA no elimina la necesidad de publicar estado durante su periodo de retención. Eliminar una clave tampoco revoca automáticamente sus certificados. Planifica sustitución y retención antes de usar **Delete Key**; el efecto de borrado en el proveedor depende del motor.
+
+El KMS se niega a eliminar una clave que todavía está referenciada por certificados. Eliminar una CA libera las referencias de su propio certificado actual y de sus certificados reemitidos vinculados, y después intenta eliminar la clave. Si otros certificados todavía la referencian, como los de otra CA que la comparte, el KMS la conserva. Revocar los certificados emitidos por la CA eliminada no libera sus propias referencias a claves. La [guía de actualización](/docs/upgrades/3-8-0-to-4-0-0#referencias-entre-certificados-claves-y-roles-va) describe las referencias heredadas que conserva la migración.

@@ -93,6 +93,10 @@ Este flujo resulta útil cuando la clave se creó previamente en un HSM, se impo
 
 Necesitas el certificado de CA en PEM, su cadena hasta una raíz conocida y, si vas a importarla, una clave privada exportable. Antes de cargar el material, verifica firma, fechas, `CA:TRUE`, usos de firma (incluido `cRLSign`, sin el cual la CA no puede publicar su [CRL](/docs/platform/pki/crl)) y correspondencia de la clave pública. El procedimiento de [verificación de claves](/docs/platform/pki/quickstarts/issue-certificate) también sirve para comparar la clave y el certificado de una CA.
 
+El backend rechaza una importación cuyo certificado carece de la restricción básica de CA (`basicConstraints cA flag is not set`), cuyo número de serie coincide con el de un certificado almacenado con contenido distinto, o cuyo certificado idéntico ya pertenece a una CA existente. El registro de certificado de una CA eliminada se conserva y puede reutilizarse al reimportar el mismo certificado, incluido su estado anterior. Reimportar otro certificado con ese número de serie se rechaza; comprueba el certificado y su estado tras reimportarlo.
+
+Eliminar una CA libera las referencias a la clave de su propio certificado actual y de sus certificados reemitidos vinculados, pero conserva esos registros para la CRL y el OCSP de su emisor. Después intenta eliminar la clave; el KMS la conserva si otros certificados todavía la referencian, como los de otra CA que comparte la clave. Revocar los certificados emitidos por la CA eliminada no libera sus propias referencias a claves.
+
 <Steps>
   <Step>
     ### Selecciona el motor

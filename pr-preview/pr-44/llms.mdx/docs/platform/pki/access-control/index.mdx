@@ -297,10 +297,6 @@ The chart includes a bootstrap principal that looks for the OIDC role `pki-admin
 
 ```yaml title="values.yaml"
 auth:
-  authorization:
-    rolesClaim: realm_access.roles
-    roles:
-      admin: pki-admin
   externalAuthorization:
     enabled: true
     failOpen: false
@@ -334,9 +330,11 @@ The pre-install and pre-upgrade Helm Job runs the `authz` migrations, preloads t
   </Step>
 
   <Step>
-    Configure the two JWT validations [#configure-the-two-jwt-validations]
+    Configure token validation [#configure-token-validation]
 
-    The Gateway uses `auth.authentication.apiGateway.jwks` to authenticate requests. `authz` uses `services.authz.jwkUrl` to resolve OIDC principals. Both endpoints must contain the keys of the same issuer and be reachable from their respective components.
+    `authz` validates every token against `services.authz.jwkUrl`, which is fetched from the `authz` pod. The Gateway does not validate tokens itself: Lamassu services authorize each request through `authz`, and routes labeled `auth=external`, such as the Job Manager ones, are checked by the Gateway through `authz` when `auth.externalAuthorization` is enabled. The endpoint must serve the keys of the issuer configured in `auth.oidc.frontend.authority`.
+
+    Releases upgraded from 3.8.0 must remove `auth.oidc.apiGateway` and `auth.authorization`, which the 4.0.0 chart rejects. See [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0#gateway-token-validation-removed).
   </Step>
 
   <Step>
@@ -418,7 +416,7 @@ The credential could be processed but did not produce a positive authorization. 
 5. that the policy includes the action and the requested resource type or route;
 6. that the identifier, relation, column filter or HTTP constraint includes the real resource.
 
-In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure. With OpenTelemetry instrumentation enabled, each decision also produces a span — `engine.CheckHTTP` on the Gateway path — whose attributes record `authz.allowed`, the matched policy and the matched principal, so you can correlate the denial with the Gateway trace.
+In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure. With OpenTelemetry <del className="lm-diff-del">instrumentation enabled, each decision also produces a span — `engine.CheckHTTP` on the Gateway path — whose attributes record `authz.allowed`, the matched policy and the matched principal, so you can correlate the denial with the Gateway trace</del><ins className="lm-diff-ins">tracing enabled, a request that reaches the policy engine produces an `engine.CheckHTTPRequest` span whose attributes record `authz.allowed`, the matched policy and the matched principal. Correlation with the Gateway trace requires trace context to be propagated to authz</ins>.
 
 Everything returns 403 [#everything-returns-403]
 

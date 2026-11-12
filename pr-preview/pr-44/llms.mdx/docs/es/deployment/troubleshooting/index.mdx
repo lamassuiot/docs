@@ -91,11 +91,16 @@ La autorización externa falla cerrada por defecto. Si authz no está disponible
 4. Comprueba que la ruta del check es /v1/ext\_authz/check.
 5. No cambies a <code>failOpen: true</code> como solución permanente: permitiría tráfico sin autorización durante la caída.
 
+Errores 500 de la API [#errores-500-de-la-api]
+
+Un 500 indica un fallo interno, como una base de datos no disponible. El cuerpo `{"err": ...}` incluye hoy el texto del error interno, que puede contener nombres de esquema, tabla y restricción y, en fallos de conexión, el host y el usuario de la base de datos (no la contraseña). Localiza la causa en el log del servicio con la hora de la petición, y no reenvíes el cuerpo a terceros ni lo muestres a usuarios finales. Es un defecto conocido de divulgación de información: está previsto devolver un mensaje genérico en los 500 y dejar el detalle solo en el log del servicio (seguimiento en [lamassuiot#814](https://github.com/lamassuiot/lamassuiot/issues/814)). El conector de autorización también devuelve el error interno, en el campo `details.error`. Algunos errores de petición, como un tamaño de clave que el motor no admite, se devuelven también como 500.
+
 Un pod no está Ready [#un-pod-no-está-ready]
 
 Revisa primero <code>kubectl describe pod</code>. Las causas habituales son:
 
 * credenciales o DNS incorrectos para PostgreSQL o RabbitMQ;
+* un Secret de CA o de certificado de cliente de AMQP inexistente referenciado por `amqp.ca.secretName` o `amqp.client.secretName`;
 * volumen persistente sin enlazar;
 * imagen inaccesible o política de pull incorrecta;
 * configuración inválida del motor criptográfico;
@@ -105,6 +110,8 @@ Revisa primero <code>kubectl describe pod</code>. Las causas habituales son:
 Los valores genéricos solicitan 100 mCPU y 128 MiB y limitan a 500 mCPU y 512 MiB. Ajusta por servicio cuando haya OOMKills, throttling o arranques lentos.
 
 Los motores KMS basados en filesystem y el almacenamiento local de VA utilizan volúmenes de acceso exclusivo. Mantén una réplica o migra a backends compartidos antes de habilitar autoscaling.
+
+Las llamadas internas ahora fallan rápido en lugar de bloquearse para los clientes cubiertos por [Proxy de salida](/docs/deployment/self-hosted/networking#proxy-de-salida): los intentos de conexión agotan el tiempo tras 30 segundos y los handshakes TLS tras 10 segundos. El conector del motor de autorización mantiene su propio transporte sin estos timeouts de conexión ni de handshake TLS; solo su timeout global de petición de 30 segundos acota cada llamada. Si un proxy de salida gestiona el tráfico de salida del clúster, comprueba las variables de entorno `HTTP_PROXY`, `HTTPS_PROXY` y `NO_PROXY` del pod e incluye los nombres de servicio internos en `NO_PROXY`.
 
 Los eventos no llegan [#los-eventos-no-llegan]
 
@@ -116,11 +123,20 @@ Los eventos de dominio y auditoría dependen del publisher del bus:
 * inspecciona dead-letter queues;
 * alerta sobre colas durables huérfanas y crecimiento de backlog.
 
+Si `amqp.tls` está habilitado, revisa también la parte TLS:
+
+* confirma que el listener del broker hable AMQPS en el puerto configurado — el puerto por defecto sigue siendo `5672` y no cambia automáticamente al habilitar TLS;
+* si defines `amqp.ca.secretName`, confirma que el Secret exista en el namespace del release y que su clave de datos coincida con `amqp.ca.certificateKey` (por defecto `ca.crt`); si no defines `amqp.ca.secretName`, los clientes confían en las CA del sistema;
+* recuerda que un Secret referenciado inexistente impide arrancar los pods consumidores;
+* tras actualizar el Secret de la CA o del certificado de cliente, reinicia los pods consumidores: el cliente AMQP carga los certificados al arrancar.
+
+Consulta [TLS de AMQP (AMQPS)](/docs/deployment/self-hosted/helm#tls-de-amqp-amqps) para la configuración completa.
+
 Una caída del consumidor no siempre impide que la operación principal termine. Por eso debes monitorizar RabbitMQ y verificar de forma independiente la persistencia de [auditoría](/docs/platform/administration/audit-logs).
 
 Observabilidad [#observabilidad]
 
-El chart puede habilitar <ins className="lm-diff-ins">la </ins>instrumentación OpenTelemetry<ins className="lm-diff-ins"> para los servicios que la admiten; el AWS Connector, authz, wfx y la UI no están instrumentados</ins>. Las trazas se exportan por OTLP HTTP y los logs pueden dirigirse a un endpoint compatible, como VictoriaLogs. Usa un identificador de correlación y la misma ventana temporal para unir Gateway<del className="lm-diff-del">, authz</del>, servicio y dependencia.
+El chart puede habilitar <ins className="lm-diff-ins">la </ins>instrumentación OpenTelemetry<ins className="lm-diff-ins"> para los servicios que la admiten, incluido authz; no configura OpenTelemetry para el AWS Connector, wfx ni la UI</ins>. Las trazas se exportan por OTLP HTTP y los logs pueden dirigirse a un endpoint compatible, como VictoriaLogs. Usa un identificador de correlación y la misma ventana temporal para unir Gateway<del className="lm-diff-del">, authz</del>, servicio y dependencia.
 
 Antes de cerrar una incidencia, guarda:
 

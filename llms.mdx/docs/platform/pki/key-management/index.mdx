@@ -195,8 +195,10 @@ Sign locally with PKCS#11 [#sign-locally-with-pkcs11]
 
 Lamassu also offers specific help for local integrations through **Sign locally with OpenSSL & PKCS11 tools**.
 
-Requiere el módulo, token y permisos del proveedor correspondiente. Comprueba que el identificador de Lamassu se corresponde con el objeto accesible desde ese módulo. La configuración del módulo pertenece al entorno del cliente o al [Despliegue](/docs/deployment/self-hosted/helm).
+It requires the module, token and permissions of the corresponding provider. Check that the Lamassu identifier matches the object accessible from that module. Module configuration belongs to the client environment or [Deployment](/docs/deployment/self-hosted/helm).
 
 Before deleting a key [#before-deleting-a-key]
 
 Review **Related Entities** and locate CAs, certificates and validation processes that still need signatures. Revoking a CA does not remove the need to publish status during its retention period. Deleting a key does not automatically revoke its certificates either. Plan replacement and retention before using **Delete Key**; provider deletion behavior depends on the engine.
+
+The KMS refuses to delete a key that certificates still reference. Deleting a CA releases the references from its own current certificate and linked reissued certificates, then attempts to delete the key. If other certificates still reference the key, such as another CA sharing it, the KMS keeps it. Revoking certificates issued by the deleted CA does not release their own key references. Legacy references retained by the upgrade migration are described in the [upgrade guide](/docs/upgrades/3-8-0-to-4-0-0#references-between-certificates-keys-and-va-roles).

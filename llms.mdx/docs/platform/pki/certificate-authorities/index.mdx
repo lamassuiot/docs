@@ -90,6 +90,10 @@ Import an external CA [#import-an-external-ca]
 
 You need the CA certificate in PEM, its chain to a known root and, when importing it, an exportable private key. Before uploading material, verify signature, dates, `CA:TRUE`, signing usages (including `cRLSign`, without which the CA cannot publish its [CRL](/docs/platform/pki/crl)) and public-key correspondence. The [key verification procedure](/docs/platform/pki/quickstarts/issue-certificate) also compares a CA key and certificate.
 
+The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number matches a stored certificate with different contents, or whose identical certificate already belongs to an existing CA. A deleted CA's certificate record is kept and can be reused when re-importing the same certificate, including its previous status. Re-importing a different certificate with that serial number is rejected; check the certificate and status after re-importing.
+
+Deleting a CA releases the key references of its own current certificate and linked reissued certificates, while keeping those records for its issuer's CRL and OCSP. It then attempts to delete the key; the KMS keeps it if other certificates still reference it, such as another CA sharing the key. Revoking certificates issued by the deleted CA does not release their own key references.
+
 <Steps>
   <Step>
     Select the engine [#select-the-engine]

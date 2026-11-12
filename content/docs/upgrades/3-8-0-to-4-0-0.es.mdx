@@ -477,7 +477,7 @@ LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration
 
 Apunta la configuración `storage` de la herramienta a la base `pki`, donde los datos de CA y del KMS viven ahora en los esquemas `ca` y `kms`. Las opciones de la herramienta se describen en `backend/cmd/ca-to-kms-migration/README.md`, en el repositorio `lamassuiot`.
 
-Los README de ambas herramientas documentan el layout de 4.0.0 con la base `pki` y coinciden con esta página: `goose-lamassu` usa ejemplos con `dbname=pki` y no valida el nombre de la base de datos, y el README de `ca-to-kms-migration` describe la base única `pki` y el orden de migración.
+Los README de ambas herramientas documentan el formato de 4.0.0 con la base `pki` y coinciden con esta página: `goose-lamassu` usa ejemplos con `dbname=pki` y no valida el nombre de la base de datos, y el README de `ca-to-kms-migration` describe la base única `pki` y el orden de migración.
 
 ### Solución de problemas
 
@@ -490,7 +490,7 @@ Los README de ambas herramientas documentan el layout de 4.0.0 con la base `pki`
 - **Nadie puede iniciar sesión tras la actualización.** Comprueba que `services.authz.jwkUrl` es accesible desde el pod de `authz`, que `services.authz.bootstrap` coincide con un rol que tu proveedor OIDC asigna realmente y que el job de base de datos terminó.
 - **Una migración aborta con `kms schema not found`.** Los esquemas deben migrarse en orden: ejecuta la migración del esquema `kms` antes que la del esquema `ca`.
 - **Una migración aborta con `ca schema not found`.** Ejecuta la migración del esquema `ca` antes que la del esquema `va`.
-- **La VA no arranca con `cannot resolve signer certificate for VA role ... N candidates`.** El certificado firmante del rol no puede identificarse de forma única entre N candidatos. Revisa los certificados que comparten el sujeto y la clave de la CA, y define en el rol `signer_certificate_serial_number` con el número de serie del firmante previsto.
+- **La migración de VA falla con `cannot resolve signer certificate for VA role ... N candidates`.** La migración no puede identificar un certificado firmante de forma única a partir del SKI guardado en el rol. Revisa el SKI y los certificados candidatos indicados en el error; corrige los datos anteriores a la migración con una copia de seguridad verificada y vuelve a ejecutar la migración. El nuevo campo `signer_certificate_serial_number` se crea durante esa migración, por lo que no se puede configurar mediante la API de VA mientras esta falla.
 - **Una migración o un servicio falla con `permission denied for table ...`.** Al rol de PostgreSQL le faltan los privilegios entre esquemas listados en [Despliegues sin Helm](#despliegues-sin-helm); incluye `certificates_view` cuando se omitió el `GRANT SELECT` posterior a la migración. Concede los privilegios que falten y vuelve a ejecutar.
 
 ## Checklist de validación

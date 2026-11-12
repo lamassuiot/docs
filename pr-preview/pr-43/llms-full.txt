@@ -2479,6 +2479,165 @@ Configuration parameters [#configuration-parameters]
 | `device_manager_client`        | string | Yes                            | HTTP URL of Lamassu's Device Manager.                                                                          |
 | `ca_client`                    | string | Yes                            | HTTP URL of Lamassu's CA service.                                                                              |
 
+<div className="lm-diff-ins lm-diff-block">
+  Resource state machine [#resource-state-machine]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The connector owns the AWS side of four resource types — CAs, DMS provisioning templates (JITP), device certificates and Things. This section maps the bus events the connector consumes to the AWS resources they touch and to the AWS calls each transition performs. AWS resources are referenced with the notation `IoTCore/<resource>`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Events the connector handles [#events-the-connector-handles]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The **CloudEvent type** column lists the event name on Lamassu's internal event bus; the **IAM actions** column lists the exact AWS SDK operations each flow invokes, so the required permissions can be derived directly from this table.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <div data-full-bleed-table>
+    | CloudEvent type                                                      | Lamassu resource     | AWS Resource                                            | IAM actions                                                                                                                                                                              | AWS calls and effect                                                                                                                                                                                                                                                 | Where in this page                                            |
+    | -------------------------------------------------------------------- | -------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+    | `EventCreateCAKey` / `EventImportCAKey` / `EventUpdateCAMetadataKey` | CA                   | `IoTCore/CACertificate`                                 | `iot:GetRegistrationCode`, `iot:RegisterCACertificate`, `iot:DescribeCACertificate`, `iot:ListCACertificates`                                                                            | Loads the CA into connector state; a `registration.status = REQUESTED` write fires the registration flow (Primary with verification certificate, or SNI-only) and writes `SUCCEEDED` or `FAILED` back to the CA's metadata.                                          | [CA registration states](#ca-registration-states)             |
+    | `EventCreateDMSKey` / `EventUpdateDMSKey`                            | DMS                  | `IoTCore/ProvisioningTemplate`                          | `iot:CreateProvisioningTemplate`, `iot:UpdateCACertificate`                                                                                                                              | In `jitp` mode, attempts to create the provisioning template and attaches it to the registered CA. Non-idempotent: a `PUT /v1/dms/{id}` edit retries the creation and lands in `lamassu-dlq` after 3 retries. Idempotent for `none` and `auto` (configuration only). | [DMS registration-mode states](#dms-registration-mode-states) |
+    | `EventBindDeviceIdentityKey`                                         | Device               | `IoTCore/Policy`, `IoTCore/ThingGroup`, `IoTCore/Thing` | `iot:CreatePolicy` / `iot:DeletePolicyVersion`, `iot:GetPolicy` / `iot:ListPolicyVersions`, `iot:CreateThingGroup`, `iot:DescribeThing` / `iot:ListThingPrincipals`, `iot:RegisterThing` | In `auto` mode: creates/updates policies, ensures Thing groups, revokes stale principals and provisions the Thing via `iot:RegisterThing`. In `jitp` mode: no AWS calls; AWS runs the JITP template on first connection.                                             | [Thing lifecycle](#thing-lifecycle)                           |
+    | `EventUpdateCertificateStatusKey`                                    | Certificate          | `IoTCore/Certificate`                                   | `iot:UpdateCertificate`, `iot:Connect` (data plane)                                                                                                                                      | Maps status to AWS (`ACTIVE`, `INACTIVE`, `REVOKED`), calls `iot:UpdateCertificate` and forces an MQTT disconnect on revoke.                                                                                                                                         | [Certificate status states](#certificate-status-states)       |
+    | `EventUpdateCertificateMetadataKey` / `EventUpdateDeviceMetadataKey` | Certificate / Device | `IoTCore/Certificate`, `IoTCore/Thing`                  | —                                                                                                                                                                                        | Refreshes internal state; the connector ignores events whose CloudEvent `source` matches its own URI to avoid self-triggered loops.                                                                                                                                  | [Device Shadow and automation](#device-shadow-and-automation) |
+  </div>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  CA registration states [#ca-registration-states]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The CA registration flow is driven by the `registration.status` field of the CA's connector metadata:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  by the `registration.status` field of the CA's connector metadata:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  stateDiagram-v2
+      direction LR
+      [*] --> NotRegistered: no connector metadata
+      NotRegistered --> Requested: admin sets REQUESTED
+      Requested --> Registering: connector starts flow
+      Registering --> Succeeded: Primary verification certificate or SNI-only direct
+      Registering --> Failed: AWS rejects the call
+      Failed --> Requested: admin retries
+      Succeeded --> Requested: re-registration requested
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Transition                           | AWS calls                                                                                                               |
+  | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+  | `NotRegistered` → `Requested`        | none (metadata write only)                                                                                              |
+  | `Requested` → `Registering`          | `iot:GetRegistrationCode` (Primary Account only)                                                                        |
+  | `Registering` → `Succeeded`          | `iot:RegisterCACertificate` (Primary: proof-of-possession with an ephemeral key; SNI-only: `CertificateMode: SNI_ONLY`) |
+  | `Registering` → `Failed`             | failed `iot:RegisterCACertificate`; the error detail is written to the CA's metadata                                    |
+  | `Failed` / `Succeeded` → `Requested` | none (a new `REQUESTED` write re-runs the flow)                                                                         |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  DMS registration-mode states [#dms-registration-mode-states]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The DMS's `registration_mode` determines what the connector does on the AWS side when the DMS is created or fully edited:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  stateDiagram-v2
+      direction LR
+      [*] --> Unconfigured: DMS without connector metadata
+      Unconfigured --> None: admin sets the key with mode none
+      Unconfigured --> Auto: admin sets the key with mode auto
+      Unconfigured --> Jitp: admin sets the key with mode jitp
+      None --> Auto: mode switch on DMS edit
+      None --> Jitp: mode switch on DMS edit
+      Auto --> None: mode switch on DMS edit
+      Auto --> Jitp: mode switch on DMS edit
+      Jitp --> None: mode switch on DMS edit
+      Jitp --> Auto: mode switch on DMS edit
+      Jitp --> Jitp: full edit (PUT /v1/dms/{id}) retries template creation
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Transition                       | AWS calls                                                                                                                                      |
+  | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `Unconfigured` → `None` / `Auto` | none (configuration only)                                                                                                                      |
+  | `None` ↔ `Auto`                  | none (configuration only)                                                                                                                      |
+  | Any → `Jitp`                     | `iot:CreateProvisioningTemplate` (non-idempotent: it fails when the template already exists; after 3 retries the event lands in `lamassu-dlq`) |
+  | `Jitp` → `None` / `Auto`         | none (the template stays in the AWS account)                                                                                                   |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Certificate status states [#certificate-status-states]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Certificates holding the connector's metadata key sync their status; certificates provisioned via JITP have no metadata key and stay out of this machine:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  stateDiagram-v2
+      direction LR
+      [*] --> NotSynced: certificate without connector metadata (JITP)
+      NotSynced --> Active: status becomes Active
+      Active --> Inactive: Revoked + certificateHold
+      Active --> Revoked: Revoked (other reasons)
+      Inactive --> Active: status becomes Active
+      Revoked --> Active: status becomes Active
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Transition                                    | AWS calls                                        |
+  | --------------------------------------------- | ------------------------------------------------ |
+  | `NotSynced` → `Active`                        | `iot:UpdateCertificate`                          |
+  | `Active` → `Inactive`                         | `iot:UpdateCertificate` + forced MQTT disconnect |
+  | `Active` → `Revoked`                          | `iot:UpdateCertificate` + forced MQTT disconnect |
+  | `Inactive` / `Revoked` → `Active`             | `iot:UpdateCertificate`                          |
+  | `RenewalWindow` / `AboutToExpire` / `Expired` | none (these states are not synced to AWS)        |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Thing lifecycle [#thing-lifecycle]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Things only exist under `auto` mode; in `jitp` mode AWS creates the Thing itself when the device first connects. The Thing name is always the device certificate's CN:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  stateDiagram-v2
+      direction LR
+      [*] --> Absent: device not yet enrolled
+      Absent --> Provisioned: EventBindDeviceIdentityKey (auto mode)
+      Provisioned --> Provisioned: re-enrollment with same CN
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Transition                                    | AWS calls                                                                                                                             |
+  | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+  | `Absent` → `Provisioned`                      | policies created/updated, Thing groups ensured, `iot:RegisterThing` (creates the Thing, registers the certificate, attaches policies) |
+  | `Provisioned` → `Provisioned` (re-enrollment) | stale principals marked `REVOKED`, new `iot:RegisterThing` run; the new certificate ARN replaces the old one in Lamassu metadata      |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  In `jitp` mode the connector makes no provisioning calls: AWS executes the JITP template on the device's first connection and creates the Thing, registers the certificate and activates it on its own.
+</div>
+
 CA registration in AWS IoT Core [#ca-registration-in-aws-iot-core]
 
 For devices to authenticate to AWS IoT Core with certificates issued by a Lamassu CA, that CA must first be registered in the AWS account. The connector handles this registration automatically in response to the `EventCreateCAKey`, `EventImportCAKey` and `EventUpdateCAMetadataKey` events, but the operation **only fires when the administrator explicitly requests it** through the CA metadata field.

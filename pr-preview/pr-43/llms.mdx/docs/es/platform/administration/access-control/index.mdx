@@ -297,10 +297,6 @@ El chart incluye un principal de bootstrap que busca el rol OIDC `pki-admin` en 
 
 ```yaml title="values.yaml"
 auth:
-  authorization:
-    rolesClaim: realm_access.roles
-    roles:
-      admin: pki-admin
   externalAuthorization:
     enabled: true
     failOpen: false
@@ -334,9 +330,11 @@ El Job Helm de preinstalación y preactualización ejecuta las migraciones de `a
   </Step>
 
   <Step>
-    Configura las dos validaciones JWT [#configura-las-dos-validaciones-jwt]
+    Configura la validación de tokens [#configura-la-validación-de-tokens]
 
-    El Gateway utiliza `auth.authentication.apiGateway.jwks` para autenticar peticiones. `authz` utiliza `services.authz.jwkUrl` para resolver los principales OIDC. Ambos endpoints deben contener las claves del mismo emisor y ser alcanzables desde sus respectivos componentes.
+    `authz` valida cada token contra `services.authz.jwkUrl`, que se consulta desde el pod de `authz`. El Gateway no valida los tokens por sí mismo: los servicios de Lamassu autorizan cada petición a través de `authz`, y las rutas con la etiqueta `auth=external`, como las de Job Manager, las comprueba el Gateway a través de `authz` cuando `auth.externalAuthorization` está habilitado. El endpoint debe servir las claves del emisor configurado en `auth.oidc.frontend.authority`.
+
+    Las releases actualizadas desde 3.8.0 deben eliminar `auth.oidc.apiGateway` y `auth.authorization`, que el chart 4.0.0 rechaza. Consulta [3.8.0 a 4.0.0](/docs/upgrades/3-8-0-to-4-0-0#retirada-de-la-validación-de-tokens-en-el-gateway).
   </Step>
 
   <Step>

@@ -15,7 +15,7 @@ Prepare the platform services that are deliberately outside the Lamassu chart:
 * a reachable RabbitMQ broker and credentials
 * an OIDC provider, normally Keycloak, with a realm/tenant and client for Lamassu
 * Envoy Gateway 1.8+ and a `GatewayClass`
-* cert-manager 1.14+; for trusted TLS, either a trusted issuer or a Kubernetes TLS Secret
+* cert-manager 1.14+ (only for the default `tls.type: certManager` mode); for trusted TLS, either a trusted issuer or a Kubernetes TLS Secret
 * a StorageClass and an [external traffic design](/docs/deployment/self-hosted/networking)
 
 The chart defaults to a `GatewayClass` named `eg`. Change `gateway.className` if your platform team uses another name.
@@ -62,7 +62,7 @@ kubectl apply -f gateway-class.yaml
 kubectl rollout status deployment/envoy-gateway -n envoy-gateway-system
 ```
 
-Install cert-manager separately before Lamassu. The current chart renders its self-signed issuer and CA certificate resources even when `tls.type: external` makes the Gateway use an existing TLS Secret. Selecting external TLS therefore does not remove the cert-manager prerequisite.
+Install cert-manager separately before Lamassu, but only for the default `tls.type: certManager` mode. In that mode the chart renders its self-signed Issuer and CA Certificate resources regardless of whether `tls.certManagerOptions.clusterIssuer` is set, so cert-manager stays a prerequisite. With `tls.type: external`, the chart renders no cert-manager resources and the Gateway terminates TLS with an existing Secret you provide instead.
 
 2. Create a values file [#2-create-a-values-file]
 
@@ -108,10 +108,6 @@ auth:
     frontend:
       clientId: frontend
       authority: https://pki.example.com/auth/realms/lamassu
-    apiGateway:
-      jwks:
-        - name: oidc-authn
-          uri: http://auth-keycloak.lamassu.svc.cluster.local/auth/realms/lamassu/protocol/openid-connect/certs
 
 services:
   ca:
@@ -138,13 +134,13 @@ If Keycloak is external and already has its own reachable URL, point the OIDC se
 
 TLS with an existing Secret [#tls-with-an-existing-secret]
 
-Create a Secret containing `tls.crt` and `tls.key`, then reference it:
+Create a Secret containing `tls.crt` and `tls.key`, then reference it. The Secret must already exist before installing: in `external` mode the chart renders no cert-manager resources and never creates this Secret.
 
 ```yaml
 tls:
   type: external
   externalOptions:
-    secretName: lamassu-downstream-tls
+    secretName: provided-tls
 ```
 
 Provision the first administrator [#provision-the-first-administrator]
@@ -206,6 +202,6 @@ Before going live, review:
 * a trusted TLS issuer or externally managed certificate
 * resource requests, replicas, autoscaling, disruption budgets and placement
 * SMTP, observability and alert delivery
-* the migration notes in `charts/lamassu/CHANGELOG/` before every upgrade
+* the [version upgrade guides](/docs/upgrades/3-8-0-to-4-0-0) and the notes in `charts/lamassu/CHANGELOG/` before every upgrade
 
 The complete values reference is maintained in `charts/lamassu/VALUES.md` in the Helm repository.

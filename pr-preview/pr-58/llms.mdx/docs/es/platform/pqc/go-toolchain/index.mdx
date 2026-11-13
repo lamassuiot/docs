@@ -45,7 +45,40 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  | Punto de código | Algoritmo                     |
+  | --------------- | ----------------------------- |
+  | `0xFE00`        | MLDSA44-RSA2048-PSS-SHA256    |
+  | `0xFE01`        | MLDSA44-RSA2048-PKCS15-SHA256 |
+  | `0xFE02`        | MLDSA65-RSA3072-PSS-SHA512    |
+  | `0xFE03`        | MLDSA65-RSA3072-PKCS15-SHA512 |
+  | `0xFE04`        | MLDSA65-RSA4096-PSS-SHA512    |
+  | `0xFE05`        | MLDSA65-RSA4096-PKCS15-SHA512 |
+  | `0xFE06`        | MLDSA87-RSA3072-PSS-SHA512    |
+  | `0xFE07`        | MLDSA87-RSA4096-PSS-SHA512    |
+  | `0xFE08`        | MLDSA44-ECDSA-P256-SHA256     |
+  | `0xFE09`        | MLDSA65-ECDSA-P256-SHA512     |
+  | `0xFE0A`        | MLDSA65-ECDSA-P384-SHA512     |
+  | `0xFE0B`        | MLDSA87-ECDSA-P384-SHA512     |
+  | `0xFE0C`        | MLDSA87-ECDSA-P521-SHA512     |
+  | `0xFE0D`        | MLDSA44-Ed25519-SHA512        |
+  | `0xFE0E`        | MLDSA65-Ed25519-SHA512        |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   El intercambio de claves no cambia respecto a Go original. Los grupos híbridos como `X25519MLKEM768`, `SecP256r1MLKEM768`, `SecP384r1MLKEM1024` y el `MLKEM1024` puro son los de la biblioteca estándar de Go 1.27.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Grupo                | Composición         |
+  | -------------------- | ------------------- |
+  | `X25519MLKEM768`     | X25519 + ML-KEM-768 |
+  | `SecP256r1MLKEM768`  | P-256 + ML-KEM-768  |
+  | `SecP384r1MLKEM1024` | P-384 + ML-KEM-1024 |
+  | `MLKEM1024`          | ML-KEM-1024 solo    |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La conexión sigue protegida mientras al menos un componente de un grupo híbrido se mantenga seguro. El intercambio de claves es independiente del tipo de certificado: una conexión puede usar un certificado clásico y aun así tener un intercambio de claves poscuántico.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -96,11 +129,15 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Qué se eliminó [#qué-se-eliminó]
+  Enfoques descartados [#enfoques-descartados]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Las primeras iteraciones del fork exploraron certificados Chameleon (`draft-bonnell-lamps-chameleon-certs`) y una construcción de certificados delta. Se eliminaron porque ya no se persiguen. El mecanismo de certificados relacionados se recuperó después por separado, siguiendo el RFC 9763.
+  Las primeras iteraciones del fork implementaron certificados Chameleon, definidos en `draft-bonnell-lamps-chameleon-certs`. La idea es emparejar dos certificados del mismo sujeto, por ejemplo uno clásico y otro poscuántico, emitiendo el primero con una extensión que codifica solo las diferencias respecto al segundo. Quien confía en el certificado y entiende la extensión puede reconstruir el certificado emparejado a partir de ella y validar ese, de modo que un único certificado emitido lleva ambas identidades sin cambiar las reglas de validación de ruta del RFC 5280.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El trabajo se descartó porque el borrador caducó sin llegar a ser un estándar y ya no se persigue, de modo que no había una especificación estable con la que interoperar. Nada en la implementación actual depende de él.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -109,6 +146,22 @@
 
 <div className="lm-diff-ins lm-diff-block">
   El fork se compila en CI mediante un workflow que ejecuta la batería de pruebas de Go y después publica una imagen multiarquitectura, `ghcr.io/lamassuiot/golang-pqc`, con la etiqueta `go1.27` y, para la rama `release-branch.go1.27`, `latest`. La imagen contiene el toolchain en `/usr/local/go-pqc`, con `GOROOT` apuntando a esa ruta.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Para compilar el toolchain desde el código fuente, usa la rama `release-branch.go1.27` y la compilación estándar de Go:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  git clone --branch release-branch.go1.27 https://github.com/lamassuiot/go.git
+  cd go/src
+  ./make.bash
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El comando `bin/go` resultante se usa como cualquier otra cadena de herramientas de Go.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

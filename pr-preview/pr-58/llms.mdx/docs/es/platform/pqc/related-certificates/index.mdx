@@ -7,6 +7,19 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Esta opción encaja cuando:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * los consumidores aún no pueden validar cadenas poscuánticas o composite, por lo que el certificado clásico debe seguir siendo el que se usa;
+  * un dispositivo tiene que llevar ambos certificados y demostrar que van juntos, usando cada uno donde el interlocutor lo admita.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El hash es SHA-256, SHA-384 o SHA-512, según el hash del algoritmo de firma del certificado relacionado, y SHA-256 si este no tiene ninguno.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   Cómo funciona la solicitud [#cómo-funciona-la-solicitud]
 </div>
 
@@ -75,6 +88,12 @@
 
 <div className="lm-diff-ins lm-diff-block">
   El fork se niega a vincular un certificado salvo que el nuevo sea compatible con el relacionado. Ninguno de los dos puede ser una CA. El certificado relacionado debe estar vigente en el momento de la emisión. Los usos de clave y los usos extendidos de clave solicitados para el nuevo certificado deben ser un subconjunto de los del certificado relacionado. La verificación posterior compara únicamente el hash, de modo que una parte que confía y comprueba el enlace averigua que la CA emisora vinculó el nuevo certificado a ese certificado concreto, no que el certificado relacionado siga siendo válido.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="info" title="Los certificados relacionados vinculan, no sustituyen">
+    La extensión es una prueba de relación, no una dependencia. Quien confía en ellos debe seguir validando cada certificado con su propia cadena y estado de revocación, y revocar el certificado clásico no revoca el vinculado.
+  </Callout>
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

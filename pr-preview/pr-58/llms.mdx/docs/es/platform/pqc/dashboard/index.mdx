@@ -35,7 +35,15 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Emitir un certificado desde una CA genera el par de claves en el navegador, construye la solicitud de certificado y la envía a la CA para su firma. Los tipos de clave que se ofrecen aquí son `RSA`, `ECDSA`, `Ed25519`, `ML-DSA`, `SLH-DSA` y una única entrada `Composite ML-DSA`, y se generan con las bibliotecas `@noble` para los algoritmos poscuánticos y composite y con WebCrypto para los clásicos. La clave privada generada se muestra una sola vez al final del procedimiento.
+  Emitir un certificado desde una CA genera el par de claves en el navegador, construye la solicitud de certificado y la envía a la CA para su firma. Los tipos de clave que se ofrecen aquí son `RSA`, `ECDSA`, `Ed25519`, `ML-DSA`, `SLH-DSA` y una única entrada `Composite ML-DSA`, y se generan en el navegador: con las bibliotecas `@noble` para ML-DSA y SLH-DSA y con WebCrypto para los algoritmos clásicos.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La generación de claves composite no está disponible en `@noble`. El equipo de Lamassu la ha implementado para el dashboard: combina la clave ML-DSA con una clave RSA, ECDSA o Ed25519 y firma el mensaje representativo composite tal como define la especificación, de modo que una solicitud de certificado composite puede crearse íntegramente en el navegador.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La clave privada generada se muestra una sola vez al final del procedimiento.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

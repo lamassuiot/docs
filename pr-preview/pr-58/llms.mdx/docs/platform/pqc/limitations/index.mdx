@@ -11,7 +11,7 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Composite certificates were implemented and tested against draft 19 of the IETF composite signatures specification, which has since been published as RFC 10073; the implementation has not been compared with the final text. Three of its algorithms (the two Brainpool variants and Ed448) are not implemented. The composite signature schemes in TLS use private-use code points in `0xFE00` to `0xFE0E` and no published draft or version is identified in the code, so they interoperate only with peers built from the same Go fork. Composite RSA-PKCS#1 v1.5 variants cannot authenticate a TLS handshake. SLH-DSA has no TLS signature scheme. The related-certificate request attribute has not been checked against other implementations of RFC 9763.
+  Composite certificates follow [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html). The implementation was written against draft 19 and passes the RFC's test vectors, but it has not had a full conformance assessment. Three of its algorithms (the two Brainpool variants and Ed448) are not implemented. The composite signature schemes in TLS use private-use code points in `0xFE00` to `0xFE0E` because IANA has assigned none, so they interoperate only with peers built from the same Go fork. Composite RSA-PKCS#1 v1.5 variants cannot authenticate a TLS handshake. SLH-DSA has no TLS signature scheme. The related-certificate request attribute has not been checked against other implementations of RFC 9763.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

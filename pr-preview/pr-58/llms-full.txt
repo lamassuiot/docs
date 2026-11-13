@@ -4883,6 +4883,18 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  | Parameter set | NIST security category |
+  | ------------- | ---------------------- |
+  | ML-DSA-44     | 2                      |
+  | ML-DSA-65     | 3                      |
+  | ML-DSA-87     | 5                      |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A higher category means larger keys and signatures in exchange for more security margin.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   Go reads ML-DSA private keys in PKCS#8 only when they contain the 32-byte seed. Keys written by OpenSSL in its default seed-plus-expanded form are rejected, so export them in the seed-only form before importing them.
 </div>
 
@@ -4906,7 +4918,7 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  The object identifiers run from `2.16.840.1.101.3.4.3.20` to `.31`. SLH-DSA signatures are large, between about 8 and 50 KB depending on the parameter set, which matters for certificate chains and for any transport with a size limit. SLH-DSA is available for keys, CAs and certificates, but the fork has no TLS signature scheme for it, so an SLH-DSA certificate cannot authenticate a TLS connection.
+  The SLH-DSA implementation is provided by Cloudflare's [CIRCL](https://github.com/cloudflare/circl/) library, which the fork integrates so that SLH-DSA keys can be used in X.509 certificates. The object identifiers run from `2.16.840.1.101.3.4.3.20` to `.31`. SLH-DSA signatures are large, between about 8 and 50 KB depending on the parameter set, which matters for certificate chains and for any transport with a size limit. SLH-DSA is available for keys, CAs and certificates, but the fork has no TLS signature scheme for it, so an SLH-DSA certificate cannot authenticate a TLS connection.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -4914,7 +4926,7 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  A composite key pairs an ML-DSA key with a traditional key. A composite signature is the concatenation of the ML-DSA signature and the traditional signature, both computed over a message representative that contains a fixed prefix, an algorithm label, an optional context and a hash of the message; verification fails if either component fails. The ML-DSA component is pure ML-DSA, with the label as its context. Lamassu implements the 15 algorithms of draft 19 of the IETF specification that rely only on algorithms available in Go. The identifiers sit under the arc `1.3.6.1.5.5.7.6`.
+  A composite key pairs an ML-DSA key with a traditional key. A composite signature is the concatenation of the ML-DSA signature and the traditional signature, both computed over a message representative that contains a fixed prefix, an algorithm label, an optional context and a hash of the message; verification fails if either component fails. The ML-DSA component is pure ML-DSA, with the label as its context. Lamassu implements the 15 algorithms of [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html) that rely only on algorithms available in Go. The identifiers sit under the arc `1.3.6.1.5.5.7.6`.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -4942,7 +4954,7 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Draft 19 has since been published as [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html). The object identifiers and the domain separator prefix checked against the RFC match this page, but the implementation was written and tested against the draft and has not been compared with the final text. Three algorithms of the specification are not implemented because Go has no Brainpool curves and no Ed448: the two Brainpool variants (`MLDSA65-ECDSA-brainpoolP256r1` and `MLDSA87-ECDSA-brainpoolP384r1`, with their hash suffix) and the Ed448 variant. The fork passes the official test vectors of draft 19 for the 15 algorithms it does implement.
+  The implementation was written against draft 19 of the specification, which was later published as RFC 10073, and has been checked against the published text. The object identifiers, the domain separator prefix, the hash used for each ECDSA component and the RFC 5915 encoding of ECDSA private keys match the RFC. Three algorithms of the specification are not implemented because Go has no Brainpool curves and no Ed448: the two Brainpool variants (`MLDSA65-ECDSA-brainpoolP256r1` and `MLDSA87-ECDSA-brainpoolP384r1`, with their hash suffix) and the Ed448 variant. The fork passes the test vectors of RFC 10073 Appendix E for the 15 algorithms it does implement, including the signatures with and without context. These checks cover the vectors and the points listed above; they are not a full conformance assessment.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -4955,6 +4967,17 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 
 <div className="lm-diff-ins lm-diff-block">
   Ed25519 is not post-quantum, but support for it as a CA and certificate key type was added in the same work and is selected with the `Ed25519` key type. It is classified in the traditional family.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Choosing an algorithm [#choosing-an-algorithm]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * **Composite ML-DSA** is the most conservative option during the transition, because the signature stays valid only if both components verify and so keeps classical protection if a flaw is found in the new algorithm. Keys and signatures are larger than classical ones.
+  * **ML-DSA** alone gives post-quantum protection with moderate sizes and fast operations.
+  * **SLH-DSA** suits long-lived trust anchors where relying only on hash functions is valued. Signatures are considerably larger, and it cannot authenticate TLS connections.
+  * **Ed25519** is not post-quantum; use it only where a classical algorithm is acceptable.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -5011,7 +5034,15 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Issuing a certificate from a CA generates the key pair in the browser, builds the certificate request and sends it to the CA for signing. The key types offered here are `RSA`, `ECDSA`, `Ed25519`, `ML-DSA`, `SLH-DSA` and a single `Composite ML-DSA` entry, and they are generated with the `@noble` libraries for the post-quantum and composite algorithms and with WebCrypto for the classical ones. The generated private key is shown once at the end of the procedure.
+  Issuing a certificate from a CA generates the key pair in the browser, builds the certificate request and sends it to the CA for signing. The key types offered here are `RSA`, `ECDSA`, `Ed25519`, `ML-DSA`, `SLH-DSA` and a single `Composite ML-DSA` entry, and they are generated in the browser: with the `@noble` libraries for ML-DSA and SLH-DSA and with WebCrypto for the classical algorithms.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Composite key generation is not available in `@noble`. The Lamassu team implemented it for the dashboard, combining the ML-DSA key with an RSA, ECDSA or Ed25519 key and signing the composite message representative as the specification defines, so that a composite certificate request can be created entirely in the browser.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The generated private key is shown once at the end of the procedure.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -5249,7 +5280,40 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  | Code point | Algorithm                     |
+  | ---------- | ----------------------------- |
+  | `0xFE00`   | MLDSA44-RSA2048-PSS-SHA256    |
+  | `0xFE01`   | MLDSA44-RSA2048-PKCS15-SHA256 |
+  | `0xFE02`   | MLDSA65-RSA3072-PSS-SHA512    |
+  | `0xFE03`   | MLDSA65-RSA3072-PKCS15-SHA512 |
+  | `0xFE04`   | MLDSA65-RSA4096-PSS-SHA512    |
+  | `0xFE05`   | MLDSA65-RSA4096-PKCS15-SHA512 |
+  | `0xFE06`   | MLDSA87-RSA3072-PSS-SHA512    |
+  | `0xFE07`   | MLDSA87-RSA4096-PSS-SHA512    |
+  | `0xFE08`   | MLDSA44-ECDSA-P256-SHA256     |
+  | `0xFE09`   | MLDSA65-ECDSA-P256-SHA512     |
+  | `0xFE0A`   | MLDSA65-ECDSA-P384-SHA512     |
+  | `0xFE0B`   | MLDSA87-ECDSA-P384-SHA512     |
+  | `0xFE0C`   | MLDSA87-ECDSA-P521-SHA512     |
+  | `0xFE0D`   | MLDSA44-Ed25519-SHA512        |
+  | `0xFE0E`   | MLDSA65-Ed25519-SHA512        |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   The key exchange is unchanged from upstream Go. Hybrid groups such as `X25519MLKEM768`, `SecP256r1MLKEM768`, `SecP384r1MLKEM1024` and the pure `MLKEM1024` are those of the Go 1.27 standard library.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Group                | Composition         |
+  | -------------------- | ------------------- |
+  | `X25519MLKEM768`     | X25519 + ML-KEM-768 |
+  | `SecP256r1MLKEM768`  | P-256 + ML-KEM-768  |
+  | `SecP384r1MLKEM1024` | P-384 + ML-KEM-1024 |
+  | `MLKEM1024`          | ML-KEM-1024 alone   |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The connection stays protected while at least one component of a hybrid group is secure. The key exchange is independent of the certificate type, so a connection can use a classical certificate and still have a post-quantum key exchange.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -5300,11 +5364,15 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  What was removed [#what-was-removed]
+  Discarded approaches [#discarded-approaches]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Earlier iterations of the fork explored Chameleon certificates (`draft-bonnell-lamps-chameleon-certs`) and a delta-certificate construction. They were removed because they are no longer pursued. The related-certificate mechanism was later restored on its own, following RFC 9763.
+  The first iterations of the fork implemented Chameleon certificates, defined in `draft-bonnell-lamps-chameleon-certs`. The idea is to pair two certificates for the same subject, for example a classical one and a post-quantum one, by issuing the first with an extension that encodes only the differences to the second. A relying party that understands the extension can rebuild the paired certificate from it and validate that one, so a single issued certificate carries both identities without changing the path validation rules of RFC 5280.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The work was dropped because the draft expired without becoming a standard and is no longer being pursued, so there was no stable specification to interoperate with. Nothing in the current implementation depends on it.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -5316,6 +5384,22 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  To build the toolchain from source instead, use the `release-branch.go1.27` branch and the standard Go source build:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  git clone --branch release-branch.go1.27 https://github.com/lamassuiot/go.git
+  cd go/src
+  ./make.bash
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The resulting `bin/go` command is used like any other Go toolchain.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   Lamassu consumes the toolchain in two ways. The backend images (CA, KMS, VA, alerts, device manager, DMS manager and the monolithic build) use `ghcr.io/lamassuiot/golang-pqc:latest` as their builder image. The backend CI workflow installs the same toolchain through a custom setup action in place of `actions/setup-go`, and the backend requires `go 1.27.3` in its module file. Traefik is not built from the image: its `build.sh` script expects a compiled checkout of the fork in a sibling directory and produces the binary outside a container. See [TLS front proxy with Traefik](/docs/platform/pqc/tls-front-proxy).
 </div>
 
@@ -5324,6 +5408,386 @@ When escalating a problem, provide identifiers, error and relevant public eviden
     <Card title="Algorithms" description="The identifiers and parameter sets behind these constants." href="/docs/platform/pqc/algorithms" />
 
     <Card title="TLS front proxy with Traefik" description="How the fork is used to terminate device TLS." href="/docs/platform/pqc/tls-front-proxy" />
+  </Cards>
+</div>
+
+
+# HTTPS integration tests (/docs/pr-preview/pr-58/platform/pqc/integration-tests/https)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  This test connects to a Lamassu API endpoint over HTTPS from an OpenSSL client and checks that the post-quantum handshake, the certificate chain and the application request all succeed. The [overview](/docs/platform/pqc/integration-tests/overview) explains the clients, the test matrix and what each check proves.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Scenario [#scenario]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The client requests `GET /api/ca/health` through the Traefik front proxy, which forwards it to Envoy Gateway and the CA service. The server certificate and the CA that signed it were created outside Lamassu and loaded into the front proxy for each case. For each case the proxy was configured with the key exchange groups and the certificate of that row and column of the matrix.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="info" title="Test PKI">
+    The CAs and certificates are test material made outside Lamassu, valid for a short period and with the server name as their subject alternative name. They are not issued by the Lamassu CA service.
+  </Callout>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Results [#results]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  All nine combinations of key exchange and certificate passed, and so did the three additional composite certificates.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Key exchange ↓ / Certificate → | **T**: ECDSA P-256                           | **PQ**: ML-DSA-65             | **PQ/T**: `MLDSA65-RSA3072-PSS-SHA512`    |
+  | ------------------------------ | -------------------------------------------- | ----------------------------- | ----------------------------------------- |
+  | **T**                          | ✅ `X25519`, `ecdsa_secp256r1_sha256`         | ✅ `X25519`, `mldsa65`         | ✅ `X25519`, `mldsa65_rsa3072_pss`         |
+  | **PQ**                         | ✅ `MLKEM1024`, `ecdsa_secp256r1_sha256`      | ✅ `MLKEM1024`, `mldsa65`      | ✅ `MLKEM1024`, `mldsa65_rsa3072_pss`      |
+  | **PQ/T**                       | ✅ `X25519MLKEM768`, `ecdsa_secp256r1_sha256` | ✅ `X25519MLKEM768`, `mldsa65` | ✅ `X25519MLKEM768`, `mldsa65_rsa3072_pss` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Each cell shows the negotiated group and the signature scheme of the handshake. In every case the chain verified, the request returned `200` and both negative checks were rejected with `handshake_failure`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Additional composite        | Signature scheme     | Result                  |
+  | --------------------------- | -------------------- | ----------------------- |
+  | `MLDSA44-ECDSA-P256-SHA256` | `mldsa44_ecdsa_p256` | ✅ with `X25519MLKEM768` |
+  | `MLDSA65-ECDSA-P256-SHA512` | `mldsa65_ecdsa_p256` | ✅ with `X25519MLKEM768` |
+  | `MLDSA65-Ed25519-SHA512`    | `mldsa65_ed25519`    | ✅ with `X25519MLKEM768` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  With a single server configuration that holds the ECDSA, ML-DSA-65 and composite certificates at once and accepts all three key exchange classes, a client that offered one group and one signature scheme negotiated each of the nine combinations. `curl` returned `200` when it trusted the three CAs.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="warn" title="Trust every class of CA you expect to be served">
+    A server with certificates of several classes serves the first that matches the client's signature preference. A default OpenSSL 3.5 or later client prefers ML-DSA, so a client that trusts only the ECDSA CA fails with `unable to get local issuer certificate`, even though the connection itself worked. Give clients the CAs of every class the server may present.
+  </Callout>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Reproduce a case [#reproduce-a-case]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  You need OpenSSL 3.5 or later. For composite certificates, also the `hybrid-provider` module with code points that match the Go PQC toolchain, loaded through `OPENSSL_CONF`. Use the CA file of the case as `ca.pem`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Steps>
+    <Step>
+      Connect offering one group and one signature scheme [#connect-offering-one-group-and-one-signature-scheme]
+
+      This example tests PQ/T key exchange with the composite certificate, and prints the negotiated values:
+
+      ```bash
+      openssl s_client -connect <LAMASSU_HOST>:443 -servername <LAMASSU_HOST> \
+        -tls1_3 -groups X25519MLKEM768 -sigalgs mldsa65_rsa3072_pss \
+        -CAfile ca.pem -verify_hostname <LAMASSU_HOST> -verify_return_error \
+        < /dev/null 2>&1 | grep -E 'Negotiated TLS1.3 group|Peer signature type|Verify return code'
+      ```
+
+      Expected output:
+
+      ```text
+      Peer signature type: mldsa65_rsa3072_pss
+      Negotiated TLS1.3 group: X25519MLKEM768
+      Verify return code: 0 (ok)
+      ```
+    </Step>
+
+    <Step>
+      Send a request [#send-a-request]
+
+      Replace the `grep` with an HTTP request to confirm that the application layer works through the proxy:
+
+      ```bash
+      printf 'GET /api/ca/health HTTP/1.1\r\nHost: <LAMASSU_HOST>\r\nConnection: close\r\n\r\n' | \
+        openssl s_client -connect <LAMASSU_HOST>:443 -servername <LAMASSU_HOST> \
+        -tls1_3 -groups X25519MLKEM768 -sigalgs mldsa65_rsa3072_pss \
+        -CAfile ca.pem -verify_hostname <LAMASSU_HOST> -verify_return_error -quiet
+      ```
+
+      The response starts with `HTTP/1.1 200 OK`. With `curl` and a bundle that contains the CAs of the classes the server presents, `curl --cacert ca-bundle.pem https://<LAMASSU_HOST>/api/ca/health` returns `200` as well.
+    </Step>
+
+    <Step>
+      Check that a wrong offer is rejected [#check-that-a-wrong-offer-is-rejected]
+
+      Offer only classical groups to a server configured for PQ key exchange:
+
+      ```bash
+      openssl s_client -connect <LAMASSU_HOST>:443 -servername <LAMASSU_HOST> \
+        -tls1_3 -groups X25519 -CAfile ca.pem < /dev/null
+      ```
+
+      The handshake fails with a `handshake failure` alert. Offering every signature scheme except the certificate's gives the same result.
+    </Step>
+  </Steps>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="MQTTS" description="The same checks for an MQTT broker." href="/docs/platform/pqc/integration-tests/mqtts" />
+
+    <Card title="TLS front proxy with Traefik" description="How the proxy chooses a certificate and enforces key exchange." href="/docs/platform/pqc/tls-front-proxy" />
+  </Cards>
+</div>
+
+
+# MQTTS integration tests (/docs/pr-preview/pr-58/platform/pqc/integration-tests/mqtts)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  This test connects `mosquitto_pub` and `mosquitto_sub` to an MQTT broker over TLS and checks that messages travel through it with post-quantum key exchange and post-quantum or composite server certificates. The [overview](/docs/platform/pqc/integration-tests/overview) explains the clients, the test matrix and what each check proves.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Scenario [#scenario]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The broker is EMQX 5.8.9. It listens for MQTT in clear text inside the cluster, and the Lamassu TLS front proxy ([TLS front proxy with Traefik](/docs/platform/pqc/tls-front-proxy)) terminates TLS for it on port 8883 and forwards the traffic. The TLS is one-way: the broker's endpoint presents its certificate, and the client presents none. The server certificate and its CA were created outside Lamassu, and the proxy was configured for each case with the key exchange groups and certificate of that row and column of the matrix.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The clients are `mosquitto_pub` and `mosquitto_sub` 2.1.2, using MQTT 3.1.1 over TLS 1.3 and linked against OpenSSL 4.1.0. A case passes when the subscriber receives the message that the publisher sent through the broker, both clients validate the certificate chain against the CA of the case and the server name, and the two negative checks are rejected.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Results [#results]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  All twelve cases passed. In each one, `mosquitto_sub` subscribed to a topic, `mosquitto_pub` published a unique value, and the subscriber received it. The test ran twice per case: once with the client offering every group and signature scheme, and once with the client offering only the group and the signature scheme expected for the case. The second run shows that the broker's endpoint negotiated exactly that group and scheme, because the client offered nothing else.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Key exchange ↓ / Certificate → | **T**: ECDSA P-256                           | **PQ**: ML-DSA-65             | **PQ/T**: `MLDSA65-RSA3072-PSS-SHA512`    |
+  | ------------------------------ | -------------------------------------------- | ----------------------------- | ----------------------------------------- |
+  | **T**                          | ✅ `X25519`, `ecdsa_secp256r1_sha256`         | ✅ `X25519`, `mldsa65`         | ✅ `X25519`, `mldsa65_rsa3072_pss`         |
+  | **PQ**                         | ✅ `MLKEM1024`, `ecdsa_secp256r1_sha256`      | ✅ `MLKEM1024`, `mldsa65`      | ✅ `MLKEM1024`, `mldsa65_rsa3072_pss`      |
+  | **PQ/T**                       | ✅ `X25519MLKEM768`, `ecdsa_secp256r1_sha256` | ✅ `X25519MLKEM768`, `mldsa65` | ✅ `X25519MLKEM768`, `mldsa65_rsa3072_pss` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The additional composite certificates behave the same way with PQ/T key exchange.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Additional composite        | Signature scheme     | Result |
+  | --------------------------- | -------------------- | ------ |
+  | `MLDSA44-ECDSA-P256-SHA256` | `mldsa44_ecdsa_p256` | ✅      |
+  | `MLDSA65-ECDSA-P256-SHA512` | `mldsa65_ecdsa_p256` | ✅      |
+  | `MLDSA65-Ed25519-SHA512`    | `mldsa65_ed25519`    | ✅      |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  When the client offered every group except those of the case, or every signature scheme except the certificate's, the TLS handshake failed with a `handshake failure` alert and the broker never sent a `CONNACK`. The same result held in all twelve cases.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  With a single server configuration that holds the ECDSA, ML-DSA-65 and composite certificates and accepts all three key exchange classes, each of the nine combinations connected on port 8883 when the client offered one group and one signature scheme. `mosquitto_pub` received `CONNACK (0)` every time.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Reproduce a case [#reproduce-a-case]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  mosquitto has no options to choose key exchange groups or signature schemes, so they are set through an OpenSSL configuration file that `mosquitto_pub` and `mosquitto_sub` read from the `OPENSSL_CONF` environment variable. You need OpenSSL 3.5 or later; for composite certificates, also the `hybrid-provider` module with code points that match the Go PQC toolchain.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Steps>
+    <Step>
+      Create the OpenSSL configuration [#create-the-openssl-configuration]
+
+      This `pqc-client.cnf` makes the client offer only `X25519MLKEM768` and the composite signature scheme, and loads the composite provider:
+
+      ```ini
+      openssl_conf = openssl_init
+
+      [openssl_init]
+      providers = provider_sect
+      ssl_conf = ssl_sect
+
+      [provider_sect]
+      default = default_sect
+      hybrid = hybrid_sect
+
+      [default_sect]
+      activate = 1
+
+      [hybrid_sect]
+      module = /path/to/hybrid.so
+      activate = 1
+
+      [ssl_sect]
+      system_default = tls_sect
+
+      [tls_sect]
+      MinProtocol = TLSv1.3
+      Groups = X25519MLKEM768
+      SignatureAlgorithms = mldsa65_rsa3072_pss
+      ```
+
+      Remove the `hybrid` provider and the module for a case that uses ML-DSA or ECDSA only.
+    </Step>
+
+    <Step>
+      Subscribe and publish [#subscribe-and-publish]
+
+      Start the subscriber in one terminal and the publisher in another. Both validate the broker's certificate against `ca.pem`, the CA of the case:
+
+      ```bash
+      export OPENSSL_CONF=$PWD/pqc-client.cnf
+
+      mosquitto_sub -h <MQTT_HOST> -p 8883 --cafile ca.pem --tls-version tlsv1.3 \
+        -t pqc-test/hello -C 1 -W 15
+
+      mosquitto_pub -h <MQTT_HOST> -p 8883 --cafile ca.pem --tls-version tlsv1.3 \
+        -t pqc-test/hello -m "hello over pqc"
+      ```
+
+      The subscriber prints `hello over pqc` and exits. Add `-d` to see the `CONNECT`, `CONNACK (0)`, `SUBACK` and `PUBLISH` packets.
+    </Step>
+
+    <Step>
+      Check that a wrong offer is rejected [#check-that-a-wrong-offer-is-rejected]
+
+      Change `Groups` to a list that does not include the group the server accepts, for example `Groups = X25519` against a server configured for `MLKEM1024`, and repeat the publish. The client fails with `tls alert handshake failure` and no `CONNACK` is received.
+    </Step>
+  </Steps>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Things to know [#things-to-know]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * **Hostname and certificate.** mosquitto uses the `-h` value as the connection target, the server name sent in the handshake and the name it verifies. The test certificates carry that name as a subject alternative name.
+  * **One certificate per name.** The front proxy keeps its certificates by name, not by port. An MQTT endpoint that shares its name with the HTTPS endpoint serves the same certificates, so give the broker its own name if it needs a different certificate.
+  * **Unpinned defaults were not tested.** Every run set the group and signature offer explicitly, so what mosquitto negotiates with the default OpenSSL offer was not checked in this test. The HTTPS tests do cover a default OpenSSL client: it is served the ML-DSA certificate if the server holds one.
+  * **Other clients on the same port.** Enforcing TLS 1.3 or post-quantum algorithms on a shared MQTT port affects every client that connects to it. During the tests the proxy logged connection attempts from other clients that only support TLS 1.2 or earlier, or that did not trust the certificate. Identify them before making the setting permanent.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="HTTPS" description="The same checks for a Lamassu HTTPS endpoint." href="/docs/platform/pqc/integration-tests/https" />
+
+    <Card title="Deployment with the Helm chart" description="Deploy the front proxy that terminates the TLS." href="/docs/platform/pqc/deployment" />
+  </Cards>
+</div>
+
+
+# Integration tests overview (/docs/pr-preview/pr-58/platform/pqc/integration-tests/overview)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  Post-quantum certificates only help if the systems that consume them can use them. These integration tests check that clients and brokers that are not part of Lamassu, built on a different cryptographic library, can connect to a Lamassu TLS endpoint, negotiate post-quantum key exchange and verify post-quantum and composite certificates. Two protocols were tested: [HTTPS](/docs/platform/pqc/integration-tests/https) and [MQTTS](/docs/platform/pqc/integration-tests/mqtts).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="info" title="What these tests demonstrate">
+    The certificates and CAs used in the tests were generated outside Lamassu, with standard tools, to show that the [Go PQC toolchain](/docs/platform/pqc/go-toolchain) implements the X.509 and TLS formats in an interoperable way. They show that certificates created externally work with Lamassu's TLS endpoint, and that independent software verifies them. They do not test certificates issued by a Lamassu CA.
+  </Callout>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  What was tested [#what-was-tested]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The server is the Traefik front proxy that terminates device TLS in Lamassu ([TLS front proxy with Traefik](/docs/platform/pqc/tls-front-proxy)). It is built with the Go PQC toolchain and was configured for each test with one key exchange class and one certificate class.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The clients are independent implementations:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * **OpenSSL 4.0.3 and 4.1.0**, with the native ML-KEM and ML-DSA support of OpenSSL 3.5 and later.
+  * **The OpenSSL `hybrid-provider` module**, for composite ML-DSA. The build used was written against draft 19 of the specification, which was later published as [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html); the test vectors of both are identical, but the provider was not otherwise checked against the final text.
+  * **`curl`** for HTTPS and **`mosquitto_pub` and `mosquitto_sub` 2.1.2** for MQTTS, both linked against that OpenSSL.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The test matrix [#the-test-matrix]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Each combination of key exchange and certificate was tested separately, using the families that Lamassu uses elsewhere (T, PQ and PQ/T, see [Algorithms](/docs/platform/pqc/algorithms)).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Key exchange | Groups the server accepts                                   |
+  | ------------ | ----------------------------------------------------------- |
+  | **T**        | `X25519`, `CurveP256`, `CurveP384`                          |
+  | **PQ**       | `MLKEM1024`                                                 |
+  | **PQ/T**     | `X25519MLKEM768`, `SecP256r1MLKEM768`, `SecP384r1MLKEM1024` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Certificate | Server certificate                     |
+  | ----------- | -------------------------------------- |
+  | **T**       | ECDSA P-256                            |
+  | **PQ**      | ML-DSA-65                              |
+  | **PQ/T**    | Composite `MLDSA65-RSA3072-PSS-SHA512` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  That gives nine combinations. Three more composite certificates were tested with PQ/T key exchange: `MLDSA44-ECDSA-P256-SHA256`, `MLDSA65-ECDSA-P256-SHA512` and `MLDSA65-Ed25519-SHA512`, for twelve cases in total. Every certificate was issued by a test CA with the same algorithm as the certificate.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  What each case checks [#what-each-case-checks]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A case passes only if all of these hold:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  1. **Key exchange.** The group negotiated in the handshake is the one expected for the case.
+  2. **Signature.** The signature scheme of the server's handshake signature is the one expected for the certificate.
+  3. **Chain.** The client verifies the certificate chain against the CA of the case and the server name, with no verification error.
+  4. **Application traffic.** The protocol works: an HTTP request returns `200`, or an MQTT message published to the broker reaches a subscriber.
+  5. **Wrong key exchange is rejected.** A client that offers every group except those of the case's class fails with the TLS alert `handshake_failure`.
+  6. **Wrong certificate scheme is rejected.** A client that offers every signature scheme except the certificate's fails with the same alert.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The last two checks show that the server enforces its configuration, not just that it accepts a compatible client.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Behaviour to expect [#behaviour-to-expect]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * **Composite code points had to be aligned.** The TLS signature schemes of composite algorithms use [private-use code points](/docs/platform/pqc/go-toolchain#tls-code-points). The `hybrid-provider` uses different values by default, so for the tests its code points were set to those of the Go PQC toolchain. A client that implements composite TLS must use the same values.
+  * **Pure ML-DSA and ML-KEM need nothing extra.** They work with OpenSSL 3.5 or later as it is; only composite certificates need the provider.
+  * **Some handshakes take an extra round trip.** A client sends the `X25519MLKEM768` key share first. When the server is configured for a class that does not include it (T and PQ), the server answers with a HelloRetryRequest and the handshake completes with the group it asks for.
+  * **The client's signature preference decides the certificate.** When the server holds certificates of several classes for the same name, it serves the first one that matches the client's list of signature schemes. A default OpenSSL 3.5 or later client lists ML-DSA first, so it is served the ML-DSA certificate and must trust that CA.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="HTTPS" description="A Lamassu API endpoint tested with openssl and curl." href="/docs/platform/pqc/integration-tests/https" />
+
+    <Card title="MQTTS" description="An MQTT broker behind the TLS front proxy, tested with mosquitto." href="/docs/platform/pqc/integration-tests/mqtts" />
+
+    <Card title="Known limitations" description="What is not covered by these tests or by the platform." href="/docs/platform/pqc/limitations" />
   </Cards>
 </div>
 
@@ -5491,7 +5955,7 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Composite certificates were implemented and tested against draft 19 of the IETF composite signatures specification, which has since been published as RFC 10073; the implementation has not been compared with the final text. Three of its algorithms (the two Brainpool variants and Ed448) are not implemented. The composite signature schemes in TLS use private-use code points in `0xFE00` to `0xFE0E` and no published draft or version is identified in the code, so they interoperate only with peers built from the same Go fork. Composite RSA-PKCS#1 v1.5 variants cannot authenticate a TLS handshake. SLH-DSA has no TLS signature scheme. The related-certificate request attribute has not been checked against other implementations of RFC 9763.
+  Composite certificates follow [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html). The implementation was written against draft 19 and passes the RFC's test vectors, but it has not had a full conformance assessment. Three of its algorithms (the two Brainpool variants and Ed448) are not implemented. The composite signature schemes in TLS use private-use code points in `0xFE00` to `0xFE0E` because IANA has assigned none, so they interoperate only with peers built from the same Go fork. Composite RSA-PKCS#1 v1.5 variants cannot authenticate a TLS handshake. SLH-DSA has no TLS signature scheme. The related-certificate request attribute has not been checked against other implementations of RFC 9763.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -5563,7 +6027,7 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 
 <div className="lm-diff-ins lm-diff-block">
   <Callout type="warn" title="Experimental">
-    PQC support lives in development branches and in forks of Go and Traefik, not in the upstream projects or in the standard Lamassu images. The composite TLS signature schemes use private-use code points that no other TLS stack understands, and the composite certificate format follows an IETF draft that can still change. Plan pilots and laboratory deployments, not production fleets. [Known limitations](/docs/platform/pqc/limitations) lists what is incomplete.
+    PQC support lives in development branches and in forks of Go and Traefik, not in the upstream projects or in the standard Lamassu images. The composite TLS signature schemes use private-use code points that no other TLS stack understands, and the composite certificate format follows [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html), a recent standard that has little deployment experience yet. Plan pilots and laboratory deployments, not production fleets. [Known limitations](/docs/platform/pqc/limitations) lists what is incomplete.
   </Callout>
 </div>
 
@@ -5641,6 +6105,19 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  This option fits when:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * the consumers cannot yet validate post-quantum or composite chains, so the classical certificate must remain the one in use;
+  * a device has to carry both certificates and show that they belong together, using each one where the peer supports it.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The hash is SHA-256, SHA-384 or SHA-512, matching the hash of the related certificate's signature algorithm, and SHA-256 when it has none.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   How the request works [#how-the-request-works]
 </div>
 
@@ -5709,6 +6186,12 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 
 <div className="lm-diff-ins lm-diff-block">
   The fork refuses to bind a certificate unless the new one is compatible with the related one. Neither certificate may be a CA. The related certificate must be valid at the time of issuance. The key usages and extended key usages requested for the new certificate must be a subset of those of the related certificate. Verification later compares only the hash, so a relying party that checks the link learns that the issuing CA linked the new certificate to that specific certificate, not that the related certificate is still valid.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="info" title="Related certificates link, they do not replace">
+    The extension is evidence of a relationship, not a dependency. A relying party must still validate each certificate against its own chain and revocation status, and revoking the classical certificate does not revoke the bound one.
+  </Callout>
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

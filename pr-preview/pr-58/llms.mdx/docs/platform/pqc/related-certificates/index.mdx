@@ -7,6 +7,19 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  This option fits when:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * the consumers cannot yet validate post-quantum or composite chains, so the classical certificate must remain the one in use;
+  * a device has to carry both certificates and show that they belong together, using each one where the peer supports it.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The hash is SHA-256, SHA-384 or SHA-512, matching the hash of the related certificate's signature algorithm, and SHA-256 when it has none.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   How the request works [#how-the-request-works]
 </div>
 
@@ -75,6 +88,12 @@
 
 <div className="lm-diff-ins lm-diff-block">
   The fork refuses to bind a certificate unless the new one is compatible with the related one. Neither certificate may be a CA. The related certificate must be valid at the time of issuance. The key usages and extended key usages requested for the new certificate must be a subset of those of the related certificate. Verification later compares only the hash, so a relying party that checks the link learns that the issuing CA linked the new certificate to that specific certificate, not that the related certificate is still valid.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="info" title="Related certificates link, they do not replace">
+    The extension is evidence of a relationship, not a dependency. A relying party must still validate each certificate against its own chain and revocation status, and revoking the classical certificate does not revoke the bound one.
+  </Callout>
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

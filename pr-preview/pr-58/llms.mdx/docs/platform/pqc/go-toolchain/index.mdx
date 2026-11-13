@@ -45,7 +45,40 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  | Code point | Algorithm                     |
+  | ---------- | ----------------------------- |
+  | `0xFE00`   | MLDSA44-RSA2048-PSS-SHA256    |
+  | `0xFE01`   | MLDSA44-RSA2048-PKCS15-SHA256 |
+  | `0xFE02`   | MLDSA65-RSA3072-PSS-SHA512    |
+  | `0xFE03`   | MLDSA65-RSA3072-PKCS15-SHA512 |
+  | `0xFE04`   | MLDSA65-RSA4096-PSS-SHA512    |
+  | `0xFE05`   | MLDSA65-RSA4096-PKCS15-SHA512 |
+  | `0xFE06`   | MLDSA87-RSA3072-PSS-SHA512    |
+  | `0xFE07`   | MLDSA87-RSA4096-PSS-SHA512    |
+  | `0xFE08`   | MLDSA44-ECDSA-P256-SHA256     |
+  | `0xFE09`   | MLDSA65-ECDSA-P256-SHA512     |
+  | `0xFE0A`   | MLDSA65-ECDSA-P384-SHA512     |
+  | `0xFE0B`   | MLDSA87-ECDSA-P384-SHA512     |
+  | `0xFE0C`   | MLDSA87-ECDSA-P521-SHA512     |
+  | `0xFE0D`   | MLDSA44-Ed25519-SHA512        |
+  | `0xFE0E`   | MLDSA65-Ed25519-SHA512        |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   The key exchange is unchanged from upstream Go. Hybrid groups such as `X25519MLKEM768`, `SecP256r1MLKEM768`, `SecP384r1MLKEM1024` and the pure `MLKEM1024` are those of the Go 1.27 standard library.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Group                | Composition         |
+  | -------------------- | ------------------- |
+  | `X25519MLKEM768`     | X25519 + ML-KEM-768 |
+  | `SecP256r1MLKEM768`  | P-256 + ML-KEM-768  |
+  | `SecP384r1MLKEM1024` | P-384 + ML-KEM-1024 |
+  | `MLKEM1024`          | ML-KEM-1024 alone   |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The connection stays protected while at least one component of a hybrid group is secure. The key exchange is independent of the certificate type, so a connection can use a classical certificate and still have a post-quantum key exchange.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -96,11 +129,15 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  What was removed [#what-was-removed]
+  Discarded approaches [#discarded-approaches]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Earlier iterations of the fork explored Chameleon certificates (`draft-bonnell-lamps-chameleon-certs`) and a delta-certificate construction. They were removed because they are no longer pursued. The related-certificate mechanism was later restored on its own, following RFC 9763.
+  The first iterations of the fork implemented Chameleon certificates, defined in `draft-bonnell-lamps-chameleon-certs`. The idea is to pair two certificates for the same subject, for example a classical one and a post-quantum one, by issuing the first with an extension that encodes only the differences to the second. A relying party that understands the extension can rebuild the paired certificate from it and validate that one, so a single issued certificate carries both identities without changing the path validation rules of RFC 5280.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The work was dropped because the draft expired without becoming a standard and is no longer being pursued, so there was no stable specification to interoperate with. Nothing in the current implementation depends on it.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -109,6 +146,22 @@
 
 <div className="lm-diff-ins lm-diff-block">
   The fork is built in CI by a workflow that runs the Go test suite and then publishes a multi-architecture image, `ghcr.io/lamassuiot/golang-pqc`, tagged `go1.27` and, for the `release-branch.go1.27` branch, `latest`. The image contains the toolchain under `/usr/local/go-pqc` with `GOROOT` pointing at it.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  To build the toolchain from source instead, use the `release-branch.go1.27` branch and the standard Go source build:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```bash
+  git clone --branch release-branch.go1.27 https://github.com/lamassuiot/go.git
+  cd go/src
+  ./make.bash
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The resulting `bin/go` command is used like any other Go toolchain.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

@@ -11,7 +11,7 @@
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Los certificados composite se implementaron y se probaron contra el borrador 19 de la especificación de firmas composite del IETF, que desde entonces se ha publicado como RFC 10073; la implementación no se ha comparado con el texto final. Tres de sus algoritmos (las dos variantes Brainpool y Ed448) no están implementados. Los esquemas de firma composite en TLS usan puntos de código de uso privado de `0xFE00` a `0xFE0E` y en el código no se identifica ningún borrador ni versión publicados, por lo que solo interoperan con pares construidos con el mismo fork de Go. Las variantes composite con RSA PKCS#1 v1.5 no pueden autenticar un handshake TLS. SLH-DSA no tiene esquema de firma TLS. El atributo de solicitud de certificado relacionado no se ha contrastado con otras implementaciones del RFC 9763.
+  Los certificados composite siguen el [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html). La implementación se escribió contra el borrador 19 y supera los vectores de prueba del RFC, pero no ha pasado una evaluación completa de conformidad. Tres de sus algoritmos (las dos variantes Brainpool y Ed448) no están implementados. Los esquemas de firma composite en TLS usan puntos de código de uso privado de `0xFE00` a `0xFE0E` porque IANA no ha asignado ninguno, por lo que solo interoperan con pares construidos con el mismo fork de Go. Las variantes composite con RSA PKCS#1 v1.5 no pueden autenticar un handshake TLS. SLH-DSA no tiene esquema de firma TLS. El atributo de solicitud de certificado relacionado no se ha contrastado con otras implementaciones del RFC 9763.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

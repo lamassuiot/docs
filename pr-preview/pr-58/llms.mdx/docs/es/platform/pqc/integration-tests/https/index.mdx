@@ -1,0 +1,128 @@
+# Pruebas de integración HTTPS (/docs/pr-preview/pr-58/es/platform/pqc/integration-tests/https)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  Esta prueba conecta con un endpoint de la API de Lamassu por HTTPS desde un cliente OpenSSL y comprueba que el handshake poscuántico, la cadena de certificados y la petición de aplicación funcionan. El [resumen](/docs/platform/pqc/integration-tests/overview) explica los clientes, la matriz de pruebas y qué demuestra cada comprobación.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Escenario [#escenario]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El cliente solicita `GET /api/ca/health` a través del proxy Traefik, que la reenvía a Envoy Gateway y al servicio de CA. El certificado del servidor y la CA que lo firmó se crearon fuera de Lamassu y se cargaron en el proxy para cada caso. En cada caso el proxy se configuró con los grupos de intercambio de claves y el certificado de esa fila y columna de la matriz.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="info" title="PKI de pruebas">
+    Las CAs y los certificados son material de pruebas creado fuera de Lamassu, válido durante un periodo corto y con el nombre del servidor como nombre alternativo del sujeto. No los emite el servicio de CA de Lamassu.
+  </Callout>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Resultados [#resultados]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Las nueve combinaciones de intercambio de claves y certificado se superaron, igual que los tres certificados composite adicionales.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Intercambio de claves ↓ / Certificado → | **T**: ECDSA P-256                           | **PQ**: ML-DSA-65             | **PQ/T**: `MLDSA65-RSA3072-PSS-SHA512`    |
+  | --------------------------------------- | -------------------------------------------- | ----------------------------- | ----------------------------------------- |
+  | **T**                                   | ✅ `X25519`, `ecdsa_secp256r1_sha256`         | ✅ `X25519`, `mldsa65`         | ✅ `X25519`, `mldsa65_rsa3072_pss`         |
+  | **PQ**                                  | ✅ `MLKEM1024`, `ecdsa_secp256r1_sha256`      | ✅ `MLKEM1024`, `mldsa65`      | ✅ `MLKEM1024`, `mldsa65_rsa3072_pss`      |
+  | **PQ/T**                                | ✅ `X25519MLKEM768`, `ecdsa_secp256r1_sha256` | ✅ `X25519MLKEM768`, `mldsa65` | ✅ `X25519MLKEM768`, `mldsa65_rsa3072_pss` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Cada celda muestra el grupo negociado y el esquema de la firma del handshake. En todos los casos la cadena se verificó, la petición devolvió `200` y las dos comprobaciones negativas se rechazaron con `handshake_failure`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Composite adicional         | Esquema de firma     | Resultado              |
+  | --------------------------- | -------------------- | ---------------------- |
+  | `MLDSA44-ECDSA-P256-SHA256` | `mldsa44_ecdsa_p256` | ✅ con `X25519MLKEM768` |
+  | `MLDSA65-ECDSA-P256-SHA512` | `mldsa65_ecdsa_p256` | ✅ con `X25519MLKEM768` |
+  | `MLDSA65-Ed25519-SHA512`    | `mldsa65_ed25519`    | ✅ con `X25519MLKEM768` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Con una única configuración de servidor que tiene a la vez los certificados ECDSA, ML-DSA-65 y composite y acepta las tres clases de intercambio de claves, un cliente que ofrecía un grupo y un esquema de firma negoció cada una de las nueve combinaciones. `curl` devolvió `200` cuando confiaba en las tres CAs.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="warn" title="Confía en todas las clases de CA que puedan servirse">
+    Un servidor con certificados de varias clases sirve el primero que coincide con la preferencia de firma del cliente. Un cliente OpenSSL 3.5 o posterior con la configuración por defecto prefiere ML-DSA, así que un cliente que solo confía en la CA ECDSA falla con `unable to get local issuer certificate`, aunque la conexión en sí haya funcionado. Da a los clientes las CAs de todas las clases que el servidor pueda presentar.
+  </Callout>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Reproducir un caso [#reproducir-un-caso]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Necesitas OpenSSL 3.5 o posterior. Para certificados composite, además el módulo `hybrid-provider` con puntos de código que coincidan con los del toolchain de Go PQC, cargado mediante `OPENSSL_CONF`. Usa el fichero de CA del caso como `ca.pem`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Steps>
+    <Step>
+      Conecta ofreciendo un grupo y un esquema de firma [#conecta-ofreciendo-un-grupo-y-un-esquema-de-firma]
+
+      Este ejemplo prueba intercambio de claves PQ/T con el certificado composite e imprime los valores negociados:
+
+      ```bash
+      openssl s_client -connect <LAMASSU_HOST>:443 -servername <LAMASSU_HOST> \
+        -tls1_3 -groups X25519MLKEM768 -sigalgs mldsa65_rsa3072_pss \
+        -CAfile ca.pem -verify_hostname <LAMASSU_HOST> -verify_return_error \
+        < /dev/null 2>&1 | grep -E 'Negotiated TLS1.3 group|Peer signature type|Verify return code'
+      ```
+
+      Salida esperada:
+
+      ```text
+      Peer signature type: mldsa65_rsa3072_pss
+      Negotiated TLS1.3 group: X25519MLKEM768
+      Verify return code: 0 (ok)
+      ```
+    </Step>
+
+    <Step>
+      Envía una petición [#envía-una-petición]
+
+      Sustituye el `grep` por una petición HTTP para confirmar que la capa de aplicación funciona a través del proxy:
+
+      ```bash
+      printf 'GET /api/ca/health HTTP/1.1\r\nHost: <LAMASSU_HOST>\r\nConnection: close\r\n\r\n' | \
+        openssl s_client -connect <LAMASSU_HOST>:443 -servername <LAMASSU_HOST> \
+        -tls1_3 -groups X25519MLKEM768 -sigalgs mldsa65_rsa3072_pss \
+        -CAfile ca.pem -verify_hostname <LAMASSU_HOST> -verify_return_error -quiet
+      ```
+
+      La respuesta empieza por `HTTP/1.1 200 OK`. Con `curl` y un bundle que contenga las CAs de las clases que presenta el servidor, `curl --cacert ca-bundle.pem https://<LAMASSU_HOST>/api/ca/health` también devuelve `200`.
+    </Step>
+
+    <Step>
+      Comprueba que una oferta incorrecta se rechaza [#comprueba-que-una-oferta-incorrecta-se-rechaza]
+
+      Ofrece solo grupos clásicos a un servidor configurado para intercambio de claves PQ:
+
+      ```bash
+      openssl s_client -connect <LAMASSU_HOST>:443 -servername <LAMASSU_HOST> \
+        -tls1_3 -groups X25519 -CAfile ca.pem < /dev/null
+      ```
+
+      El handshake falla con una alerta `handshake failure`. Ofrecer todos los esquemas de firma salvo el del certificado da el mismo resultado.
+    </Step>
+  </Steps>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="MQTTS" description="Las mismas comprobaciones para un broker MQTT." href="/docs/platform/pqc/integration-tests/mqtts" />
+
+    <Card title="Proxy TLS con Traefik" description="Cómo elige el proxy el certificado e impone el intercambio de claves." href="/docs/platform/pqc/tls-front-proxy" />
+  </Cards>
+</div>

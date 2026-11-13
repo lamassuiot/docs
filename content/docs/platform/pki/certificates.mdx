@@ -7,7 +7,16 @@ This guide is for a PKI operator inspecting or retiring an issued identity. You 
 
 ## Find a certificate
 
-Filter by `Common Name`, serial, status and issuer. Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata. Certificate details include the key reference (`key_id`) and whether the private key is managed (`has_private_key`), and certificate lists can be filtered on `has_private_key`.
+Filter by `Common Name`, serial, status and issuer. A certificate does not contain its private key, so the private-key surfaces answer which certificates have their key held in Lamassu’s KMS:
+
+- The advanced **Private Key** filter, available on the Certificates page and on a CA’s **Issued Certificates** tab, narrows the list to **All Certificates**, **With Private Key** or **Without Private Key**.
+- The sortable **Private Key** column — shown by default, hidden on narrow screens — marks a key held in the KMS with a green check mark and otherwise shows `-`.
+- In certificate details, the **Information** tab shows a **Private Key** row in the **Key & Signature** section. When the certificate reports a private key and its KMS engine and key IDs are available, the row links to the key (tooltip: **Open private key in KMS**). Otherwise, it shows **Present** if the certificate reports a private key, or **Not available** if it does not. This does not establish whether a key exists outside Lamassu.
+
+Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata.
+
+Certificate details include the key reference (`key_id`) and whether the private key is managed (`has_private_key`); certificate lists can be filtered on `has_private_key`.
+
 
 Identify a certificate by issuer and serial; a name can correspond to several renewals. Check which certificate the consumer actually uses and which occupies the device’s active identity. [Identity history](/docs/platform/iot-fleets/device-management) and the certificate inventory answer different questions.
 

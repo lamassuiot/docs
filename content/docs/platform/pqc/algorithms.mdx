@@ -26,6 +26,14 @@ An unknown key type string is not rejected when it is parsed; it becomes an unkn
 
 ML-DSA is the lattice-based signature scheme standardized in FIPS 204. Lamassu accepts the three parameter sets ML-DSA-44, ML-DSA-65 and ML-DSA-87, selected with `size` 44, 65 or 87. The implementation is the `crypto/mldsa` package of Go 1.27, so it is the standard library's own code and not part of the fork. In certificates the algorithm identifiers are `2.16.840.1.101.3.4.3.17`, `.18` and `.19` for ML-DSA-44, -65 and -87.
 
+| Parameter set | NIST security category |
+| --- | --- |
+| ML-DSA-44 | 2 |
+| ML-DSA-65 | 3 |
+| ML-DSA-87 | 5 |
+
+A higher category means larger keys and signatures in exchange for more security margin.
+
 Go reads ML-DSA private keys in PKCS#8 only when they contain the 32-byte seed. Keys written by OpenSSL in its default seed-plus-expanded form are rejected, so export them in the seed-only form before importing them.
 
 ## SLH-DSA
@@ -41,11 +49,11 @@ SLH-DSA is the hash-based scheme of FIPS 205. It offers twelve parameter sets th
 | 5 | SLH-DSA-SHA2-192s | 11 | SLH-DSA-SHA2-256f |
 | 6 | SLH-DSA-SHAKE-192s | 12 | SLH-DSA-SHAKE-256f |
 
-The object identifiers run from `2.16.840.1.101.3.4.3.20` to `.31`. SLH-DSA signatures are large, between about 8 and 50 KB depending on the parameter set, which matters for certificate chains and for any transport with a size limit. SLH-DSA is available for keys, CAs and certificates, but the fork has no TLS signature scheme for it, so an SLH-DSA certificate cannot authenticate a TLS connection.
+The SLH-DSA implementation is provided by Cloudflare's [CIRCL](https://github.com/cloudflare/circl/) library, which the fork integrates so that SLH-DSA keys can be used in X.509 certificates. The object identifiers run from `2.16.840.1.101.3.4.3.20` to `.31`. SLH-DSA signatures are large, between about 8 and 50 KB depending on the parameter set, which matters for certificate chains and for any transport with a size limit. SLH-DSA is available for keys, CAs and certificates, but the fork has no TLS signature scheme for it, so an SLH-DSA certificate cannot authenticate a TLS connection.
 
 ## Composite ML-DSA
 
-A composite key pairs an ML-DSA key with a traditional key. A composite signature is the concatenation of the ML-DSA signature and the traditional signature, both computed over a message representative that contains a fixed prefix, an algorithm label, an optional context and a hash of the message; verification fails if either component fails. The ML-DSA component is pure ML-DSA, with the label as its context. Lamassu implements the 15 algorithms of draft 19 of the IETF specification that rely only on algorithms available in Go. The identifiers sit under the arc `1.3.6.1.5.5.7.6`.
+A composite key pairs an ML-DSA key with a traditional key. A composite signature is the concatenation of the ML-DSA signature and the traditional signature, both computed over a message representative that contains a fixed prefix, an algorithm label, an optional context and a hash of the message; verification fails if either component fails. The ML-DSA component is pure ML-DSA, with the label as its context. Lamassu implements the 15 algorithms of [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html) that rely only on algorithms available in Go. The identifiers sit under the arc `1.3.6.1.5.5.7.6`.
 
 | `size` | Algorithm | Final OID digit | Family |
 | --- | --- | --- | --- |
@@ -67,13 +75,20 @@ A composite key pairs an ML-DSA key with a traditional key. A composite signatur
 
 The key type must match the family of the variant: creating a `Composite-ML-DSA-ECDSA` key with `size` 3 fails with an error saying that the variant is not valid for that key type.
 
-Draft 19 has since been published as [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html). The object identifiers and the domain separator prefix checked against the RFC match this page, but the implementation was written and tested against the draft and has not been compared with the final text. Three algorithms of the specification are not implemented because Go has no Brainpool curves and no Ed448: the two Brainpool variants (`MLDSA65-ECDSA-brainpoolP256r1` and `MLDSA87-ECDSA-brainpoolP384r1`, with their hash suffix) and the Ed448 variant. The fork passes the official test vectors of draft 19 for the 15 algorithms it does implement.
+The implementation was written against draft 19 of the specification, which was later published as RFC 10073, and has been checked against the published text. The object identifiers, the domain separator prefix, the hash used for each ECDSA component and the RFC 5915 encoding of ECDSA private keys match the RFC. Three algorithms of the specification are not implemented because Go has no Brainpool curves and no Ed448: the two Brainpool variants (`MLDSA65-ECDSA-brainpoolP256r1` and `MLDSA87-ECDSA-brainpoolP384r1`, with their hash suffix) and the Ed448 variant. The fork passes the test vectors of RFC 10073 Appendix E for the 15 algorithms it does implement, including the signatures with and without context. These checks cover the vectors and the points listed above; they are not a full conformance assessment.
 
 The composite parameters of keys and signatures must be absent from the `AlgorithmIdentifier`; certificates that carry them are rejected. ECDSA components must use a private scalar of the exact length of the curve.
 
 ## Ed25519
 
 Ed25519 is not post-quantum, but support for it as a CA and certificate key type was added in the same work and is selected with the `Ed25519` key type. It is classified in the traditional family.
+
+## Choosing an algorithm
+
+- **Composite ML-DSA** is the most conservative option during the transition, because the signature stays valid only if both components verify and so keeps classical protection if a flaw is found in the new algorithm. Keys and signatures are larger than classical ones.
+- **ML-DSA** alone gives post-quantum protection with moderate sizes and fast operations.
+- **SLH-DSA** suits long-lived trust anchors where relying only on hash functions is valued. Signatures are considerably larger, and it cannot authenticate TLS connections.
+- **Ed25519** is not post-quantum; use it only where a classical algorithm is acceptable.
 
 ## What is not covered
 

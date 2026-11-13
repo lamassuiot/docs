@@ -6,7 +6,7 @@ description: Qué soporte poscuántico (PQC) añade Lamassu a las claves, las au
 Lamassu puede crear claves, autoridades de certificación (CA) y certificados que usan algoritmos de firma poscuánticos, y puede servirlos y verificarlos por TLS. El trabajo abarca cinco bases de código que dependen unas de otras: un fork del toolchain de Go que implementa los algoritmos, el backend de Lamassu, el dashboard web, un fork del proxy Traefik que termina el TLS de los dispositivos y el Helm chart que despliega todo junto.
 
 <Callout type="warn" title="Experimental">
-El soporte PQC reside en ramas de desarrollo y en forks de Go y Traefik, no en los proyectos originales ni en las imágenes estándar de Lamassu. Los esquemas de firma TLS composite usan puntos de código de uso privado que ninguna otra pila TLS reconoce, y el formato de certificado composite sigue un borrador del IETF que todavía puede cambiar. Conviene planificar pilotos y despliegues de laboratorio, no flotas en producción. [Limitaciones conocidas](/docs/platform/pqc/limitations) recoge lo que está incompleto.
+El soporte PQC reside en ramas de desarrollo y en forks de Go y Traefik, no en los proyectos originales ni en las imágenes estándar de Lamassu. Los esquemas de firma TLS composite usan puntos de código de uso privado que ninguna otra pila TLS reconoce, y el formato de certificado composite sigue el [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html), un estándar reciente con poca experiencia de despliegue todavía. Conviene planificar pilotos y despliegues de laboratorio, no flotas en producción. [Limitaciones conocidas](/docs/platform/pqc/limitations) recoge lo que está incompleto.
 </Callout>
 
 ## Por qué importa en flotas de dispositivos

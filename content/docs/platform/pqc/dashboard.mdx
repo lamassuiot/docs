@@ -21,7 +21,11 @@ Which options are enabled depends on the crypto engine. When creating a key or a
 
 ## Issuing a certificate with a browser-generated key
 
-Issuing a certificate from a CA generates the key pair in the browser, builds the certificate request and sends it to the CA for signing. The key types offered here are `RSA`, `ECDSA`, `Ed25519`, `ML-DSA`, `SLH-DSA` and a single `Composite ML-DSA` entry, and they are generated with the `@noble` libraries for the post-quantum and composite algorithms and with WebCrypto for the classical ones. The generated private key is shown once at the end of the procedure.
+Issuing a certificate from a CA generates the key pair in the browser, builds the certificate request and sends it to the CA for signing. The key types offered here are `RSA`, `ECDSA`, `Ed25519`, `ML-DSA`, `SLH-DSA` and a single `Composite ML-DSA` entry, and they are generated in the browser: with the `@noble` libraries for ML-DSA and SLH-DSA and with WebCrypto for the classical algorithms.
+
+Composite key generation is not available in `@noble`. The Lamassu team implemented it for the dashboard, combining the ML-DSA key with an RSA, ECDSA or Ed25519 key and signing the composite message representative as the specification defines, so that a composite certificate request can be created entirely in the browser.
+
+The generated private key is shown once at the end of the procedure.
 
 The browser does not verify the signatures of ML-DSA, SLH-DSA, composite or Ed25519 requests; it relies on the KMS.
 

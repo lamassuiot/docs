@@ -5,6 +5,13 @@ description: Bind a certificate with a post-quantum key to an existing classical
 
 A fleet that is migrating to post-quantum algorithms usually holds two certificates per device for a while: the classical one already in use and a new one with a post-quantum key. [RFC 9763](https://www.rfc-editor.org/rfc/rfc9763.html) defines a way to link them. The new certificate carries the `id-pe-relatedCert` extension (`1.3.6.1.5.5.7.1.36`), which holds a hash of the classical certificate, so a relying party can see that both identify the same entity. Lamassu implements the issuing side of this mechanism.
 
+This option fits when:
+
+- the consumers cannot yet validate post-quantum or composite chains, so the classical certificate must remain the one in use;
+- a device has to carry both certificates and show that they belong together, using each one where the peer supports it.
+
+The hash is SHA-256, SHA-384 or SHA-512, matching the hash of the related certificate's signature algorithm, and SHA-256 when it has none.
+
 ## How the request works
 
 The device asks for the bound certificate with an ordinary PKCS#10 certificate request that carries one extra attribute, `relatedCertRequest` (`1.2.840.113549.1.9.16.2.60`). The attribute identifies the existing certificate by issuer and serial number, states the time of the request, gives the location from which the certificate can be downloaded and carries a signature made with the private key of that existing certificate. The signature covers the issuer, the serial number and the request time, not the location, and shows that the requester controls the existing key; the key of the new certificate is proven by the signature of the certificate request itself. Lamassu accepts a list of locations, as in the ASN.1 module of the RFC, and tries them in order.
@@ -47,6 +54,10 @@ The feature is configured in the `related_certificate` object of the issuance pr
 ## What the issued certificate must satisfy
 
 The fork refuses to bind a certificate unless the new one is compatible with the related one. Neither certificate may be a CA. The related certificate must be valid at the time of issuance. The key usages and extended key usages requested for the new certificate must be a subset of those of the related certificate. Verification later compares only the hash, so a relying party that checks the link learns that the issuing CA linked the new certificate to that specific certificate, not that the related certificate is still valid.
+
+<Callout type="info" title="Related certificates link, they do not replace">
+The extension is evidence of a relationship, not a dependency. A relying party must still validate each certificate against its own chain and revocation status, and revoking the classical certificate does not revoke the bound one.
+</Callout>
 
 ## From the dashboard
 

@@ -1,0 +1,111 @@
+---
+title: Pruebas de integración MQTTS
+description: Resultados de probar un broker MQTT detrás del proxy TLS de Lamassu con mosquitto, usando intercambio de claves poscuántico y certificados poscuánticos y composite.
+---
+
+Esta prueba conecta `mosquitto_pub` y `mosquitto_sub` a un broker MQTT por TLS y comprueba que los mensajes lo atraviesan con intercambio de claves poscuántico y certificados de servidor poscuánticos o composite. El [resumen](/docs/platform/pqc/integration-tests/overview) explica los clientes, la matriz de pruebas y qué demuestra cada comprobación.
+
+## Escenario
+
+El broker es EMQX 5.8.9. Escucha MQTT en claro dentro del clúster, y el proxy TLS de Lamassu ([Proxy TLS con Traefik](/docs/platform/pqc/tls-front-proxy)) termina el TLS por él en el puerto 8883 y reenvía el tráfico. El TLS es unidireccional: el endpoint del broker presenta su certificado y el cliente no presenta ninguno. El certificado del servidor y su CA se crearon fuera de Lamassu, y el proxy se configuró en cada caso con los grupos de intercambio de claves y el certificado de esa fila y columna de la matriz.
+
+Los clientes son `mosquitto_pub` y `mosquitto_sub` 2.1.2, con MQTT 3.1.1 sobre TLS 1.3 y enlazados con OpenSSL 4.1.0. Un caso se supera cuando el suscriptor recibe el mensaje que el publicador envió a través del broker, ambos clientes validan la cadena de certificados contra la CA del caso y el nombre del servidor, y las dos comprobaciones negativas se rechazan.
+
+## Resultados
+
+Los doce casos se superaron. En cada uno, `mosquitto_sub` se suscribió a un tema, `mosquitto_pub` publicó un valor único y el suscriptor lo recibió. La prueba se ejecutó dos veces por caso: una con el cliente ofreciendo todos los grupos y esquemas de firma, y otra con el cliente ofreciendo solo el grupo y el esquema de firma esperados para el caso. La segunda ejecución demuestra que el endpoint del broker negoció exactamente ese grupo y ese esquema, porque el cliente no ofrecía nada más.
+
+| Intercambio de claves ↓ / Certificado → | **T**: ECDSA P-256 | **PQ**: ML-DSA-65 | **PQ/T**: `MLDSA65-RSA3072-PSS-SHA512` |
+| --- | --- | --- | --- |
+| **T** | ✅ `X25519`, `ecdsa_secp256r1_sha256` | ✅ `X25519`, `mldsa65` | ✅ `X25519`, `mldsa65_rsa3072_pss` |
+| **PQ** | ✅ `MLKEM1024`, `ecdsa_secp256r1_sha256` | ✅ `MLKEM1024`, `mldsa65` | ✅ `MLKEM1024`, `mldsa65_rsa3072_pss` |
+| **PQ/T** | ✅ `X25519MLKEM768`, `ecdsa_secp256r1_sha256` | ✅ `X25519MLKEM768`, `mldsa65` | ✅ `X25519MLKEM768`, `mldsa65_rsa3072_pss` |
+
+Los certificados composite adicionales se comportan igual con intercambio de claves PQ/T.
+
+| Composite adicional | Esquema de firma | Resultado |
+| --- | --- | --- |
+| `MLDSA44-ECDSA-P256-SHA256` | `mldsa44_ecdsa_p256` | ✅ |
+| `MLDSA65-ECDSA-P256-SHA512` | `mldsa65_ecdsa_p256` | ✅ |
+| `MLDSA65-Ed25519-SHA512` | `mldsa65_ed25519` | ✅ |
+
+Cuando el cliente ofrecía todos los grupos salvo los de la clase del caso, o todos los esquemas de firma salvo el del certificado, el handshake TLS fallaba con una alerta `handshake failure` y el broker nunca enviaba un `CONNACK`. El resultado fue el mismo en los doce casos.
+
+Con una única configuración de servidor que tiene los certificados ECDSA, ML-DSA-65 y composite y acepta las tres clases de intercambio de claves, cada una de las nueve combinaciones conectó en el puerto 8883 cuando el cliente ofrecía un grupo y un esquema de firma. `mosquitto_pub` recibió `CONNACK (0)` en todas.
+
+## Reproducir un caso
+
+mosquitto no tiene opciones para elegir grupos de intercambio de claves ni esquemas de firma, así que se fijan mediante un fichero de configuración de OpenSSL que `mosquitto_pub` y `mosquitto_sub` leen de la variable de entorno `OPENSSL_CONF`. Necesitas OpenSSL 3.5 o posterior; para certificados composite, además el módulo `hybrid-provider` con puntos de código que coincidan con los del toolchain de Go PQC.
+
+<Steps>
+  <Step>
+    ### Crea la configuración de OpenSSL
+
+    Este `pqc-client.cnf` hace que el cliente ofrezca solo `X25519MLKEM768` y el esquema de firma composite, y carga el provider composite:
+
+    ```ini
+    openssl_conf = openssl_init
+
+    [openssl_init]
+    providers = provider_sect
+    ssl_conf = ssl_sect
+
+    [provider_sect]
+    default = default_sect
+    hybrid = hybrid_sect
+
+    [default_sect]
+    activate = 1
+
+    [hybrid_sect]
+    module = /path/to/hybrid.so
+    activate = 1
+
+    [ssl_sect]
+    system_default = tls_sect
+
+    [tls_sect]
+    MinProtocol = TLSv1.3
+    Groups = X25519MLKEM768
+    SignatureAlgorithms = mldsa65_rsa3072_pss
+    ```
+
+    Elimina el provider `hybrid` y el módulo en un caso que use solo ML-DSA o ECDSA.
+  </Step>
+
+  <Step>
+    ### Suscríbete y publica
+
+    Arranca el suscriptor en una terminal y el publicador en otra. Ambos validan el certificado del broker contra `ca.pem`, la CA del caso:
+
+    ```bash
+    export OPENSSL_CONF=$PWD/pqc-client.cnf
+
+    mosquitto_sub -h <MQTT_HOST> -p 8883 --cafile ca.pem --tls-version tlsv1.3 \
+      -t pqc-test/hello -C 1 -W 15
+
+    mosquitto_pub -h <MQTT_HOST> -p 8883 --cafile ca.pem --tls-version tlsv1.3 \
+      -t pqc-test/hello -m "hello over pqc"
+    ```
+
+    El suscriptor imprime `hello over pqc` y termina. Añade `-d` para ver los paquetes `CONNECT`, `CONNACK (0)`, `SUBACK` y `PUBLISH`.
+  </Step>
+
+  <Step>
+    ### Comprueba que una oferta incorrecta se rechaza
+
+    Cambia `Groups` por una lista que no incluya el grupo que acepta el servidor, por ejemplo `Groups = X25519` frente a un servidor configurado para `MLKEM1024`, y repite la publicación. El cliente falla con `tls alert handshake failure` y no se recibe ningún `CONNACK`.
+  </Step>
+</Steps>
+
+## Qué debes saber
+
+- **Nombre del host y certificado.** mosquitto usa el valor de `-h` como destino de la conexión, como nombre de servidor enviado en el handshake y como nombre que verifica. Los certificados de prueba llevan ese nombre como nombre alternativo del sujeto.
+- **Un certificado por nombre.** El proxy TLS guarda sus certificados por nombre, no por puerto. Un endpoint MQTT que comparte nombre con el endpoint HTTPS sirve los mismos certificados, así que da al broker su propio nombre si necesita un certificado distinto.
+- **No se probaron los valores por defecto sin fijar.** Todas las ejecuciones fijaron explícitamente la oferta de grupos y firmas, así que no se comprobó qué negocia mosquitto con la oferta por defecto de OpenSSL. Las pruebas HTTPS sí cubren un cliente OpenSSL por defecto: recibe el certificado ML-DSA si el servidor lo tiene.
+- **Otros clientes en el mismo puerto.** Imponer TLS 1.3 o algoritmos poscuánticos en un puerto MQTT compartido afecta a todos los clientes que se conectan a él. Durante las pruebas el proxy registró intentos de conexión de otros clientes que solo admiten TLS 1.2 o anterior, o que no confiaban en el certificado. Identifícalos antes de dejar el ajuste de forma permanente.
+
+<Cards>
+  <Card title="HTTPS" description="Las mismas comprobaciones para un endpoint HTTPS de Lamassu." href="/docs/platform/pqc/integration-tests/https" />
+  <Card title="Despliegue con el chart de Helm" description="Despliega el proxy que termina el TLS." href="/docs/platform/pqc/deployment" />
+</Cards>

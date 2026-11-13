@@ -1,0 +1,85 @@
+---
+title: Algoritmos
+description: Los algoritmos de firma poscuánticos y composite que soporta Lamassu, cómo se identifica cada uno en las peticiones a la API y los estándares que siguen.
+---
+
+Lamassu soporta cuatro grupos de algoritmos de firma además de RSA y ECDSA: ML-DSA, SLH-DSA, ML-DSA composite y Ed25519. Todos proceden del [toolchain de Go PQC](/docs/platform/pqc/go-toolchain); el backend solo selecciona el algoritmo y delega la criptografía.
+
+## Cómo se selecciona un algoritmo
+
+Una clave o una CA se crea con un tipo de clave y un tamaño. En RSA y ECDSA el tamaño es una longitud en bits o una curva. En los algoritmos poscuánticos el mismo campo transporta un **identificador de conjunto de parámetros**, no un número de bits:
+
+| Tipo de clave (`algorithm` / `type`) | Valor de `size` / `bits` | Significado |
+| --- | --- | --- |
+| `RSA` | 2048, 3072, 4096 | Longitud del módulo en bits. |
+| `ECDSA` | 256, 384, 521 | Tamaño de la curva en bits (P-256, P-384, P-521). |
+| `Ed25519` | 256 | Fijo. Cualquier otro valor se sustituye por 256. |
+| `ML-DSA` | 44, 65, 87 | Conjunto de parámetros de ML-DSA. |
+| `SLH-DSA` | 1 a 12 | Conjunto de parámetros de SLH-DSA, en el orden de la tabla siguiente. |
+| `Composite-ML-DSA-RSA` | 1 a 8 | Variante composite con componente RSA. |
+| `Composite-ML-DSA-ECDSA` | 9 a 13 | Variante composite con componente ECDSA. |
+| `Composite-ML-DSA-Ed25519` | 14 y 15 | Variante composite con componente Ed25519. |
+
+Una cadena de tipo de clave desconocida no se rechaza al interpretarla: se convierte en un tipo desconocido y falla más tarde. Deben usarse exactamente las cadenas anteriores.
+
+## ML-DSA
+
+ML-DSA es el esquema de firma basado en retículos estandarizado en FIPS 204. Lamassu acepta los tres conjuntos de parámetros ML-DSA-44, ML-DSA-65 y ML-DSA-87, que se seleccionan con `size` 44, 65 o 87. La implementación es el paquete `crypto/mldsa` de Go 1.27, es decir, el código de la propia biblioteca estándar y no del fork. En los certificados, los identificadores de algoritmo son `2.16.840.1.101.3.4.3.17`, `.18` y `.19` para ML-DSA-44, -65 y -87.
+
+Go solo lee claves privadas ML-DSA en PKCS#8 cuando contienen únicamente la semilla de 32 bytes. Las claves que OpenSSL escribe por defecto en la forma semilla más clave expandida se rechazan, por lo que deben exportarse en la forma de solo semilla antes de importarlas.
+
+## SLH-DSA
+
+SLH-DSA es el esquema basado en funciones hash de FIPS 205. Ofrece doce conjuntos de parámetros que combinan una familia de hash (SHA-2 o SHAKE), el parámetro n de 128, 192 o 256 bits, que corresponde a las categorías de seguridad 1, 3 y 5 del NIST y un compromiso entre tamaño de firma y velocidad de firma (`s` para firmas pequeñas, `f` para firma rápida). El identificador que se escribe en `size` sigue el orden de la biblioteca subyacente:
+
+| ID | Conjunto de parámetros | ID | Conjunto de parámetros |
+| --- | --- | --- | --- |
+| 1 | SLH-DSA-SHA2-128s | 7 | SLH-DSA-SHA2-192f |
+| 2 | SLH-DSA-SHAKE-128s | 8 | SLH-DSA-SHAKE-192f |
+| 3 | SLH-DSA-SHA2-128f | 9 | SLH-DSA-SHA2-256s |
+| 4 | SLH-DSA-SHAKE-128f | 10 | SLH-DSA-SHAKE-256s |
+| 5 | SLH-DSA-SHA2-192s | 11 | SLH-DSA-SHA2-256f |
+| 6 | SLH-DSA-SHAKE-192s | 12 | SLH-DSA-SHAKE-256f |
+
+Los identificadores de objeto van de `2.16.840.1.101.3.4.3.20` a `.31`. Las firmas SLH-DSA son grandes, de entre unos 8 y 50 KB según el conjunto de parámetros, lo que importa en las cadenas de certificados y en cualquier transporte con un límite de tamaño. SLH-DSA está disponible para claves, CA y certificados, pero el fork no tiene esquema de firma TLS para él, por lo que un certificado SLH-DSA no puede autenticar una conexión TLS.
+
+## ML-DSA composite
+
+Una clave composite empareja una clave ML-DSA con una clave tradicional. Una firma composite es la concatenación de la firma ML-DSA y la firma tradicional, ambas calculadas sobre un mensaje representativo que contiene un prefijo fijo, una etiqueta de algoritmo, un contexto opcional y un hash del mensaje; la verificación falla si falla cualquiera de los componentes. El componente ML-DSA es ML-DSA puro, con la etiqueta como contexto. Lamassu implementa los 15 algoritmos del borrador 19 de la especificación del IETF que dependen solo de algoritmos disponibles en Go. Los identificadores cuelgan del arco `1.3.6.1.5.5.7.6`.
+
+| `size` | Algoritmo | Último dígito del OID | Familia |
+| --- | --- | --- | --- |
+| 1 | MLDSA44-RSA2048-PSS-SHA256 | 37 | RSA |
+| 2 | MLDSA44-RSA2048-PKCS15-SHA256 | 38 | RSA |
+| 3 | MLDSA65-RSA3072-PSS-SHA512 | 41 | RSA |
+| 4 | MLDSA65-RSA3072-PKCS15-SHA512 | 42 | RSA |
+| 5 | MLDSA65-RSA4096-PSS-SHA512 | 43 | RSA |
+| 6 | MLDSA65-RSA4096-PKCS15-SHA512 | 44 | RSA |
+| 7 | MLDSA87-RSA3072-PSS-SHA512 | 52 | RSA |
+| 8 | MLDSA87-RSA4096-PSS-SHA512 | 53 | RSA |
+| 9 | MLDSA44-ECDSA-P256-SHA256 | 40 | ECDSA |
+| 10 | MLDSA65-ECDSA-P256-SHA512 | 45 | ECDSA |
+| 11 | MLDSA65-ECDSA-P384-SHA512 | 46 | ECDSA |
+| 12 | MLDSA87-ECDSA-P384-SHA512 | 49 | ECDSA |
+| 13 | MLDSA87-ECDSA-P521-SHA512 | 54 | ECDSA |
+| 14 | MLDSA44-Ed25519-SHA512 | 39 | Ed25519 |
+| 15 | MLDSA65-Ed25519-SHA512 | 48 | Ed25519 |
+
+El tipo de clave debe coincidir con la familia de la variante: crear una clave `Composite-ML-DSA-ECDSA` con `size` 3 falla con un error que indica que la variante no es válida para ese tipo de clave.
+
+El borrador 19 se ha publicado desde entonces como [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html). Los identificadores de objeto y el prefijo de separación de dominio comprobados frente al RFC coinciden con esta página, pero la implementación se escribió y se probó contra el borrador y no se ha comparado con el texto final. Tres algoritmos de la especificación no están implementados porque Go no dispone de curvas Brainpool ni de Ed448: las dos variantes Brainpool (`MLDSA65-ECDSA-brainpoolP256r1` y `MLDSA87-ECDSA-brainpoolP384r1`, con su sufijo de hash) y la variante Ed448. El fork supera los vectores de prueba oficiales del borrador 19 para los 15 algoritmos que sí implementa.
+
+Los parámetros de las claves y de las firmas composite deben estar ausentes en el `AlgorithmIdentifier`; los certificados que los incluyen se rechazan. Los componentes ECDSA deben usar un escalar privado con la longitud exacta de la curva.
+
+## Ed25519
+
+Ed25519 no es poscuántico, pero el soporte como tipo de clave de CA y de certificado se añadió en el mismo trabajo y se selecciona con el tipo de clave `Ed25519`. Se clasifica en la familia tradicional.
+
+## Qué no se cubre
+
+Lamassu no implementa intercambio de claves poscuántico propio. Los intercambios de claves híbridos que ofrece el endpoint TLS, como `X25519MLKEM768`, son los de la biblioteca estándar de Go 1.27. Los diseños de certificados Chameleon y delta que se exploraron en iteraciones anteriores se eliminaron y no forman parte de la implementación.
+
+<Cards>
+  <Card title="Toolchain de Go PQC" description="El fork que implementa estos algoritmos y la API que añade." href="/docs/platform/pqc/go-toolchain" />
+  <Card title="Claves y autoridades de certificación" description="Usar estos parámetros en las peticiones al KMS y a la CA." href="/docs/platform/pqc/keys-and-cas" />
+</Cards>

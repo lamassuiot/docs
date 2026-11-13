@@ -1,0 +1,53 @@
+---
+title: Dashboard
+description: How the web interface exposes post-quantum algorithms when creating keys, CAs and certificates, and how it displays them.
+---
+
+The dashboard (branch `feat/lamassu-q`) lets an administrator create and inspect post-quantum keys, certificate authorities and certificates without writing API requests. It adds the algorithm choices, shows the algorithm family of every object and parses the new identifiers in certificates. Everything it sends is described in [Keys and certificate authorities](/docs/platform/pqc/keys-and-cas); this page covers what the interface shows and where its behaviour differs between screens.
+
+## Choosing a key type and specification
+
+Creating a KMS key, a CA with a new key and a certificate with a server-generated key all use the same pair of selectors. *Key type* is grouped by family and *Key specification* depends on the type.
+
+| Group | Key types |
+| --- | --- |
+| T (Traditional) | `RSA`, `ECDSA`, `Ed25519` |
+| PQ (Pure PQC) | `ML-DSA`, `SLH-DSA` |
+| PQ/T (Hybrid) | `Composite-ML-DSA-RSA`, `Composite-ML-DSA-ECDSA`, `Composite-ML-DSA-Ed25519` |
+
+The specification list shows ML-DSA-44, -65 or -87, the twelve SLH-DSA parameter sets (for example *4 - SHAKE_128f*) or the composite variants by name. The interface sends the identifier of the parameter set as `size`, as explained in [Algorithms](/docs/platform/pqc/algorithms), and shows a strength indicator next to each option. For composite keys the indicator shows two bars, one for the classical component and one for the post-quantum component.
+
+Which options are enabled depends on the crypto engine. When creating a key or a CA, the interface lists every algorithm but disables those that the selected engine does not support, and asks to select an engine first. When creating a certificate on the server, unsupported types are hidden instead.
+
+## Issuing a certificate with a browser-generated key
+
+Issuing a certificate from a CA generates the key pair in the browser, builds the certificate request and sends it to the CA for signing. The key types offered here are `RSA`, `ECDSA`, `Ed25519`, `ML-DSA`, `SLH-DSA` and a single `Composite ML-DSA` entry, and they are generated with the `@noble` libraries for the post-quantum and composite algorithms and with WebCrypto for the classical ones. The generated private key is shown once at the end of the procedure.
+
+The browser does not verify the signatures of ML-DSA, SLH-DSA, composite or Ed25519 requests; it relies on the KMS.
+
+## How objects are displayed
+
+Lists and detail views show the algorithm family. The CA table has a *PQC* column with T, PQ or PQ/T, CA cards and the CA graph show a *PQC* badge, key lists show a quantum icon, and the details of a CA or certificate show the algorithm, its strength and the family badge. The family is computed from the algorithm identifier in the parsed certificate.
+
+Algorithm names are resolved from the object identifiers. ML-DSA, SLH-DSA, composite and Ed25519 identifiers are shown as names with their parameter set, for example *ML-DSA-65* or *Composite-Signature MLDSA65-ECDSA-P384-SHA512*, and no bit length is shown for them. RSA and ECDSA signature algorithms are displayed with the dashboard's own labels, such as *RSA PKCS#1 v1.5 SHA-256* and *ECDSA SHA-256*, instead of the OpenSSL names `sha256WithRSAEncryption` and `ecdsa-with-SHA256`.
+
+The key detail page can sign and verify with a post-quantum key and enables only the signature algorithm that corresponds to it.
+
+## Related certificates
+
+The issuance profile form, the issue-certificate form and the detail pages include the related-certificate controls described in [Related certificates](/docs/platform/pqc/related-certificates).
+
+## Things to know
+
+The key type names are not identical across all screens. Key and CA creation use `Composite-ML-DSA-RSA`, `-ECDSA` and `-Ed25519`; the issue-certificate form uses a single `Composite-ML-DSA`; and the server-side certificate form compares upper-case names. The names that the backend reports for a key may therefore differ in case from what the interface submits.
+
+The interface carries no experimental warning for these algorithms and has no translation: all texts are in English.
+
+<Callout type="warn" title="SLH-DSA in browser-generated keys">
+The mapping from the SLH-DSA parameter set identifier to the algorithm used by the in-browser key generator does not follow the same order as the identifiers shown in the selector and used by the backend, except for identifier 1. A certificate issued through the browser flow with an SLH-DSA identifier from 2 to 12 may therefore use a different parameter set than the one named in the selector. Create SLH-DSA keys with the KMS until this is corrected.
+</Callout>
+
+<Cards>
+  <Card title="Keys and certificate authorities" description="The API behind these screens." href="/docs/platform/pqc/keys-and-cas" />
+  <Card title="Known limitations" description="Gaps in the interface and the platform." href="/docs/platform/pqc/limitations" />
+</Cards>

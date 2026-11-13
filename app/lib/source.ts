@@ -2,6 +2,7 @@ import { docs } from "fumadocs-mdx:collections/server";
 import type { Item as PageTreeItem } from "fumadocs-core/page-tree";
 import { type InferPageType, loader } from "fumadocs-core/source";
 import {
+  Atom,
   BadgeCheck,
   Bell,
   ClipboardList,
@@ -43,6 +44,7 @@ const lucideIconMap: Record<
   va: BadgeCheck,
   certs: FileCheck2,
   devices: Cpu,
+  pqc: Atom,
   alerts: Bell,
   est: Network,
   ocsp: SearchCheck,

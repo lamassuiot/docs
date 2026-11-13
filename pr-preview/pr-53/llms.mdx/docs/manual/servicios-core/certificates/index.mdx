@@ -13,10 +13,14 @@ Find a certificate [#find-a-certificate]
 <div className="lm-diff-ins lm-diff-block">
   * The advanced **Private Key** filter, available on the Certificates page and on a CA's **Issued Certificates** tab, narrows the list to **All Certificates**, **With Private Key** or **Without Private Key**.
   * The sortable **Private Key** column — shown by default, hidden on narrow screens — marks a key held in the KMS with a green check mark and otherwise shows `-`.
-  * In certificate details, the **Information** tab shows a **Private Key** row in the Key & Signature section: when the key is locatable in the KMS the row shows the KMS key ID as a link (tooltip: **Open private key in KMS**), otherwise it shows a **Present** or **Not available** badge.
+  * In certificate details, the **Information** tab shows a **Private Key** row in the **Key & Signature** section. When the certificate reports a private key and its KMS engine and key IDs are available, the row links to the key (tooltip: **Open private key in KMS**). Otherwise, it shows **Present** if the certificate reports a private key, or **Not available** if it does not. This does not establish whether a key exists outside Lamassu.
 </div>
 
-<del className="lm-diff-del">Filter by `Common Name`, serial, status and issuer. </del>Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata.
+<div className="lm-diff-ins lm-diff-block">
+  Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata.
+</div>
+
+<del className="lm-diff-del">Filter by `Common Name`, serial, status and issuer. Use </del>**<del className="lm-diff-del">Quick Inspect</del>**<del className="lm-diff-del"> for a quick review or </del>**<del className="lm-diff-del">View Details</del>**<del className="lm-diff-del"> for subject, SAN, usages, chain, dates and metadata. </del>Certificate details include the key reference (`key_id`) and whether the private key is managed (`has_private_key`)<del className="lm-diff-del">, and</del><ins className="lm-diff-ins">;</ins> certificate lists can be filtered on `has_private_key`.
 
 Identify a certificate by issuer and serial; a name can correspond to several renewals. Check which certificate the consumer actually uses and which occupies the device’s active identity. [Identity history](/docs/platform/iot-fleets/device-management) and the certificate inventory answer different questions.
 

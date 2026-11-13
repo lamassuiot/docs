@@ -132,6 +132,8 @@ No añadas `gateway.addresses` por defecto. Deja la asignación de dirección a 
 
 Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OIDC hacia él y omite la entrada `/auth` de `gateway.extraRouting`.
 
+Si tu archivo de valores aún contiene los ajustes heredados de validación JWT del Gateway — `auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` o `auth.authorization.roles.admin` — elimínalos. La guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md` documenta su eliminación sin alias de compatibilidad, y `values.schema.json` rechaza los bloques residuales en lugar de ignorarlos silenciosamente. Los reemplazos son `services.authz.jwkUrl` y `services.authz.bootstrap`, que ya aparecen en el ejemplo anterior.
+
 TLS con un Secret existente [#tls-con-un-secret-existente]
 
 Crea un Secret con `tls.crt` y `tls.key` y referéncialo. El Secret debe existir antes de instalar: en modo `external` el chart no renderiza recursos de cert-manager ni crea nunca este Secret.
@@ -142,6 +144,34 @@ tls:
   externalOptions:
     secretName: provided-tls
 ```
+
+TLS de AMQP (AMQPS) [#tls-de-amqp-amqps]
+
+`amqp.tls: true` selecciona AMQPS en todos los bloques de configuración del bus de eventos. El puerto por defecto sigue siendo `5672` y no cambia automáticamente al habilitar TLS, así que define `amqp.port` con el listener TLS del broker, normalmente `5671`.
+
+Sin un Secret de CA configurado, los clientes del bus de eventos usan las CA de confianza del sistema. Para confiar en una CA privada, crea un Secret en el namespace del release con el certificado de la CA en formato PEM y define `amqp.ca.secretName` (y `amqp.ca.certificateKey` si la clave de datos no es `ca.crt`).
+
+Para brokers que exijan TLS mutuo, crea un Secret con el certificado de cliente y su clave privada y define `amqp.client.secretName` (con `amqp.client.certificateKey` y `amqp.client.privateKeyKey` si las claves de datos no son `tls.crt` y `tls.key`).
+
+```yaml
+amqp:
+  tls: true
+  port: 5671
+  ca:
+    secretName: rabbitmq-ca
+  client:
+    secretName: lamassu-amqp-client
+```
+
+El chart monta los Secrets configurados en modo de solo lectura en todas las cargas de trabajo que consumen AMQP: el certificado de la CA en `/etc/lamassu/amqp/ca` y el certificado y la clave de cliente en `/etc/lamassu/amqp/client`. Los nombres de los archivos montados son siempre `ca.crt`, `tls.crt` y `tls.key` — los valores `certificateKey` y `privateKeyKey` renombran solo las claves de datos del Secret, nunca las rutas en disco. La clave privada del cliente se monta con permisos restrictivos (`defaultMode: 0440`; el volumen de la CA usa `0444`), que funcionan porque el chart añade `fsGroup` al security context del pod cuando `amqp.client.secretName` está definido — usa el `runAsGroup` del contenedor (por defecto `65532`) cuando `fsGroup` no está ya definido.
+
+Ambas opciones de Secret exigen `amqp.tls: true`: `values.schema.json` rechaza un `secretName` no vacío cuando `tls` es false, rechaza claves desconocidas y rechaza nombres de clave de datos fuera de `^[A-Za-z0-9._-]+$`. El Secret referenciado debe existir en el namespace del release o los pods consumidores no llegan a arrancar.
+
+El cliente AMQP carga los certificados al arrancar, así que reinicia los pods consumidores tras actualizar cualquiera de los dos Secrets. Cambiar cualquier valor de `amqp` reinicia las cargas de trabajo consumidoras mediante la anotación `checksum/config`, pero cambiar solo el contenido de un Secret no desencadena un rollout.
+
+<Callout type="warn" title="Define el puerto AMQP antes del upgrade">
+  Según la guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: en 3.8.0 `amqp.tls` no se aplicaba y los clientes del bus de eventos usaban AMQP en claro; desde 4.0.0, `amqp.tls: true` los cambia a AMQPS. Define `amqp.port` con el listener TLS del broker antes del upgrade, o usa `amqp.tls: false` para mantener AMQP en claro. `amqp.tls: false` envía las credenciales del broker y todo el tráfico del bus de eventos en claro.
+</Callout>
 
 Provisiona el primer administrador [#provisiona-el-primer-administrador]
 
@@ -191,6 +221,18 @@ El Gateway debe mostrar `PROGRAMMED=True`. Si está programado pero no tiene una
 
 El test de Helm comprueba los endpoints de salud de CA, DMS Manager, Device Manager y VA, y verifica la respuesta de la UI.
 
+Actualiza Lamassu [#actualiza-lamassu]
+
+Los pasos de upgrade específicos de cada versión se mantienen en `charts/lamassu/CHANGELOG/` dentro del repositorio Helm. El chart también incluye un job de pre-upgrade opcional que migra las claves privadas de CA existentes al motor KMS configurado para el release. Está desactivado por defecto (`migrations.caToKms.enabled: false`) y solo es necesario cuando actualizas desde una versión anterior a 3.7.0.
+
+Mientras el flag esté activo, cada `helm upgrade` crea el job `<chart fullname>-ca-to-kms-migration` (`lamassu-ca-to-kms-migration` para el release `lamassu`); una instalación nueva no lo crea. Su hook weight es `-10`, por lo que se ejecuta antes de los otros hooks de pre-upgrade: la configuración de bootstrap de autorización (peso `-4`) y el job de migración de base de datos (peso `-3`).
+
+El job consume la misma configuración del servicio KMS que el chart renderiza en el ConfigMap de KMS, incluidos los motores de `services.kms.cryptoEngines`, y ejecuta la imagen de la herramienta de migración definida en `migrations.caToKms.image`. La monta en modo read-only en `/etc/lamassuiot/config.yml` desde la clave `config` del ConfigMap, así que configura el motor de destino en tus valores antes del upgrade que realiza la migración.
+
+El job resuelve su configuración mediante un volumen proyectado con dos fuentes opcionales: el ConfigMap `<chart fullname>-kms-config`, cuyo nombre incorpora el release (`lamassu-kms-config` para el release `lamassu`, `prod-lamassu-kms-config` para el release `prod`), y el ConfigMap legacy `kms-config`, sin el nombre del release, creado por versiones anteriores del chart. La configuración legacy mantiene la autoridad mientras siga presente y el job usa el ConfigMap del release una vez el legacy desaparece. Ambas fuentes son opcionales, por lo que un ConfigMap ausente nunca deja el pod del upgrade en `ContainerCreating`.
+
+Mantén `migrations.caToKms.enabled: true` en el upgrade que realiza la migración y elimina después el flag de tus valores una vez completada la migración; su valor por defecto es `false`.
+
 Decisiones para producción [#decisiones-para-producción]
 
 Antes de pasar a producción, revisa:
@@ -202,6 +244,6 @@ Antes de pasar a producción, revisa:
 * un emisor TLS de confianza o un certificado gestionado externamente
 * recursos, réplicas, autoscaling, disruption budgets y placement
 * SMTP, observabilidad y entrega de alertas
-* las [guías de actualización entre versiones](/docs/upgrades/3-8-0-to-4-0-0) y las notas de `charts/lamassu/CHANGELOG/` antes de cada upgrade
+* las [guías de actualización entre versiones](/docs/upgrades/3-8-0-to-4-0-0) y las notas de migración de `charts/lamassu/CHANGELOG/` antes de cada upgrade, incluido el hook opcional de migración CA-to-KMS descrito arriba
 
 La referencia completa de valores se mantiene en `charts/lamassu/VALUES.md` dentro del repositorio Helm.

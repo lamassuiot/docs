@@ -13,10 +13,14 @@ Busca un certificado [#busca-un-certificado]
 <div className="lm-diff-ins lm-diff-block">
   * El filtro avanzado **Private Key**, disponible en la página Certificates y en la pestaña **Issued Certificates** de una CA, limita la lista a **All Certificates**, **With Private Key** o **Without Private Key**.
   * La columna ordenable **Private Key** — visible por defecto y oculta en pantallas estrechas — marca con una marca de verificación verde la clave custodiada en el KMS y muestra `-` en los demás casos.
-  * En los detalles del certificado, la pestaña **Information** muestra una fila **Private Key** en la sección Key & Signature: cuando la clave está localizable en el KMS la fila muestra el identificador de la clave en el KMS como un enlace (tooltip: **Open private key in KMS**); en caso contrario, la insignia **Present** o **Not available**.
+  * En los detalles del certificado, la pestaña **Information** muestra una fila **Private Key** en la sección **Key & Signature**. Cuando el certificado indica que tiene clave privada y están disponibles los identificadores de la clave y del motor del KMS, la fila enlaza a la clave (tooltip: **Open private key in KMS**). En caso contrario, muestra **Present** si el certificado indica que tiene clave privada o **Not available** si no lo indica. Esto no determina si existe una clave fuera de Lamassu.
 </div>
 
-<del className="lm-diff-del">Filtra por `Common Name`, serie, estado y autoridad emisora. </del>Usa **Quick Inspect** para una revisión rápida o **View Details** para sujeto, SAN, usos, cadena, fechas y metadatos.
+<div className="lm-diff-ins lm-diff-block">
+  Usa **Quick Inspect** para una revisión rápida o **View Details** para sujeto, SAN, usos, cadena, fechas y metadatos.
+</div>
+
+<del className="lm-diff-del">Filtra por `Common Name`, serie, estado y autoridad emisora. Usa </del>**<del className="lm-diff-del">Quick Inspect</del>**<del className="lm-diff-del"> para una revisión rápida o </del>**<del className="lm-diff-del">View Details</del>**<del className="lm-diff-del"> para sujeto, SAN, usos, cadena, fechas y metadatos. </del>Los detalles del certificado incluyen la referencia a la clave (`key_id`) y si la clave privada está gestionada (`has_private_key`)<del className="lm-diff-del">, y</del><ins className="lm-diff-ins">;</ins> las listas de certificados pueden filtrarse por `has_private_key`.
 
 Identifica el certificado por emisor y número de serie; un nombre puede corresponder a varias renovaciones. Comprueba cuál utiliza realmente el consumidor y cuál ocupa la identidad activa del dispositivo. El [historial de identidades](/docs/platform/iot-fleets/device-management) y el inventario de certificados responden preguntas distintas.
 

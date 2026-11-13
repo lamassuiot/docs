@@ -200,3 +200,5 @@ Requiere el módulo, token y permisos del proveedor correspondiente. Comprueba q
 Antes de eliminar una clave [#antes-de-eliminar-una-clave]
 
 Revisa **Related Entities** y localiza CAs, certificados y procesos de validación que siguen necesitando firmas. Revocar una CA no elimina la necesidad de publicar estado durante su periodo de retención. Eliminar una clave tampoco revoca automáticamente sus certificados. Planifica sustitución y retención antes de usar **Delete Key**; el efecto de borrado en el proveedor depende del motor.
+
+El KMS se niega a eliminar una clave que todavía está referenciada por certificados. Eliminar una CA libera las referencias de su propio certificado actual y de sus certificados reemitidos vinculados, y después intenta eliminar la clave. Si otros certificados todavía la referencian, como los de otra CA que la comparte, el KMS la conserva. Revocar los certificados emitidos por la CA eliminada no libera sus propias referencias a claves. La [guía de actualización](/docs/upgrades/3-8-0-to-4-0-0#referencias-entre-certificados-claves-y-roles-va) describe las referencias heredadas que conserva la migración.

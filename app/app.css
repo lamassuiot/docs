@@ -1378,4 +1378,13 @@ html[data-show-diff] .lm-diff-merged {
   #nd-sidebar button[aria-haspopup="dialog"]:has(p) {
     display: none;
   }
+
+  /* The sidebar header (p-4 pb-2) only collapses through `empty:hidden`, but
+     the hidden dropdown above still counts as a child. While the version
+     selector renders nothing (fewer than two versions published) the header
+     is just 24px of blank padding under the tab row. Drop it in that case; it
+     comes back as soon as the selector is present beside the dropdown. */
+  #nd-sidebar > div:has(> button[aria-haspopup="dialog"]:only-child) {
+    display: none;
+  }
 }

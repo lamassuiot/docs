@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
+import { mermaidConfig } from "../lib/mermaid-theme";
 
 /**
  * Renders ```mermaid code blocks with client-side mermaid, and opens a
@@ -26,11 +27,7 @@ export function Mermaid({ chart }: { chart: string }) {
     async function render() {
       try {
         const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: "strict",
-          theme: resolvedTheme === "dark" ? "dark" : "default",
-        });
+        mermaid.initialize(mermaidConfig(resolvedTheme === "dark"));
         const { svg } = await mermaid.render(renderId, chart);
         if (!cancelled) {
           setSvg(svg);

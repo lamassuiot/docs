@@ -90,7 +90,7 @@ openssl crl -in ca.crl.pem -noout -text
 openssl crl -in ca.crl.pem -noout -verify -CAfile issuer.pem
 ```
 
-Necesitas OpenSSL 3.x e `issuer.pem` con el certificado del emisor directo. La comprobación de firma presupone el firmante predeterminado, el certificado de la propia CA; para otro firmante, usa su certificado en `-CAfile`. Exige firma válida, tiempos vigentes y emisor esperado. Para una prueba con una raíz que emite directamente:
+Necesitas OpenSSL 3.x e `issuer.pem` con el certificado del emisor directo. Un certificado firmante aceptado tiene el mismo sujeto y la misma clave pública que la CA, por lo que esta comprobación de firma también funciona cuando el rol apunta a un certificado anterior de esa CA y clave. Exige firma válida, tiempos vigentes y emisor esperado. Para una prueba con una raíz que emite directamente:
 
 ```bash
 openssl verify -CAfile roots.pem -CRLfile ca.crl.pem \

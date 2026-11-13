@@ -1,0 +1,93 @@
+# Dashboard (/docs/pr-preview/pr-58/es/platform/pqc/dashboard)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  El dashboard (rama `feat/lamassu-q`) permite a un administrador crear e inspeccionar claves, autoridades de certificación y certificados poscuánticos sin escribir peticiones a la API. Añade las opciones de algoritmo, muestra la familia de algoritmo de cada objeto e interpreta los nuevos identificadores en los certificados. Todo lo que envía se describe en [Claves y autoridades de certificación](/docs/platform/pqc/keys-and-cas); esta página cubre lo que muestra la interfaz y dónde difiere su comportamiento entre pantallas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Elegir tipo de clave y especificación [#elegir-tipo-de-clave-y-especificación]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Crear una clave del KMS, una CA con una clave nueva y un certificado con clave generada en el servidor usan el mismo par de selectores. *Key type* está agrupado por familia y *Key specification* depende del tipo.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Grupo           | Tipos de clave                                                               |
+  | --------------- | ---------------------------------------------------------------------------- |
+  | T (Traditional) | `RSA`, `ECDSA`, `Ed25519`                                                    |
+  | PQ (Pure PQC)   | `ML-DSA`, `SLH-DSA`                                                          |
+  | PQ/T (Hybrid)   | `Composite-ML-DSA-RSA`, `Composite-ML-DSA-ECDSA`, `Composite-ML-DSA-Ed25519` |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La lista de especificaciones muestra ML-DSA-44, -65 o -87, los doce conjuntos de parámetros de SLH-DSA (por ejemplo *4 - SHAKE\_128f*) o las variantes composite por nombre. La interfaz envía como `size` el identificador del conjunto de parámetros, según se explica en [Algoritmos](/docs/platform/pqc/algorithms), y muestra un indicador de fortaleza junto a cada opción. En las claves composite el indicador muestra dos barras, una para el componente clásico y otra para el poscuántico.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Las opciones habilitadas dependen del motor criptográfico. Al crear una clave o una CA, la interfaz lista todos los algoritmos pero deshabilita los que el motor seleccionado no soporta, y pide seleccionar antes un motor. Al crear un certificado en el servidor, los tipos no soportados se ocultan en su lugar.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Emitir un certificado con una clave generada en el navegador [#emitir-un-certificado-con-una-clave-generada-en-el-navegador]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Emitir un certificado desde una CA genera el par de claves en el navegador, construye la solicitud de certificado y la envía a la CA para su firma. Los tipos de clave que se ofrecen aquí son `RSA`, `ECDSA`, `Ed25519`, `ML-DSA`, `SLH-DSA` y una única entrada `Composite ML-DSA`, y se generan con las bibliotecas `@noble` para los algoritmos poscuánticos y composite y con WebCrypto para los clásicos. La clave privada generada se muestra una sola vez al final del procedimiento.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El navegador no verifica las firmas de las solicitudes ML-DSA, SLH-DSA, composite ni Ed25519; confía en el KMS.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Cómo se muestran los objetos [#cómo-se-muestran-los-objetos]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Las listas y las vistas de detalle muestran la familia del algoritmo. La tabla de CA tiene una columna *PQC* con T, PQ o PQ/T, las tarjetas de CA y el grafo de CA muestran una insignia *PQC*, las listas de claves muestran un icono cuántico, y el detalle de una CA o un certificado muestra el algoritmo, su fortaleza y la insignia de familia. La familia se calcula a partir del identificador de algoritmo del certificado interpretado.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Los nombres de algoritmo se resuelven a partir de los identificadores de objeto. Los identificadores de ML-DSA, SLH-DSA, composite y Ed25519 se muestran como nombres con su conjunto de parámetros, por ejemplo *ML-DSA-65* o *Composite-Signature MLDSA65-ECDSA-P384-SHA512*, y para ellos no se muestra longitud en bits. Los algoritmos de firma RSA y ECDSA se muestran con etiquetas propias del dashboard, como *RSA PKCS#1 v1.5 SHA-256* y *ECDSA SHA-256*, en lugar de los nombres de OpenSSL `sha256WithRSAEncryption` y `ecdsa-with-SHA256`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La página de detalle de una clave puede firmar y verificar con una clave poscuántica y habilita únicamente el algoritmo de firma que le corresponde.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Certificados relacionados [#certificados-relacionados]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El formulario del perfil de emisión, el formulario de emisión de certificados y las páginas de detalle incluyen los controles de certificados relacionados descritos en [Certificados relacionados](/docs/platform/pqc/related-certificates).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Aspectos a tener en cuenta [#aspectos-a-tener-en-cuenta]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Los nombres de los tipos de clave no son idénticos en todas las pantallas. La creación de claves y de CA usa `Composite-ML-DSA-RSA`, `-ECDSA` y `-Ed25519`; el formulario de emisión de certificados usa un único `Composite-ML-DSA`; y el formulario de certificado en el servidor compara nombres en mayúsculas. Los nombres que el backend informa para una clave pueden diferir, por tanto, en mayúsculas y minúsculas de lo que envía la interfaz.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La interfaz no incluye ningún aviso de carácter experimental para estos algoritmos y no está traducida: todos los textos están en inglés.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="warn" title="SLH-DSA en claves generadas en el navegador">
+    La correspondencia entre el identificador del conjunto de parámetros de SLH-DSA y el algoritmo que usa el generador de claves del navegador no sigue el mismo orden que los identificadores que muestra el selector y que usa el backend, salvo en el identificador 1. Un certificado emitido por el flujo del navegador con un identificador SLH-DSA del 2 al 12 puede usar, por tanto, un conjunto de parámetros distinto del que nombra el selector. Hasta que se corrija, conviene crear las claves SLH-DSA con el KMS.
+  </Callout>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="Claves y autoridades de certificación" description="La API que hay detrás de estas pantallas." href="/docs/platform/pqc/keys-and-cas" />
+
+    <Card title="Limitaciones conocidas" description="Carencias de la interfaz y de la plataforma." href="/docs/platform/pqc/limitations" />
+  </Cards>
+</div>

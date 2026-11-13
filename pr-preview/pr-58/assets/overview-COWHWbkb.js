@@ -1,0 +1,117 @@
+import{j as e}from"./index-DqgIL_Rv.js";let h=`
+
+<div className="lm-diff-ins lm-diff-block">
+  Lamassu can create keys, certificate authorities (CAs) and certificates that use post-quantum signature algorithms, and it can serve and verify them over TLS. The work spans five codebases that depend on one another: a fork of the Go toolchain that implements the algorithms, the Lamassu backend, the web dashboard, a fork of the Traefik proxy that terminates TLS for devices, and the Helm chart that deploys all of it together.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="warn" title="Experimental">
+    PQC support lives in development branches and in forks of Go and Traefik, not in the upstream projects or in the standard Lamassu images. The composite TLS signature schemes use private-use code points that no other TLS stack understands, and the composite certificate format follows an IETF draft that can still change. Plan pilots and laboratory deployments, not production fleets. [Known limitations](/docs/platform/pqc/limitations) lists what is incomplete.
+  </Callout>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Why it matters for device fleets [#why-it-matters-for-device-fleets]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Certificates issued to devices often live for years, and the devices that hold them are hard to replace. A signature algorithm that is broken by a future quantum computer would force a fleet-wide re-enrollment. Issuing devices a certificate signed with a post-quantum or composite algorithm today, and serving them a TLS endpoint that accepts it, lets a fleet be validated against that risk before it becomes urgent. Signatures are not exposed to "harvest now, decrypt later" attacks the way a key exchange is, so the urgency is about the lifetime of certificates and devices, not about recorded traffic.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Three families of algorithms [#three-families-of-algorithms]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Lamassu groups signature algorithms in three families, the same labels the dashboard shows.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Label    | Family             | Algorithms                                                                        |
+  | -------- | ------------------ | --------------------------------------------------------------------------------- |
+  | **T**    | Traditional        | RSA, ECDSA, Ed25519                                                               |
+  | **PQ**   | Pure post-quantum  | ML-DSA, SLH-DSA                                                                   |
+  | **PQ/T** | Hybrid (composite) | ML-DSA combined with RSA, ECDSA or Ed25519 in a single key and a single signature |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A composite signature is valid only if both of its components verify. Its unforgeability is intended to hold as long as at least one of the two algorithms remains unbroken, provided the relying party requires the composite and does not fall back to a classical certificate. In the key exchange, \`PQ/T\` means a hybrid group that combines a classical and an ML-KEM exchange, and \`PQ\` means pure ML-KEM. [Algorithms](/docs/platform/pqc/algorithms) describes each one and the parameter sets Lamassu accepts.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  How the pieces fit [#how-the-pieces-fit]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  \`\`\`mermaid
+  flowchart LR
+      GO["Go PQC fork<br/>(algorithms, x509, TLS)"]
+      BE["Lamassu backend<br/>(KMS, CA, VA)"]
+      UI["Dashboard"]
+      TR["Traefik PQC fork<br/>(device-facing TLS)"]
+      HC["Helm chart"]
+      DEV["Device"]
+      ENV["Envoy Gateway<br/>(classical TLS)"]
+      GO --> BE
+      GO --> TR
+      UI -->|REST API| BE
+      DEV -->|"TLS / mTLS (T, PQ or PQ/T)"| TR
+      TR -->|"TLS (classical)"| ENV
+      ENV --> BE
+      HC -. deploys .-> BE
+      HC -. deploys .-> TR
+      HC -. deploys .-> ENV
+  \`\`\`
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The Go fork is the foundation: the backend and Traefik are compiled with it, because the standard Go toolchain does not provide the composite and SLH-DSA certificate support. The backend creates and holds the keys, issues certificates and signs revocation data. The dashboard drives the same REST API. Devices reach the platform through Traefik, which negotiates post-quantum authentication and key exchange with the device and then forwards the request to Envoy Gateway over ordinary TLS. Post-quantum protection therefore applies only to the hop between the device and Traefik.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Where to read next [#where-to-read-next]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Read [Algorithms](/docs/platform/pqc/algorithms) first to learn what is supported and how parameter sets are written in API requests. Developers writing a device client should continue with [Go PQC toolchain](/docs/platform/pqc/go-toolchain). Administrators who want to create a post-quantum CA follow [Keys and certificate authorities](/docs/platform/pqc/keys-and-cas), and those who deploy the platform go to [Deployment with the Helm chart](/docs/platform/pqc/deployment).
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="Algorithms" description="ML-DSA, SLH-DSA and the 15 composite algorithms, with their parameter sets." href="/docs/platform/pqc/algorithms" />
+
+    <Card title="Keys and certificate authorities" description="Create post-quantum keys and CAs and issue certificates through the API." href="/docs/platform/pqc/keys-and-cas" />
+
+    <Card title="Deployment with the Helm chart" description="Install the platform with a Traefik front proxy that serves PQC certificates." href="/docs/platform/pqc/deployment" />
+  </Cards>
+</div>
+`,d={title:"Post-quantum cryptography overview",description:"What post-quantum (PQC) support Lamassu adds to keys, certificate authorities, device TLS and deployment, and how its pieces fit together."},l={isNew:!0,changes:14,title:void 0,description:void 0},c={contents:[{heading:void 0,content:"Lamassu can create keys, certificate authorities (CAs) and certificates that use post-quantum signature algorithms, and it can serve and verify them over TLS. The work spans five codebases that depend on one another: a fork of the Go toolchain that implements the algorithms, the Lamassu backend, the web dashboard, a fork of the Traefik proxy that terminates TLS for devices, and the Helm chart that deploys all of it together."},{heading:void 0,content:"PQC support lives in development branches and in forks of Go and Traefik, not in the upstream projects or in the standard Lamassu images. The composite TLS signature schemes use private-use code points that no other TLS stack understands, and the composite certificate format follows an IETF draft that can still change. Plan pilots and laboratory deployments, not production fleets. Known limitations lists what is incomplete."},{heading:"why-it-matters-for-device-fleets",content:'Certificates issued to devices often live for years, and the devices that hold them are hard to replace. A signature algorithm that is broken by a future quantum computer would force a fleet-wide re-enrollment. Issuing devices a certificate signed with a post-quantum or composite algorithm today, and serving them a TLS endpoint that accepts it, lets a fleet be validated against that risk before it becomes urgent. Signatures are not exposed to "harvest now, decrypt later" attacks the way a key exchange is, so the urgency is about the lifetime of certificates and devices, not about recorded traffic.'},{heading:"three-families-of-algorithms",content:"Lamassu groups signature algorithms in three families, the same labels the dashboard shows."},{heading:"three-families-of-algorithms",content:"Label"},{heading:"three-families-of-algorithms",content:"Family"},{heading:"three-families-of-algorithms",content:"Algorithms"},{heading:"three-families-of-algorithms",content:"**T**"},{heading:"three-families-of-algorithms",content:"Traditional"},{heading:"three-families-of-algorithms",content:"RSA, ECDSA, Ed25519"},{heading:"three-families-of-algorithms",content:"**PQ**"},{heading:"three-families-of-algorithms",content:"Pure post-quantum"},{heading:"three-families-of-algorithms",content:"ML-DSA, SLH-DSA"},{heading:"three-families-of-algorithms",content:"**PQ/T**"},{heading:"three-families-of-algorithms",content:"Hybrid (composite)"},{heading:"three-families-of-algorithms",content:"ML-DSA combined with RSA, ECDSA or Ed25519 in a single key and a single signature"},{heading:"three-families-of-algorithms",content:"A composite signature is valid only if both of its components verify. Its unforgeability is intended to hold as long as at least one of the two algorithms remains unbroken, provided the relying party requires the composite and does not fall back to a classical certificate. In the key exchange, `PQ/T` means a hybrid group that combines a classical and an ML-KEM exchange, and `PQ` means pure ML-KEM. Algorithms describes each one and the parameter sets Lamassu accepts."},{heading:"how-the-pieces-fit",content:"The Go fork is the foundation: the backend and Traefik are compiled with it, because the standard Go toolchain does not provide the composite and SLH-DSA certificate support. The backend creates and holds the keys, issues certificates and signs revocation data. The dashboard drives the same REST API. Devices reach the platform through Traefik, which negotiates post-quantum authentication and key exchange with the device and then forwards the request to Envoy Gateway over ordinary TLS. Post-quantum protection therefore applies only to the hop between the device and Traefik."},{heading:"where-to-read-next",content:"Read Algorithms first to learn what is supported and how parameter sets are written in API requests. Developers writing a device client should continue with Go PQC toolchain. Administrators who want to create a post-quantum CA follow Keys and certificate authorities, and those who deploy the platform go to Deployment with the Helm chart."},{heading:"where-to-read-next",content:'<Card title="Algorithms" description="ML-DSA, SLH-DSA and the 15 composite algorithms, with their parameter sets." href="/docs/platform/pqc/algorithms" />'},{heading:"where-to-read-next",content:'<Card title="Keys and certificate authorities" description="Create post-quantum keys and CAs and issue certificates through the API." href="/docs/platform/pqc/keys-and-cas" />'},{heading:"where-to-read-next",content:'<Card title="Deployment with the Helm chart" description="Install the platform with a Traefik front proxy that serves PQC certificates." href="/docs/platform/pqc/deployment" />'}],headings:[{id:"why-it-matters-for-device-fleets",content:"Why it matters for device fleets"},{id:"three-families-of-algorithms",content:"Three families of algorithms"},{id:"how-the-pieces-fit",content:"How the pieces fit"},{id:"where-to-read-next",content:"Where to read next"}]};const m=[{depth:2,url:"#why-it-matters-for-device-fleets",title:e.jsx(e.Fragment,{children:"Why it matters for device fleets"})},{depth:2,url:"#three-families-of-algorithms",title:e.jsx(e.Fragment,{children:"Three families of algorithms"})},{depth:2,url:"#how-the-pieces-fit",title:e.jsx(e.Fragment,{children:"How the pieces fit"})},{depth:2,url:"#where-to-read-next",title:e.jsx(e.Fragment,{children:"Where to read next"})}];function r(i){const t={a:"a",code:"code",div:"div",h2:"h2",p:"p",pre:"pre",span:"span",strong:"strong",table:"table",tbody:"tbody",td:"td",th:"th",thead:"thead",tr:"tr",...i.components},{Callout:n,Card:a,Cards:o}=t;return n||s("Callout"),a||s("Card"),o||s("Cards"),e.jsxs(e.Fragment,{children:[e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(t.p,{children:"Lamassu can create keys, certificate authorities (CAs) and certificates that use post-quantum signature algorithms, and it can serve and verify them over TLS. The work spans five codebases that depend on one another: a fork of the Go toolchain that implements the algorithms, the Lamassu backend, the web dashboard, a fork of the Traefik proxy that terminates TLS for devices, and the Helm chart that deploys all of it together."})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(n,{type:"warn",title:"Experimental",children:e.jsxs(t.p,{children:["PQC support lives in development branches and in forks of Go and Traefik, not in the upstream projects or in the standard Lamassu images. The composite TLS signature schemes use private-use code points that no other TLS stack understands, and the composite certificate format follows an IETF draft that can still change. Plan pilots and laboratory deployments, not production fleets. ",e.jsx(t.a,{href:"/docs/platform/pqc/limitations",children:"Known limitations"})," lists what is incomplete."]})})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(t.h2,{id:"why-it-matters-for-device-fleets",children:"Why it matters for device fleets"})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(t.p,{children:'Certificates issued to devices often live for years, and the devices that hold them are hard to replace. A signature algorithm that is broken by a future quantum computer would force a fleet-wide re-enrollment. Issuing devices a certificate signed with a post-quantum or composite algorithm today, and serving them a TLS endpoint that accepts it, lets a fleet be validated against that risk before it becomes urgent. Signatures are not exposed to "harvest now, decrypt later" attacks the way a key exchange is, so the urgency is about the lifetime of certificates and devices, not about recorded traffic.'})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(t.h2,{id:"three-families-of-algorithms",children:"Three families of algorithms"})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(t.p,{children:"Lamassu groups signature algorithms in three families, the same labels the dashboard shows."})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsxs(t.table,{children:[e.jsx(t.thead,{children:e.jsxs(t.tr,{children:[e.jsx(t.th,{children:"Label"}),e.jsx(t.th,{children:"Family"}),e.jsx(t.th,{children:"Algorithms"})]})}),e.jsxs(t.tbody,{children:[e.jsxs(t.tr,{children:[e.jsx(t.td,{children:e.jsx(t.strong,{children:"T"})}),e.jsx(t.td,{children:"Traditional"}),e.jsx(t.td,{children:"RSA, ECDSA, Ed25519"})]}),e.jsxs(t.tr,{children:[e.jsx(t.td,{children:e.jsx(t.strong,{children:"PQ"})}),e.jsx(t.td,{children:"Pure post-quantum"}),e.jsx(t.td,{children:"ML-DSA, SLH-DSA"})]}),e.jsxs(t.tr,{children:[e.jsx(t.td,{children:e.jsx(t.strong,{children:"PQ/T"})}),e.jsx(t.td,{children:"Hybrid (composite)"}),e.jsx(t.td,{children:"ML-DSA combined with RSA, ECDSA or Ed25519 in a single key and a single signature"})]})]})]})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsxs(t.p,{children:["A composite signature is valid only if both of its components verify. Its unforgeability is intended to hold as long as at least one of the two algorithms remains unbroken, provided the relying party requires the composite and does not fall back to a classical certificate. In the key exchange, ",e.jsx(t.code,{children:"PQ/T"})," means a hybrid group that combines a classical and an ML-KEM exchange, and ",e.jsx(t.code,{children:"PQ"})," means pure ML-KEM. ",e.jsx(t.a,{href:"/docs/platform/pqc/algorithms",children:"Algorithms"})," describes each one and the parameter sets Lamassu accepts."]})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(t.h2,{id:"how-the-pieces-fit",children:"How the pieces fit"})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(e.Fragment,{children:e.jsx(t.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z" fill="currentColor" /></svg>',children:e.jsxs(t.code,{children:[e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"flowchart LR"})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:'    GO["Go PQC fork<br/>(algorithms, x509, TLS)"]'})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:'    BE["Lamassu backend<br/>(KMS, CA, VA)"]'})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:'    UI["Dashboard"]'})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:'    TR["Traefik PQC fork<br/>(device-facing TLS)"]'})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:'    HC["Helm chart"]'})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:'    DEV["Device"]'})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:'    ENV["Envoy Gateway<br/>(classical TLS)"]'})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"    GO --> BE"})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"    GO --> TR"})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"    UI -->|REST API| BE"})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:'    DEV -->|"TLS / mTLS (T, PQ or PQ/T)"| TR'})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:'    TR -->|"TLS (classical)"| ENV'})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"    ENV --> BE"})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"    HC -. deploys .-> BE"})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"    HC -. deploys .-> TR"})}),`
+`,e.jsx(t.span,{className:"line",children:e.jsx(t.span,{style:{"--shiki-light":"#1F2328","--shiki-dark":"#E6EDF3"},children:"    HC -. deploys .-> ENV"})})]})})})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(t.p,{children:"The Go fork is the foundation: the backend and Traefik are compiled with it, because the standard Go toolchain does not provide the composite and SLH-DSA certificate support. The backend creates and holds the keys, issues certificates and signs revocation data. The dashboard drives the same REST API. Devices reach the platform through Traefik, which negotiates post-quantum authentication and key exchange with the device and then forwards the request to Envoy Gateway over ordinary TLS. Post-quantum protection therefore applies only to the hop between the device and Traefik."})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsx(t.h2,{id:"where-to-read-next",children:"Where to read next"})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsxs(t.p,{children:["Read ",e.jsx(t.a,{href:"/docs/platform/pqc/algorithms",children:"Algorithms"})," first to learn what is supported and how parameter sets are written in API requests. Developers writing a device client should continue with ",e.jsx(t.a,{href:"/docs/platform/pqc/go-toolchain",children:"Go PQC toolchain"}),". Administrators who want to create a post-quantum CA follow ",e.jsx(t.a,{href:"/docs/platform/pqc/keys-and-cas",children:"Keys and certificate authorities"}),", and those who deploy the platform go to ",e.jsx(t.a,{href:"/docs/platform/pqc/deployment",children:"Deployment with the Helm chart"}),"."]})}),`
+`,e.jsx(t.div,{className:"lm-diff-ins lm-diff-block",children:e.jsxs(o,{children:[e.jsx(a,{title:"Algorithms",description:"ML-DSA, SLH-DSA and the 15 composite algorithms, with their parameter sets.",href:"/docs/platform/pqc/algorithms"}),e.jsx(a,{title:"Keys and certificate authorities",description:"Create post-quantum keys and CAs and issue certificates through the API.",href:"/docs/platform/pqc/keys-and-cas"}),e.jsx(a,{title:"Deployment with the Helm chart",description:"Install the platform with a Traefik front proxy that serves PQC certificates.",href:"/docs/platform/pqc/deployment"})]})})]})}function f(i={}){const{wrapper:t}=i.components||{};return t?e.jsx(t,{...i,children:e.jsx(r,{...i})}):r(i)}function s(i,t){throw new Error("Expected component `"+i+"` to be defined: you likely forgot to import, pass, or provide it.")}const u=Object.freeze(Object.defineProperty({__proto__:null,_markdown:h,default:f,frontmatter:d,lmDiff:l,structuredData:c,toc:m},Symbol.toStringTag,{value:"Module"}));export{u as _};

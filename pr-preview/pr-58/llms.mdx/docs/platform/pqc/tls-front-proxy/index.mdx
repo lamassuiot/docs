@@ -1,0 +1,112 @@
+# TLS front proxy with Traefik (/docs/pr-preview/pr-58/platform/pqc/tls-front-proxy)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  Devices connect to Lamassu over TLS, and EST enrollment relies on mutual TLS. To accept a post-quantum or composite certificate on that connection, the TLS endpoint must be built with the [Go PQC toolchain](/docs/platform/pqc/go-toolchain). Lamassu does this with a fork of Traefik, based on Traefik 3.7.15, that sits in front of Envoy Gateway. The fork adds two behaviours: it can serve several certificates for the same host and chooses among them per client, and it lets a Gateway API listener reference a Traefik TLS option.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Several certificates for the same host [#several-certificates-for-the-same-host]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Upstream Traefik keeps one certificate per set of names. If a classical ECDSA certificate and an ML-DSA certificate exist for `lab.example.com`, only the first is kept. The fork stores every distinct certificate (duplicates are detected by comparing the leaf certificate) and chooses one for each handshake.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The choice follows the signature algorithms the client announces:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  1. The server name from the client is normalized and the certificates whose names match it are collected, with exact names ahead of wildcards. A common-name-only certificate still matches.
+  2. If no certificate matches, the connection is closed in strict-SNI mode, or the default certificate is served.
+  3. If exactly one certificate matches, it is served without further checks.
+  4. Otherwise the proxy takes the client's signature schemes in the order the client sent them, and for each scheme returns the first certificate whose key the scheme, the TLS version and the key type allow. This matches the leaf key against `signature_algorithms`, the schemes the client accepts for the handshake signature; the signatures in the rest of the chain are a separate check against `signature_algorithms_cert`.
+  5. If the client announces no scheme, the first compatible certificate is returned. If none is compatible, the first candidate is returned and the handshake fails with the underlying error.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The client's order of preference prevails, so a client that lists ML-DSA first receives the post-quantum certificate and a client that lists ECDSA first receives the classical one, even if it also supports ML-DSA. A client with no post-quantum support never announces those schemes and receives the classical certificate. TLS 1.2 never selects ML-DSA or composite certificates. The server cannot be configured with its own order of preference.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  TLS options on Gateway API listeners [#tls-options-on-gateway-api-listeners]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Traefik reads its Gateway API configuration from Kubernetes. The fork reads the listener option `traefik.io/tls-options`, whose value names the TLS option to apply to that listener: either `default`, or a qualified name such as `traefik-system-pqc@kubernetescrd`. This works for HTTPS listeners and for TLS listeners in `Terminate` mode that serve a `TLSRoute`. It is ignored in passthrough mode.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```yaml
+  apiVersion: gateway.networking.k8s.io/v1
+  kind: Gateway
+  metadata:
+    name: traefik-gw
+  spec:
+    gatewayClassName: traefik
+    listeners:
+      - name: https
+        protocol: HTTPS
+        port: 8443
+        tls:
+          mode: Terminate
+          certificateRefs:
+            - kind: Secret
+              name: edge-cert
+          options:
+            traefik.io/tls-options: default
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A TLS option is where the supported key exchange groups and the client authentication mode are set. When several listeners share a parent router and name different options, the proxy logs a warning and uses isolated defaults for each. Without the fork, Traefik ignores the annotation, applies its own defaults and the settings cannot be controlled; devices that need mutual TLS then fail.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The fork also adds `mlkem1024` to the group names accepted in `curvePreferences`, next to the hybrid groups that Traefik already maps.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Mutual TLS [#mutual-tls]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Client authentication is the standard Traefik mechanism, configured in the TLS option. With `RequireAndVerifyClientCert` and a client CA file the proxy validates the chain, and the verification of the client signature is done by the TLS stack of the Go fork, which has been tested with composite client certificates in a TLS 1.3 handshake. With `RequestClientCert`, which the Lamassu chart sets in its default option, the proxy checks that the client holds the key of the certificate it presents but does not validate the chain; the decision is delegated to the backend, which receives the certificate in a header (see [Deployment with the Helm chart](/docs/platform/pqc/deployment)). No Traefik test covers post-quantum mutual TLS, and a client chain signed by a composite or post-quantum CA depends on the x509 code of the fork.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Building the proxy [#building-the-proxy]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The fork is not built from the Go image. The `build.sh` script requires an already compiled checkout of the Go fork, by default in `../go`, and checks that it is the fork before it forces `GOROOT` and `GOTOOLCHAIN=local`. It compiles the binary with `CGO_ENABLED=0`, builds the web UI unless `SKIP_WEBUI=1`, and packages the binary into an Alpine image with `docker buildx`. The default image is `ghcr.io/lamassuiot/traefik:pqc-3.7.15`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Variable        | Purpose                                                                           |
+  | --------------- | --------------------------------------------------------------------------------- |
+  | `GO_FORK_ROOT`  | Location of the compiled Go fork.                                                 |
+  | `PLATFORMS`     | Target platforms; the default is `linux/amd64`.                                   |
+  | `SKIP_WEBUI`    | Skip building the web UI when set to `1`.                                         |
+  | `IMAGE`, `PUSH` | Name of the image and whether to push it. Multi-platform builds require `PUSH=1`. |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The `pqc-*` tags are mutable and have been rebuilt in place, so pin the digest in production-like environments.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Callout type="info" title="Not yet validated with composite certificates">
+    The selection tests of the fork use pure ML-DSA-65 together with ECDSA P-256. Selecting a composite certificate depends on the fork's TLS stack knowing the composite key, which it does, but the proxy has no test for it.
+  </Callout>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="Deployment with the Helm chart" description="Install the proxy in front of Envoy Gateway with the chart." href="/docs/platform/pqc/deployment" />
+
+    <Card title="Known limitations" description="Interoperability and operational caveats." href="/docs/platform/pqc/limitations" />
+  </Cards>
+</div>

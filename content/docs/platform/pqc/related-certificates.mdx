@@ -61,7 +61,7 @@ The extension is evidence of a relationship, not a dependency. A relying party m
 
 ## From the dashboard
 
-The dashboard exposes the feature in two places. The issuance profile form has a *Related Certificates* section with a switch, the allowed hosts and the maximum age. When issuing a certificate from a CA with a browser-generated key and a profile that enables the feature, the form offers *Bind to a related certificate*: the user supplies the existing certificate, or its issuer and serial number, signs the data shown with the existing key outside the browser, and pastes the signature. Certificate and CA details show a *Related Certificate* row with the hash algorithm and value. See [Dashboard](/docs/platform/pqc/dashboard).
+The dashboard covers the feature without API requests. The issuance profile form has a *Related Certificates* switch with the allowed hosts and the maximum age, and the issue-certificate form offers *Bind to a related certificate* when the selected profile enables it. Certificate and CA details show a *Related Certificate* row with the hash algorithm and value. The steps, with screenshots, are in [Dashboard](/docs/platform/pqc/dashboard#related-certificates).
 
 <Callout type="info" title="Scope of the implementation">
 The bound certificate is created by the fork's `CreateBoundCertificate`, whose tests cover an ML-DSA key bound to RSA, ECDSA and Ed25519 certificates. The tests do not use composite keys. Only the issuing side is implemented in Lamassu: the platform does not evaluate the extension when it validates certificates.

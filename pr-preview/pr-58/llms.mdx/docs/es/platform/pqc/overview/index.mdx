@@ -46,23 +46,11 @@
 
 <div className="lm-diff-ins lm-diff-block">
   ```mermaid
-  flowchart LR
-      GO["Fork de Go PQC<br/>(algoritmos, x509, TLS)"]
-      BE["Backend de Lamassu<br/>(KMS, CA, VA)"]
-      UI["Dashboard"]
-      TR["Fork de Traefik PQC<br/>(TLS hacia dispositivos)"]
-      HC["Helm chart"]
-      DEV["Dispositivo"]
-      ENV["Envoy Gateway<br/>(TLS clásico)"]
-      GO --> BE
-      GO --> TR
-      UI -->|API REST| BE
-      DEV -->|"TLS / mTLS (T, PQ o PQ/T)"| TR
-      TR -->|"TLS (clásico)"| ENV
-      ENV --> BE
-      HC -. despliega .-> BE
-      HC -. despliega .-> TR
-      HC -. despliega .-> ENV
+  flowchart TB
+      DEV["Dispositivo"] -->|"TLS / mTLS<br/>(T, PQ o PQ/T)"| TR["Fork de Traefik PQC<br/>TLS hacia dispositivos"]
+      TR -->|"TLS clásico"| ENV["Envoy Gateway"]
+      ENV --> BE["Backend de Lamassu<br/>KMS, CA, VA"]
+      UI["Dashboard"] -->|"API REST"| BE
   ```
 </div>
 

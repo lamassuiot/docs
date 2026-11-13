@@ -18,10 +18,10 @@
 
 <div className="lm-diff-ins lm-diff-block">
   ```mermaid
-  flowchart LR
-      D["Device / client"] -->|"TLS 1.3, mTLS optional<br/>PQC key exchange and certificates"| T["Traefik (traefik-system)<br/>Gateway traefik-gw, Terminate"]
+  flowchart TB
+      D["Device / client"] -->|"TLS 1.3, mTLS optional<br/>PQC key exchange and certificates"| T["Traefik (Terminate)<br/>Gateway traefik-gw"]
       T -->|"HTTPS, classical certificate<br/>certificate not verified"| E["Envoy Gateway<br/>envoy-gateway-proxy :443"]
-      E --> S["Lamassu services<br/>(HTTPRoutes + ext-authz)"]
+      E --> S["Lamassu services<br/>HTTPRoutes + ext-authz"]
   ```
 </div>
 

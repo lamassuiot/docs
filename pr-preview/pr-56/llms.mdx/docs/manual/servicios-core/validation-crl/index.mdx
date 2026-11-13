@@ -29,6 +29,10 @@ When a CA is reissued, the role keeps pointing at the previous certificate. CRLs
   `PUT` always validates the signer, even when the request does not change it. If the stored signer is no longer valid, no field of the role can be modified, not even the validity, until a valid one is set.
 </Callout>
 
+<Callout type="warn" title="Do not share keys between CAs">
+  Sharing a key between CAs can prevent CRL validation. See [CAs that share a key](#cas-that-share-a-key).
+</Callout>
+
 `latest_crl` contains version, validity start and end. Versions are kept as PEM in object storage at `pki/va/crl/{subject_key_id}/{version}.crl`; the public endpoint returns DER.
 
 CAs that share a key [#cas-that-share-a-key]
@@ -39,7 +43,7 @@ The certificates of all of them point to `/crl/{ski}`, but the published list ha
 
 If the first CA is deleted, CRL generation for the remaining one fails because the configured signer no longer matches a CA with that name. Until the role’s signer is updated to a certificate of the remaining CA, the last published list keeps being served until it expires (7 days by default).
 
-To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Until Lamassu rejects these imports, restrict the permission to import CAs as an interim control; it covers only the import path. Creating a CA with **Create New CA (Existing Key)** on a KMS key another CA already uses produces the same collision, so also avoid reusing keys across CAs. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
+Before upgrading, review CAs that share a key. To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Until Lamassu rejects these imports, restrict the permission to import CAs as an interim control; it covers only the import path. Creating a CA with **Create New CA (Existing Key)** on a KMS key another CA already uses produces the same collision, so also avoid reusing keys across CAs. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
 
 Periodic and automatic regeneration [#periodic-and-automatic-regeneration]
 

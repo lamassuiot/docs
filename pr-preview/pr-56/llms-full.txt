@@ -486,6 +486,18 @@ The Gateway should report `PROGRAMMED=True`. If it is programmed but has no usab
 
 The Helm test checks the CA, DMS Manager, Device Manager and VA health endpoints and verifies the UI response.
 
+Upgrading Lamassu [#upgrading-lamassu]
+
+Version-specific upgrade steps live in `charts/lamassu/CHANGELOG/` in the Helm repository. The chart also ships an optional pre-upgrade Job that migrates existing CA private keys into the KMS engine configured for the release. It is off by default (`migrations.caToKms.enabled: false`) and is only needed when upgrading from a version prior to 3.7.0.
+
+While the flag is enabled, every `helm upgrade` creates the `<chart fullname>-ca-to-kms-migration` Job (`lamassu-ca-to-kms-migration` for release `lamassu`); a fresh install does not create it. Its hook weight is `-10`, so it runs before the other pre-upgrade hooks: the authorization bootstrap configuration (weight `-4`) and the database-migration Job (weight `-3`).
+
+The Job consumes the same KMS service configuration the chart renders into the KMS ConfigMap, including the engines from `services.kms.cryptoEngines`, and runs the migration tool defined in `migrations.caToKms.image`. It mounts that configuration read-only at `/etc/lamassuiot/config.yml` from the ConfigMap key `config`, so configure the destination engine in your values before the upgrade that performs the migration.
+
+The Job resolves its configuration through a projected volume with two optional sources: the release-scoped `<chart fullname>-kms-config` (`lamassu-kms-config` for release `lamassu`, `prod-lamassu-kms-config` for release `prod`) and the legacy unscoped `kms-config` created by chart versions before release-scoped naming. The legacy configuration remains authoritative while it is still present, and the release-scoped one is used once the legacy one is gone. Both sources are optional, so a missing ConfigMap never leaves the upgrade pod in `ContainerCreating`.
+
+Keep `migrations.caToKms.enabled: true` for the upgrade that performs the migration, then remove the flag from your values once the migration completes; it defaults to `false`.
+
 Production decisions [#production-decisions]
 
 Before going live, review:
@@ -497,7 +509,7 @@ Before going live, review:
 * a trusted TLS issuer or externally managed certificate
 * resource requests, replicas, autoscaling, disruption budgets and placement
 * SMTP, observability and alert delivery
-* the [version upgrade guides](/docs/upgrades/3-8-0-to-4-0-0) and the notes in `charts/lamassu/CHANGELOG/` before every upgrade
+* the [version upgrade guides](/docs/upgrades/3-8-0-to-4-0-0) and migration notes in `charts/lamassu/CHANGELOG/` before every upgrade, including the optional CA-to-KMS migration hook described above
 
 The complete values reference is maintained in `charts/lamassu/VALUES.md` in the Helm repository.
 
@@ -884,7 +896,7 @@ A consumer outage does not always prevent the main operation from completing. Th
 
 Observability [#observability]
 
-The chart can enable OpenTelemetry instrumentation. Traces are exported over OTLP HTTP and logs can be directed to a compatible endpoint, such as VictoriaLogs. Use a correlation identifier and the same time window to join Gateway, authz, service and dependency.
+The chart can enable OpenTelemetry instrumentation for the services that support it, including authz; it does not configure OpenTelemetry for AWS Connector, wfx or the UI. Traces are exported over OTLP HTTP and logs can be directed to a compatible endpoint, such as VictoriaLogs. Use a correlation identifier and the same time window to join Gateway, service and dependency.
 
 Before closing an incident, record:
 
@@ -1314,7 +1326,7 @@ The credential could be processed but did not produce a positive authorization. 
 5. that the policy includes the action and the requested resource type or route;
 6. that the identifier, relation, column filter or HTTP constraint includes the real resource.
 
-In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure. With OpenTelemetry instrumentation enabled, each decision also produces a span — `engine.CheckHTTP` on the Gateway path — whose attributes record `authz.allowed`, the matched policy and the matched principal, so you can correlate the denial with the Gateway trace.
+In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure. With OpenTelemetry tracing enabled, a request that reaches the policy engine produces an `engine.CheckHTTPRequest` span whose attributes record `authz.allowed`, the matched policy and the matched principal. Correlation with the Gateway trace requires trace context to be propagated to authz.
 
 Everything returns 403 [#everything-returns-403]
 
@@ -1386,6 +1398,8 @@ Create a subscription [#create-a-subscription]
     * **JavaScript** lets you express custom logic. Each filter runs for at most 100 milliseconds; a filter that exceeds this limit fails the condition and the notification is skipped with the error `javascript filter execution timed out`.
 
     For example, `function (event) { return event.data.status == "NO_IDENTITY"; }` limits a subscription to devices without an identity.
+
+    The console evaluates the filter against the JSON shown in the **Input Event** editor, which is prefilled with the latest event, and reports whether it matches. For JSON Path and JavaScript filters, it shows **The filter matches this Cloud Event** or **The filter does not match this Cloud Event**. JSON Path expressions are evaluated against the full Cloud Event, so the default `$.data` selects the event's `data` field, and the expression must start with `$`.
   </Step>
 
   <Step>
@@ -2517,11 +2531,9 @@ Configuration parameters [#configuration-parameters]
 | `device_manager_client`        | string | Yes                            | HTTP URL of Lamassu's Device Manager.                                                                          |
 | `ca_client`                    | string | Yes                            | HTTP URL of Lamassu's CA service.                                                                              |
 
-Resource state machine [#resource-state-machine]
+Events and AWS resources [#events-and-aws-resources]
 
-The connector owns the AWS side of four resource types — CAs, DMS provisioning templates (JITP), device certificates and Things. This section maps the bus events the connector consumes to the AWS resources they touch and to the AWS calls each transition performs. AWS resources are referenced with the notation `IoTCore/<resource>`.
-
-Events the connector handles [#events-the-connector-handles]
+The connector owns the AWS side of four resource types — CAs, DMS provisioning templates (JITP), device certificates and Things. This section maps the bus events the connector consumes to the AWS resources they touch and to the AWS calls each flow performs. The state machine of each resource lives next to its detailed explanation; the last column links to it. AWS resources are referenced with the notation `IoTCore/<resource>`.
 
 The **CloudEvent type** column lists the event name on Lamassu's internal event bus; the **IAM actions** column lists the exact AWS SDK operations each flow invokes, so the required permissions can be derived directly from this table.
 
@@ -2535,11 +2547,19 @@ The **CloudEvent type** column lists the event name on Lamassu's internal event 
   | `EventUpdateCertificateMetadataKey` / `EventUpdateDeviceMetadataKey` | Certificate / Device | `IoTCore/Certificate`, `IoTCore/Thing`                  | —                                                                                                                                                                                        | Refreshes internal state; the connector ignores events whose CloudEvent `source` matches its own URI to avoid self-triggered loops.                                                                                                                                  | [Device Shadow and automation](#device-shadow-and-automation) |
 </div>
 
+CA registration in AWS IoT Core [#ca-registration-in-aws-iot-core]
+
+For devices to authenticate to AWS IoT Core with certificates issued by a Lamassu CA, that CA must first be registered in the AWS account. The connector handles this registration automatically in response to the `EventCreateCAKey`, `EventImportCAKey` and `EventUpdateCAMetadataKey` events, but the operation **only fires when the administrator explicitly requests it** through the CA metadata field.
+
+How to request registration [#how-to-request-registration]
+
+Registration is triggered by setting `registration.status = "REQUESTED"` on the `lamassu.io/iot/{connector_id}` key of the CA's metadata. This can be done from the Lamassu console in the CA management section or through the API.
+
+Once the event is received, the connector attempts to register the CA in AWS and updates the `registration.status` field in the CA's metadata with the result: `"SUCCEEDED"` if registration was successful, or `"FAILED"` with an error message otherwise. The process is asynchronous, so you must periodically check the metadata status until the operation completes.
+
 CA registration states [#ca-registration-states]
 
 The CA registration flow is driven by the `registration.status` field of the CA's connector metadata:
-
-by the `registration.status` field of the CA's connector metadata:
 
 ```mermaid
 stateDiagram-v2
@@ -2560,85 +2580,6 @@ stateDiagram-v2
 | `Registering` → `Succeeded`          | `iot:RegisterCACertificate` (Primary: proof-of-possession with an ephemeral key; SNI-only: `CertificateMode: SNI_ONLY`) |
 | `Registering` → `Failed`             | failed `iot:RegisterCACertificate`; the error detail is written to the CA's metadata                                    |
 | `Failed` / `Succeeded` → `Requested` | none (a new `REQUESTED` write re-runs the flow)                                                                         |
-
-DMS registration-mode states [#dms-registration-mode-states]
-
-The DMS's `registration_mode` determines what the connector does on the AWS side when the DMS is created or fully edited:
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> Unconfigured: DMS without connector metadata
-    Unconfigured --> None: admin sets the key with mode none
-    Unconfigured --> Auto: admin sets the key with mode auto
-    Unconfigured --> Jitp: admin sets the key with mode jitp
-    None --> Auto: mode switch on DMS edit
-    None --> Jitp: mode switch on DMS edit
-    Auto --> None: mode switch on DMS edit
-    Auto --> Jitp: mode switch on DMS edit
-    Jitp --> None: mode switch on DMS edit
-    Jitp --> Auto: mode switch on DMS edit
-    Jitp --> Jitp: full edit (PUT /v1/dms/{id}) retries template creation
-```
-
-| Transition                       | AWS calls                                                                                                                                      |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Unconfigured` → `None` / `Auto` | none (configuration only)                                                                                                                      |
-| `None` ↔ `Auto`                  | none (configuration only)                                                                                                                      |
-| Any → `Jitp`                     | `iot:CreateProvisioningTemplate` (non-idempotent: it fails when the template already exists; after 3 retries the event lands in `lamassu-dlq`) |
-| `Jitp` → `None` / `Auto`         | none (the template stays in the AWS account)                                                                                                   |
-
-Certificate status states [#certificate-status-states]
-
-Certificates holding the connector's metadata key sync their status; certificates provisioned via JITP have no metadata key and stay out of this machine:
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> NotSynced: certificate without connector metadata (JITP)
-    NotSynced --> Active: status becomes Active
-    Active --> Inactive: Revoked + certificateHold
-    Active --> Revoked: Revoked (other reasons)
-    Inactive --> Active: status becomes Active
-    Revoked --> Active: status becomes Active
-```
-
-| Transition                                    | AWS calls                                        |
-| --------------------------------------------- | ------------------------------------------------ |
-| `NotSynced` → `Active`                        | `iot:UpdateCertificate`                          |
-| `Active` → `Inactive`                         | `iot:UpdateCertificate` + forced MQTT disconnect |
-| `Active` → `Revoked`                          | `iot:UpdateCertificate` + forced MQTT disconnect |
-| `Inactive` / `Revoked` → `Active`             | `iot:UpdateCertificate`                          |
-| `RenewalWindow` / `AboutToExpire` / `Expired` | none (these states are not synced to AWS)        |
-
-Thing lifecycle [#thing-lifecycle]
-
-Things only exist under `auto` mode; in `jitp` mode AWS creates the Thing itself when the device first connects. The Thing name is always the device certificate's CN:
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> Absent: device not yet enrolled
-    Absent --> Provisioned: EventBindDeviceIdentityKey (auto mode)
-    Provisioned --> Provisioned: re-enrollment with same CN
-```
-
-| Transition                                    | AWS calls                                                                                                                             |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `Absent` → `Provisioned`                      | policies created/updated, Thing groups ensured, `iot:RegisterThing` (creates the Thing, registers the certificate, attaches policies) |
-| `Provisioned` → `Provisioned` (re-enrollment) | stale principals marked `REVOKED`, new `iot:RegisterThing` run; the new certificate ARN replaces the old one in Lamassu metadata      |
-
-In `jitp` mode the connector makes no provisioning calls: AWS executes the JITP template on the device's first connection and creates the Thing, registers the certificate and activates it on its own.
-
-CA registration in AWS IoT Core [#ca-registration-in-aws-iot-core]
-
-For devices to authenticate to AWS IoT Core with certificates issued by a Lamassu CA, that CA must first be registered in the AWS account. The connector handles this registration automatically in response to the `EventCreateCAKey`, `EventImportCAKey` and `EventUpdateCAMetadataKey` events, but the operation **only fires when the administrator explicitly requests it** through the CA metadata field.
-
-How to request registration [#how-to-request-registration]
-
-Registration is triggered by setting `registration.status = "REQUESTED"` on the `lamassu.io/iot/{connector_id}` key of the CA's metadata. This can be done from the Lamassu console in the CA management section or through the API.
-
-Once the event is received, the connector attempts to register the CA in AWS and updates the `registration.status` field in the CA's metadata with the result: `"SUCCEEDED"` if registration was successful, or `"FAILED"` with an error message otherwise. The process is asynchronous, so you must periodically check the metadata status until the operation completes.
 
 Primary Account [#primary-account]
 
@@ -2693,6 +2634,33 @@ The Thing name in the JITP template is derived from `AWS::IoT::Certificate::Comm
 
 This mode requires the `jitp_config.provisioning_role_arn` field to be configured with the ARN of an IAM role AWS IoT Core can assume to execute the template. If not configured, the connector uses the default `arn:aws:iam::{account}:role/JITPRole` and logs a warning. The administrator must ensure that role exists in the account and has the necessary permissions before enabling JITP mode.
 
+DMS registration-mode states [#dms-registration-mode-states]
+
+The DMS's `registration_mode` determines what the connector does on the AWS side when the DMS is created or fully edited:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Unconfigured: DMS without connector metadata
+    Unconfigured --> None: admin sets the key with mode none
+    Unconfigured --> Auto: admin sets the key with mode auto
+    Unconfigured --> Jitp: admin sets the key with mode jitp
+    None --> Auto: mode switch on DMS edit
+    None --> Jitp: mode switch on DMS edit
+    Auto --> None: mode switch on DMS edit
+    Auto --> Jitp: mode switch on DMS edit
+    Jitp --> None: mode switch on DMS edit
+    Jitp --> Auto: mode switch on DMS edit
+    Jitp --> Jitp: full edit (PUT /v1/dms/{id}) retries template creation
+```
+
+| Transition                       | AWS calls                                                                                                                                      |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Unconfigured` → `None` / `Auto` | none (configuration only)                                                                                                                      |
+| `None` ↔ `Auto`                  | none (configuration only)                                                                                                                      |
+| Any → `Jitp`                     | `iot:CreateProvisioningTemplate` (non-idempotent: it fails when the template already exists; after 3 retries the event lands in `lamassu-dlq`) |
+| `Jitp` → `None` / `Auto`         | none (the template stays in the AWS account)                                                                                                   |
+
 Device provisioning (automatic mode) [#device-provisioning-automatic-mode]
 
 For the firmware developer, `auto` mode is transparent: the device performs its EST enrollment as usual and, as a side effect, it is provisioned in AWS IoT Core with no additional step.
@@ -2723,6 +2691,25 @@ base64 -d -i enroll.b64 | openssl pkcs7 -inform DER -print_certs -out device.crt
 
 Once the connector completes provisioning, the device can connect to the AWS IoT Core MQTT endpoint using its private key and the certificate issued by Lamassu. The ThingName it must identify itself with in AWS is exactly the certificate's CN.
 
+Thing lifecycle [#thing-lifecycle]
+
+Things only exist under `auto` mode; in `jitp` mode AWS creates the Thing itself when the device first connects. The Thing name is always the device certificate's CN:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Absent: device not yet enrolled
+    Absent --> Provisioned: EventBindDeviceIdentityKey (auto mode)
+    Provisioned --> Provisioned: re-enrollment with same CN
+```
+
+| Transition                                    | AWS calls                                                                                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `Absent` → `Provisioned`                      | policies created/updated, Thing groups ensured, `iot:RegisterThing` (creates the Thing, registers the certificate, attaches policies) |
+| `Provisioned` → `Provisioned` (re-enrollment) | stale principals marked `REVOKED`, new `iot:RegisterThing` run; the new certificate ARN replaces the old one in Lamassu metadata      |
+
+In `jitp` mode the connector makes no provisioning calls: AWS executes the JITP template on the device's first connection and creates the Thing, registers the certificate and activates it on its own.
+
 Device provisioning (JITP mode) [#device-provisioning-jitp-mode]
 
 In JITP mode the device also performs its EST enrollment conventionally and obtains its certificate from Lamassu. The difference is that AWS IoT Core does not know the device until it attempts its first connection.
@@ -2748,6 +2735,29 @@ The connector listens for the `EventUpdateCertificateStatusKey` event and, when 
 | `Revoked`         | Any other reason  | `REVOKED`              |
 
 Only the `Active` and `Revoked` states produce a call to `iot:UpdateCertificate`. The other lifecycle states of Lamassu (`RenewalWindow`, `AboutToExpire`, `Expired`) are not synced to AWS IoT Core; the certificate status in AWS remains unchanged until the status in Lamassu becomes `Active` or `Revoked`.
+
+Certificate status states [#certificate-status-states]
+
+Certificates holding the connector's metadata key sync their status; certificates provisioned via JITP have no metadata key and stay out of this machine:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> NotSynced: certificate without connector metadata (JITP)
+    NotSynced --> Active: status becomes Active
+    Active --> Inactive: Revoked + certificateHold
+    Active --> Revoked: Revoked (other reasons)
+    Inactive --> Active: status becomes Active
+    Revoked --> Active: status becomes Active
+```
+
+| Transition                                    | AWS calls                                        |
+| --------------------------------------------- | ------------------------------------------------ |
+| `NotSynced` → `Active`                        | `iot:UpdateCertificate`                          |
+| `Active` → `Inactive`                         | `iot:UpdateCertificate` + forced MQTT disconnect |
+| `Active` → `Revoked`                          | `iot:UpdateCertificate` + forced MQTT disconnect |
+| `Inactive` / `Revoked` → `Active`             | `iot:UpdateCertificate`                          |
+| `RenewalWindow` / `AboutToExpire` / `Expired` | none (these states are not synced to AWS)        |
 
 Forced disconnect on revocation [#forced-disconnect-on-revocation]
 
@@ -3509,6 +3519,10 @@ Import an external CA [#import-an-external-ca]
 
 You need the CA certificate in PEM, its chain to a known root and, when importing it, an exportable private key. Before uploading material, verify signature, dates, `CA:TRUE`, signing usages (including `cRLSign`, without which the CA cannot publish its [CRL](/docs/platform/pki/crl)) and public-key correspondence. The [key verification procedure](/docs/platform/pki/quickstarts/issue-certificate) also compares a CA key and certificate.
 
+The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number matches a stored certificate with different contents, or whose identical certificate already belongs to an existing CA. A deleted CA's certificate record is kept and can be reused when re-importing the same certificate, including its previous status. Re-importing a different certificate with that serial number is rejected; check the certificate and status after re-importing.
+
+Deleting a CA releases the key references of its own current certificate and linked reissued certificates, while keeping those records for its issuer's CRL and OCSP. It then attempts to delete the key; the KMS keeps it if other certificates still reference it, such as another CA sharing the key. Revoking certificates issued by the deleted CA does not release their own key references.
+
 <Steps>
   <Step>
     Select the engine [#select-the-engine]
@@ -3780,7 +3794,7 @@ This guide is for a PKI operator inspecting or retiring an issued identity. You 
 
 Find a certificate [#find-a-certificate]
 
-Filter by `Common Name`, serial, status and issuer. Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata.
+Filter by `Common Name`, serial, status and issuer. Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata. Certificate details include the key reference (`key_id`) and whether the private key is managed (`has_private_key`), and certificate lists can be filtered on `has_private_key`.
 
 Identify a certificate by issuer and serial; a name can correspond to several renewals. Check which certificate the consumer actually uses and which occupies the device’s active identity. [Identity history](/docs/platform/iot-fleets/device-management) and the certificate inventory answer different questions.
 
@@ -4046,6 +4060,10 @@ When a CA is reissued, the role keeps pointing at the previous certificate. CRLs
   `PUT` always validates the signer, even when the request does not change it. If the stored signer is no longer valid, no field of the role can be modified, not even the validity, until a valid one is set.
 </Callout>
 
+<Callout type="warn" title="Do not share keys between CAs">
+  Sharing a key between CAs can prevent CRL validation. See [CAs that share a key](#cas-that-share-a-key).
+</Callout>
+
 `latest_crl` contains version, validity start and end. Versions are kept as PEM in object storage at `pki/va/crl/{subject_key_id}/{version}.crl`; the public endpoint returns DER.
 
 CAs that share a key [#cas-that-share-a-key]
@@ -4056,7 +4074,7 @@ The certificates of all of them point to `/crl/{ski}`, but the published list ha
 
 If the first CA is deleted, CRL generation for the remaining one fails because the configured signer no longer matches a CA with that name. Until the role’s signer is updated to a certificate of the remaining CA, the last published list keeps being served until it expires (7 days by default).
 
-To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Until Lamassu rejects these imports, restrict the permission to import CAs as an interim control; it covers only the import path. Creating a CA with **Create New CA (Existing Key)** on a KMS key another CA already uses produces the same collision, so also avoid reusing keys across CAs. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
+Before upgrading, review CAs that share a key. To detect the problem, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued. A CA imported with an SKI already in use does not replace the existing one as CRL issuer, because the issuer is resolved from the role’s signer. However, its own certificates point to that same URL and its revocations are not published. Until Lamassu rejects these imports, restrict the permission to import CAs as an interim control; it covers only the import path. Creating a CA with **Create New CA (Existing Key)** on a KMS key another CA already uses produces the same collision, so also avoid reusing keys across CAs. A per-CA CRL and the rejection of imports whose SKI collides with an existing CA are both proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), and neither is implemented yet.
 
 Periodic and automatic regeneration [#periodic-and-automatic-regeneration]
 
@@ -4348,11 +4366,13 @@ Sign locally with PKCS#11 [#sign-locally-with-pkcs11]
 
 Lamassu also offers specific help for local integrations through **Sign locally with OpenSSL & PKCS11 tools**.
 
-Requiere el módulo, token y permisos del proveedor correspondiente. Comprueba que el identificador de Lamassu se corresponde con el objeto accesible desde ese módulo. La configuración del módulo pertenece al entorno del cliente o al [Despliegue](/docs/deployment/self-hosted/helm).
+It requires the module, token and permissions of the corresponding provider. Check that the Lamassu identifier matches the object accessible from that module. Module configuration belongs to the client environment or [Deployment](/docs/deployment/self-hosted/helm).
 
 Before deleting a key [#before-deleting-a-key]
 
 Review **Related Entities** and locate CAs, certificates and validation processes that still need signatures. Revoking a CA does not remove the need to publish status during its retention period. Deleting a key does not automatically revoke its certificates either. Plan replacement and retention before using **Delete Key**; provider deletion behavior depends on the engine.
+
+The KMS refuses to delete a key that certificates still reference. Deleting a CA releases the references from its own current certificate and linked reissued certificates, then attempts to delete the key. If other certificates still reference the key, such as another CA sharing it, the KMS keeps it. Revoking certificates issued by the deleted CA does not release their own key references. Legacy references retained by the upgrade migration are described in the [upgrade guide](/docs/upgrades/3-8-0-to-4-0-0#references-between-certificates-keys-and-va-roles).
 
 
 # Online validation with OCSP (/docs/pr-preview/pr-56/platform/pki/ocsp)
@@ -10660,6 +10680,53 @@ When escalating a problem, provide identifiers, error and relevant public eviden
 </div>
 
 
+# Security (/docs/pr-preview/pr-56/security)
+
+
+
+Found a security vulnerability in lamassuiot, lamassu-dashboard, or lamassu-helm? This page explains how to report it privately, what to include in your report and which releases receive security fixes.
+
+Report a vulnerability [#report-a-vulnerability]
+
+Do not report security vulnerabilities through public GitHub issues, discussions, or pull requests. Public reports disclose the problem before maintainers can fix it.
+
+Instead, report privately using GitHub Security Advisories for the affected repository:
+
+* [lamassuiot](https://github.com/lamassuiot/lamassuiot/security/advisories/new)
+* [lamassu-dashboard](https://github.com/lamassuiot/lamassu-dashboard/security/advisories/new)
+* [lamassu-helm](https://github.com/lamassuiot/lamassu-helm/security/advisories/new)
+
+This lets maintainers assess and address the issue before it is publicly disclosed.
+
+If private vulnerability reporting is not enabled for that repository, report the vulnerability privately to [lamassuiot@lksnext.com](mailto:lamassuiot@lksnext.com) before disclosing any details publicly.
+
+What to include in a report [#what-to-include-in-a-report]
+
+Describe the vulnerability, its potential impact, and steps to reproduce it using non-sensitive, redacted examples.
+
+Do not include in the report:
+
+* Credentials, tokens, or private keys
+* Customer data or customer-identifiable information
+* Confidential architecture or internal infrastructure details
+
+Supported versions [#supported-versions]
+
+Only the latest stable release receives security support. Support for a stable release ends when the next stable release is published. Older releases and pre-releases are not supported.
+
+For upgrade guidance, see [Upgrades](/docs/upgrades/3-8-0-to-4-0-0).
+
+Responsible disclosure [#responsible-disclosure]
+
+* Give maintainers reasonable time to investigate and address a reported vulnerability before any public disclosure.
+* Avoid privacy violations, data destruction, and service disruption while researching a vulnerability.
+* Only interact with accounts or data you own, or for which you have explicit permission.
+
+Maintainers acknowledge reports in a timely manner and keep you informed of remediation progress.
+
+This policy covers the source code, configuration, and CI/CD workflows of the lamassuiot, lamassu-dashboard, and lamassu-helm repositories.
+
+
 # 3.8.0 to 4.0.0 (/docs/pr-preview/pr-56/upgrades/3-8-0-to-4-0-0)
 
 
@@ -10716,25 +10783,26 @@ Two things never migrate on their own: the KMS and VA data on local volumes, whi
 
 Breaking changes [#breaking-changes]
 
-| Change                                                                                | Who is affected                                                                      | Severity                                                      | Action                                                                                     |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| [Release-scoped resource names](#release-scoped-resource-names)                       | Helm releases with a filesystem KMS engine or local VA CRL storage                   | High: KMS and VA start on empty volumes                       | Copy the data into the new volumes                                                         |
-| [Strict values validation](#strict-values-validation)                                 | Every Helm release                                                                   | High: `helm upgrade` fails                                    | Remove or rename legacy keys                                                               |
-| [Required authorization configuration](#required-authorization-configuration)         | Every deployment                                                                     | High: without a bootstrap principal there is no administrator | Configure `services.authz`                                                                 |
-| [Gateway token validation removed](#gateway-token-validation-removed)                 | Every Helm release                                                                   | High: `helm upgrade` fails on the old keys                    | Move JWKS and roles into `services.authz`                                                  |
-| [PostgreSQL consolidation](#postgresql-consolidation)                                 | 3.8.0 deployments with per-service databases                                         | High: services find no data, or a migration aborts            | Clean duplicate CA IDs and empty `engine_id` values first; move data manually outside Helm |
-| [SQLite storage removed](#sqlite-storage-removed)                                     | Deployments on SQLite, `couch_db` or `dynamo_db`                                     | High: the backend no longer starts with them                  | Move to PostgreSQL before upgrading                                                        |
-| [Webhooks with file references](#dms-webhooks)                                        | DMSs whose webhook mTLS certificate or key were file paths                           | High: enrollments calling the webhook fail                    | Re-enter certificate and key as PEM, or remove the file fields                             |
-| [Non-root containers](#non-root-containers)                                           | Releases with per-service identity overrides or mounted key material                 | Medium: services cannot read their files                      | Remove the overrides and fix volume ownership                                              |
-| [AMQP over TLS](#amqp-over-tls)                                                       | Releases that set `amqp.tls`                                                         | Medium: clients connect to the wrong port                     | Point `amqp.port` at the TLS listener, or disable TLS                                      |
-| [Legacy CA keys in the KMS](#legacy-ca-keys-in-the-kms)                               | Installations whose CA keys predate the KMS                                          | Medium: CA keys stay unmanaged                                | Run the CA-to-KMS migration                                                                |
-| [Receiver certificate verification](#dms-webhooks)                                    | DMSs whose webhook had `validate_server_cert: false`                                 | Medium: credentials go to an unverified receiver              | Set `insecure_skip_verify` to `false`                                                      |
-| [Re-enrollment trust set](#re-enrollment-trust-set)                                   | Scripts and consoles that edit DMSs through the API                                  | Medium: an old-layout edit silently empties `validation_cas`  | Read the DMS before editing and use the new field                                          |
-| [Device events](#device-events)                                                       | Consumers that read the device `events` field                                        | Medium: the field disappears                                  | Use the new event endpoints                                                                |
-| [Renamed and reshaped values](#renamed-and-reshaped-values)                           | Releases that override `toolbox`, `services.connectors`, ports, probes or scheduling | Low to medium: validation errors or changed defaults          | Update the values file                                                                     |
-| [DMS update API](#dms-update-api)                                                     | Clients that send the DMS ID in the update body                                      | Low: the ID in the URL wins                                   | Send the ID in the URL                                                                     |
-| [Certificate type values](#certificate-type-values)                                   | Consumers that match on certificate `type`                                           | Low: two values are renamed                                   | Adapt consumers                                                                            |
-| [Independent re-enrollment authentication](#independent-re-enrollment-authentication) | Any DMS                                                                              | Low: informational                                            | Read both blocks before editing                                                            |
+| Change                                                                                | Who is affected                                                                      | Severity                                                      | Action                                                                                                       |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [Release-scoped resource names](#release-scoped-resource-names)                       | Helm releases with a filesystem KMS engine or local VA CRL storage                   | High: KMS and VA start on empty volumes                       | Copy the data into the new volumes                                                                           |
+| [Strict values validation](#strict-values-validation)                                 | Every Helm release                                                                   | High: `helm upgrade` fails                                    | Remove or rename legacy keys                                                                                 |
+| [Required authorization configuration](#required-authorization-configuration)         | Every deployment                                                                     | High: without a bootstrap principal there is no administrator | Configure `services.authz`                                                                                   |
+| [Gateway token validation removed](#gateway-token-validation-removed)                 | Every Helm release                                                                   | High: `helm upgrade` fails on the old keys                    | Move JWKS and roles into `services.authz`                                                                    |
+| [PostgreSQL consolidation](#postgresql-consolidation)                                 | 3.8.0 deployments with per-service databases                                         | High: services find no data, or a migration aborts            | Clean duplicate CA IDs and empty `engine_id` values first; move data manually outside Helm                   |
+| [SQLite storage removed](#sqlite-storage-removed)                                     | Deployments on SQLite, `couch_db` or `dynamo_db`                                     | High: the backend no longer starts with them                  | Move to PostgreSQL before upgrading                                                                          |
+| [Webhooks with file references](#dms-webhooks)                                        | DMSs whose webhook mTLS certificate or key were file paths                           | High: enrollments calling the webhook fail                    | Re-enter certificate and key as PEM, or remove the file fields                                               |
+| [Non-root containers](#non-root-containers)                                           | Releases with per-service identity overrides or mounted key material                 | Medium: services cannot read their files                      | Remove the overrides and fix volume ownership                                                                |
+| [AMQP over TLS](#amqp-over-tls)                                                       | Releases that set `amqp.tls`                                                         | Medium: clients connect to the wrong port                     | Point `amqp.port` at the TLS listener, or disable TLS                                                        |
+| [Legacy CA keys in the KMS](#legacy-ca-keys-in-the-kms)                               | Installations whose CA keys predate the KMS                                          | Medium: CA keys stay unmanaged                                | Run the CA-to-KMS migration                                                                                  |
+| [Receiver certificate verification](#dms-webhooks)                                    | DMSs whose webhook had `validate_server_cert: false`                                 | Medium: credentials go to an unverified receiver              | Set `insecure_skip_verify` to `false`                                                                        |
+| [Re-enrollment trust set](#re-enrollment-trust-set)                                   | Scripts and consoles that edit DMSs through the API                                  | Medium: an old-layout edit silently empties `validation_cas`  | Read the DMS before editing and use the new field                                                            |
+| [VA role signer field](#va-role-signer-field)                                         | Clients that create or update VA roles through the API                               | Medium: requests with the old field return an error           | Replace `crl_options.subject_key_id_signer` with the required `crl_options.signer_certificate_serial_number` |
+| [Device events](#device-events)                                                       | Consumers that read the device `events` field                                        | Medium: the field disappears                                  | Use the new event endpoints                                                                                  |
+| [Renamed and reshaped values](#renamed-and-reshaped-values)                           | Releases that override `toolbox`, `services.connectors`, ports, probes or scheduling | Low to medium: validation errors or changed defaults          | Update the values file                                                                                       |
+| [DMS update API](#dms-update-api)                                                     | Clients that send the DMS ID in the update body                                      | Low: the ID in the URL wins                                   | Send the ID in the URL                                                                                       |
+| [Certificate type values](#certificate-type-values)                                   | Consumers that match on certificate `type`                                           | Low: two values are renamed                                   | Adapt consumers                                                                                              |
+| [Independent re-enrollment authentication](#independent-re-enrollment-authentication) | Any DMS                                                                              | Low: informational                                            | Read both blocks before editing                                                                              |
 
 Helm chart and values [#helm-chart-and-values]
 
@@ -10803,6 +10871,12 @@ CA certificates of type `MANAGED` or `IMPORTED_WITH_KEY` whose private keys pred
 
 With Helm, enable the hook for the upgrade in [step 2](#step-2-update-the-values-file); without Helm, run the tool by hand.
 
+Once legacy keys are registered, starting the KMS with the backend configuration option `crypto_engines.migrate_keys_format` renames keys whose name is not the public-key SHA-256 digest, keeps the old name as an alias and moves certificate references along. It is safe to re-run and can be disabled afterwards.
+
+References between certificates, keys and VA roles [#references-between-certificates-keys-and-va-roles]
+
+Certificates now reference their KMS key, and VA roles reference their signer certificate, so a key or certificate in use cannot be deleted. The KMS migration drops the legacy `lamassu.io/kms/binded-resources` key metadata. Before 4.0.0, deleting a CA could remove its key while leaving key references in its retained certificate records. The CA migration registers those missing keys in the KMS with only their public key to satisfy the retained references. These entries cannot be deleted while the retained certificates reference them; they do not restore the private key. In 4.0.0, deleting a CA releases the references from its own current certificate and linked reissued certificates before attempting to delete the key; other certificates that still reference it prevent deletion.
+
 APIs and stored configuration [#apis-and-stored-configuration]
 
 DMS webhooks [#dms-webhooks]
@@ -10862,6 +10936,10 @@ The `events` field no longer appears in the device representation. Point consume
 * `POST /v1/devices/:id/events` creates an event.
 
 When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Each Device Manager instance binds a durable AMQP queue named after its service ID, `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until removed, so configure an expiration or cleanup policy on the broker.
+
+VA role signer field [#va-role-signer-field]
+
+`crl_options.subject_key_id_signer` is replaced by the required `crl_options.signer_certificate_serial_number`, the serial number of the existing certificate that signs the CRL. A new role's initial value is the CA's current certificate serial number. Requests that still carry `subject_key_id_signer` return an error. Custom authorization policies that filter on the old field must be updated: the filter `crl_subject_key_id_signer` is renamed to `crl_signer_certificate_serial_number` and takes serial-number values.
 
 Helm migration guide [#helm-migration-guide]
 
@@ -11108,6 +11186,10 @@ Deployments without Helm [#deployments-without-helm]
 
 Without the chart's database job, no tool moves data between databases: the migration tooling only applies migrations to a schema that already exists. Move each per-service database into its `pki` schema yourself, preserving structure, indexes, constraints, data and migration history, with writes stopped and a verified backup in hand.
 
+Run the migrations in the required order, one schema at a time: `kms` first, then the `ca-to-kms-migration` tool (needed only for legacy deployments whose CA keys are named by SKI), then `ca`, then `va`. The `devicemanager`, `dmsmanager` and `alerts` schemas are independent and can be migrated in any order. With Helm, the chart's pre-install job applies the schemas in the correct order automatically.
+
+The schemas reference each other, so the PostgreSQL role running the migrations needs cross-schema privileges: the `ca` schema needs `USAGE` on `kms` plus `SELECT`, `REFERENCES` and `INSERT` on `kms.kms_keys`, and the `va` schema needs `USAGE` on `ca` plus `SELECT` and `REFERENCES` on `ca.certificates` and `SELECT` on `ca.ca_certificates`. If your services connect with a different user than the one that ran the migrations, grant that user `SELECT` on `ca.certificates_view` after the migrations.
+
 To apply migrations by hand, `goose-lamassu` must run against the `pki` database with `search_path=<schema>` in the connection string. The binary validates only `search_path`, not the database name, so check `dbname=pki` before running it, and repeat for `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` and `alerts`:
 
 ```bash
@@ -11123,9 +11205,7 @@ LAMASSU_CONFIG_FILE=migrate.yaml ./ca-to-kms-migration
 
 Point the tool's `storage` configuration at the `pki` database, where the CA and KMS data now live in the `ca` and `kms` schemas. The tool's options are described in `backend/cmd/ca-to-kms-migration/README.md` in the `lamassuiot` repository.
 
-<Callout type="warn" title="The tools' READMEs are outdated">
-  The `goose-lamassu` README still shows per-database examples (`dbname=ca`, `dbname=kms`) and claims the tool validates the database name, and the `ca-to-kms-migration` README still describes the pre-4.0.0 two-database layout. Follow the `dbname=pki` form on this page instead of their examples.
-</Callout>
+Both tools' READMEs document the 4.0.0 `pki` layout and match this page: `goose-lamassu` uses `dbname=pki` examples and does not validate the database name, and the `ca-to-kms-migration` README describes the single `pki` database and the migration order.
 
 Troubleshooting [#troubleshooting]
 
@@ -11136,12 +11216,16 @@ Troubleshooting [#troubleshooting]
 * **The upgrade fails at the database job.** The PostgreSQL role cannot create databases or schemas, or a schema migration aborted on duplicate CA IDs or missing `engine_id` values. Check the job logs, fix the privileges or the data, and re-run the upgrade.
 * **The upgrade fails at the CA-to-KMS hook.** CA certificates that share a `subject_key_id` declare conflicting `engine_id`s. Resolve the conflict and re-run.
 * **Nobody can log in after the upgrade.** Check that `services.authz.jwkUrl` is reachable from the `authz` pod, that `services.authz.bootstrap` matches a role your OIDC provider actually assigns, and that the database job completed.
+* **A migration aborts with `kms schema not found`.** The schemas must be migrated in order: run the `kms` schema migration before the `ca` schema migration.
+* **A migration aborts with `ca schema not found`.** Run the `ca` schema migration before the `va` schema migration.
+* **The VA migration fails with `cannot resolve signer certificate for VA role ... N candidates`.** The migration cannot uniquely identify a signer certificate from the SKI stored on the role. Review the SKI and candidate certificates reported in the error; correct the pre-migration data with a verified backup and rerun the migration. The new `signer_certificate_serial_number` field is created during that migration, so it cannot be set through the VA API while the migration is failing.
+* **A migration or service fails with `permission denied for table ...`.** The PostgreSQL role is missing the cross-schema privileges listed in [Deployments without Helm](#deployments-without-helm); this includes `certificates_view` when the post-migration `GRANT SELECT` was skipped. Grant the missing privileges and re-run.
 
 Validation checklist [#validation-checklist]
 
 After the upgrade, check in this order:
 
-1. **Databases.** Each service reads the `pki` database with its own schema, `authz` and `wfx` data are reachable, and the migration status is registered per schema, including the CA unique-ID and KMS composite-key migrations.
+1. **Databases.** Each service reads the `pki` database with its own schema, `authz` and `wfx` data are reachable, and the migration status is registered per schema, including the CA unique-ID and KMS composite-key migrations and the foreign-key migrations that run per schema in the required order.
 2. **KMS and VA start cleanly.** Their logs show no `no such file or directory` or `code=NotFound` errors.
 3. **Existing KMS keys work.** Issue a certificate from a CA that existed before the upgrade. None of the other checks reads a KMS key, so this is the only one that proves the key material was copied.
 4. **Existing CRLs are served.** `GET /crl/<ca-ski>` on VA returns a previously issued CRL, and new CRLs are issued.

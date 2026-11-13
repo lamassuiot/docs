@@ -1,0 +1,45 @@
+# Seguridad (/docs/pr-preview/pr-56/es/security)
+
+
+
+¿Has encontrado una vulnerabilidad de seguridad en lamassuiot, lamassu-dashboard o lamassu-helm? Esta página explica cómo reportarla de forma privada, qué incluir en tu reporte y qué releases reciben correcciones de seguridad.
+
+Cómo reportar una vulnerabilidad [#cómo-reportar-una-vulnerabilidad]
+
+No reportes vulnerabilidades de seguridad mediante issues, discusiones o pull requests públicos de GitHub. Un reporte público divulga el problema antes de que los mantenedores puedan corregirlo.
+
+En su lugar, reporta de forma privada mediante GitHub Security Advisories para el repositorio afectado:
+
+* [lamassuiot](https://github.com/lamassuiot/lamassuiot/security/advisories/new)
+* [lamassu-dashboard](https://github.com/lamassuiot/lamassu-dashboard/security/advisories/new)
+* [lamassu-helm](https://github.com/lamassuiot/lamassu-helm/security/advisories/new)
+
+Así los mantenedores pueden evaluar y resolver el problema antes de que se publique.
+
+Si el reporte privado de vulnerabilidades no está habilitado en ese repositorio, reporta la vulnerabilidad de forma privada a [lamassuiot@lksnext.com](mailto:lamassuiot@lksnext.com) antes de divulgar cualquier detalle públicamente.
+
+Qué incluir en un reporte [#qué-incluir-en-un-reporte]
+
+Describe la vulnerabilidad, su impacto potencial y los pasos para reproducirla usando ejemplos no sensibles y anonimizados.
+
+No incluyas en el reporte:
+
+* Credenciales, tokens o claves privadas
+* Datos de clientes o información identificable de clientes
+* Detalles confidenciales de arquitectura o de infraestructura interna
+
+Versiones soportadas [#versiones-soportadas]
+
+Solo el último release estable recibe soporte de seguridad. El soporte de un release estable termina cuando se publica el siguiente release estable. Los releases anteriores y los pre-releases no tienen soporte.
+
+Para saber cómo actualizar, consulta [Actualizaciones](/docs/upgrades/3-8-0-to-4-0-0).
+
+Divulgación responsable [#divulgación-responsable]
+
+* Da a los mantenedores un tiempo razonable para investigar y resolver la vulnerabilidad reportada antes de cualquier divulgación pública.
+* Evita violaciones de privacidad, destrucción de datos e interrupciones de servicio mientras investigas la vulnerabilidad.
+* Interactúa solo con cuentas o datos que sean tuyos o sobre los que tengas permiso explícito.
+
+Los mantenedores reconocen los reportes en un tiempo razonable y te mantienen informado del progreso de la remediación.
+
+Esta política cubre el código fuente, la configuración y los flujos de CI/CD de los repositorios lamassuiot, lamassu-dashboard y lamassu-helm.

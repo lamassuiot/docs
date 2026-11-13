@@ -6,7 +6,7 @@ Esta guía sirve al operador PKI que necesita inspeccionar o retirar una identid
 
 Busca un certificado [#busca-un-certificado]
 
-Filtra por `Common Name`, serie, estado y autoridad emisora. Usa **Quick Inspect** para una revisión rápida o **View Details** para sujeto, SAN, usos, cadena, fechas y metadatos.
+Filtra por `Common Name`, serie, estado y autoridad emisora. Usa **Quick Inspect** para una revisión rápida o **View Details** para sujeto, SAN, usos, cadena, fechas y metadatos. Los detalles del certificado incluyen la referencia a la clave (`key_id`) y si la clave privada está gestionada (`has_private_key`), y las listas de certificados pueden filtrarse por `has_private_key`.
 
 Identifica el certificado por emisor y número de serie; un nombre puede corresponder a varias renovaciones. Comprueba cuál utiliza realmente el consumidor y cuál ocupa la identidad activa del dispositivo. El [historial de identidades](/docs/platform/iot-fleets/device-management) y el inventario de certificados responden preguntas distintas.
 

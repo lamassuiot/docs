@@ -28,23 +28,11 @@ Una firma composite solo es válida si se verifican sus dos componentes. Está p
 ## Cómo encajan las piezas
 
 ```mermaid
-flowchart LR
-    GO["Fork de Go PQC<br/>(algoritmos, x509, TLS)"]
-    BE["Backend de Lamassu<br/>(KMS, CA, VA)"]
-    UI["Dashboard"]
-    TR["Fork de Traefik PQC<br/>(TLS hacia dispositivos)"]
-    HC["Helm chart"]
-    DEV["Dispositivo"]
-    ENV["Envoy Gateway<br/>(TLS clásico)"]
-    GO --> BE
-    GO --> TR
-    UI -->|API REST| BE
-    DEV -->|"TLS / mTLS (T, PQ o PQ/T)"| TR
-    TR -->|"TLS (clásico)"| ENV
-    ENV --> BE
-    HC -. despliega .-> BE
-    HC -. despliega .-> TR
-    HC -. despliega .-> ENV
+flowchart TB
+    DEV["Dispositivo"] -->|"TLS / mTLS<br/>(T, PQ o PQ/T)"| TR["Fork de Traefik PQC<br/>TLS hacia dispositivos"]
+    TR -->|"TLS clásico"| ENV["Envoy Gateway"]
+    ENV --> BE["Backend de Lamassu<br/>KMS, CA, VA"]
+    UI["Dashboard"] -->|"API REST"| BE
 ```
 
 El fork de Go es la base: el backend y Traefik se compilan con él, porque el toolchain estándar de Go no incluye el soporte de certificados composite y SLH-DSA. El backend crea y custodia las claves, emite certificados y firma los datos de revocación. El dashboard usa la misma API REST. Los dispositivos llegan a la plataforma a través de Traefik, que negocia con ellos la autenticación y el intercambio de claves poscuánticos y después reenvía la petición a Envoy Gateway mediante TLS ordinario. La protección poscuántica se aplica, por tanto, solo al salto entre el dispositivo y Traefik.

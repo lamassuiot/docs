@@ -12,10 +12,10 @@ El chart y el instalador asumen un clúster de desarrollo. La imagen del proxy u
 ## Topología
 
 ```mermaid
-flowchart LR
-    D["Dispositivo / cliente"] -->|"TLS 1.3, mTLS opcional<br/>intercambio de claves y certificados PQC"| T["Traefik (traefik-system)<br/>Gateway traefik-gw, Terminate"]
+flowchart TB
+    D["Dispositivo / cliente"] -->|"TLS 1.3, mTLS opcional<br/>intercambio de claves y certificados PQC"| T["Traefik (Terminate)<br/>Gateway traefik-gw"]
     T -->|"HTTPS, certificado clásico<br/>certificado no verificado"| E["Envoy Gateway<br/>envoy-gateway-proxy :443"]
-    E --> S["Servicios de Lamassu<br/>(HTTPRoutes + ext-authz)"]
+    E --> S["Servicios de Lamassu<br/>HTTPRoutes + ext-authz"]
 ```
 
 Traefik es el borde público. Negocia el intercambio de claves, sirve el certificado y, si se solicita, recibe el certificado del cliente. Después abre una segunda conexión TLS hacia el servicio `envoy-gateway-proxy` de Envoy Gateway, que presenta el certificado clásico autofirmado del chart; Traefik está configurado para aceptarlo sin verificarlo. Envoy no llega a ver, por tanto, un handshake poscuántico, y la protección poscuántica cubre solo la conexión entre el cliente y Traefik. Traefik y Envoy Gateway se instalan una sola vez por clúster y se comparten entre espacios de nombres, mientras que los recursos del proxy frontal (el Gateway, la ruta, el middleware, el certificado y el reference grant) pertenecen a la release de Lamassu.

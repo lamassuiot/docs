@@ -45,6 +45,15 @@ An issued identity needs a consumer that trusts its issuer, validates the certif
 
 The [AWS IoT Core guide](/docs/platform/iot-fleets/integrations/aws-iot-core) explains how to use the identity in that destination. Provisioning in Lamassu and provisioning in the destination are separate decisions; review the conditions of the chosen mode before expecting state synchronization.
 
+## Software updates
+
+Once devices hold an identity, Lamassu Updates delivers firmware and software to them over the air. You publish a pack, choose the devices or groups that receive it and watch the rollout; devices install it with SWUpdate, and packages can be signed and encrypted.
+
+<Cards>
+  <Card title="Lamassu Updates" description="Understand the service, its two backends and the update lifecycle." href="/docs/platform/updates/overview" />
+  <Card title="Publish and roll out an update" description="Create a pack, build the package and launch it to a group of devices." href="/docs/platform/updates/guides/publish-and-roll-out" />
+</Cards>
+
 ## Who prepares each part
 
 | Participant | Responsibility |

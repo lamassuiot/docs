@@ -1,0 +1,87 @@
+---
+title: Despliegue con el Helm chart
+description: Desplegar Lamassu con un proxy frontal Traefik que sirve certificados clásicos, poscuánticos y composite, mediante los valores del chart o el instalador fast-lane.
+---
+
+La rama `pqc` del Helm chart de Lamassu añade un proxy frontal: una instancia de Traefik compilada con el [toolchain de Go PQC](/docs/platform/pqc/go-toolchain) que termina el TLS de los dispositivos, los autentica y reenvía el tráfico a Envoy Gateway. Esta página describe la topología resultante, los valores que la controlan y el instalador que automatiza un despliegue de laboratorio.
+
+<Callout type="warn" title="Despliegue de laboratorio">
+El chart y el instalador asumen un clúster de desarrollo. La imagen del proxy usa una etiqueta mutable, los certificados PQC no se renuevan automáticamente y el salto entre Traefik y Envoy no verifica certificados. Esta configuración no debe usarse tal cual en producción.
+</Callout>
+
+## Topología
+
+```mermaid
+flowchart TB
+    D["Dispositivo / cliente"] -->|"TLS 1.3, mTLS opcional<br/>intercambio de claves y certificados PQC"| T["Traefik (Terminate)<br/>Gateway traefik-gw"]
+    T -->|"HTTPS, certificado clásico<br/>certificado no verificado"| E["Envoy Gateway<br/>envoy-gateway-proxy :443"]
+    E --> S["Servicios de Lamassu<br/>HTTPRoutes + ext-authz"]
+```
+
+Traefik es el borde público. Negocia el intercambio de claves, sirve el certificado y, si se solicita, recibe el certificado del cliente. Después abre una segunda conexión TLS hacia el servicio `envoy-gateway-proxy` de Envoy Gateway, que presenta el certificado clásico autofirmado del chart; Traefik está configurado para aceptarlo sin verificarlo. Envoy no llega a ver, por tanto, un handshake poscuántico, y la protección poscuántica cubre solo la conexión entre el cliente y Traefik. Traefik y Envoy Gateway se instalan una sola vez por clúster y se comparten entre espacios de nombres, mientras que los recursos del proxy frontal (el Gateway, la ruta, el middleware, el certificado y el reference grant) pertenecen a la release de Lamassu.
+
+Cuando el cliente ha enviado un certificado, el middleware `inject-client-cert` del chart lo añade, en formato PEM, a la cabecera `X-Forwarded-Tls-Client-Cert`, y se establece la cabecera `X-Forwarded-Proto: https` en la petición.
+
+## Valores del chart
+
+Todos los valores nuevos están bajo `traefikFrontProxy` y los valida el esquema del chart, que rechaza claves desconocidas.
+
+| Nombre | Tipo | Valor por defecto | Descripción |
+| --- | --- | --- | --- |
+| `traefikFrontProxy.enabled` | booleano | `false` | Despliega los recursos del proxy frontal. |
+| `traefikFrontProxy.domain` | cadena | `""` | Nombre del certificado de borde y nombre de host de la ruta. Debe indicarse cuando el proxy está habilitado. |
+| `traefikFrontProxy.webSecurePort` | entero | `8443` | Puerto del listener HTTPS; debe coincidir con el entry point `websecure` de Traefik. |
+| `traefikFrontProxy.tls.type` | cadena | `certManager` | Origen del certificado clásico: `certManager`, `external` o `none`. |
+| `traefikFrontProxy.tls.certManagerOptions.addresses` | lista | `[]` | Direcciones IP añadidas al certificado autofirmado. |
+| `traefikFrontProxy.tls.externalOptions.secretName` | cadena | `""` | Secret con `tls.crt` y `tls.key` cuando el tipo es `external`. |
+| `traefikFrontProxy.tls.additionalSecretNames` | lista | `[]` | Secrets TLS adicionales, por ejemplo certificados ML-DSA o composite, que se sirven en el mismo listener. |
+
+Con `certManager`, el chart solicita un certificado ECDSA P-256 válido durante 2160 horas a su propio emisor autofirmado y lo guarda en el secret `edge-cert`. Con `none`, solo se sirven los secrets adicionales, y el chart se detiene con un error si no hay ninguno. El proxy elige entre todos los certificados según el cliente, tal como describe [Proxy TLS con Traefik](/docs/platform/pqc/tls-front-proxy). Los nombres de los recursos que crea el chart son fijos, por lo que solo se admite una release por espacio de nombres.
+
+```yaml
+traefikFrontProxy:
+  enabled: true
+  domain: lab.example.com
+  webSecurePort: 8443
+  tls:
+    type: certManager
+    certManagerOptions:
+      addresses: ["10.0.0.5"]
+    additionalSecretNames:
+      - edge-cert-pq
+      - edge-cert-pqt
+```
+
+El chart modifica además el servicio de Envoy Gateway para que su puerto HTTPS declare `appProtocol: https`, algo que las versiones recientes de Traefik necesitan para hablar TLS con él. Cuando `gateway.addresses` está vacío, el servicio de Envoy es de tipo `ClusterIP` en lugar de un balanceador de carga.
+
+El chart no despliega Traefik, ni la GatewayClass `traefik`, ni la opción TLS `default` en el espacio de nombres `traefik-system`; los crea el instalador. Sin ellos, el borde no tiene intercambio de claves poscuántico ni solicitud de certificado de cliente. Tampoco fija las imágenes de los servicios de Lamassu: los valores por defecto son las imágenes de desarrollo, y el instalador sustituye las de la interfaz, CA, KMS, VA, device manager, DMS manager, alertas y autorización por las etiquetas `:pqc` de `ghcr.io/lamassuiot`.
+
+## El instalador fast-lane
+
+`scripts/lamassu-fast-lane.sh` instala todo en un clúster: las definiciones de recursos personalizados de Gateway API (versión 1.6.3, canal experimental), Envoy Gateway 1.8.0, el chart de Traefik 41.0.2 con la imagen PQC, la opción TLS, PostgreSQL, Keycloak, RabbitMQ, opcionalmente observabilidad y SoftHSM, y por último la release de Lamassu. Los dos parámetros relevantes aquí seleccionan qué algoritmos se ofrecen.
+
+```bash
+./scripts/lamassu-fast-lane.sh -d lab.example.com -ip <IP> -n
+./scripts/lamassu-fast-lane.sh -d lab.example.com --tls-kex PQ,PQ/T --tls-auth PQ,PQ/T
+```
+
+Ambos parámetros aceptan una lista separada por comas de `T`, `PQ` y `PQ/T`, y ambos toman por defecto los tres valores. En el intercambio de claves, `PQ/T` es un grupo híbrido que combina un intercambio clásico y uno ML-KEM (`X25519MLKEM768`, `SecP256r1MLKEM768` y `SecP384r1MLKEM1024`) y `PQ` es ML-KEM puro (`MLKEM1024`); en la autenticación, `PQ/T` es un certificado composite. `--tls-kex` rellena los `curvePreferences` de la opción TLS, y `--tls-auth` selecciona qué certificados se sirven:
+
+| Valor | Grupos de intercambio de claves | Certificado |
+| --- | --- | --- |
+| `T` | `X25519`, `CurveP256`, `CurveP384` | ECDSA P-256 de cert-manager, o los ficheros indicados con `--tls-crt` y `--tls-key`, en el secret `edge-cert`. |
+| `PQ` | `MLKEM1024` | ML-DSA-65, en el secret `edge-cert-pq`. |
+| `PQ/T` | `X25519MLKEM768`, `SecP256r1MLKEM768`, `SecP384r1MLKEM1024` | Composite `MLDSA65-RSA3072-PSS-SHA512`, en el secret `edge-cert-pqt`. |
+
+La versión mínima de TLS es 1.3, salvo que ambos parámetros sean solo `T`, en cuyo caso es 1.2. cert-manager no puede emitir certificados poscuánticos, por lo que el instalador crea los certificados PQ y PQ/T localmente con OpenSSL 3.5 o posterior; el certificado composite necesita además el módulo `hybrid-provider`, que el script compila bajo demanda con `git`, `cmake` y un compilador de C. Las claves privadas ML-DSA se escriben en la forma de solo semilla que Go acepta, y los secrets se crean a partir de un manifiesto porque `kubectl create secret tls` rechaza claves ML-DSA. Los certificados duran 365 días y se conservan si el secret ya existe.
+
+El script requiere `yq`, `kubectl` y `helm`, y `jq` con `--sample-data`. Al terminar imprime cómo extraer la CA en la que deben confiar los dispositivos, por ejemplo `kubectl get secret edge-cert-pq -o jsonpath='{.data.ca\.crt}'`.
+
+<Callout type="info" title="Scripts auxiliares aún fuera del repositorio">
+Los scripts complementarios para un broker MQTT detrás de Traefik (`scripts/emqx`), para exportar claves del KMS y para restaurar una copia de seguridad están presentes en el árbol de trabajo del chart, pero sin confirmar en el repositorio. Son solo para uso en laboratorio y no se describen más aquí.
+</Callout>
+
+<Cards>
+  <Card title="Proxy TLS con Traefik" description="Cómo elige certificado el proxy y cómo se compila." href="/docs/platform/pqc/tls-front-proxy" />
+  <Card title="Limitaciones conocidas" description="Advertencias del despliegue de laboratorio." href="/docs/platform/pqc/limitations" />
+</Cards>

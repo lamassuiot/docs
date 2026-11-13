@@ -1,0 +1,40 @@
+---
+title: Known limitations
+description: What is incomplete, non-standard or unverified in Lamassu's post-quantum support, grouped by component.
+---
+
+This page collects the limits of the current implementation so they can be weighed before planning a deployment. Each one has been observed in the code or the tests of the branches described in this section.
+
+## Standards and interoperability
+
+Composite certificates follow [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html). The implementation was written against draft 19 and passes the RFC's test vectors, but it has not had a full conformance assessment. Three of its algorithms (the two Brainpool variants and Ed448) are not implemented. The composite signature schemes in TLS use private-use code points in `0xFE00` to `0xFE0E` because IANA has assigned none, so they interoperate only with peers built from the same Go fork. Composite RSA-PKCS#1 v1.5 variants cannot authenticate a TLS handshake. SLH-DSA has no TLS signature scheme. The related-certificate request attribute has not been checked against other implementations of RFC 9763.
+
+## Keys and engines
+
+Post-quantum, composite and Ed25519 keys work only with the filesystem and software engines. The Vault KV2 and AWS Secrets Manager engines announce support and then fail at creation, and AWS KMS, Azure and PKCS#11 do not support them. There is therefore no hardware-backed or cloud-KMS-backed post-quantum key. Some engine error messages are copied from other engines and name the wrong one.
+
+The `CryptoEngine` interface gained methods to create and import each new key type. Engines developed outside the Lamassu repository must implement them.
+
+## Certificate authority and validation
+
+OCSP responses cannot be signed by a CA with a post-quantum, Ed25519 or composite key, because the signing library supports only RSA and ECDSA. CRL generation uses the fork's signing and is expected to work, but neither CRL nor OCSP has tests with these keys.
+
+Issuance profiles cannot allow or deny post-quantum algorithms; their enforcement applies only to RSA and ECDSA. The key strength of an issued certificate is computed only for RSA and ECDSA, so other certificates are stored with unknown type and size and low strength. Importing an existing CA with an SLH-DSA or composite key is not supported.
+
+The DMS can generate keys on the server only for RSA and ECDSA, so `serverkeygen` cannot return a post-quantum key. The enrollment flows through EST and the device manager have no tests with post-quantum keys.
+
+The backend does not evaluate the related-certificate extension. It only issues it.
+
+## Dashboard
+
+The in-browser SLH-DSA key generator maps parameter set identifiers differently from the rest of the interface, as described in [Dashboard](/docs/platform/pqc/dashboard). Key type names are not uniform between screens, and the interface has no experimental notice and no translation.
+
+## Build and deployment
+
+Everything depends on forks of Go and Traefik that are not upstream, and the proxy image has a mutable tag. The backend's OpenAPI specification for the KMS still lists only RSA, ECDSA and Ed25519 and does not reflect the new key types.
+
+The Helm chart uses fixed resource names, supports one release per namespace and sends traffic from Traefik to Envoy without verifying certificates. The post-quantum certificates created by the installer are valid for 365 days and are not renewed. The installer needs a Linux host and runs a Helm install, not an upgrade.
+
+<Cards>
+  <Card title="Post-quantum cryptography overview" description="Return to the summary of the section." href="/docs/platform/pqc/overview" />
+</Cards>

@@ -87,7 +87,7 @@ openssl crl -in ca.crl.pem -noout -text
 openssl crl -in ca.crl.pem -noout -verify -CAfile issuer.pem
 ```
 
-You need OpenSSL 3.x and `issuer.pem` containing the direct issuer’s certificate. Require a valid signature, current timestamps and the expected issuer. For a root that issues directly:
+You need OpenSSL 3.x and `issuer.pem` containing the direct issuer’s certificate. An accepted signer certificate has the same subject and public key as the CA, so this signature check also works when the role points to an earlier certificate for that CA and key. Require a valid signature, current timestamps and the expected issuer. For a root that issues directly:
 
 ```bash
 openssl verify -CAfile roots.pem -CRLfile ca.crl.pem \
@@ -123,7 +123,7 @@ Common VA role errors [#common-va-role-errors]
 
 From the interface [#from-the-interface]
 
-The CA view lets you inspect and download the available list. Compare version, issuer and timestamps with the copy downloaded from the public endpoint. Diagnose differences using [PKI troubleshooting](/docs/platform/pki/troubleshooting).
+The CA view lets you inspect and download the available list. Compare version, issuer and timestamps with the copy downloaded from the public endpoint. The CA’s VA settings also let you select the CRL signer: the certificate picker only offers certificates that have a private key and carry the `cRLSign` key usage. If a configured signer’s certificate cannot be resolved, the interface shows `Unknown Certificate (Serial: X)` or `Certificate details unavailable (Serial: X)`. Diagnose differences using [PKI troubleshooting](/docs/platform/pki/troubleshooting).
 
 References [#references]
 

@@ -202,7 +202,7 @@ A rule identifies the domain (`namespace`), the data schema (`schema_name`) and 
 
 ### Access inherited through relations
 
-Rules can follow relations declared between entities. For example, the schema knows the relation of a certificate to its issuing CA and of a device to its DMS. A policy can grant access to a parent resource and propagate selected actions to its related resources.
+Rules can follow relations declared between entities. For example, the schema knows the relation of a certificate to its issuing CA, of a device to its DMS and of a certificate to the KMS key that stores its private key, so a grant on the key also covers the certificates that use it. A policy can grant access to a parent resource and propagate selected actions to its related resources.
 
 This lets you express models like "can operate the devices of this DMS" without maintaining an individual list of every device. When a resource is added under that relation, it inherits the scope planned by the policy.
 

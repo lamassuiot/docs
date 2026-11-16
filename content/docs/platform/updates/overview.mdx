@@ -1,0 +1,56 @@
+---
+title: Lamassu Updates
+description: What the service does, how it fits with Lamassu IoT, WFX and hawkBit, and where to start.
+---
+
+Lamassu Updates (also called the OTA Update Service) orchestrates over-the-air software updates for IoT fleets. You publish an update, choose which devices receive it, and watch the rollout. The service builds the package that [SWUpdate](https://swupdate.org/) clients install, and can sign and encrypt it.
+
+There is one HTTP API and two interchangeable backends behind it, chosen with the `mode` setting. The backend decides which update server the devices talk to, so the systems around the service depend on it.
+
+## What it connects to
+
+| System | What it does | `native` | `hawkbit` |
+|---|---|---|---|
+| [Lamassu IoT](/docs/platform/iot-fleets/overview) | Device registry (device groups) and KMS. Signing keys live in its KMS | Required | Optional: without it, groups are read from the `group:<id>` tags on hawkBit's own targets |
+| [WFX](https://github.com/siemens/wfx) | Job orchestration. Each device update is a WFX job that the device polls | Required | Not used |
+| [Eclipse hawkBit](https://www.eclipse.org/hawkbit/) | Update server. Stores packs, modules and rollouts, and devices poll it | Not used | Required |
+| Postgres | The service's own data | Required | Required |
+| swugenerator | Python tool, bundled in the [ota repository](https://github.com/lamassuiot/ota), that assembles the signed and optionally encrypted `.swu` file | When building | When building |
+
+The Lamassu dashboard is the web interface for this API. It reads its base URL from `LAMASSU_UPDATES_API` in `public/config.js` (when unset it falls back to the main API base URL) and appends `/updates/v1` and `/symkms/v1` itself. It also reads `GET /updates/v1/capabilities` once and hides the features the active backend does not support.
+
+## Choose your backend
+
+The HTTP API is the same either way. What differs is who stores the data and who the devices talk to.
+
+| | `native` (default) | `hawkbit` |
+|---|---|---|
+| Stores packs, launches, jobs | This service's Postgres, plus WFX | An Eclipse hawkBit server |
+| Devices poll | WFX | hawkBit (DDI API) |
+| A pack is built | As a whole, from all its modules' files, into one `.swu` | One `.swu` (or raw deliverable) per module, built in the module catalog |
+| Per-device encryption | Supported | Not supported |
+| Pick it when | You start from scratch, or need per-device encryption | hawkBit is already your fleet's update backend |
+
+Set it with the `mode` field of the [configuration](/docs/platform/updates/reference/configuration). The backends are not equivalent in every feature: see [Capabilities](/docs/platform/updates/reference/capabilities) and [hawkBit mode](/docs/platform/updates/hawkbit-mode).
+
+## Where to go next
+
+| I want to... | Read |
+|---|---|
+| Run the whole stack locally | [Getting started](/docs/platform/updates/getting-started) |
+| Understand the terms (pack, module, launch) | [Concepts](/docs/platform/updates/concepts) and [Data model](/docs/platform/updates/data-model) |
+| See the components and how data flows | [Architecture](/docs/platform/updates/architecture) and [Flows](/docs/platform/updates/flows) |
+| Publish an update and roll it out | [Publish and roll out an update](/docs/platform/updates/guides/publish-and-roll-out) |
+| Try the whole flow with curl | [Native](/docs/platform/updates/guides/native-curl) or [hawkBit](/docs/platform/updates/guides/hawkbit-curl) |
+| Do it from the web interface | [Use the dashboard](/docs/platform/updates/guides/dashboard) |
+| Connect a device | [Connect a device](/docs/platform/updates/guides/connect-a-device) |
+| Use an existing hawkBit | [hawkBit mode](/docs/platform/updates/hawkbit-mode) |
+| Sign or encrypt updates | [Signing and encryption](/docs/platform/updates/signing-and-encryption) |
+| Set a config field | [Configuration](/docs/platform/updates/reference/configuration) |
+| Call the API | [API reference](/docs/platform/updates/reference/api) |
+| Deploy, scale, back up or upgrade it | [Operations](/docs/platform/updates/operations) |
+| Secure it | [Security](/docs/platform/updates/security) |
+| Fix a problem | [Troubleshooting](/docs/platform/updates/troubleshooting) |
+| See what is not supported | [Limitations](/docs/platform/updates/limitations) |
+
+The source code, sample configurations and Helm chart are in the [ota repository](https://github.com/lamassuiot/ota).

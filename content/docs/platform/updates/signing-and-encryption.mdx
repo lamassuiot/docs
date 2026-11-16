@@ -1,0 +1,165 @@
+---
+title: Signing and encryption
+description: Sign deliverables with the Lamassu KMS, encrypt them with a shared or per-device key, and manage device keys in SymKMS.
+---
+
+This page explains how Lamassu Updates protects what it delivers: which keys sign and encrypt a package, how to configure them, and what each backend supports. There are three independent layers.
+
+| Layer | Protects | Configured in |
+|---|---|---|
+| Package signing | That the package came from you and is unmodified | A signing key and certificate in the Lamassu KMS, plus `kms_endpoint` and `sign_script_path` |
+| Package encryption | The contents of the package in transit and on the device's download path | The build request, plus a key in SymKMS |
+| At-rest encryption | Artifacts, builds and keys stored by the service | The `encryption` block of each [blob storage block](/docs/platform/updates/reference/configuration#blob-storage-blocks) |
+
+## Signing
+
+Signing is optional. When you ask for it, `swugenerator` calls the configured signer script (`sign_script_path`, which is `sign_kms.sh`), and the script asks the Lamassu KMS (`kms_endpoint`) to sign. The private key never reaches the machine that builds the package.
+
+- For `.swu` builds both settings must be set: the service refuses a signing request when either is missing.
+- Signing a manifest, a `non-swu` package or a hawkBit `raw` module calls the KMS directly from the service and needs only `kms_endpoint`.
+
+Select the key in the build request with `signature_key_id`, `signature_alg_name` (default `RSASSA_PSS_SHA_256`; `-` and `_` are interchangeable) and `signature_certificate` (PEM). The three fields go together: a request with a key but no algorithm or certificate is refused, never built unsigned.
+
+### Set up signing
+
+<Steps>
+  <Step>
+    ### Create the key and a certificate
+
+    In the Lamassu KMS, create (or choose) the signing key and issue a certificate for it from a CA your devices trust. See [Keys and cryptographic engines](/docs/platform/pki/key-management). The key ID is your `signature_key_id`.
+  </Step>
+  <Step>
+    ### Configure the service
+
+    Set `kms_endpoint` and `sign_script_path` (`/app/sign_kms.sh` in the image). `swugenerator` calls the script with the key ID, the KMS URL, the algorithm and the path of the certificate file, which the script requires. The script writes a debug log to `/tmp/sign_kms_debug.log`.
+  </Step>
+  <Step>
+    ### Send the signature fields in the build
+
+    Include `signature_key_id`, `signature_alg_name` and `signature_certificate` in the build body. In `hawkbit` mode they go in the module build body.
+  </Step>
+</Steps>
+
+<Callout type="warn" title="The KMS must return a CMS (PKCS7) signature">
+SWUpdate verifies a `.swu` with a CMS `SignedData` signature, and the service requires CMS for the manifests it signs itself. A Lamassu KMS that ignores the `Accept` header and answers with a bare signature in a JSON envelope produces a signature no device can verify. Where the service signs itself (version manifests, set manifests, raw-module checksums) it refuses such an answer and the operation fails with `the KMS did not return a PKCS7/CMS signature`. The SWU signer script does not check the format: it unwraps the answer and embeds it, so against a KMS without CMS support a `.swu` build can succeed and still be rejected by a device that sets `public-key-file`. Test one signed build on a real device before you rely on a KMS version.
+</Callout>
+
+`sign_kms_nocms.sh` is a variant of the script that takes no certificate. The service's own manifest signing is separate: it always sends the certificate and refuses to sign without one.
+
+TLS towards the KMS: in `native` mode the service's KMS client skips certificate verification, and `sign_kms.sh` calls `curl -k`. In `hawkbit` mode the service's own KMS calls verify the certificate, but the SWU signer script still uses `curl -k`. Reach the KMS over an internal address you trust. See [Security](/docs/platform/updates/security).
+
+### Signed manifests
+
+Each built version also has a **manifest**, an anti-rollback record of what the version contains: name, group, version, packaging, artifacts with their SHA-256, the deliverable and, in `hawkbit` mode, the exact modules and versions that compose the set. A manifest is valid for 5 years (`expires_at`). It is signed with the KMS key when the build carried signing fields, and stored unsigned otherwise (the service logs a warning). If a signing key is configured but the manifest cannot be signed, the build fails.
+
+Read it with:
+
+```text
+GET /updates/v1/groups/:groupID/distribution-sets/:name/versions/:version/signature
+GET /updates/v1/groups/:groupID/distribution-sets/:name/signature        # current version
+```
+
+The response has `manifest` (the exact bytes the signature covers), `signature` (base64 CMS), `algorithm`, `certificate` (PEM), `signed_at` and `expires_at`. In `hawkbit` mode `stale: true` means a signed manifest exists but the set's contents changed since, so the manifest returned describes the set as it is now. The `artifact_signatures` [capability](/docs/platform/updates/reference/capabilities) reports whether the active backend provides it.
+
+## Encryption modes
+
+| Mode | What you get | `native` | `hawkbit` |
+|---|---|---|---|
+| None | One unencrypted deliverable | Yes | Yes |
+| Shared | One deliverable encrypted with one key, served to every device | Yes | Yes, through the module build endpoints, when the build pipeline is configured |
+| Per-device | One deliverable per device, each encrypted with that device's own key from SymKMS | Yes | No |
+
+The build body decides the mode:
+
+- **Shared**: send `user`, `encryption_key_name` and `encryption_alg_name`. A `.swu` build is refused without the algorithm. A `.../package` build picks AES-GCM from the key length and only records the name you send.
+- **Per-device**: send `encryption_alg_name` **without** `user` or `encryption_key_name`. This holds for `.../package` too: sending the algorithm is what selects per-device mode, and omitting it builds an unencrypted package.
+- **None**: send neither.
+
+Other build fields: `sw_desc_encrypted` also encrypts the sw-description itself, and `selected_artifact_ids` lists the artifacts the build includes. In `native` mode a `.swu` build with no selected artifacts fails.
+
+In `hawkbit` mode `POST .../swu` returns `501`. Send the same signing and encryption fields to the module build instead: `POST /updates/v1/softwaremodules/by-id/:moduleID/build` (for `swu-build` and `raw` modules). See [hawkBit mode](/docs/platform/updates/hawkbit-mode#create-and-build-a-pack).
+
+The sw-description must mark the artifacts to encrypt with `encrypted = true;`. A per-device build is refused when no artifact is marked, because the key alone does nothing.
+
+### Algorithms
+
+The `algorithm` of a SymKMS key and the `encryption_alg_name` of a build use these names.
+
+| Algorithm | Key length |
+|---|---|
+| `AES-128-CBC`, `AES-128-CTR`, `AES-128-GCM` | 16 bytes |
+| `AES-192-CBC`, `AES-192-CTR`, `AES-192-GCM` | 24 bytes |
+| `AES-256-CBC`, `AES-256-CTR`, `AES-256-GCM` | 32 bytes |
+| `ASCON-128`, `ASCON-128A` | 16 bytes |
+| `ASCON-80PQ` | 20 bytes |
+
+- **SymKMS key names**: matching ignores case, and `_` and `-` are interchangeable (`aes_256_gcm` is stored as `AES-256-GCM`). The separators of the name must still be there: `ascon128a` is not `ASCON-128A`. A key whose length does not match its algorithm is rejected when it is created.
+- **Build names**: `encryption_alg_name` is passed to `swugenerator` as it is. Case is ignored, but the hyphens are required: `aes-256-gcm` works, `AES_256_GCM` is rejected. If the name differs from the algorithm stored with the key, the service logs a warning and uses the name from the request.
+- **`non-swu` packages** (`.../package`, and `hawkbit` `raw` modules) are always encrypted with **AES-GCM**, chosen by key length (16, 24 or 32 bytes). The requested name is only recorded, and a 20-byte Ascon-80pq key is refused. The result is `nonce || ciphertext`.
+
+The service generates the IV or nonce. In `native` mode the algorithm and, for shared-key packs, the IV are passed to the device in the WFX job. A per-device build draws a fresh IV for each device and does not record it in the job, so the job carries the algorithm only. The job fields are listed in [Connect a device](/docs/platform/updates/guides/connect-a-device).
+
+### Set up per-device encryption
+
+<Steps>
+  <Step>
+    ### Create a key per device
+
+    In SymKMS, `POST /symkms/v1/` with `user_id`, an `algorithm` from the table and a `key` (hex or base64) of the right length.
+  </Step>
+  <Step>
+    ### Assign it to the device
+
+    `POST /symkms/v1/inventory/:deviceID/keys/:keyID` with a body `{"purpose":"firmware-encryption"}` and an optional `expires_at` (RFC 3339). A per-device build asks for each device's `firmware-encryption` key.
+  </Step>
+  <Step>
+    ### Put the same key on the device
+
+    In the form SWUpdate expects (its `-K` key file, with the key, IV and algorithm).
+  </Step>
+  <Step>
+    ### Build
+
+    Send `encryption_alg_name` and no `user` or `encryption_key_name`. The sw-description must mark an artifact `encrypted = true;`.
+  </Step>
+</Steps>
+
+**Key purposes.** The conventional purposes are `firmware-encryption`, `config-encryption` and `mac-verification`. The purpose is a placeholder: any value is accepted, and a binding with an empty purpose acts as a wildcard that matches any lookup. This is intentional while per-purpose keys are rolled out. An exact (case-insensitive) match wins over a wildcard, and among equals the most recent assignment wins. Expired or revoked bindings are skipped.
+
+**Coverage.** A device with no `firmware-encryption` key is skipped (the reason reads `no firmware-encryption key assigned` for `.swu` builds). The build still succeeds if at least one device was covered, and the pack records the coverage: read `built_device_count`, `total_device_count` and `uncovered_devices` on it. A launch on a pack with uncovered devices is refused with `400`, and there is no override: assign the missing keys and build again. If no device was covered, the build itself fails.
+
+**Cost.** A per-device build runs one `swugenerator` process per device, in parallel up to the CPU available to the container. On a 100 MB artifact, one device costs roughly half a second of encryption, plus about three seconds more if the sw-description asks for gzip compression. Size the container accordingly: see [Resource sizing](/docs/platform/updates/operations#resource-sizing). Builds of the same pack are serialized: a second build or version bump while one runs answers `409`.
+
+## SymKMS
+
+SymKMS is the embedded symmetric key service, served by the same process under `/symkms/v1`. It stores keys, assigns them to devices, and can also encrypt, decrypt and compute MACs. Keys are stored in the `symkms` blob store, optionally with at-rest encryption. Create keys with the correct length for their algorithm: random bytes, never a passphrase.
+
+| Task | Route |
+|---|---|
+| Store a key | `POST /symkms/v1/` |
+| List keys of a user | `GET /symkms/v1/?user_id=...` |
+| Delete a key | `DELETE /symkms/v1/:keyID?user_id=...` |
+| Assign or revoke a key for a device | `POST` or `DELETE /symkms/v1/inventory/:deviceID/keys/:keyID` |
+| A device's active key (privileged, returns key material) | `GET /symkms/v1/inventory/:deviceID/key?purpose=...` |
+| Which devices use a key | `GET /symkms/v1/inventory/by-key/:keyID` |
+| A device's key bindings | `GET /symkms/v1/inventory/:deviceID` |
+| Encrypt, decrypt | `POST /symkms/v1/encrypt`, `POST /symkms/v1/decrypt` |
+| MAC and verify | `POST /symkms/v1/mac`, `POST /symkms/v1/mac/verify` (and the `/file` variants) |
+
+### Request bodies
+
+| Route | Body (JSON) |
+|---|---|
+| `POST /symkms/v1/` | `user_id`, `algorithm`, `key` (hex or base64; hex is tried first), optional `id`. `user_id`, `algorithm` and `key` are required. |
+| `POST /symkms/v1/encrypt` | `user_id`, `key_name`, `algorithm`, `plaintext` (base64), optional `iv`, optional `format`. |
+| `POST /symkms/v1/decrypt` | `user_id`, `key_name`, `algorithm`, `ciphertext`, `iv`, optional `format`. |
+| `POST /symkms/v1/mac` | `user_id`, `key_name`, `mac_algorithm`, `data` (base64). The MAC is returned as hex. |
+| `POST /symkms/v1/mac/verify` | The same as `/mac`, plus `mac` (hex). |
+
+- `format` is `ciphertext` (hex, the default), `base64`, or `cms` (`pkcs7` is an alias): a PEM-encoded CMS structure that embeds the algorithm and IV. With `cms`, `decrypt` can omit `algorithm` and `iv`.
+- The server generates the nonce for GCM, CTR and Ascon: **a caller-supplied `iv` is refused** for those algorithms. Only CBC accepts one (16 bytes). The response carries the `iv` used (hex).
+- `mac_algorithm` is `HMAC-SHA3-256`, `AES-CMAC` or `ASCON-MAC`. The `/file` variants take the data as `multipart/form-data`.
+
+`GET /symkms/v1/:keyID/raw?user_id=...` and `GET /symkms/v1/inventory/:deviceID/key` return raw key material and are privileged: the Updates service itself calls them during a build. The service has no authentication of its own, so restrict these routes at a gateway. See [Security](/docs/platform/updates/security).
+
+The same SymKMS routes can run as their own process (`cmd/symkms`) instead of inside the monolith. See [Configuration](/docs/platform/updates/reference/configuration#symkms-as-its-own-process).

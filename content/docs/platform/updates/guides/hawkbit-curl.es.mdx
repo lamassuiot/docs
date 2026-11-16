@@ -1,0 +1,301 @@
+---
+title: Flujo de actualización con curl, backend hawkBit
+description: Todas las peticiones de una actualización completa en modo hawkBit, incluido el lado del dispositivo por DDI, con respuestas reales.
+---
+
+La misma actualización que en la [guía native](/docs/platform/updates/guides/native-curl), contra el servicio en modo hawkBit. Las peticiones de gestión van a Lamassu Updates. El lado del dispositivo es otro protocolo: los dispositivos consultan la API DDI de hawkBit, no este servicio ni WFX. Los comandos se ejecutaron contra un hawkBit 1.1.0 real, y las respuestas son reales, recortadas cuando son largas. Los ejemplos que indican que no se ejecutaron solo se comprobaron contra el código.
+
+Las diferencias respecto al modo native, en resumen:
+
+| | Native | hawkBit |
+|---|---|---|
+| Compilación | Sube artefactos y un sw-description al pack y luego compila el pack | Compila primero un **módulo** en el catálogo y luego crea el pack a partir de él |
+| Pack tras crearlo | `draft` | Ya está `built` |
+| Quién avisa al dispositivo | Un job de WFX | Una acción de hawkBit, leída por DDI |
+| El dispositivo informa a | WFX | hawkBit (feedback DDI) |
+| Siguiente lote, con `auto` activado | El servicio, a partir de eventos de WFX | hawkBit, a partir de sus grupos de rollout |
+
+## Antes de empezar
+
+- El [stack está en marcha](/docs/platform/updates/hawkbit-mode) en modo hawkBit: este servicio, su Postgres, hawkBit y el device manager de Lamassu.
+- Un grupo de dispositivos en Lamassu con dispositivos dentro. Esta guía usa `fleet-a` con `dev-001` a `dev-004`.
+- `curl` y `jq`.
+- Un compilador de SWU configurado (`swugenerator_path`), para compilar un módulo `swu-build`. Sin él, `POST .../build` sobre un módulo así responde `501`.
+
+```bash
+API=http://localhost:10090/updates/v1
+HB=http://localhost:8090                                  # hawkBit
+HB_AUTH="admin:${HAWKBIT_ADMIN_PASSWORD:-admin}"          # hawkBit Management API login
+GROUP=fleet-a
+```
+
+<Callout type="info" title="Puertos y gateways">
+  `config-hawkbit.yml` del repositorio sirve la API en el puerto `10090`, igual que el stack native, así que ejecuta un solo backend a la vez en ese puerto. `config-hawkbit-demo.yml` la sirve en el `10091`, al que apunta el entorno de desarrollo del dashboard del repositorio para el backend hawkBit. Ajusta `API` a donde escuche tu instancia. A través de un gateway de Lamassu la API suele ser `https://lamassu.example.com/api/updates/v1` y cada llamada necesita la credencial de tu gateway, por ejemplo `-H "Authorization: Bearer $TOKEN"`.
+</Callout>
+
+## 1. Comprueba el backend
+
+```bash
+curl -s $API/capabilities | jq -c '{backend, unsupported}'
+```
+```json
+{"backend":"hawkbit","unsupported":["per_device_encryption","workflows","launch_strategy_update","launch_complete","launch_device_assignment","push_events","prebuilt_deliverable"]}
+```
+
+`artifact_encryption`, `software_module_composition`, `standalone_software_modules` y `software_module_replace` también aparecen en esa lista si faltan los ajustes de compilación o los tipos de módulo de hawkBit. Consulta [Capabilities](/docs/platform/updates/reference/capabilities).
+
+## 2. Crea un módulo en el catálogo
+
+Un conjunto de distribución de hawkBit solo puede enlazar módulos **compilados**, así que el módulo va primero. `delivery_intent` indica cómo se entrega: `swu-build` compila un `.swu` a partir de tus archivos y un sw-description. Consulta [Modo hawkBit](/docs/platform/updates/hawkbit-mode) para las demás intenciones (`swu-prebuilt`, `raw`).
+
+```bash
+MID=$(curl -s -X POST $API/softwaremodules -H 'Content-Type: application/json' \
+  -d '{"type":"os","name":"water-panel","version":"1.0.0","delivery_intent":"swu-build"}' | jq -r .id)
+curl -s $API/softwaremodules/by-id/$MID | jq -c '{id,key,built,delivery_intent}'
+```
+```json
+{"id":"1","key":"os:water-panel","built":false,"delivery_intent":"swu-build"}
+```
+
+`type` es `os` o `application`, y `type`, `name` y `version` son obligatorios. Sin `delivery_intent` el módulo queda `undecided`: acepta archivos, pero no se puede compilar ni enlazar hasta que elijas una con `PUT /softwaremodules/by-id/$MID`.
+
+## 3. Sube el archivo y el sw-description
+
+Usa el mismo `index.html` y `sw-description` que en la [guía native](/docs/platform/updates/guides/native-curl).
+
+```bash
+curl -s -X POST $API/softwaremodules/by-id/$MID/artifacts -F file=@index.html
+```
+```json
+{"id":"hb:1:1","name":"water-panel","version":"1.0.0","filename":"index.html","checksum":"c400a4f1...","size":52}
+```
+
+```bash
+curl -s -X POST $API/softwaremodules/by-id/$MID/descriptor -F file=@sw-description | jq -c '{id,built,artifacts: [.artifacts[].filename]}'
+# {"id":"1","built":false,"artifacts":["index.html"]}
+```
+
+Un módulo `swu-build` rechaza un `.swu` terminado como entrada, y un módulo `swu-prebuilt` admite exactamente un `.swu`.
+
+## 4. Compila el módulo
+
+```bash
+curl -s -X POST $API/softwaremodules/by-id/$MID/build -H 'Content-Type: application/json' -d '{}'
+# {"msg":"Software module built"}
+
+curl -s $API/softwaremodules/by-id/$MID | jq -c '{built, locked, files: [.artifacts[] | {filename,size}]}'
+```
+```json
+{"built":true,"locked":false,"files":[{"filename":"water-panel.swu","size":1024}]}
+```
+
+La compilación sustituyó los archivos de entrada del módulo por el `.swu` terminado. El cuerpo de la compilación es opcional. Para cifrar o firmar, envía `user`, `encryption_key_name`, `encryption_alg_name`, `signature_key_id`, `signature_alg_name` y `signature_certificate`, como en la página de [firma y cifrado](/docs/platform/updates/signing-and-encryption). Un módulo se compila una sola vez: para cambiarlo, publica una nueva versión del módulo.
+
+## 5. Crea el pack a partir del módulo compilado
+
+```bash
+curl -s -X POST $API/groups/$GROUP/distribution-sets -H 'Content-Type: application/json' \
+  -d "{\"name\":\"water-panel\",\"version\":\"1.0.0\",\"group_id\":\"fleet-a\",\"type\":\"rawfile\",\"packaging\":\"swu\",\"modules\":[{\"source_module_id\":\"$MID\"}]}" \
+  | jq -c '{id,name,version,status}'
+# {"id":"1","name":"water-panel","version":"1.0.0","status":"built"}
+
+curl -s $API/groups/$GROUP/distribution-sets | jq -r '.list[0].uri'
+# http://localhost:8090/DEFAULT/controller/v1/{controllerId}/softwaremodules/1/artifacts/water-panel.swu
+```
+
+El pack está compilado desde el principio. Su `uri` es una dirección de descarga de hawkBit que los dispositivos resuelven por sí mismos. En modo hawkBit `modules` solo admite entradas `source_module_id`, y cada módulo debe estar compilado y ser compatible con el empaquetado del pack. Varias entradas forman un pack con varios módulos, y entonces `GET .../swu/download` responde `400`: descarga el entregable de cada módulo con `GET .../modules/:moduleKey/artifact/download`.
+
+## 6. Simula el lanzamiento y créalo
+
+Los dispositivos de un grupo solo existen en hawkBit cuando el servicio los ha registrado. El servicio lo hace cada vez que lista los dispositivos del grupo, algo que hacen un lanzamiento, una simulación, un listado de jobs o una lectura de conformidad. La comprobación del canario se ejecuta **antes**, así que en el primer lanzamiento de un grupo que aún no se ha listado, un `test_device_id` falla:
+
+```bash
+curl -s -X POST "$API/groups/$GROUP/launch?dry_run=true" -H 'Content-Type: application/json' \
+  -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2,"test_device_id":"dev-001"}'
+```
+```json
+{"err":"Failed to create launch history: test device dev-001 cannot act as this group's canary: device dev-001 does not exist"}
+```
+
+Ejecuta primero la simulación sin canario. Registra los dispositivos del grupo en hawkBit como targets y los etiqueta `group:fleet-a`:
+
+```bash
+curl -s -X POST "$API/groups/$GROUP/launch?dry_run=true" -H 'Content-Type: application/json' \
+  -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2}' | jq -c .
+```
+```json
+{"never_seen_devices":["dev-001","dev-002","dev-003","dev-004"],"precondition_failures":[],"qualifying_devices":["dev-001","dev-002","dev-003","dev-004"],"superseded_devices":null}
+```
+
+`never_seen_devices` lista los targets que aún no han contactado con hawkBit. Un grupo de rollout no puede terminar mientras sus dispositivos nunca consulten, así que revisa esta lista. `superseded_devices` lista los dispositivos que ya tienen una actualización en curso: crear el lanzamiento **cancela** esas acciones, porque hawkBit sustituye las acciones sin terminar de un target por la nueva. Ahora crea el lanzamiento con el canario:
+
+```bash
+LAUNCH=$(curl -s -X POST $API/groups/$GROUP/launch -H 'Content-Type: application/json' \
+  -d '{"distribution_set_name":"water-panel","workflow_type":"direct","rollout_type":"fixed","rollout_value":2,"test_device_id":"dev-001","name":"water-panel 1.0.0 wave 1"}' \
+  | jq -r .launch_id)
+echo $LAUNCH     # 1: the id of the hawkBit rollout
+```
+
+`workflow_type` no tiene aquí significado de WFX: `phased` crea una acción `soft` de hawkBit (el dispositivo decide cuándo instalar) y cualquier otro valor una `forced`. Define una función auxiliar para seguir el lanzamiento:
+
+```bash
+status() {
+  curl -s $API/groups/$GROUP/launch | jq -c --arg id "$LAUNCH" \
+    '.list[] | select(.id==$id) | {status,pending_count,active_count,completed_count,failed_count}'
+}
+```
+
+Para iniciar el rollout más tarde, añade `scheduled_at` (RFC 3339) al cuerpo de creación. El planificador propio de hawkBit lo inicia entonces, y una llamada a `rollout` antes de esa hora respeta la programación. No se ejecutó aquí.
+
+## 7. Inicia el rollout
+
+```bash
+curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/rollout
+# {"message":"Launch history executed successfully"}
+status
+# {"status":"running","pending_count":3,"active_count":1,"completed_count":0,"failed_count":0}
+
+curl -s -u "$HB_AUTH" $HB/rest/v1/rollouts | jq -c '.content[] | {id,name,status,totalTargets,type}'
+# {"id":1,"name":"water-panel 1.0.0 wave 1","status":"running","totalTargets":4,"type":"forced"}
+```
+
+El servicio inició un rollout de hawkBit: el canario en el primer grupo y el resto después.
+
+## 8. Haz de dispositivo (DDI)
+
+Un dispositivo real ejecuta `suricatta` de SWUpdate, que hace esto por sí mismo. Estas son las peticiones que realiza.
+
+Primero, los dispositivos deben autenticarse. Por defecto hawkBit los rechaza. Activa una sola vez los tokens de seguridad del tenant y lee el token del target:
+
+```bash
+curl -s -u "$HB_AUTH" -X PUT $HB/rest/v1/system/configs/authentication.targettoken.enabled \
+  -H 'Content-Type: application/json' -d '{"value":true}'
+TOKEN=$(curl -s -u "$HB_AUTH" $HB/rest/v1/targets/dev-001 | jq -r .securityToken)
+AUTH="Authorization: TargetToken $TOKEN"
+DDI=$HB/DEFAULT/controller/v1
+```
+
+Esta es la configuración local. En un despliegue donde los dispositivos llegan a hawkBit a través del gateway de Lamassu, `hawkbit.ddi_url` es la ruta del gateway (por ejemplo `https://lamassu.example.com/api/hawkbit-ddi`) y los dispositivos se autentican como exija el gateway, normalmente con su certificado de cliente. Consulta [Conectar un dispositivo](/docs/platform/updates/guides/connect-a-device).
+
+Consulta. Cuando hay trabajo, la respuesta enlaza a un `deploymentBase`:
+
+```bash
+curl -s -H "$AUTH" $DDI/dev-001 | jq
+```
+```json
+{
+  "config": {"polling": {"sleep": "00:05:00"}},
+  "_links": {
+    "deploymentBase": {"href": "http://localhost:8090/DEFAULT/controller/v1/dev-001/deploymentBase/1?c=411629670"},
+    "configData": {"href": "http://localhost:8090/DEFAULT/controller/v1/dev-001/configData"}
+  }
+}
+```
+
+Lee el despliegue y descarga su artefacto:
+
+```bash
+DEP=$(curl -s -H "$AUTH" $DDI/dev-001 | jq -r '._links.deploymentBase.href')
+curl -s -H "$AUTH" "$DEP" | jq -c '{action: .id, download: .deployment.download, update: .deployment.update,
+  chunks: [.deployment.chunks[] | {part,name,version, artifacts: [.artifacts[] | {filename,size}]}]}'
+```
+```json
+{"action":"1","download":"forced","update":"forced","chunks":[{"part":"os","name":"water-panel","version":"1.0.0","artifacts":[{"filename":"water-panel.swu","size":1024}]}]}
+```
+
+```bash
+ACTION=$(curl -s -H "$AUTH" "$DEP" | jq -r .id)
+curl -s -H "$AUTH" -o water.swu -w '%{http_code} %{size_download} bytes\n' \
+  $DDI/dev-001/softwaremodules/1/artifacts/water-panel.swu
+# 200 1024 bytes
+```
+
+Cuando el servicio publica la URL de artefactos del dispositivo (la ruta de `ddi_url`), sirve él mismo esa misma ruta, solo para los módulos del conjunto asignado o instalado del dispositivo, y con la firma previa de S3 activada responde `302` a una URL firmada de corta duración. Un dispositivo no necesita notar la diferencia: sigue la redirección.
+
+Informa del progreso y del resultado. `closed` con `finished: success` es el final:
+
+```bash
+curl -s -H "$AUTH" -X POST $DDI/dev-001/deploymentBase/$ACTION/feedback -H 'Content-Type: application/json' \
+  -d '{"status":{"execution":"proceeding","result":{"finished":"none"},"details":["installing"]}}'
+curl -s -H "$AUTH" -X POST $DDI/dev-001/deploymentBase/$ACTION/feedback -H 'Content-Type: application/json' \
+  -d '{"status":{"execution":"closed","result":{"finished":"success"},"details":["installed"]}}'
+```
+
+El servicio lee hawkBit cuando se lo pides, así que el lanzamiento está al día:
+
+```bash
+status
+# {"status":"running","pending_count":3,"active_count":0,"completed_count":1,"failed_count":0}
+```
+
+Para informar de un fallo, envía `"finished":"failure"` en el feedback `closed`.
+
+## 9. Libera los siguientes lotes
+
+Con `auto` desactivado, hawkBit se detiene tras cada grupo. Cada llamada a `rollout` libera el siguiente:
+
+```bash
+curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/rollout
+curl -s $API/launch/$LAUNCH/jobs | jq -r '.list[] | "\(.clientId) \(.status.state)"'
+```
+```text
+dev-001 ACTIVATED
+dev-002 DOWNLOADING
+dev-003 DOWNLOADING
+dev-004 CREATED
+```
+
+Aquí una acción de hawkBit se muestra como un estado de workflow: una acción programada es `CREATED`, una en curso `DOWNLOADING` (hawkBit no informa de pasos más finos), una terminada (o terminada con una advertencia) `ACTIVATED`, y una fallida, cancelada o en cancelación `TERMINATED`. Repite el paso 8 para `dev-002` y `dev-003` (el token sale de cada target) y vuelve a llamar a `rollout` para `dev-004`. Cuando todas las acciones han terminado:
+
+```json
+{"status":"completed","pending_count":0,"active_count":0,"completed_count":4,"failed_count":0}
+```
+
+hawkBit decide cuándo termina un lote. Cuando informa el último dispositivo de un lote, hawkBit pausa el rollout, y durante un momento su grupo sigue figurando como `running`. El servicio no distingue esa pausa de una hecha por un operador, así que una llamada a `rollout` en esa ventana responde `400` con `rollout 1 is paused; resume it first`. Llama a `resume` y hawkBit libera por sí mismo el siguiente lote:
+
+```bash
+curl -s -X POST $API/groups/$GROUP/launch/$LAUNCH/resume
+# {"message":"Launch resumed","status":"running"}
+```
+
+## 10. Comprueba el resultado
+
+```bash
+curl -s $API/devices/dev-001/distribution-set-inventory | jq -c '.list[] | {distribution_set_name,version,installed_at,artifacts: [.artifacts[].artifact_name]}'
+# {"distribution_set_name":"water-panel","version":"1.0.0","installed_at":"2026-10-21T07:39:23.345+02:00","artifacts":["water-panel.swu"]}
+```
+
+## Lo que se comporta de forma distinta
+
+- **Rollout automático.** Con `auto: true`, hawkBit avanza los grupos por sí mismo cuando se cumple `approval_threshold`. El servicio no ejecuta un consumidor de eventos en este modo. Los umbrales se establecen en cada grupo de rollout, y hawkBit evalúa ambos porcentajes **por grupo**, no sobre todos los dispositivos como hace native. Un umbral sin definir o `0` pasa a 100, así que un `error_threshold` sin definir nunca se activa. El grupo del canario siempre necesita el 100 %. Se aplican también con `auto` desactivado.
+- **Un umbral de error activado.** hawkBit pausa entonces el rollout, y el servicio informa el lanzamiento como `cancelled`. `resume` y `rollout` responden ambos `400`.
+- **Pausar y reanudar.** `pause` y `resume` se corresponden con la pausa y la reanudación de rollouts de hawkBit, pero solo se puede reanudar una pausa hecha por un operador. hawkBit ya retiene el rollout entre grupos cuando `auto` está desactivado, así que `pause` responde entonces `400` («Rollout can only be paused in state running but current state is paused») y `resume` responde `400` («not paused; use Execute to release the next batch»). Usa `rollout` para liberar el siguiente grupo.
+- **Lectura de la estrategia.** La estrategia que se muestra de un lanzamiento se deriva de los grupos del rollout de hawkBit, no se almacena. Un lanzamiento creado con un lote fijo de 2 para 4 dispositivos se lee como `percentage` 50.
+- **Pertenencia estática.** Un rollout se construye con los dispositivos del grupo en el momento de crear el lanzamiento. Los dispositivos añadidos después al grupo no se incorporan (`launch_device_assignment` no está admitido).
+- **No disponible.** Cifrado por dispositivo, workflows personalizados (`GET /workflows` devuelve una lista vacía), editar una estrategia en curso, marcar un lanzamiento como completado, eventos de job enviados por el servidor (el progreso se sondea), subida de un precompilado a nivel de conjunto y compilar un pack directamente. `POST .../swu` responde `501`:
+
+```text
+{"err":"Failed to execute update pack: operation not supported by the active updates backend: hawkbit mode: a distribution set is not built directly — build each software module in the Software Modules catalog, then link the built modules into the ..."}
+```
+
+## Solución de problemas
+
+| Síntoma | Causa y solución |
+|---|---|
+| `501` al compilar un módulo: no hay compilador de SWU | `swugenerator_path` no está configurado. Configúralo, o sube un `.swu` precompilado con la intención `swu-prebuilt` |
+| `501` al compilar un módulo: no hay SymKMS o no hay endpoint de KMS | El cifrado necesita `symkms_endpoint` y la firma necesita `kms_endpoint`. Compila sin esos campos, o configúralos |
+| `400 ... is not built` al crear un pack | Un módulo enlazado a un pack debe estar compilado antes. Compílalo en el catálogo |
+| `400 ... incompatible with distribution set packaging` | Un módulo `raw` no puede ir en un pack `swu`, y un módulo `swu-prebuilt` no puede ir en un pack `non-swu` |
+| `400 ... frozen` al cambiar un módulo | Un módulo enlazado a un pack está congelado. Edítalo y compílalo en el catálogo y enlázalo de nuevo |
+| `400 ... already built` | Un módulo se compila una sola vez. Publica una nueva versión del módulo |
+| `409 ... being built or changed by another request` | Otra petición retiene el módulo. Reintenta cuando termine |
+| Crear un módulo responde `400` mencionando que hawkBit reserva el nombre y la versión | hawkBit conserva el nombre y la versión de un módulo que se asignó a un dispositivo, incluso después de eliminarlo. Usa una versión nueva |
+| El canario falla con `device ... does not exist` | Los dispositivos del grupo aún no están en hawkBit. Ejecuta antes una simulación sin `test_device_id` |
+| Un lanzamiento nunca avanza | Revisa `never_seen_devices`: un dispositivo que nunca consulta bloquea su grupo de rollout |
+
+## Siguientes pasos
+
+- [Modo hawkBit](/docs/platform/updates/hawkbit-mode), para módulos, intenciones de entrega y qué vive dónde
+- [Conectar un dispositivo](/docs/platform/updates/guides/connect-a-device), para la configuración del lado del dispositivo
+- [Referencia de la API](/docs/platform/updates/reference/api)
+- [Solución de problemas](/docs/platform/updates/troubleshooting)

@@ -1,0 +1,279 @@
+---
+title: Referencia de configuración
+description: Todas las claves de configuración de Lamassu Updates, su valor por defecto, qué backend las lee y cómo sobrescribirlas con variables de entorno.
+---
+
+Lamassu Updates lee un único fichero YAML al arrancar. Esta página lista todas las claves que lee el código, su valor por defecto y qué backend (`native` o `hawkbit`) las usa. Las claves que aparecen en los ficheros de ejemplo pero no se leen se indican aparte para que no confíes en ellas.
+
+## Cómo se carga la configuración
+
+- Indica la ubicación del fichero con la variable de entorno `OTA_CONFIG_FILE`. Si no está definida, el servicio lee `/etc/lamassuiot/config.yml`, que es donde la imagen Docker y el chart de Helm lo montan.
+- Si `OTA_CONFIG_FILE` apunta a un fichero que no se puede cargar (no existe, o el YAML no es válido), el servicio registra una advertencia y **recurre a `/etc/lamassuiot/config.yml`**. En la imagen Docker esa ruta contiene el `config.yml` de desarrollo del repositorio, así que un error al escribir la ruta puede arrancar el servicio con una configuración equivocada. Si esa alternativa también falla, el servicio termina.
+- El fichero se lee una sola vez. Reinicia el servicio tras cualquier cambio.
+- `LAMASSU_CONFIG_FILE`, que definen el Dockerfile y el chart de Helm, no lo lee el código. Solo importa `OTA_CONFIG_FILE`.
+- Cualquier clave se puede sobrescribir con una variable de entorno. Consulta [Variables de entorno](#variables-de-entorno).
+
+El [repositorio](https://github.com/lamassuiot/ota) incluye tres ejemplos:
+
+| Fichero | Para |
+|---|---|
+| `config.yml` | Desarrollo local en modo `native` |
+| `config-docker.yml` | El contenedor `updates` de `docker-compose.yml` |
+| `config-hawkbit.yml` | Desarrollo local en modo `hawkbit` contra el hawkBit del fichero compose (puerto 8090 del host) |
+
+Los ejemplos contienen valores de una máquina de desarrollo (rutas absolutas y direcciones de red local) y secretos de desarrollo. Sustitúyelos todos y no reutilices nunca sus claves ni contraseñas.
+
+## Qué claves lee cada modo
+
+| Clave | `native` | `hawkbit` |
+|---|---|---|
+| `mode`, `app.*`, `storage.*` | Sí | Sí |
+| `dms_endpoint` | Sí (obligatoria) | Opcional |
+| `kms_endpoint`, `sign_script_path`, `swugenerator_path` | Sí | Sí, solo para construir o firmar |
+| `symkms_endpoint`, `symkms`, `sym_keys_dir` | Sí | Sí, solo para cifrar |
+| `max_artifact_size_mb`, `enable_test_endpoints` | Sí | Sí |
+| `wfx_endpoint`, `workflow_file`, `update_domain` | Sí | No |
+| `update_files_base_dir`, `artifacts`, `builds` | Sí | No |
+| `leader_election` | Sí | No |
+| `hawkbit` | No | Sí (obligatoria) |
+| `build_memory_limit_mb` | No | Sí |
+
+`mode` vale `native` cuando está vacío o contiene cualquier valor distinto de `hawkbit`.
+
+## Ajustes generales y del servidor
+
+| Clave | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `mode` | cadena | vacío (`native`) | `native` o `hawkbit`. Consulta [Modo hawkBit](/docs/platform/updates/hawkbit-mode). |
+| `app.logs.level` | cadena | `info` | `trace`, `debug`, `info`, `warn`, `error`, `fatal` o `none` (sin distinguir mayúsculas). Un valor no reconocido se convierte en `info`. Con `info`, el registro de arranque muestra una advertencia inofensiva de «unknown log level». `none` descarta toda la salida de registro. |
+| `app.server.listen_address` | cadena | vacío (todas las interfaces) | Dirección en la que escuchar. Los ejemplos usan `0.0.0.0`. |
+| `app.server.port` | entero | ninguno (obligatorio) | Puerto HTTP. `0` elige un puerto aleatorio. Los ejemplos y el chart usan `10090`. |
+| `app.server.shutdown_timeout` | duración | `60s` | Cuánto esperar a las peticiones en curso tras `SIGTERM` o `SIGINT`. Mantenlo por debajo del periodo de gracia de terminación del pod (el chart fija 120 s). |
+| `enable_test_endpoints` | booleano | `false` | Registra `PUT /updates/v1/jobs/:jobID/transition`, que falsifica un cambio de estado de un trabajo sin comprobar propiedad. Úsalo solo en pruebas; mantenlo en `false` en cualquier otro sitio. |
+
+El servicio sirve siempre HTTP sin cifrar. Estas claves existen en las estructuras de configuración y en los ficheros de ejemplo pero **no se leen**, así que definirlas no tiene efecto: `app.server.protocol`, `app.server.log_level`, `app.server.health_check` (y el `health_check_logging` de los ejemplos), `app.server.cert_file`, `app.server.key_file` y `app.server.authentication.mutual_tls.*`. Termina TLS delante del servicio. Consulta [Seguridad](/docs/platform/updates/security).
+
+## Base de datos
+
+```yaml
+storage:
+  provider: "postgres"
+  hostname: "postgres"
+  port: 5432
+  username: "postgres"
+  password: "<password>"
+  log_level: info
+```
+
+| Clave | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `storage.provider` | cadena | ninguno | Solo existe `postgres`. El valor no se comprueba. |
+| `storage.hostname` | cadena | ninguno (obligatorio) | Host de Postgres. En modo `hawkbit` el arranque falla si está vacío. |
+| `storage.port` | entero | ninguno (obligatorio) | Puerto de Postgres. No hay valor por defecto. |
+| `storage.username`, `storage.password` | cadena | ninguno | Credenciales. |
+| `storage.log_level` | cadena | `info` | Nivel de registro de la capa de base de datos. Las sentencias SQL se registran en `trace`. |
+
+- El nombre de la base de datos está fijado en **`updates`**. No hay clave para cambiarlo. El servicio crea sus tablas y las migra al arrancar, pero no crea la base de datos: crea `updates` antes. En Docker Compose, `init.sql` crea `updates` y `hawkbit`, y `POSTGRES_DB` crea `wfx`.
+- La conexión usa `sslmode=disable`. No hay forma de activar TLS hacia Postgres desde la configuración. Mantén la base de datos en una red privada.
+- Cada proceso mantiene como máximo 25 conexiones abiertas y 10 inactivas (las conexiones se reciclan a los 30 minutos, o a los 5 minutos de inactividad). Calcula `25 x réplicas` frente al `max_connections` de Postgres.
+
+## Endpoints de otros servicios
+
+| Clave | Por defecto | Modo | Descripción |
+|---|---|---|---|
+| `dms_endpoint` | ninguno | Obligatoria en `native`, opcional en `hawkbit` | URL base de la API Device Manager de Lamassu, por ejemplo `http://host:8080/api/devmanager`. Es el origen de los grupos de dispositivos. Sin ella en modo `hawkbit`, los grupos se leen de las etiquetas `group:<id>` de los targets de hawkBit. El servicio envía `X-Principal-ID: admin-mode` en estas llamadas. |
+| `kms_endpoint` | ninguno | Ambos | URL base de la API KMS de Lamassu, por ejemplo `http://host:8080/api/kms/v1`. Necesaria para firmar. Consulta [Firma y cifrado](/docs/platform/updates/signing-and-encryption). |
+| `symkms_endpoint` | ninguno | Ambos | URL base de SymKMS, **sin** la ruta `/symkms/v1`. En el monolito apunta al propio servicio (por ejemplo `http://localhost:10090`) y debe coincidir con `app.server.port`. Vacío significa que se rechaza el cifrado. |
+| `wfx_endpoint` | ninguno | `native` | URL base de la API de **gestión** de WFX (puerto `8081` dentro de la red de Compose, `9081` en el host). El servicio añade `/api/wfx/v1/`. El arranque falla si no se puede alcanzar WFX. Los dispositivos usan el puerto de cliente de WFX. |
+| `update_domain` | ninguno | `native` | URL base pública que usan los dispositivos para descargar compilaciones, por ejemplo `http://updates:10090/updates/v1/`. **Debe terminar en `/updates/v1/`, con la barra final**: el servicio añade `groups/...` directamente y guarda el resultado como URI del paquete. Debe ser alcanzable desde los dispositivos. |
+
+## Construcción y firma
+
+| Clave | Por defecto | Modo | Descripción |
+|---|---|---|---|
+| `swugenerator_path` | `swugenerator` en el `PATH` en `native`; sin definir en `hawkbit` | Ambos | Ruta del binario `swugenerator`. En modo `hawkbit` el constructor de SWU existe solo si se define: sin ella, los módulos `swu-build` no se pueden construir (`501`). Las construcciones de módulos raw no la necesitan. |
+| `sign_script_path` | ninguno | Ambos | El script firmante que llama swugenerator para firmar un `.swu`, `sign_kms.sh` (`/app/sign_kms.sh` en la imagen). Firmar un `.swu` necesita esta clave y `kms_endpoint`; el servicio rechaza una petición de firma cuando falta alguna de las dos. |
+| `workflow_file` | `wfx.workflow.dau.direct.yml` (relativo al directorio de trabajo) | `native` | Ruta del workflow `direct` de WFX. El nombre **debe contener `direct`**: los ficheros `phased`, `download-install` y `simple` se localizan sustituyendo esa palabra en la ruta, y el arranque falla en caso contrario. El servicio sube al arrancar los workflows que falten en WFX. |
+| `update_files_base_dir` | ninguno | `native` | Directorio base para el espacio temporal de construcción (`in/`) y, hasta que las compilaciones se publican en el almacén `builds`, las salidas de compilación (`out/`). También proporciona el `local_dir` por defecto de `artifacts` y `builds`. |
+| `sym_keys_dir` | ninguno | Ambos | Directorio alternativo para el almacén de claves de SymKMS cuando `symkms.storage.local_dir` está vacío. |
+| `build_memory_limit_mb` | `0` (sin comprobación) | `hawkbit` | Rechaza una construcción que cifraría un fichero en memoria (unas dos veces su tamaño) por encima de este límite, en MiB, antes de que el proceso muera por falta de memoria. |
+
+## Límites de subida
+
+| Clave | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `max_artifact_size_mb` | entero | `10240` (10 GiB) | Mayor fichero individual subido en MiB: artefacto o `.swu` precompilado. Un fichero multipart mayor recibe `413` con el mensaje `file "<name>" is <n> MiB; the maximum upload size is <m> MiB`. El límite del cuerpo HTTP es este valor más 1 MiB. Los valores `0` o menores equivalen al valor por defecto. |
+
+Las subidas se transmiten en streaming: la memoria no crece con el fichero, pero cada subida en curso se escribe primero en un fichero temporal bajo `TMPDIR` (por defecto `/tmp`), así que necesita ese espacio libre en disco. Cualquier proxy delante del servicio debe aceptar el mismo tamaño y mantener la conexión abierta: los tiempos de lectura y escritura son de 6 horas y las conexiones inactivas se cierran a los 5 minutos. Consulta [Operaciones](/docs/platform/updates/operations#tamaño-de-subida-y-proxies).
+
+## Bloques de almacenamiento de blobs
+
+Cuatro bloques comparten un mismo formato, de modo que artefactos, salidas de compilación y material de claves pueden vivir cada uno en disco local o en S3:
+
+| Bloque | Modo | Contiene | Por defecto |
+|---|---|---|---|
+| `artifacts` | `native` | Binarios de artefactos subidos | Local, `{update_files_base_dir}/artifacts` |
+| `builds` | `native` | Salidas de compilación que descargan los dispositivos: `.swu` y `.tar.gz` | Local, `{update_files_base_dir}/out` |
+| `symkms` | Ambos | Claves simétricas y asignaciones de claves a dispositivos | Local, `sym_keys_dir`, o `data` relativo al directorio de trabajo si ambos están vacíos |
+| `hawkbit.artifact_store` | `hawkbit` | Solo lectura, para firmar URLs de descarga del bucket S3 de hawkBit (consulta el [bloque `hawkbit`](#bloque-hawkbit)) | Ninguno |
+
+```yaml
+artifacts:
+  storage:
+    type: s3                       # local (default) or s3
+    s3_bucket: "ota-updates"
+    s3_prefix: "ota/artifacts/"
+    s3_endpoint: "http://rustfs:9000"
+    s3_path_style: true
+    s3_access_key_id_file: /etc/ota/s3/access-key
+    s3_secret_access_key_file: /etc/ota/s3/secret-key
+  encryption:
+    type: none                     # none (default), local or awskms
+```
+
+### Almacenamiento (`*.storage`)
+
+| Clave | Por defecto | Descripción |
+|---|---|---|
+| `type` | `local` | `local` o `s3`. |
+| `local_dir` | valor por defecto del bloque, arriba | Directorio para `local`. Se crea con modo `0700`. |
+| `s3_bucket` | ninguno | Obligatorio para `s3`. El bucket debe existir: el servicio comprueba el acceso al arrancar y se detiene si falla (`S3 bucket "x" is not accessible at ...`). |
+| `s3_region` | `us-east-1` | Región de AWS. |
+| `s3_endpoint` | vacío (AWS) | URL de un almacén compatible con S3, como RustFS o MinIO. |
+| `s3_path_style` | `false` | Direcciona los buckets como `<endpoint>/<bucket>`. La mayoría de los almacenes autoalojados necesitan `true`. |
+| `s3_prefix` | vacío | Mantiene todas las claves bajo una «carpeta» del bucket. Un mismo bucket puede contener varios almacenes, incluidos los artefactos de hawkBit. Se añade la `/` final si falta. |
+| `s3_access_key_id`, `s3_secret_access_key` | ninguno | Credenciales estáticas. Define ambas o ninguna. |
+| `s3_access_key_id_file`, `s3_secret_access_key_file` | ninguno | Las mismas credenciales leídas de ficheros, por ejemplo un Secret de Kubernetes montado. Se releen cada minuto, así que rotar el Secret no exige reiniciar. Define ambas o ninguna, y no junto con el par en línea. |
+
+Sin credenciales definidas se aplica la cadena de credenciales por defecto de AWS (entorno, IRSA, perfil de instancia).
+
+### Cifrado en reposo (`*.encryption`)
+
+| Clave | Por defecto | Descripción |
+|---|---|---|
+| `type` | `none` | `none`, `local` o `awskms`. |
+| `local_key` | ninguno | Obligatoria para `local`: una clave de 32 bytes codificada en hexadecimal. |
+| `awskms_key_id` | ninguno | Obligatoria para `awskms`: ARN o alias de la clave. |
+| `awskms_region` | `us-east-1` | Región de la clave de AWS KMS. |
+
+Un objeto cifrado se cifra y descifra entero, en memoria: con cifrado en reposo, leer o escribir un artefacto de 10 GiB necesita esa misma memoria, y los rangos de bytes se cortan de la copia descifrada. Un almacén con el cifrado activado no puede usar descargas prefirmadas. Para ficheros grandes, es preferible cifrar en el propio almacén (por ejemplo, con cifrado del lado del servidor de S3).
+
+### Descargas prefirmadas (`*.presign`)
+
+Con almacenamiento S3, una descarga puede responderse con `302` a una URL firmada de corta duración del almacén, en lugar de transmitir los bytes a través del servicio. Antes se autoriza al solicitante, como en cualquier descarga. El modo `native` firma las salidas de compilación (`builds.presign`); el modo `hawkbit` firma los objetos del plugin S3 de hawkBit (`hawkbit.artifact_store.presign`). Las descargas de artefactos por ID en modo `native` siempre se transmiten a través del servicio.
+
+```yaml
+builds:
+  storage: {type: s3, s3_bucket: ota-updates, s3_prefix: ota/builds/,
+            s3_endpoint: http://rustfs:9000, s3_path_style: true,
+            s3_access_key_id_file: /etc/ota/s3/access-key,
+            s3_secret_access_key_file: /etc/ota/s3/secret-key}
+  presign:
+    enabled: true
+    public_endpoint: https://updates.example.com
+    ttl: 60s
+    access_key_id_file: /etc/ota/presign/access-key
+    secret_access_key_file: /etc/ota/presign/secret-key
+```
+
+| Clave | Por defecto | Descripción |
+|---|---|---|
+| `enabled` | `false` | Activa la función. |
+| `public_endpoint` | el `s3_endpoint` del almacenamiento | Origen del almacén **tal como lo alcanzan los dispositivos**, sin ruta (por ejemplo, el gateway que publica el bucket). Es lo que se firma: la firma cubre la cabecera `Host`, así que una URL firmada para una dirección interna del clúster se rechaza cuando un dispositivo la usa a través del gateway. Obligatoria salvo que los dispositivos alcancen el almacén en su propio endpoint (por ejemplo, AWS S3). |
+| `ttl` | `60s` | Cuánto tiempo puede una URL **iniciar** una descarga. Entre `1s` y 7 días. Una transferencia ya en curso no se corta al caducar. |
+| `min_remaining` | `min(25s, ttl/2)` | Una URL ya firmada para el mismo objeto se entrega de nuevo mientras le quede al menos esta validez, de modo que un reintento o una reanudación nunca recibe una URL a punto de caducar. Un valor negativo firma una URL nueva en cada petición. Debe ser menor que `ttl`. |
+| `access_key_id`, `secret_access_key` (o las variantes `_file`) | ninguno | La credencial que firma. **Obligatoria, y debe ser una credencial de solo lectura distinta de la del almacenamiento.** |
+
+Al arrancar, el servicio se niega a ejecutarse si la credencial de firma es la del almacenamiento, si puede escribir en el bucket (lo comprueba intentando una escritura), si el almacén la rechaza (espera hasta 2 minutos a que el almacén la acepte) o si `encryption.type` no es `none` (los dispositivos recibirían texto cifrado). Si no se puede consultar el almacén en absoluto, registra una advertencia y continúa. El dispositivo debe poder resolver y alcanzar `public_endpoint`. Consulta [Seguridad](/docs/platform/updates/security#urls-de-descarga-prefirmadas).
+
+## Bloque `hawkbit`
+
+Se usa solo cuando `mode: hawkbit`.
+
+| Clave | Por defecto | Descripción |
+|---|---|---|
+| `hawkbit.base_url` | ninguno (obligatoria) | Raíz de la API de gestión de hawkBit, por ejemplo `http://hawkbit:8080`. El arranque falla si está vacía. Las llamadas caducan a los 30 s; las transferencias de artefactos, a las 6 h. |
+| `hawkbit.username`, `hawkbit.password` | ninguno | Credenciales Basic Auth de la API de gestión. |
+| `hawkbit.tenant` | `DEFAULT` | Segmento de ruta del tenant DDI. |
+| `hawkbit.ddi_url` | `hawkbit.base_url` | Raíz DDI de hawkBit **tal como la alcanzan los dispositivos** (por ejemplo `https://updates.example.com/api/hawkbit-ddi`). Se usa para construir las URLs de descarga que reciben los dispositivos, y su ruta pasa a ser el prefijo de la ruta de descarga DDI que sirve este servicio. |
+| `hawkbit.artifact_store` | ninguno | Mismo formato que los [bloques de almacenamiento de blobs](#bloques-de-almacenamiento-de-blobs): `storage` debe apuntar al bucket y al `s3_prefix` del plugin S3 de artefactos de hawkBit, y `presign` activa las descargas firmadas. Sin él, los artefactos se transmiten a través de hawkBit. |
+
+El bloque `storage` (Postgres) también es obligatorio en modo `hawkbit`.
+
+## Variables de entorno
+
+Cualquier clave del fichero se puede sobrescribir con una variable de entorno: el nombre es la ruta de la clave en mayúsculas con los puntos sustituidos por guiones bajos. `KMS_ENDPOINT` sobrescribe `kms_endpoint`, `STORAGE_PASSWORD` sobrescribe `storage.password` y `BUILDS_PRESIGN_TTL` sobrescribe `builds.presign.ttl`. La clave debe existir en el fichero (basta con un valor vacío): el cargador solo considera las claves que ha leído de él.
+
+Variables que lee el código además de estas sobrescrituras:
+
+| Variable | Descripción |
+|---|---|
+| `OTA_CONFIG_FILE` | Ruta del fichero de configuración. |
+| `POD_NAME`, `POD_NAMESPACE` | Identidad y espacio de nombres para la elección de líder de Kubernetes. El chart de Helm las define. Si no están definidas, se usan el nombre de host y el fichero de espacio de nombres de la cuenta de servicio. |
+| `TMPDIR` | Dónde escriben ficheros temporales las subidas y las construcciones (el directorio temporal de Go). |
+| `SERVER_PORT` | Solo lo usa la comprobación de salud de la imagen Docker para encontrar el puerto. Por defecto `10090`. |
+| `AWS_*` | La cadena de credenciales por defecto de AWS, cuando un bloque S3 o AWS KMS no tiene credencial explícita. |
+
+En Docker Compose, el fichero `.env` lo lee `docker-compose.yml`, no el servicio: `HOST_IP`, `HAWKBIT_ADMIN_PASSWORD`, `HAWKBIT_ARTIFACT_STORAGE` y las variables `HAWKBIT_ARTIFACT_S3_*` y `LOCAL_S3_*`. Consulta `.env.example` en el repositorio.
+
+<Callout type="warn" title="El registro de depuración imprime la configuración">
+Con `app.logs.level: debug`, el servicio escribe en el registro, al arrancar, toda la configuración cargada, incluidos `storage.password`, `encryption.local_key`, las claves de S3 y `hawkbit.password`. En modo `native`, el bloque `storage`, contraseña incluida, también se imprime en la salida estándar en cada arranque, sea cual sea el nivel de registro. Usa `info` o superior donde se almacenen o compartan los registros, y guarda los secretos en un gestor de secretos, no en el fichero (consulta las credenciales `*_file` más arriba).
+</Callout>
+
+## Configuraciones mínimas
+
+El modo `native` necesita la base de datos, los endpoints a los que llama y las rutas de almacenamiento. Parte de `config-docker.yml`:
+
+```yaml
+app:
+  logs: {level: info}
+  server: {listen_address: "0.0.0.0", port: 10090}
+storage:
+  provider: postgres
+  hostname: postgres
+  port: 5432
+  username: postgres
+  password: "<password>"
+dms_endpoint: "http://<lamassu>/api/devmanager"
+kms_endpoint: "http://<lamassu>/api/kms/v1"
+wfx_endpoint: "http://custom-wfx:8081/"
+update_domain: "http://updates:10090/updates/v1/"
+symkms_endpoint: "http://updates:10090"
+update_files_base_dir: "/data/update_files"
+sym_keys_dir: "/data/symmetric_keys"
+sign_script_path: "/app/sign_kms.sh"
+workflow_file: "/app/wfx/workflow/dau/wfx.workflow.dau.direct.yml"
+symkms:
+  storage: {type: local, local_dir: "/data/symmetric_keys"}
+  encryption: {type: none}
+```
+
+El modo `hawkbit` necesita `mode: hawkbit`, `hawkbit.base_url`, las credenciales de la API de gestión y el bloque `storage`. Añade los ajustes de construcción solo si quieres construir. Las claves siguientes son las que usa `config-hawkbit.yml`:
+
+```yaml
+mode: hawkbit
+hawkbit:
+  base_url: "http://hawkbit:8080"
+  username: "admin"
+  password: "<hawkbit admin password>"
+swugenerator_path: "/usr/local/bin/swugenerator"   # builds .swu modules
+sign_script_path: "/app/sign_kms.sh"               # with kms_endpoint: signing
+kms_endpoint: "http://<lamassu>/api/kms/v1"
+symkms_endpoint: "http://localhost:10090"          # with the symkms block: encryption
+sym_keys_dir: "/data/symmetric_keys"
+symkms:
+  storage: {type: local, local_dir: "/data/symmetric_keys"}
+```
+
+En modo `hawkbit`, las rutas de SymKMS se registran solo cuando `symkms.storage.type` o `sym_keys_dir` están definidos. Con `symkms_endpoint` definido pero ninguno de los dos, el propio servicio respondería `404` a cada consulta de clave.
+
+## SymKMS como proceso independiente
+
+El binario `cmd/symkms` ejecuta SymKMS en solitario. Su configuración solo tiene `app` (como arriba), `symkms` (un bloque de almacenamiento) y `sym_keys_dir`. Su directorio de claves es por defecto `/data/symmetric_keys` cuando no se define ni `symkms.storage.local_dir` ni `sym_keys_dir`. Sirve `/symkms/v1/*` pero no tiene ruta `/health`, y carece de autenticación igual que el monolito: consulta [Seguridad](/docs/platform/updates/security).
+
+## Páginas relacionadas
+
+- [Operaciones](/docs/platform/updates/operations) para los valores de Helm, el escalado y las copias de seguridad.
+- [Modo hawkBit](/docs/platform/updates/hawkbit-mode) para lo que cambia en ese backend.
+- [Firma y cifrado](/docs/platform/updates/signing-and-encryption) para las claves que hay detrás de `kms_endpoint` y `symkms`.
+- [Resolución de problemas](/docs/platform/updates/troubleshooting) para los errores de arranque.

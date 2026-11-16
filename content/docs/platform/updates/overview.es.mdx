@@ -1,0 +1,56 @@
+---
+title: Lamassu Updates
+description: Qué hace el servicio, cómo encaja con Lamassu IoT, WFX y hawkBit, y por dónde empezar.
+---
+
+Lamassu Updates (también llamado OTA Update Service) orquesta las actualizaciones de software por aire (OTA) de flotas IoT. Publicas una actualización, eliges qué dispositivos la reciben y sigues el despliegue. El servicio construye el paquete que instalan los clientes [SWUpdate](https://swupdate.org/) y puede firmarlo y cifrarlo.
+
+Hay una única API HTTP y dos backends intercambiables detrás de ella, que se eligen con el ajuste `mode`. El backend decide con qué servidor de actualizaciones hablan los dispositivos, así que los sistemas que rodean al servicio dependen de él.
+
+## Con qué se conecta
+
+| Sistema | Qué hace | `native` | `hawkbit` |
+|---|---|---|---|
+| [Lamassu IoT](/docs/platform/iot-fleets/overview) | Registro de dispositivos (grupos de dispositivos) y KMS. Las claves de firma viven en su KMS | Obligatorio | Opcional: sin él, los grupos se leen de las etiquetas `group:<id>` de los targets del propio hawkBit |
+| [WFX](https://github.com/siemens/wfx) | Orquestación de trabajos. Cada actualización de un dispositivo es un trabajo (job) de WFX que el dispositivo consulta | Obligatorio | No se usa |
+| [Eclipse hawkBit](https://www.eclipse.org/hawkbit/) | Servidor de actualizaciones. Almacena paquetes, módulos y rollouts, y los dispositivos lo consultan | No se usa | Obligatorio |
+| Postgres | Los datos propios del servicio | Obligatorio | Obligatorio |
+| swugenerator | Herramienta Python, incluida en el [repositorio ota](https://github.com/lamassuiot/ota), que ensambla el fichero `.swu` firmado y, opcionalmente, cifrado | Al construir | Al construir |
+
+El dashboard de Lamassu es la interfaz web de esta API. Lee su URL base de `LAMASSU_UPDATES_API` en `public/config.js` (si no está definida, usa la URL base de la API principal) y añade él mismo `/updates/v1` y `/symkms/v1`. También lee una vez `GET /updates/v1/capabilities` y oculta las funciones que el backend activo no soporta.
+
+## Elige tu backend
+
+La API HTTP es la misma en ambos casos. Lo que cambia es quién almacena los datos y con quién hablan los dispositivos.
+
+| | `native` (por defecto) | `hawkbit` |
+|---|---|---|
+| Almacena paquetes, lanzamientos y trabajos | El Postgres de este servicio, más WFX | Un servidor Eclipse hawkBit |
+| Los dispositivos consultan | WFX | hawkBit (API DDI) |
+| Un paquete se construye | Entero, a partir de los ficheros de todos sus módulos, en un único `.swu` | Un `.swu` (o entregable raw) por módulo, construido en el catálogo de módulos |
+| Cifrado por dispositivo | Soportado | No soportado |
+| Elígelo cuando | Empiezas de cero, o necesitas cifrado por dispositivo | hawkBit ya es el backend de actualizaciones de tu flota |
+
+Se configura con el campo `mode` de la [configuración](/docs/platform/updates/reference/configuration). Los backends no son equivalentes en todas las funciones: consulta [Capacidades](/docs/platform/updates/reference/capabilities) y [Modo hawkBit](/docs/platform/updates/hawkbit-mode).
+
+## Siguientes pasos
+
+| Quiero... | Lee |
+|---|---|
+| Ejecutar toda la pila en local | [Primeros pasos](/docs/platform/updates/getting-started) |
+| Entender los términos (paquete, módulo, lanzamiento) | [Conceptos](/docs/platform/updates/concepts) y [Modelo de datos](/docs/platform/updates/data-model) |
+| Ver los componentes y cómo fluyen los datos | [Arquitectura](/docs/platform/updates/architecture) y [Flujos](/docs/platform/updates/flows) |
+| Publicar una actualización y desplegarla | [Publicar y desplegar una actualización](/docs/platform/updates/guides/publish-and-roll-out) |
+| Probar todo el flujo con curl | [Nativo](/docs/platform/updates/guides/native-curl) o [hawkBit](/docs/platform/updates/guides/hawkbit-curl) |
+| Hacerlo desde la interfaz web | [Usar el dashboard](/docs/platform/updates/guides/dashboard) |
+| Conectar un dispositivo | [Conectar un dispositivo](/docs/platform/updates/guides/connect-a-device) |
+| Usar un hawkBit existente | [Modo hawkBit](/docs/platform/updates/hawkbit-mode) |
+| Firmar o cifrar actualizaciones | [Firma y cifrado](/docs/platform/updates/signing-and-encryption) |
+| Ajustar un campo de configuración | [Configuración](/docs/platform/updates/reference/configuration) |
+| Llamar a la API | [Referencia de la API](/docs/platform/updates/reference/api) |
+| Desplegarlo, escalarlo, respaldarlo o actualizarlo | [Operaciones](/docs/platform/updates/operations) |
+| Securizarlo | [Seguridad](/docs/platform/updates/security) |
+| Resolver un problema | [Resolución de problemas](/docs/platform/updates/troubleshooting) |
+| Ver qué no está soportado | [Limitaciones](/docs/platform/updates/limitations) |
+
+El código fuente, las configuraciones de ejemplo y el chart de Helm están en el [repositorio ota](https://github.com/lamassuiot/ota).

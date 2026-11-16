@@ -67,13 +67,13 @@ function renderBadgeTitle(title: string, compact = false): ReactNode {
   }
 
   const badgeClassName = compact
-    ? "inline-flex items-center rounded-full border border-fd-primary/20 bg-fd-primary/10 px-1.5 py-px text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-fd-primary"
-    : "inline-flex items-center rounded-full border border-fd-primary/20 bg-fd-primary/10 px-3 py-1 text-sm font-semibold uppercase tracking-[0.12em] text-fd-primary";
+    ? "inline-flex items-center rounded-[3px] bg-[var(--lm-badge-bg)] px-1.5 py-px text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-white"
+    : "inline-flex items-center rounded-[5px] bg-[var(--lm-badge-bg)] px-3 py-1 text-sm font-semibold uppercase tracking-[0.12em] text-white";
 
   return (
     <span>
-      <span className={`${badgeClassName} mr-2 align-middle`}>{badge}</span>
       <span>{text}</span>
+      <span className={`${badgeClassName} ml-2 align-middle`}>{badge}</span>
     </span>
   );
 }

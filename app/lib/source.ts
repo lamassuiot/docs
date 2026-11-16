@@ -6,6 +6,7 @@ import {
   Bell,
   ClipboardList,
   Cloud,
+  CloudDownload,
   Cpu,
   FileCheck2,
   Globe,
@@ -50,6 +51,7 @@ const lucideIconMap: Record<
   aws: Cloud,
   server: Server,
   fastlane: Zap,
+  updates: CloudDownload,
   cloud: Cloud,
   saas: Globe,
   // Root-folder tab icon: sized like the 20px logos of the other tabs and

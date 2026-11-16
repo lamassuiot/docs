@@ -61,7 +61,7 @@ La frecuencia del trabajo se configura en Helm con `services.va.job.crl.frequenc
 
 Si la generación falla (por ejemplo, por un rol sin CA o un firmante inválido), el trabajo registra el aviso `something went wrong while calculating CRL for CA <ski>` y lo reintenta en el ciclo siguiente. No hay otra vía de renovación hasta corregir la causa, y la última lista publicada se sigue sirviendo hasta vencer. Todo ello depende de que el trabajo, el almacenamiento y la firma funcionen.
 
-Con `regenerate_on_revoke`, el manejador de eventos solicita una nueva CRL cuando recibe una revocación o la reactivación de un certificado desde `CertificateHold` a `ACTIVE`. Es un paso posterior al cambio de estado, con sus propios posibles errores: si falla (rol inexistente, firmante inválido), el evento se reintenta y, agotados los reintentos, pasa a la cola de eventos fallidos. Confirmar la revocación no demuestra que la CRL nueva ya esté publicada ni que todos los clientes la hayan descargado.
+Con `regenerate_on_revoke`, el manejador de eventos solicita una nueva CRL cuando recibe una revocación o la reactivación de un certificado desde `CertificateHold` a `ACTIVE`. Es un paso posterior al cambio de estado, con sus propios posibles errores: si falla la generación (por ejemplo, por un firmante inválido), el evento se reintenta y, agotados los reintentos, pasa a la cola de eventos fallidos. Si la CA emisora no tiene rol VA, no hay CRL que regenerar: el evento se da por atendido sin reintento, la VA registra un aviso y no aparece nada en la cola de eventos fallidos. Confirmar la revocación no demuestra que la CRL nueva ya esté publicada ni que todos los clientes la hayan descargado.
 
 Comprueba el número de CRL y sus tiempos antes y después del cambio. Supervisa listas vencidas y fallos de generación; los clientes deben aplicar su política cuando no disponen de evidencia vigente.
 
@@ -128,7 +128,7 @@ Después de un cambio, comprueba la configuración guardada y la siguiente lista
 | `PUT /v1/roles/{ca-ski}` devuelve 404 y `GET` devuelve 200. | Se eliminó la CA del rol y no queda otra con el mismo SKI. | No hay salida por API; requiere intervención en la base de datos. Evítalo ajustando el rol antes de eliminar la CA. |
 | `PUT` devuelve 400. | El firmante no tiene `cRLSign`, o su sujeto y su clave no coinciden con ninguna CA de ese SKI (por ejemplo, tras eliminar la primera de dos CAs que comparten clave). | Asigna con `PUT` el número de serie de un certificado válido de la CA restante. |
 | `PUT` devuelve 400 desde un cliente de 3.x. | `crl_options.subject_key_id_signer` se sustituyó por `signer_certificate_serial_number`, que es obligatorio. | Actualiza el cliente para enviar el campo nuevo. |
-| La CRL no cambia tras revocar un certificado. | `regenerate_on_revoke` es `false`, o el evento falló por falta de rol o por un firmante inválido. | Revisa los logs de la VA y la cola de eventos fallidos; corrige el firmante. |
+| La CRL no cambia tras revocar un certificado. | `regenerate_on_revoke` es `false`, la CA emisora no tiene rol VA, o la generación falló por un firmante inválido. | Revisa los logs de la VA. La falta de rol solo genera un aviso (sin reintento ni entrada en la cola de eventos fallidos); un firmante inválido además deja el evento en la cola de eventos fallidos, así que corrige el firmante. |
 | Un verificador rechaza la CRL por el emisor. | Varias CAs comparten SKI. | Consulta [CAs que comparten clave](#cas-que-comparten-clave). |
 
 ## Desde la interfaz

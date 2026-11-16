@@ -6,7 +6,15 @@ Esta guía sirve al operador PKI que necesita inspeccionar o retirar una identid
 
 Busca un certificado [#busca-un-certificado]
 
-Filtra por `Common Name`, serie, estado y autoridad emisora. Usa **Quick Inspect** para una revisión rápida o **View Details** para sujeto, SAN, usos, cadena, fechas y metadatos.
+Filtra por `Common Name`, serie, estado y autoridad emisora. Un certificado no contiene su clave privada, así que las superficies de clave privada responden qué certificados tienen su clave custodiada en el KMS de Lamassu:
+
+* El filtro avanzado **Private Key**, disponible en la página Certificates y en la pestaña **Issued Certificates** de una CA, limita la lista a **All Certificates**, **With Private Key** o **Without Private Key**.
+* La columna ordenable **Private Key** — visible por defecto y oculta en pantallas estrechas — marca con una marca de verificación verde la clave custodiada en el KMS y muestra `-` en los demás casos.
+* En los detalles del certificado, la pestaña **Information** muestra una fila **Private Key** en la sección **Key & Signature**. Cuando el certificado indica que tiene clave privada y están disponibles los identificadores de la clave y del motor del KMS, la fila enlaza a la clave (tooltip: **Open private key in KMS**). En caso contrario, muestra **Present** si el certificado indica que tiene clave privada o **Not available** si no lo indica. Esto no determina si existe una clave fuera de Lamassu.
+
+Usa **Quick Inspect** para una revisión rápida o **View Details** para sujeto, SAN, usos, cadena, fechas y metadatos.
+
+Los detalles del certificado incluyen la referencia a la clave (`key_id`) y si la clave privada está gestionada (`has_private_key`); las listas de certificados pueden filtrarse por `has_private_key`.
 
 <div className="lm-diff-ins lm-diff-block">
   Los registros de certificados exponen `key_id` (la clave del KMS que custodia la clave privada, vacía cuando el KMS no la custodia) y `has_private_key` (derivada al leerla desde el KMS). Los listados de certificados y CAs admiten un filtro `has_private_key`, útil, por ejemplo, para comprobar el resultado de la migración de CA a KMS de la actualización a 4.0.0.

@@ -59,11 +59,9 @@ Parámetros de configuración [#parámetros-de-configuración]
 | `device_manager_client`        | string | Sí                            | URL HTTP del Device Manager de Lamassu.                                                                                                 |
 | `ca_client`                    | string | Sí                            | URL HTTP del servicio de CA de Lamassu.                                                                                                 |
 
-Máquina de estados de los recursos [#máquina-de-estados-de-los-recursos]
+Eventos y recursos de AWS [#eventos-y-recursos-de-aws]
 
-El conector gestiona el lado AWS de cuatro tipos de recursos: CAs, plantillas de aprovisionamiento de DMS (JITP), certificados de dispositivo y Things. Esta sección mapea los eventos del bus que consume el conector a los recursos de AWS que toca y a las llamadas AWS que ejecuta cada transición. Los recursos de AWS se referencian con la notación `IoTCore/<recurso>`.
-
-Eventos que gestiona el conector [#eventos-que-gestiona-el-conector]
+El conector gestiona el lado AWS de cuatro tipos de recursos: CAs, plantillas de aprovisionamiento de DMS (JITP), certificados de dispositivo y Things. Esta sección mapea los eventos del bus que consume el conector a los recursos de AWS que toca y a las llamadas AWS que ejecuta cada flujo. La máquina de estados de cada recurso está junto a su explicación detallada; la última columna enlaza a ella. Los recursos de AWS se referencian con la notación `IoTCore/<recurso>`.
 
 La columna **Tipo de CloudEvent** lista el nombre del evento en el bus interno de Lamassu; la columna **Acciones IAM** lista las operaciones exactas del SDK de AWS que invoca cada flujo, para que los permisos necesarios se deriven directamente de esta tabla.
 
@@ -77,11 +75,19 @@ La columna **Tipo de CloudEvent** lista el nombre del evento en el bus interno d
   | `EventUpdateCertificateMetadataKey` / `EventUpdateDeviceMetadataKey` | Certificado / Dispositivo | `IoTCore/Certificate`, `IoTCore/Thing`                  | —                                                                                                                                                                                        | Refresca el estado interno; el conector ignora los eventos cuyo campo CloudEvent `source` coincide con su propia URI para evitar bucles autodisparados.                                                                                                                  | [Device Shadow y automatización](#device-shadow-y-automatización)             |
 </div>
 
+Registro de la CA en AWS IoT Core [#registro-de-la-ca-en-aws-iot-core]
+
+Para que los dispositivos puedan autenticarse en AWS IoT Core con certificados emitidos por una CA de Lamassu, esa CA debe registrarse previamente en la cuenta AWS. El conector gestiona este registro de forma automática en respuesta a los eventos `EventCreateCAKey`, `EventImportCAKey` y `EventUpdateCAMetadataKey`, pero la operación **solo se dispara cuando el administrador la solicita explícitamente** mediante el campo de metadatos de la CA.
+
+Cómo solicitar el registro [#cómo-solicitar-el-registro]
+
+El registro se desencadena estableciendo el valor `registration.status = "REQUESTED"` en la clave `lamassu.io/iot/{connector_id}` de los metadatos de la CA. Esto puede hacerse desde la consola de Lamassu en la sección de gestión de la CA o mediante la API.
+
+Una vez recibido el evento, el conector intenta registrar la CA en AWS y actualiza el campo `registration.status` en los metadatos de la CA con el resultado: `"SUCCEEDED"` si el registro fue correcto, o `"FAILED"` acompañado de un mensaje de error en caso contrario. El proceso es asíncrono, por lo que es necesario consultar periódicamente el estado de los metadatos hasta que la operación concluya.
+
 Estados del registro de la CA [#estados-del-registro-de-la-ca]
 
 El flujo de registro de la CA se gobierna por el campo `registration.status` de los metadatos del conector en la CA:
-
-por el campo `registration.status` de los metadatos del conector en la CA:
 
 ```mermaid
 stateDiagram-v2
@@ -102,85 +108,6 @@ stateDiagram-v2
 | `Registrando` → `Completada`            | `iot:RegisterCACertificate` (Primary: prueba de posesión con clave efímera; SNI-only: `CertificateMode: SNI_ONLY`) |
 | `Registrando` → `Fallida`               | `iot:RegisterCACertificate` fallida; el detalle del error se escribe en los metadatos de la CA                     |
 | `Fallida` / `Completada` → `Solicitada` | ninguna (una nueva escritura `REQUESTED` reejecuta el flujo)                                                       |
-
-Estados del modo de registro del DMS [#estados-del-modo-de-registro-del-dms]
-
-El `registration_mode` del DMS determina qué hace el conector en el lado AWS cuando el DMS se crea o se edita por completo:
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> SinConfigurar: DMS sin metadatos del conector
-    SinConfigurar --> None: el admin pone la clave con modo none
-    SinConfigurar --> Auto: el admin pone la clave con modo auto
-    SinConfigurar --> Jitp: el admin pone la clave con modo jitp
-    None --> Auto: cambio de modo al editar el DMS
-    None --> Jitp: cambio de modo al editar el DMS
-    Auto --> None: cambio de modo al editar el DMS
-    Auto --> Jitp: cambio de modo al editar el DMS
-    Jitp --> None: cambio de modo al editar el DMS
-    Jitp --> Auto: cambio de modo al editar el DMS
-    Jitp --> Jitp: edición completa (PUT /v1/dms/{id}) reintenta la creación de la plantilla
-```
-
-| Transición                        | Llamadas AWS                                                                                                                           |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `SinConfigurar` → `None` / `Auto` | ninguna (solo configuración)                                                                                                           |
-| `None` ↔ `Auto`                   | ninguna (solo configuración)                                                                                                           |
-| Cualquiera → `Jitp`               | `iot:CreateProvisioningTemplate` (no idempotente: falla si la plantilla ya existe; tras 3 reintentos el evento acaba en `lamassu-dlq`) |
-| `Jitp` → `None` / `Auto`          | ninguna (la plantilla permanece en la cuenta AWS)                                                                                      |
-
-Estados del certificado [#estados-del-certificado]
-
-Los certificados con la clave de metadatos del conector sincronizan su estado; los aprovisionados vía JITP no tienen clave de metadatos y quedan fuera de esta máquina:
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> NoSincronizado: certificado sin metadatos del conector (JITP)
-    NoSincronizado --> Active: el estado pasa a Active
-    Active --> Inactive: Revoked + certificateHold
-    Active --> Revoked: Revoked (otras razones)
-    Inactive --> Active: el estado pasa a Active
-    Revoked --> Active: el estado pasa a Active
-```
-
-| Transición                                    | Llamadas AWS                                       |
-| --------------------------------------------- | -------------------------------------------------- |
-| `NoSincronizado` → `Active`                   | `iot:UpdateCertificate`                            |
-| `Active` → `Inactive`                         | `iot:UpdateCertificate` + desconexión MQTT forzada |
-| `Active` → `Revoked`                          | `iot:UpdateCertificate` + desconexión MQTT forzada |
-| `Inactive` / `Revoked` → `Active`             | `iot:UpdateCertificate`                            |
-| `RenewalWindow` / `AboutToExpire` / `Expired` | ninguna (estos estados no se sincronizan con AWS)  |
-
-Ciclo de vida del Thing [#ciclo-de-vida-del-thing]
-
-Los Things solo existen en modo `auto`; en modo `jitp` AWS crea el Thing por sí mismo cuando el dispositivo se conecta por primera vez. El nombre del Thing es siempre el CN del certificado del dispositivo:
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> Ausente: dispositivo aún sin enrolar
-    Ausente --> Aprovisionado: EventBindDeviceIdentityKey (modo auto)
-    Aprovisionado --> Aprovisionado: re-enrolamiento con el mismo CN
-```
-
-| Transición                                          | Llamadas AWS                                                                                                                                                         |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Ausente` → `Aprovisionado`                         | políticas creadas/actualizadas, grupos de Things asegurados, `iot:RegisterThing` (crea el Thing, registra el certificado, adjunta políticas)                         |
-| `Aprovisionado` → `Aprovisionado` (re-enrolamiento) | principals obsoletos marcados como `REVOKED`, nueva ejecución de `iot:RegisterThing`; el nuevo ARN del certificado sustituye al anterior en los metadatos de Lamassu |
-
-En modo `jitp` el conector no hace llamadas de aprovisionamiento: AWS ejecuta la plantilla JITP en la primera conexión del dispositivo y crea el Thing, registra el certificado y lo activa por su cuenta.
-
-Registro de la CA en AWS IoT Core [#registro-de-la-ca-en-aws-iot-core]
-
-Para que los dispositivos puedan autenticarse en AWS IoT Core con certificados emitidos por una CA de Lamassu, esa CA debe registrarse previamente en la cuenta AWS. El conector gestiona este registro de forma automática en respuesta a los eventos `EventCreateCAKey`, `EventImportCAKey` y `EventUpdateCAMetadataKey`, pero la operación **solo se dispara cuando el administrador la solicita explícitamente** mediante el campo de metadatos de la CA.
-
-Cómo solicitar el registro [#cómo-solicitar-el-registro]
-
-El registro se desencadena estableciendo el valor `registration.status = "REQUESTED"` en la clave `lamassu.io/iot/{connector_id}` de los metadatos de la CA. Esto puede hacerse desde la consola de Lamassu en la sección de gestión de la CA o mediante la API.
-
-Una vez recibido el evento, el conector intenta registrar la CA en AWS y actualiza el campo `registration.status` en los metadatos de la CA con el resultado: `"SUCCEEDED"` si el registro fue correcto, o `"FAILED"` acompañado de un mensaje de error en caso contrario. El proceso es asíncrono, por lo que es necesario consultar periódicamente el estado de los metadatos hasta que la operación concluya.
 
 Primary Account [#primary-account]
 
@@ -234,6 +161,33 @@ El nombre del Thing en la plantilla JITP se deriva de `AWS::IoT::Certificate::Co
 
 Este modo requiere que se configure el campo `jitp_config.provisioning_role_arn` con el ARN de un rol IAM que AWS IoT Core pueda asumir para ejecutar la plantilla. Si no se configura, el conector utiliza el valor por defecto `arn:aws:iam::{account}:role/JITPRole` y registra un aviso en el log. El administrador debe asegurarse de que ese rol existe en la cuenta y tiene los permisos necesarios antes de activar el modo JITP.
 
+Estados del modo de registro del DMS [#estados-del-modo-de-registro-del-dms]
+
+El `registration_mode` del DMS determina qué hace el conector en el lado AWS cuando el DMS se crea o se edita por completo:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> SinConfigurar: DMS sin metadatos del conector
+    SinConfigurar --> None: el admin pone la clave con modo none
+    SinConfigurar --> Auto: el admin pone la clave con modo auto
+    SinConfigurar --> Jitp: el admin pone la clave con modo jitp
+    None --> Auto: cambio de modo al editar el DMS
+    None --> Jitp: cambio de modo al editar el DMS
+    Auto --> None: cambio de modo al editar el DMS
+    Auto --> Jitp: cambio de modo al editar el DMS
+    Jitp --> None: cambio de modo al editar el DMS
+    Jitp --> Auto: cambio de modo al editar el DMS
+    Jitp --> Jitp: edición completa (PUT /v1/dms/{id}) reintenta la creación de la plantilla
+```
+
+| Transición                        | Llamadas AWS                                                                                                                           |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `SinConfigurar` → `None` / `Auto` | ninguna (solo configuración)                                                                                                           |
+| `None` ↔ `Auto`                   | ninguna (solo configuración)                                                                                                           |
+| Cualquiera → `Jitp`               | `iot:CreateProvisioningTemplate` (no idempotente: falla si la plantilla ya existe; tras 3 reintentos el evento acaba en `lamassu-dlq`) |
+| `Jitp` → `None` / `Auto`          | ninguna (la plantilla permanece en la cuenta AWS)                                                                                      |
+
 Aprovisionamiento de dispositivos (modo automático) [#aprovisionamiento-de-dispositivos-modo-automático]
 
 Para el desarrollador de firmware, el modo `auto` es transparente: el dispositivo realiza su enrolamiento EST de la forma habitual y, como efecto secundario, queda aprovisionado en AWS IoT Core sin ningún paso adicional.
@@ -264,6 +218,25 @@ base64 -d -i enroll.b64 | openssl pkcs7 -inform DER -print_certs -out device.crt
 
 Una vez que el conector completa el aprovisionamiento, el dispositivo puede conectarse al endpoint AWS IoT Core de MQTT usando su clave privada y el certificado emitido por Lamassu. El ThingName con el que debe identificarse en AWS es exactamente el CN del certificado.
 
+Ciclo de vida del Thing [#ciclo-de-vida-del-thing]
+
+Los Things solo existen en modo `auto`; en modo `jitp` AWS crea el Thing por sí mismo cuando el dispositivo se conecta por primera vez. El nombre del Thing es siempre el CN del certificado del dispositivo:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Ausente: dispositivo aún sin enrolar
+    Ausente --> Aprovisionado: EventBindDeviceIdentityKey (modo auto)
+    Aprovisionado --> Aprovisionado: re-enrolamiento con el mismo CN
+```
+
+| Transición                                          | Llamadas AWS                                                                                                                                                         |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Ausente` → `Aprovisionado`                         | políticas creadas/actualizadas, grupos de Things asegurados, `iot:RegisterThing` (crea el Thing, registra el certificado, adjunta políticas)                         |
+| `Aprovisionado` → `Aprovisionado` (re-enrolamiento) | principals obsoletos marcados como `REVOKED`, nueva ejecución de `iot:RegisterThing`; el nuevo ARN del certificado sustituye al anterior en los metadatos de Lamassu |
+
+En modo `jitp` el conector no hace llamadas de aprovisionamiento: AWS ejecuta la plantilla JITP en la primera conexión del dispositivo y crea el Thing, registra el certificado y lo activa por su cuenta.
+
 Aprovisionamiento de dispositivos (modo JITP) [#aprovisionamiento-de-dispositivos-modo-jitp]
 
 En el modo JITP el dispositivo también realiza su enrolamiento EST de forma convencional y obtiene su certificado de Lamassu. La diferencia es que AWS IoT Core no conoce al dispositivo hasta que este intenta conectarse por primera vez.
@@ -289,6 +262,29 @@ El conector escucha el evento `EventUpdateCertificateStatusKey` y, cuando un cer
 | `Revoked`         | Cualquier otra razón | `REVOKED`              |
 
 Solo los estados `Active` y `Revoked` producen una llamada a `iot:UpdateCertificate`. Los demás estados del ciclo de vida de Lamassu (`RenewalWindow`, `AboutToExpire`, `Expired`) no se sincronizan con AWS IoT Core; el estado del certificado en AWS permanece sin cambios hasta que el estado en Lamassu sea `Active` o `Revoked`.
+
+Estados del certificado [#estados-del-certificado]
+
+Los certificados con la clave de metadatos del conector sincronizan su estado; los aprovisionados vía JITP no tienen clave de metadatos y quedan fuera de esta máquina:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> NoSincronizado: certificado sin metadatos del conector (JITP)
+    NoSincronizado --> Active: el estado pasa a Active
+    Active --> Inactive: Revoked + certificateHold
+    Active --> Revoked: Revoked (otras razones)
+    Inactive --> Active: el estado pasa a Active
+    Revoked --> Active: el estado pasa a Active
+```
+
+| Transición                                    | Llamadas AWS                                       |
+| --------------------------------------------- | -------------------------------------------------- |
+| `NoSincronizado` → `Active`                   | `iot:UpdateCertificate`                            |
+| `Active` → `Inactive`                         | `iot:UpdateCertificate` + desconexión MQTT forzada |
+| `Active` → `Revoked`                          | `iot:UpdateCertificate` + desconexión MQTT forzada |
+| `Inactive` / `Revoked` → `Active`             | `iot:UpdateCertificate`                            |
+| `RenewalWindow` / `AboutToExpire` / `Expired` | ninguna (estos estados no se sincronizan con AWS)  |
 
 Desconexión forzada al revocar [#desconexión-forzada-al-revocar]
 

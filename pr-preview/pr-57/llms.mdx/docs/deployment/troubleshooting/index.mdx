@@ -136,7 +136,7 @@ A consumer outage does not always prevent the main operation from completing. Th
 
 Observability [#observability]
 
-The chart can enable OpenTelemetry instrumentation. Traces are exported over OTLP HTTP and logs can be directed to a compatible endpoint, such as VictoriaLogs. Use a correlation identifier and the same time window to join Gateway, authz, service and dependency.
+The chart can enable OpenTelemetry instrumentation for the services that support it, including authz; it does not configure OpenTelemetry for AWS Connector, wfx or the UI. Traces are exported over OTLP HTTP and logs can be directed to a compatible endpoint, such as VictoriaLogs. Use a correlation identifier and the same time window to join Gateway, service and dependency.
 
 Before closing an incident, record:
 

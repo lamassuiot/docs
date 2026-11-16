@@ -6,7 +6,15 @@ This guide is for a PKI operator inspecting or retiring an issued identity. You 
 
 Find a certificate [#find-a-certificate]
 
-Filter by `Common Name`, serial, status and issuer. Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata.
+Filter by `Common Name`, serial, status and issuer. A certificate does not contain its private key, so the private-key surfaces answer which certificates have their key held in Lamassu’s KMS:
+
+* The advanced **Private Key** filter, available on the Certificates page and on a CA’s **Issued Certificates** tab, narrows the list to **All Certificates**, **With Private Key** or **Without Private Key**.
+* The sortable **Private Key** column — shown by default, hidden on narrow screens — marks a key held in the KMS with a green check mark and otherwise shows `-`.
+* In certificate details, the **Information** tab shows a **Private Key** row in the **Key & Signature** section. When the certificate reports a private key and its KMS engine and key IDs are available, the row links to the key (tooltip: **Open private key in KMS**). Otherwise, it shows **Present** if the certificate reports a private key, or **Not available** if it does not. This does not establish whether a key exists outside Lamassu.
+
+Use **Quick Inspect** for a quick review or **View Details** for subject, SAN, usages, chain, dates and metadata.
+
+Certificate details include the key reference (`key_id`) and whether the private key is managed (`has_private_key`); certificate lists can be filtered on `has_private_key`.
 
 <div className="lm-diff-ins lm-diff-block">
   Certificate records expose `key_id` (the KMS key that holds the private key, empty when the KMS does not hold it) and `has_private_key` (derived at read time from the KMS). Certificate and CA listings accept a `has_private_key` filter, which is useful, for example, to check the result of the CA-to-KMS migration of the 4.0.0 upgrade.

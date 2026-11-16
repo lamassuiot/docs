@@ -53,6 +53,8 @@ Crea una suscripción [#crea-una-suscripción]
     * **JavaScript** permite expresar lógica personalizada. Cada filtro se ejecuta como máximo durante 100 milisegundos; un filtro que supera ese límite hace fallar la condición y la notificación se omite con el error `javascript filter execution timed out`.
 
     Por ejemplo, `function (event) { return event.data.status == "NO_IDENTITY"; }` limita una suscripción a dispositivos sin identidad.
+
+    La consola evalúa el filtro contra el JSON del editor **Input Event**, que está prellenado con el último evento, e indica si coincide. Para los filtros JSON Path y JavaScript, muestra **The filter matches this Cloud Event** o **The filter does not match this Cloud Event**. Las expresiones JSON Path se evalúan sobre el Cloud Event completo, así que el valor por defecto, `$.data`, selecciona el campo `data` del evento, y la expresión debe empezar por `$`.
   </Step>
 
   <Step>

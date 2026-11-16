@@ -416,7 +416,7 @@ La credencial pudo procesarse, pero no produjo una autorización positiva. Revis
 5. que la política incluya la acción y el tipo de recurso o ruta solicitados;
 6. que el identificador, relación, filtro de columna o restricción HTTP incluya el recurso real.
 
-En los logs de `authz`, una decisión del endpoint externo incluye `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` y el código de estado. Estos campos permiten separar un fallo de coincidencia de un fallo de permisos. Con la instrumentación OpenTelemetry habilitada, cada decisión genera además un span —`engine.CheckHTTP` en el camino del Gateway— cuyos atributos registran `authz.allowed`, la política coincidente y el principal coincidente, de forma que puedas correlacionar la denegación con la traza del Gateway.
+En los logs de `authz`, una decisión del endpoint externo incluye `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` y el código de estado. Estos campos permiten separar un fallo de coincidencia de un fallo de permisos. Con las trazas OpenTelemetry habilitadas, una solicitud que llega al motor de políticas genera un span `engine.CheckHTTPRequest` cuyos atributos registran `authz.allowed`, la política coincidente y el principal coincidente. Para correlacionarlo con la traza del Gateway, el contexto de traza debe propagarse hasta authz.
 
 Todo devuelve 403 [#todo-devuelve-403]
 

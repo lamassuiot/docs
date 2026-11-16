@@ -16,7 +16,7 @@ El rol VA guarda la configuración y los metadatos de la última lista publicada
 | Campo de `crl_options` | Función | Valor inicial del backend |
 |---|---|---|
 | `validity` | Tiempo desde `thisUpdate` hasta `nextUpdate`. | 7 días. |
-| `refresh_interval` | Tiempo desde la emisión de la última CRL publicada que activa la renovación programada; `0` la desactiva (consulta [Regeneración periódica y automática](#regeneración-periódica-y-automática)). | 6 días y 23 horas. |
+| `refresh_interval` | Tiempo desde la emisión de la última CRL publicada que activa la renovación programada; `0` desactiva solo este disparador (consulta [Regeneración periódica y automática](#regeneración-periódica-y-automática)). | 6 días y 23 horas. |
 | `regenerate_on_revoke` | Solicitar regeneración por eventos de revocación o reactivación desde `CertificateHold`. | `true`. |
 | `signer_certificate_serial_number` | Número de serie del certificado existente que firma la CRL. | Número de serie del certificado actual de la CA. |
 
@@ -50,7 +50,14 @@ Antes de actualizar, revisa las CAs que comparten clave. Para detectar el proble
 
 ## Regeneración periódica y automática
 
-El trabajo programado de la VA revisa todos los roles en cada ejecución y solicita otra lista cuando a `latest_crl` le queda menos validez que el intervalo entre ejecuciones. La frecuencia se configura en Helm con `services.va.job.crl.frequency` (por defecto `0 * * * *`) y admite una duración (`1h`) o una expresión cron. Una expresión cron se convierte en un intervalo constante igual al tiempo que falta para su siguiente disparo cuando arranca el servicio, así que no se alinea con el reloj. También solicita otra lista cuando el tiempo transcurrido desde la emisión de la última CRL publicada alcanza `refresh_interval`; con `0` solo se desactiva este disparador. Mantén `validity` claramente por encima del intervalo: con una validez menor, la lista se regenera en cada ciclo.
+El trabajo programado de la VA revisa todos los roles en cada ejecución y solicita una lista nueva cuando se cumple alguna de estas condiciones:
+
+- **La lista está a punto de vencer:** a `latest_crl` le queda menos validez que el intervalo entre ejecuciones del trabajo. Esta condición se aplica siempre y no puede desactivarse.
+- **Ha transcurrido el intervalo de renovación:** el tiempo desde la emisión de la última CRL publicada alcanza `refresh_interval`. Con `refresh_interval` a `0` se desactiva solo esta condición; la lista se sigue regenerando cuando está a punto de vencer.
+
+Poner `refresh_interval` a `0` no congela, por tanto, la regeneración. Con la validez por defecto de 7 días y un trabajo cada hora, la CRL se renueva hasta una hora antes de vencer aunque `refresh_interval` sea `0`.
+
+La frecuencia del trabajo se configura en Helm con `services.va.job.crl.frequency` (por defecto `0 * * * *`) y admite una duración (`1h`) o una expresión cron. Una expresión cron se convierte en un intervalo constante igual al tiempo que falta para su siguiente disparo cuando arranca el servicio, así que no se alinea con el reloj. Mantén `validity` claramente por encima de ese intervalo: con una validez menor, la lista se regenera en cada ciclo.
 
 Si la generación falla (por ejemplo, por un rol sin CA o un firmante inválido), el trabajo registra el aviso `something went wrong while calculating CRL for CA <ski>` y lo reintenta en el ciclo siguiente. No hay otra vía de renovación hasta corregir la causa, y la última lista publicada se sigue sirviendo hasta vencer. Todo ello depende de que el trabajo, el almacenamiento y la firma funcionen.
 

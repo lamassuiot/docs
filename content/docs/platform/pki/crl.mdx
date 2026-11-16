@@ -16,7 +16,7 @@ The VA role stores configuration and metadata for the latest list published for 
 | `crl_options` field | Purpose | Backend initial value |
 |---|---|---|
 | `validity` | Time from `thisUpdate` to `nextUpdate`. | 7 days. |
-| `refresh_interval` | Time since the issuance of the latest published CRL that triggers scheduled renewal; `0` disables it (see [Periodic and automatic regeneration](#periodic-and-automatic-regeneration)). | 6 days and 23 hours. |
+| `refresh_interval` | Time since the issuance of the latest published CRL that triggers scheduled renewal; `0` disables only this trigger (see [Periodic and automatic regeneration](#periodic-and-automatic-regeneration)). | 6 days and 23 hours. |
 | `regenerate_on_revoke` | Request regeneration on revocation or reactivation from `CertificateHold` events. | `true`. |
 | `signer_certificate_serial_number` | Serial number of the existing certificate that signs the CRL. | Serial number of the CA’s current certificate. |
 
@@ -50,7 +50,14 @@ Before upgrading, review CAs that share a key. To detect the problem, compare th
 
 ## Periodic and automatic regeneration
 
-The VA scheduled job checks every role on each run and requests another list when the remaining validity of `latest_crl` is less than the interval between runs. The frequency is set in Helm with `services.va.job.crl.frequency` (default `0 * * * *`) and accepts a duration (`1h`) or a cron expression. A cron expression is converted into a constant interval equal to the time left until its next firing when the service starts, so it is not aligned with the clock. It also requests another list when the time elapsed since the issuance of the latest published CRL reaches `refresh_interval`; setting it to `0` disables only this trigger. Keep `validity` well above the interval: with a shorter validity, the list is regenerated on every cycle.
+The VA scheduled job checks every role on each run and requests a new list when either of these conditions is met:
+
+- **The list is about to expire:** the remaining validity of `latest_crl` is less than the interval between job runs. This condition always applies and cannot be disabled.
+- **The refresh interval has elapsed:** the time since the issuance of the latest published CRL reaches `refresh_interval`. Setting `refresh_interval` to `0` disables only this condition; the list is still regenerated when it is about to expire.
+
+Setting `refresh_interval` to `0` therefore does not freeze regeneration. With the default 7-day validity and an hourly job, a CRL is renewed up to an hour before it expires even if `refresh_interval` is `0`.
+
+The job frequency is set in Helm with `services.va.job.crl.frequency` (default `0 * * * *`) and accepts a duration (`1h`) or a cron expression. A cron expression is converted into a constant interval equal to the time left until its next firing when the service starts, so it is not aligned with the clock. Keep `validity` well above that interval: with a shorter validity, the list is regenerated on every cycle.
 
 If generation fails (for example, because of a role without a CA or an invalid signer), the job logs the warning `something went wrong while calculating CRL for CA <ski>` and retries on the next cycle. There is no other renewal path until the cause is fixed, and the last published list keeps being served until it expires. All of this depends on working jobs, storage and signing.
 

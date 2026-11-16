@@ -143,7 +143,7 @@ Los certificados de CA de tipo `MANAGED` o `IMPORTED_WITH_KEY` cuyas claves priv
 - Los certificados que no pueden leerse, o que carecen de motor o de ID de clave de sujeto, se omiten con un aviso. Revisa los logs y resuelve los registros afectados.
 - Cuando certificados de CA que comparten un `subject_key_id` declaran `engine_id` en conflicto, la herramienta marca esa clave como fallida y sale con código `1`, lo que hace fallar un hook de preactualización de Helm. Resuelve el conflicto a mano antes de volver a ejecutarla.
 
-Una vez registradas las claves, los certificados las referencian en la base de datos y el KMS se niega a eliminar una clave que un certificado aún usa (`409` `key is in use`); libera o elimina primero los certificados dependientes.
+Una vez registradas las claves, los certificados las referencian en la base de datos y el KMS se niega a eliminar una clave que un certificado aún usa (`409` `key is in use`). Eliminar el registro de un certificado lo quita de la CRL y de OCSP, así que lee [Antes de eliminar una clave](/docs/platform/pki/key-management#antes-de-eliminar-una-clave) antes de liberar una clave.
 
 Opcionalmente, las instalaciones con CAs importadas anteriores a 3.7 pueden arrancar el KMS una vez con `crypto_engines.migrate_keys_format: true`: el KMS renombra esas claves heredadas con nombre de SKI al resumen SHA-256 de su clave pública (el nombre antiguo se conserva como alias, y las referencias de los certificados se actualizan solas). Ejecútalo una vez y vuelve a desactivar la opción; repetirla es seguro.
 

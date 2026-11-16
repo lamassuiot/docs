@@ -143,7 +143,7 @@ CA certificates of type `MANAGED` or `IMPORTED_WITH_KEY` whose private keys pred
 - Certificates that cannot be read, or lack an engine or a subject key ID, are skipped with a warning. Review the logs and resolve the affected records.
 - When CA certificates sharing a `subject_key_id` declare conflicting `engine_id`s, the tool fails that key and exits with code `1`, which fails a Helm pre-upgrade hook. Resolve the conflict manually before rerunning.
 
-Once the keys are registered, certificates reference them in the database and the KMS refuses to delete a key that a certificate still uses (`409` `key is in use`); release or delete the dependent certificates first.
+Once the keys are registered, certificates reference them in the database and the KMS refuses to delete a key that a certificate still uses (`409` `key is in use`). Deleting a certificate record removes it from the CRL and OCSP, so read [Before deleting a key](/docs/platform/pki/key-management#before-deleting-a-key) before freeing a key.
 
 Optionally, installations with imported CAs from before 3.7 can start the KMS once with `crypto_engines.migrate_keys_format: true`: the KMS renames those SKI-named legacy keys to the SHA-256 digest of their public key (the old name is kept as an alias, and the certificate references follow automatically). Run it once and disable the option again; running it again is safe.
 

@@ -18,19 +18,24 @@ import {
   DocsTitle,
 } from "fumadocs-ui/layouts/notebook/page";
 import defaultMdxComponents from "fumadocs-ui/mdx";
+import { getSidebarTabs } from "fumadocs-ui/utils/get-sidebar-tabs";
 import type { ReactNode } from "react";
+import { createElement } from "react";
 import { Navigate, useLocation } from "react-router";
 import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions";
 import { ArchitectureDiagram } from "@/components/architecture-diagram";
-import { PlatformDemo } from "@/components/platform-demo";
+import { CreateCaDemo } from "@/components/create-ca-demo";
 import {
   type AffectedPages,
   DiffText,
   DiffToggle,
   type PageDiff,
 } from "@/components/diff-toggle";
+import { DmsEstDemo } from "@/components/dms-est-demo";
+import { ImageLightbox } from "@/components/image-lightbox";
 import { MdxCard, MdxLink } from "@/components/mdx-link";
 import { Mermaid } from "@/components/mermaid";
+import { PlatformDemo } from "@/components/platform-demo";
 import { ScalarIcon } from "@/components/scalar-icon";
 import { VersionSelector } from "@/components/version-selector";
 import { asset } from "@/lib/asset";
@@ -38,14 +43,11 @@ import { DOCS_BASE_PATH, docsPath } from "@/lib/base-path";
 import { baseOptions, gitConfig } from "@/lib/layout.shared";
 import { DEFAULT_LOCALE, splitLocaleSlugs } from "@/lib/locales";
 import { source } from "@/lib/source";
-import { getSidebarTabs } from "fumadocs-ui/utils/get-sidebar-tabs";
-import { createElement } from "react";
 import {
   canonicalDocPath,
   resolveDocRedirect,
 } from "../../lib/docs-redirects/redirects";
 import type { Route } from "./+types/docs";
-import { ImageLightbox } from "@/components/image-lightbox";
 
 function splitBadgeTitle(title: string) {
   const match = /^\[([^\]]+)\]\s*(.+)$/.exec(title.trim());
@@ -315,6 +317,8 @@ const clientLoader = browserCollections.docs.createClientLoader({
               Step,
               Steps,
               ArchitectureDiagram,
+              CreateCaDemo,
+              DmsEstDemo,
               PlatformDemo,
               Mermaid,
             }}
@@ -341,9 +345,14 @@ export default function Page({ loaderData }: Route.ComponentProps) {
     ...getSidebarTabs(pageTree),
     {
       url: docsPath("api-reference/ca"),
-      title: loaderData.locale === DEFAULT_LOCALE ? "API Reference" : "Referencia de API",
+      title:
+        loaderData.locale === DEFAULT_LOCALE
+          ? "API Reference"
+          : "Referencia de API",
       description: "",
-      icon: createElement(ScalarIcon, { className: "size-full text-[#237b69]" }),
+      icon: createElement(ScalarIcon, {
+        className: "size-full text-[#237b69]",
+      }),
       urls: new Set<string>([docsPath("api-reference/ca")]),
     },
   ];

@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 import { asset } from "@/lib/asset";
 
-export function PlatformDemo({
-  locale,
-  noBackdrop = false,
-}: {
-  locale: "en" | "es";
-  noBackdrop?: boolean;
-}) {
+export function PlatformDemo({ locale }: { locale: "en" | "es" }) {
   const [Demo, setDemo] = useState<
     typeof import("@rustrak/openshowcase-player-react").InteractiveDemo | null
   >(null);
@@ -23,15 +17,13 @@ export function PlatformDemo({
   }, []);
 
   return (
-    <div
-      className={`platform-demo not-prose my-6 aspect-video w-full ${noBackdrop ? "platform-demo--plain overflow-hidden rounded-xl shadow-xl" : ""}`}
-    >
+    <div className="platform-demo platform-demo--plain not-prose my-6 aspect-video w-full">
       {Demo && (
         <Demo
           key={locale}
           src={asset(`demos/lamassu-lab/${locale}.json`)}
           wrapper="none"
-          backdrop={noBackdrop ? null : undefined}
+          backdrop={null}
           hotspotStyle={{ bgColor: "#405fff", textColor: "#ffffff" }}
           startWhenVisible
         />

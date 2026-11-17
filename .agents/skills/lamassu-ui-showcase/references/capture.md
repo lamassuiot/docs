@@ -1,0 +1,170 @@
+# OpenShowcase capture and integration
+
+Read this when producing or updating a demo. Always inspect the installed CLI
+help and recorder README first; flags and extension internals can change.
+
+## Flow and repeated runs
+
+1. Install the recorder and Chromium in an owned temporary directory. Use a
+   temporary profile through `--profile`; do not reuse the user's browser
+   profile implicitly. Put the `.flow.json` in the intended persistent source
+   location, or draft it temporarily and copy it there after validation.
+2. Inspect the UI with the recorder and build steps from actual accessible
+   names. Use `wait` for an observable target after navigation; for example,
+   wait for the create button before clicking it. `inspect` can return while a
+   page still displays “Loading Page...”; URL and title alone do not mean it is
+   ready. Avoid relying solely on fixed delays.
+3. Check the complete flow with `inspect`. It performs real clicks and fills:
+   a CA or other entity created by an inspection remains on the server. Ensure
+   the next `record` run has a unique target/name or reset only owned demo
+   state, so exact selectors do not match old results. Confirm the final state,
+   not just “all steps ran”. Apply the popup rule below to every step.
+4. Record to a temporary `.osrec`, export to a temporary `.openshowcase` or
+   `.zip`, and inspect the result. If the user edits the recording in the
+   editor, those changes live in its browser storage, not in the original
+   `.osrec`: export through the editor to retain them. If no edit was made,
+   CLI export is suitable. Do not add a review approval gate unless required
+   by the user or higher-priority instructions.
+
+## Popup rule: every step has a popup
+
+**Every user-visible step must have a popup (hotspot with a label).** No step
+may be left silent in the final demo.
+
+- In the flow: every `click`, `fill`, `select` and similar action that changes
+  what the user sees has a non-empty `tooltip` that explains *what* is done and
+  *why* (field meaning, chosen value, expected result). Never use
+  `"hotspot": false` on such an action. If a click is trivial (e.g. choosing
+  one option from a dropdown), explain the choice in its tooltip instead of
+  hiding it. Only `wait` steps may omit a tooltip, because they are not user
+  actions.
+- A form with several fields (e.g. the certificate subject) needs one popup
+  per field or per logical group of fields, not a silent typing sequence.
+- In the exported `steps.json`: `video` steps are only the playback that
+  connects two popups. Never leave a stretch of video that performs a user
+  action with no popup, and never end a demo on an action without a popup. Add a
+  popup on the final result (e.g. the created certificate) too.
+- Popups are only supported on `photo` steps (a still frame plus `hotspot`).
+  If an action has no popup, add a `photo` step at that moment with a hotspot
+  and a label; do not try to attach a hotspot to a `video` step.
+- Write the label in every supported locale. Labels are short, one sentence,
+  and describe the action or its purpose; never leave `label` empty.
+
+Verify mechanically after export, for every locale JSON (adapt the path):
+
+```bash
+python3 - path/to/steps.json <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+bad = [s['id'] for s in d['steps']
+       if s['type'] == 'photo' and not (s.get('hotspot') or {}).get('label', '').strip()]
+if bad:
+    raise SystemExit(f'Photo steps without popup label: {bad}')
+vids = [i for i, s in enumerate(d['steps']) if s['type'] == 'video']
+print('OK:', len(d['steps']), 'steps,', len(vids), 'video segments')
+PY
+```
+
+Also read the flow: `grep -c '"hotspot": false' <flow.json>` must print `0`, and
+every non-`wait` step must have a `tooltip`. Fix failures before delivery.
+
+## Keep only useful assets
+
+The `step-N.avif` stills in an export exist only as the backdrop of a popup
+(photo step). They are useful only when a `photo` step with a hotspot
+references them. Before copying a demo into the docs repository:
+
+1. Copy only `recording.mp4`/video files, the locale JSON files, and the
+   stills referenced by a `photo` step that has a hotspot label. Do not copy
+   everything the export produced.
+2. Delete unreferenced or duplicate files (stills of steps that ended up
+   without a popup, leftovers from earlier takes, `.osrec`, screenshots,
+   scratch PNGs). Check with:
+
+   ```bash
+   python3 - public/demos/<name> <<'PY'
+   import json, os, sys
+   root = sys.argv[1]
+   refs = set()
+   for f in os.listdir(root):
+       if f.endswith('.json'):
+           d = json.load(open(os.path.join(root, f)))
+           refs.add(d['video']['src'])
+           refs |= {s['image']['src'] for s in d['steps'] if s['type'] == 'photo'}
+   files = {'assets/' + f for f in os.listdir(os.path.join(root, 'assets'))}
+   print('Unreferenced:', sorted(files - refs))
+   print('Missing:', sorted(refs - files))
+   PY
+   ```
+   Both lists must be empty. Remove any unreferenced file.
+3. Do not add a still for a step just to “document” it. If it has no popup,
+   either give it a popup (preferred) or remove the step.
+4. Use meaningful asset names when you create extra stills (for example
+   `subject-cn.png`), not generic numbering, and keep image sizes reasonable
+   (prefer AVIF/WebP over PNG).
+
+## Reduce capture load without shrinking the UI
+
+A 1600 × 900 logical viewport captures 3200 × 1800 with the stock 0.6.2
+extension. On the observed host this caused severe stuttering; a temporary
+extension requesting one pixel per logical pixel produced 1600 × 900 with
+better frame rate. The CLI's Chromium `--force-device-scale-factor` alone did
+not fix the capture dimensions. Do not change the project dependency or the
+user's installed extension.
+
+Only if the installed 0.6.2 extension still has the exact strings below, copy
+its built extension to the temporary directory and apply this guarded patch:
+
+```bash
+# RECORDER_DIR is the temporary npm project; WORK_DIR is the temporary workspace.
+cp -a "$RECORDER_DIR/node_modules/@rustrak/openshowcase-recorder/dist/extension" "$WORK_DIR/extension-1x"
+python3 - "$WORK_DIR/extension-1x" <<'PY'
+from pathlib import Path
+import sys
+
+matches = list((Path(sys.argv[1]) / 'chunks').glob('offscreen-*.js'))
+if len(matches) != 1:
+    raise SystemExit('Unexpected extension layout: inspect current version')
+path = matches[0]
+source = path.read_text()
+changes = {
+    'maxWidth:n*2,maxHeight:i*2,maxFrameRate:60': 'maxWidth:n,maxHeight:i,maxFrameRate:60',
+    'scale:2,mimeType:l,fps:60': 'scale:1,mimeType:l,fps:60',
+}
+for old, new in changes.items():
+    if source.count(old) != 1:
+        raise SystemExit('Capture implementation changed: inspect current version')
+    source = source.replace(old, new, 1)
+path.write_text(source)
+PY
+```
+
+Pass `--extension "$WORK_DIR/extension-1x"` to the recorder's `inspect`,
+`record`, and `export` commands. The extension still requests up to 60 fps;
+that does not guarantee 60 fps. Check actual exported dimensions and frame rate
+with `ffprobe` or another reliable media inspector, and inspect playback. If
+this patch no longer matches, stop and investigate the current extension rather
+than patching unrelated code. Mention the temporary modification in the report.
+
+## Documentation integration
+
+- If an insertion destination is specified, add the demo at that location; if
+  not, deliver a local output folder and leave docs pages alone. Retain the
+  `.flow.json` as the editable source in either case.
+- For an existing translated page, translate each hotspot label and surrounding
+  text in all supported locales. An exported ZIP contains `steps.json` and
+  assets: separate locale-specific JSON files may share the same media paths.
+  Use the project's existing OpenShowcase component and base-aware asset helper.
+- Always use the **plain, no-backdrop** presentation, which is the project's
+  default: `wrapper="none"`, `backdrop={null}`, the `platform-demo
+  platform-demo--plain` classes and the brand `hotspotStyle`
+  (`{ bgColor: "#405fff", textColor: "#ffffff" }`). Copy
+  `app/components/create-ca-demo.tsx` for a new demo and register it in
+  `app/routes/docs.tsx`. Do not add a backdrop/browser-frame variant or a
+  `noBackdrop` prop, and never embed the same demo twice on a page.
+- Replace the requested process without removing surrounding prerequisites,
+  verification commands, troubleshooting, or next steps unless requested.
+  If the actual UI differs from existing prose, correct the prose to match the
+  verified behavior; don't claim recorded application UI text was translated.
+- Validate asset paths and both locales, run applicable checks, and preview the
+  player in a browser. Check the output for visible secrets or unrelated data.

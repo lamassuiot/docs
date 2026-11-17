@@ -35,6 +35,7 @@ import { DmsEstDemo } from "@/components/dms-est-demo";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { MdxCard, MdxLink } from "@/components/mdx-link";
 import { Mermaid } from "@/components/mermaid";
+import { RevokeCertificateDemo } from "@/components/revoke-certificate-demo";
 import { ScalarIcon } from "@/components/scalar-icon";
 import { VersionSelector } from "@/components/version-selector";
 import { asset } from "@/lib/asset";
@@ -318,6 +319,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               ArchitectureDiagram,
               CreateCaDemo,
               DmsEstDemo,
+              RevokeCertificateDemo,
               Mermaid,
             }}
           />

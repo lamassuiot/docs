@@ -1,0 +1,136 @@
+{
+  "title": "Revoke a certificate",
+  "url": "http://localhost:32771/",
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "steps": [
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certification Authorities",
+        "exact": true
+      },
+      "tooltip": "Open the certification authorities inventory."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "Create New CA"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "text": "Acme Showcase Root CA",
+        "exact": true
+      },
+      "tooltip": "Open the authority that issued the certificate to revoke."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "tab",
+        "name": "Issued Certificates"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "tab",
+        "name": "Issued Certificates"
+      },
+      "tooltip": "Open the Issued Certificates tab: the authority has already issued 100 certificates."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "textbox",
+        "name": "Search"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "textbox",
+        "name": "Search"
+      },
+      "tooltip": "With so many certificates, search for the one to revoke by its Common Name."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Search"
+      },
+      "value": "device-042"
+    },
+    {
+      "action": "wait",
+      "for": {
+        "text": "Active filters"
+      }
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "More actions"
+      },
+      "tooltip": "Open the actions of the matching certificate, device-042."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "menuitem",
+        "name": "Revoke Certificate"
+      },
+      "tooltip": "Choose Revoke Certificate."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "combobox",
+        "name": "Revocation Reason"
+      },
+      "tooltip": "Open the reason list and choose KeyCompromise, because the device key is considered exposed."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "option",
+        "name": "KeyCompromise"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Confirm Revocation"
+      },
+      "tooltip": "Confirm the revocation. The change is applied immediately."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "cell",
+        "name": "REVOKED KeyCompromise"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "cell",
+        "name": "REVOKED KeyCompromise"
+      },
+      "tooltip": "The certificate now shows the REVOKED status, with its reason and revocation time."
+    }
+  ]
+}

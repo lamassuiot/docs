@@ -14,6 +14,9 @@ importers:
       '@react-router/node':
         specifier: ^7.13.1
         version: 7.13.1(react-router@7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3)
+      '@rustrak/openshowcase-player-react':
+        specifier: 0.6.2
+        version: 0.6.2(react@19.2.4)(typescript@5.9.3)
       '@scalar/api-reference-react':
         specifier: ^0.9.41
         version: 0.9.41(react@19.2.4)(supports-color@7.2.0)(tailwindcss@4.2.1)(typescript@5.9.3)(zod@4.3.6)
@@ -1216,6 +1219,17 @@ packages:
     resolution: {integrity: sha512-2HRCml6OztYXyJXAvdDXPKcawukWY2GpR5/nxKp4iBgiO3wcoEGkAaqctIbZcNB6KlUQBIqt8VYkNSj2397EfA==}
     cpu: [x64]
     os: [win32]
+
+  '@rustrak/openshowcase-player-core@0.6.2':
+    resolution: {integrity: sha512-EZe3ZldvQ5vA58mz0p5oYd8gw09/FkLBNu3wVbpgcZNnGF6pN3qoGYz0zSCb2RTizfOL0s03V2Z9l+yVzsJ1VA==}
+
+  '@rustrak/openshowcase-player-react@0.6.2':
+    resolution: {integrity: sha512-zrXe1Mgf0Fho19pucCM4qlAB5kENNP2+SyI9MJx6qy6cMcTrVGlKcUBpfqMhevWaBPceAAhjfJwWeKTeOj1DXg==}
+    peerDependencies:
+      react: '>=18'
+
+  '@rustrak/openshowcase-schema@0.6.2':
+    resolution: {integrity: sha512-D3BCLtkDiqGuTOKVoWlbUKMRB9EwO2MGgdeYRfX67wpFP6zwZCc8fy3qmvyfEBvCzTAAtKNs5HSfUA3ldZSPXQ==}
 
   '@scalar/agent-chat@0.12.5':
     resolution: {integrity: sha512-FS/v/GCc0H8d1s5wLOI0iz+4aAMR8eTJxl+cdVMCnhCAZYSQUf2bfwRRu9AxmK8htLHTZC7C5gPIPxItQnVelg==}
@@ -3779,6 +3793,14 @@ packages:
       typescript:
         optional: true
 
+  valibot@1.5.0:
+    resolution: {integrity: sha512-nil6AkP2TChWL43Z5uJ6GTxX01CUA+g8LWUM+N/rB9NBbkUMaUsi9PUNzlUPgoKASgmx9f7eGOYpJ04/fSa6FQ==}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
@@ -5057,6 +5079,26 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.59.0':
     optional: true
+
+  '@rustrak/openshowcase-player-core@0.6.2(typescript@5.9.3)':
+    dependencies:
+      '@rustrak/openshowcase-schema': 0.6.2(typescript@5.9.3)
+    transitivePeerDependencies:
+      - typescript
+
+  '@rustrak/openshowcase-player-react@0.6.2(react@19.2.4)(typescript@5.9.3)':
+    dependencies:
+      '@rustrak/openshowcase-player-core': 0.6.2(typescript@5.9.3)
+      '@rustrak/openshowcase-schema': 0.6.2(typescript@5.9.3)
+      react: 19.2.4
+    transitivePeerDependencies:
+      - typescript
+
+  '@rustrak/openshowcase-schema@0.6.2(typescript@5.9.3)':
+    dependencies:
+      valibot: 1.5.0(typescript@5.9.3)
+    transitivePeerDependencies:
+      - typescript
 
   '@scalar/agent-chat@0.12.5(supports-color@7.2.0)(tailwindcss@4.2.1)(typescript@5.9.3)(zod@4.3.6)':
     dependencies:
@@ -8300,6 +8342,10 @@ snapshots:
   uuid@8.3.2: {}
 
   valibot@1.2.0(typescript@5.9.3):
+    optionalDependencies:
+      typescript: 5.9.3
+
+  valibot@1.5.0(typescript@5.9.3):
     optionalDependencies:
       typescript: 5.9.3
 

@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions";
 import { ArchitectureDiagram } from "@/components/architecture-diagram";
+import { PlatformDemo } from "@/components/platform-demo";
 import {
   type AffectedPages,
   DiffText,
@@ -314,6 +315,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               Step,
               Steps,
               ArchitectureDiagram,
+              PlatformDemo,
               Mermaid,
             }}
           />

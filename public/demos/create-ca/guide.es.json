@@ -2,63 +2,63 @@
   "steps": [
     {
       "title": "El inventario de CA",
-      "body": "Certification Authorities lista todas las CA de la instancia con su estado y caducidad. Desde aquí creas una CA nueva, importas una existente o abres una para ver su certificado y su configuración."
+      "body": "Certification Authorities lista todas las CA de esta instancia con su estado, tipo, clave y caducidad. Desde aquí creas una CA nueva, incorporas una existente o abres una para inspeccionar su certificado y su configuración."
     },
     {
       "title": "Crear una raíz de confianza",
-      "body": "Create New CA crea una CA desde cero con una clave que Lamassu genera y custodia. Si la clave ya está registrada en Lamassu, usa Create New CA (Existing Key).",
+      "body": "Create New CA abre una página que agrupa las opciones en dos bloques: Create (New Key Pair o Reuse Existing Key) e Import (With Private Key o Certificate Only).",
       "note": "Este ejemplo crea una raíz que emite directamente. Para una jerarquía operativa, consulta Jerarquía y rotación."
     },
     {
       "title": "Nuevo par de claves",
-      "body": "Lamassu genera el par de claves dentro de un motor criptográfico y la clave privada permanece allí. Solo descargas el certificado público.",
-      "note": "Los algoritmos disponibles dependen de lo que admita el motor."
+      "body": "New Key Pair aparece como Recommended: se genera un par de claves nuevo, totalmente gestionado por el KMS, de modo que no manejas la clave privada.",
+      "note": "Los algoritmos disponibles dependen de lo que admita el motor criptográfico."
     },
     {
       "title": "Algoritmo de la clave",
-      "body": "Cada motor define los algoritmos y tamaños que admite, como RSA o ECDSA. ECDSA ofrece claves y firmas más cortas que RSA con un nivel de seguridad comparable."
+      "body": "Key Type ofrece las familias de algoritmos RSA y ECDSA. ECDSA da claves y firmas más cortas que RSA con un nivel de seguridad comparable."
     },
     {
       "title": "Curva: P-384",
-      "body": "P-384 (secp384r1) ofrece un nivel de seguridad de unos 192 bits, superior a P-256, por lo que es una elección habitual para raíces de larga vida.",
+      "body": "La lista de curvas muestra P-384 (NIST P-384, secp384r1). P-384 ofrece aproximadamente 192 bits de seguridad, por encima de P-256, lo que la hace habitual en raíces de larga vida.",
       "note": "Comprueba que los dispositivos y validadores que verificarán esta CA admiten la curva."
     },
     {
       "title": "Nombre de la CA = Common Name",
-      "body": "El nombre de la CA debe ser único y se convierte en el Common Name (CN) del subject del certificado. Como una raíz es autofirmada, el mismo valor es también su emisor.",
-      "note": "Nombra la autoridad por su finalidad, no por una persona."
+      "body": "El nombre de la CA pasa a ser el Common Name (CN) del subject del certificado. Con CA Type en Root CA el emisor es Self-signed, así que el emisor del nuevo certificado lleva el mismo nombre.",
+      "note": "Pon a la autoridad un nombre que refleje su función, no el de una persona."
     },
     {
       "title": "País (C)",
-      "body": "Opcional. Usa el código ISO 3166-1 de dos letras, aquí ES. Complétalo solo si tu política lo exige.",
+      "body": "Opcional. Usa el código ISO 3166-1 de dos letras, aquí ES. Rellénalo solo si tu política lo exige.",
       "note": "El subject forma parte del certificado firmado: cambiarlo después implica emitir un certificado nuevo."
     },
     {
       "title": "Organización (O)",
-      "body": "Opcional. La organización o el equipo que opera la CA. Aparece en el subject y, en los certificados emitidos, en el campo del emisor."
+      "body": "Opcional. La organización o el equipo que opera la CA. Aparece en el subject del certificado de la CA, que también es su emisor porque la raíz es autofirmada."
     },
     {
       "title": "Validez de la CA",
-      "body": "Introduce una duración como 1y, 365d o 2w. Una CA debe durar más que los certificados que emite, así que planifica su validez por encima de la de ellos.",
-      "note": "1y es solo para esta evaluación. La emisión no recorta un certificado a la caducidad de su emisor, así que deja margen para reemplazar la CA."
+      "body": "El campo parte de 10y; aquí se fija en 1y. Las unidades admitidas son y, w, d, h, m y s. Una CA debe sobrevivir a los certificados que emite, así que planifica su validez más larga que la de ellos.",
+      "note": "1y es solo para esta evaluación. Una CA creada el 17/11/2026 con 1y caducaba el 16/11/2027 en esta grabación."
     },
     {
       "title": "Perfil de emisión",
-      "body": "El perfil es la política predeterminada de los certificados que emite esta CA: validez, tratamiento del subject y usos como ClientAuth. Client Certificates encaja con identidades de dispositivos y usuarios.",
-      "note": "Los perfiles disponibles y su vigencia dependen de tu entorno."
+      "body": "El Default Issuance Profile es el perfil que esta CA usa por defecto al emitir certificados. Client Certificates («Profile for issuing client certificates») tiene una validez de 1y1d y el key usage DigitalSignature.",
+      "note": "Es el perfil de los certificados que emite la CA, no el del certificado de la propia CA: ese es la sección independiente CA Certificate Profile, que se deja en No Profile."
     },
     {
       "title": "Crear la autoridad",
-      "body": "Lamassu genera la clave en el motor y firma el certificado raíz autofirmado. Los valores introducidos quedan fijados en ese certificado una vez firmado."
+      "body": "Lamassu genera la clave en el motor y firma el certificado raíz autofirmado. Los valores que has introducido quedan fijados en ese certificado una vez firmado."
     },
     {
       "title": "Comprueba el resultado",
-      "body": "Abre la CA nueva y confirma que su estado es Active, además de su emisor, fechas, motor y clave."
+      "body": "Abre la nueva CA y confirma el estado ACTIVE, el emisor C=ES, O=Acme, CN=Acme Showcase Root CA, las fechas de validez y la clave ECDSA 384."
     },
     {
       "title": "Certificate PEM",
-      "body": "La pestaña Certificate PEM contiene el certificado público de la CA: descárgalo como ca.pem. La clave privada no sale del motor.",
-      "note": "Verifícalo con OpenSSL: CA:TRUE y un uso de clave que permita firmar certificados. Una autofirma válida no instala la confianza en otros sistemas; distribuye la raíz de forma explícita."
+      "body": "La pestaña Certificate PEM muestra el certificado público de la CA como X.509 en PEM, con los botones Copy y .pem para descargarlo, además del paquete Full Chain.",
+      "note": "Verifícalo con OpenSSL: CA:TRUE y un key usage que permita firmar certificados (esta CA tiene CertSign y CRLSign). Una autofirma válida no instala confianza en otros sistemas; distribuye la raíz de forma explícita."
     }
   ]
 }

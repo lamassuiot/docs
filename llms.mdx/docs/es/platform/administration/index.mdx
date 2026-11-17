@@ -201,7 +201,7 @@ Una regla identifica el dominio (`namespace`), el esquema de datos (`schema_name
 
 Acceso heredado por relaciones [#acceso-heredado-por-relaciones]
 
-Las reglas pueden seguir relaciones declaradas entre entidades. Por ejemplo, el esquema conoce la relación de un certificado con su CA emisora y la de un dispositivo con su DMS. Una política puede conceder acceso a un recurso padre y propagar acciones seleccionadas hacia sus recursos relacionados.
+Las reglas pueden seguir relaciones declaradas entre entidades. Por ejemplo, el esquema conoce la relación de un certificado con su CA emisora, la de un dispositivo con su DMS y la de un certificado con la clave KMS que almacena su clave privada, de modo que un grant sobre la clave también cubre los certificados que la utilizan. Una política puede conceder acceso a un recurso padre y propagar acciones seleccionadas hacia sus recursos relacionados.
 
 Esto permite expresar modelos como “puede operar los dispositivos de este DMS” sin mantener una lista individual de cada dispositivo. Cuando se añade un recurso bajo esa relación, hereda el alcance previsto por la política.
 

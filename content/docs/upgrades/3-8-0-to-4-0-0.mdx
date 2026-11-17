@@ -152,7 +152,9 @@ Optionally, installations with imported CAs from before 3.7 can start the KMS on
 
 With Helm, enable the hook for the upgrade in [step 2](#step-2-update-the-values-file); without Helm, run the tool by hand.
 
-#### References between certificates, keys and VA roles
+<span id="references-between-certificates-keys-and-va-roles" />
+
+#### References between certificates, keys and CRL settings
 
 Certificates now reference their KMS key, and CRL settings reference their signer certificate, so a key or certificate in use cannot be deleted. The KMS migration drops the legacy `lamassu.io/kms/binded-resources` key metadata. Before 4.0.0, deleting a CA could remove its key while leaving key references in its retained certificate records. The CA migration registers those missing keys in the KMS with only their public key to satisfy the retained references. These entries cannot be deleted while the retained certificates reference them; they do not restore the private key. In 4.0.0, deleting a CA releases the references from its own current certificate and linked reissued certificates before attempting to delete the key; other certificates that still reference it prevent deletion.
 
@@ -248,7 +250,7 @@ The migration aborts, and the upgrade fails, on five kinds of data:
 
 The settings of a CA deleted before the upgrade are migrated as `ARCHIVED`, with a `legacy-<ski>` ID and no signer: their last CRL is still served, but never regenerated, and `PUT` returns `409`. There is no API way back to `ACTIVE`. The [CRL guide](/docs/platform/pki/crl) describes the full behavior.
 
-**Custom authorization policies.** The entity `va_role` is renamed to `crl_settings`, with `ca_id` as its primary key and `signer_serial_number` as its relation to certificates. Policies that reference the old entity, or that filter on the signer by its former name `crl_signer_certificate_serial_number`, must be updated.
+**Custom authorization policies.** The entity `va_role` is renamed to `crl_settings`, with `ca_id` as its primary key and `signer_serial_number` as its relation to certificates. Update policies referencing the old entity. Replace the 3.8.0 signer filter `crl_subject_key_id_signer` (or `crl_signer_certificate_serial_number` if used by an intermediate version) with `signer_serial_number`. Replace SKI filter values with the corresponding certificate serial numbers; renaming the filter alone is insufficient.
 
 #### Renamed VA events
 

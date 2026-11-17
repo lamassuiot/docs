@@ -152,7 +152,9 @@ Opcionalmente, las instalaciones con CAs importadas anteriores a 3.7 pueden arra
 
 Con Helm, activa el hook para la actualización en el [paso 2](#paso-2-actualiza-el-archivo-de-values); sin Helm, ejecuta la herramienta a mano.
 
-#### Referencias entre certificados, claves y roles VA
+<span id="referencias-entre-certificados-claves-y-roles-va" />
+
+#### Referencias entre certificados, claves y ajustes de CRL
 
 Los certificados referencian ahora su clave del KMS, y los ajustes de CRL referencian su certificado firmante, de modo que no se puede eliminar una clave o un certificado en uso. La migración del KMS descarta los metadatos de clave heredados `lamassu.io/kms/binded-resources`. Antes de 4.0.0, eliminar una CA podía borrar su clave y dejar referencias a ella en los registros de certificado conservados. La migración de CA registra esas claves ausentes en el KMS solo con su clave pública para satisfacer las referencias conservadas. Estas entradas no pueden eliminarse mientras los certificados conservados las referencien; no recuperan la clave privada. En 4.0.0, eliminar una CA libera las referencias de su propio certificado actual y de sus certificados reemitidos vinculados antes de intentar eliminar la clave; los demás certificados que todavía la referencien impiden su eliminación.
 
@@ -248,7 +250,7 @@ La migración aborta, y con ella la actualización, con cinco tipos de datos:
 
 Los ajustes de una CA eliminada antes de la actualización se migran como `ARCHIVED`, con un ID `legacy-<ski>` y sin firmante: su última CRL sigue sirviéndose, pero nunca se regenera, y `PUT` devuelve `409`. No hay forma de volver a `ACTIVE` por API. La [guía de CRL](/docs/platform/pki/crl) describe el comportamiento completo.
 
-**Políticas de autorización personalizadas.** La entidad `va_role` se renombra a `crl_settings`, con `ca_id` como clave primaria y `signer_serial_number` como su relación con certificados. Deben actualizarse las políticas que referencien la entidad antigua o que filtren por el firmante con su nombre anterior, `crl_signer_certificate_serial_number`.
+**Políticas de autorización personalizadas.** La entidad `va_role` se renombra a `crl_settings`, con `ca_id` como clave primaria y `signer_serial_number` como su relación con certificados. Actualiza las políticas que referencien la entidad antigua. Sustituye el filtro de firmante de 3.8.0 `crl_subject_key_id_signer` (o `crl_signer_certificate_serial_number` si se usa en una versión intermedia) por `signer_serial_number`. Sustituye los valores SKI del filtro por los números de serie de los certificados correspondientes; cambiar solo el nombre del filtro no basta.
 
 #### Eventos de VA renombrados
 

@@ -1,6 +1,6 @@
 {
   "title": "Create a registration authority",
-  "url": "http://localhost:33067/",
+  "url": "http://localhost:32769/",
   "viewport": {
     "width": 1600,
     "height": 900
@@ -13,7 +13,7 @@
         "name": "Registration Authorities",
         "exact": true
       },
-      "tooltip": "Open the registration authorities inventory"
+      "tooltip": "Open the registration authorities inventory."
     },
     {
       "action": "wait",
@@ -29,7 +29,7 @@
         "name": "Create New RA",
         "exact": true
       },
-      "tooltip": "Start creating a registration authority"
+      "tooltip": "Start creating a registration authority."
     },
     {
       "action": "wait",
@@ -41,7 +41,7 @@
         "role": "textbox",
         "name": "Name"
       },
-      "tooltip": "Name the registration authority"
+      "tooltip": "Name the registration authority. The ID used in the EST URLs is derived from it."
     },
     {
       "action": "fill",
@@ -49,7 +49,15 @@
         "role": "textbox",
         "name": "Name"
       },
-      "value": "DMS Showcase 7"
+      "value": "DMS Showcase"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "Just-in-time provisioning"
+      },
+      "tooltip": "Choose how devices register: just-in-time provisioning creates unknown devices on their first enrollment."
     },
     {
       "action": "click",
@@ -57,7 +65,7 @@
         "role": "combobox",
         "name": "Enrollment CA"
       },
-      "tooltip": "Open the enrollment CA picker"
+      "tooltip": "Open the enrollment CA picker."
     },
     {
       "action": "wait",
@@ -72,7 +80,7 @@
         "text": "DMS Enrollment CA",
         "nth": 0
       },
-      "tooltip": "Choose the CA that signs device identities"
+      "tooltip": "Choose the CA that signs device identities."
     },
     {
       "action": "wait",
@@ -84,7 +92,7 @@
         "role": "button",
         "name": "Add validation CA"
       },
-      "tooltip": "Open the validation CA picker"
+      "tooltip": "Open the validation CA picker."
     },
     {
       "action": "wait",
@@ -99,7 +107,7 @@
         "text": "DMS Bootstrap CA",
         "nth": 0
       },
-      "tooltip": "Trust the bootstrap CA for device authentication"
+      "tooltip": "Trust the bootstrap CA to validate the devices’ initial credential."
     },
     {
       "action": "wait",
@@ -111,7 +119,7 @@
         "role": "button",
         "name": "Create RA"
       },
-      "tooltip": "Create the registration authority"
+      "tooltip": "Create the registration authority."
     },
     {
       "action": "wait",

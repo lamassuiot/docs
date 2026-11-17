@@ -54,7 +54,7 @@ Las versiones de las CRLs se conservan en el almacenamiento de objetos como PEM 
 
 Desde 4.0.0, cada CA publica su propia CRL aunque comparta clave: dos CAs con la misma clave tienen el mismo SKI, pero cada una tiene sus propios ajustes de CRL y su propia lista, firmada por un certificado con la identidad de esa CA.
 
-Los certificados emitidos a partir de ahora llevan puntos de distribución `/crl/<ca-id>`, así que los certificados de cada CA resuelven a su propia lista. Los certificados emitidos antes de la actualización conservan sus puntos de distribución `/crl/<ski>`: esa URL sigue resolviendo a los ajustes que migró la actualización y sirve siempre la lista de la CA propietaria de ese SKI cuando se ejecutó la actualización. Nunca se reasigna a una CA creada después con la misma clave. La lista migrada incluye ambas URLs en su *Issuing Distribution Point* (OID `2.5.29.28`), de modo que un verificador que compara el IDP con el CDP del certificado acepta cualquiera de las dos formas.
+Los certificados emitidos a partir de ahora llevan puntos de distribución `/crl/<ca-id>`, así que los certificados de cada CA resuelven a su propia lista. Los certificados emitidos antes de la actualización conservan sus puntos de distribución `/crl/<ski>`: esa URL sigue resolviendo a los ajustes que migró la actualización y sirve siempre la lista de la CA propietaria de ese SKI cuando se ejecutó la actualización. Nunca se reasigna a una CA creada después con la misma clave. Tras la regeneración, la lista migrada incluye ambas URLs en su *Issuing Distribution Point* (OID `2.5.29.28`), de modo que un verificador que compara el IDP con el CDP del certificado acepta cualquiera de las dos formas. Hasta que el job de CRL de la VA la regenere correctamente, la lista anterior a la actualización solo contiene el IDP heredado `/crl/<ski>`; los verificadores que comprueban el IDP no pueden validar los certificados recién emitidos con CDP `/crl/<ca-id>`. Con la frecuencia predeterminada, la primera ejecución puede tardar hasta aproximadamente una hora y los fallos pueden prolongar ese intervalo.
 
 Compartir un SKI entre CAs bloquea la actualización: la migración aborta y nombra los SKIs. Para detectar el problema antes de actualizar, compara el SKI de las CAs en el inventario: dos con el mismo SKI están afectadas. Para resolverlo, crea una CA con clave propia y reemite sus certificados; los ya emitidos conservan la URL antigua y no se corrigen hasta reemitirlos.
 
@@ -62,7 +62,7 @@ Lamassu toma el SKI del certificado importado tal cual y no comprueba que corres
 
 ## Regeneración periódica y automática
 
-El trabajo programado de la VA revisa los ajustes de CRL de todas las CA en cada ejecución y solicita una lista nueva cuando se cumple alguna de estas condiciones:
+El job de la VA revisa los ajustes de CRL de todas las CA en cada ejecución y solicita una lista nueva cuando se cumple alguna de estas condiciones:
 
 - **La lista está a punto de vencer:** a `latest_crl` le queda menos validez que el intervalo entre ejecuciones del trabajo. Esta condición se aplica siempre y no puede desactivarse.
 - **Ha transcurrido el intervalo de renovación:** el tiempo desde la emisión de la última CRL publicada alcanza `refresh_interval`. Con `refresh_interval` a `0` se desactiva solo esta condición; la lista se sigue regenerando cuando está a punto de vencer.

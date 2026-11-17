@@ -112,4 +112,4 @@ Subscriptions created with older console versions may store the webhook target u
 
 Use the catalog shown in the console as the source for the types available in your deployed version.
 
-Since 4.0.0, `va.crl-settings.init` and `va.crl-settings.update` carry the CRL settings of a CA (`ca_id`) and replace `va.role.crl.init` and `va.role.update`. The upgrade migration renames the types of existing subscriptions automatically, but it does not rewrite their conditions: review any filter that reads a field of the old payload (see [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0#crl-settings-keyed-by-ca-id)).
+Since 4.0.0, `va.crl-settings.init` and `va.crl-settings.update` carry the CRL settings of a CA (`ca_id`) and replace `va.role.crl.init` and `va.role.update`. The upgrade migration renames the types of existing subscriptions automatically, but it does not rewrite their conditions: review filters that read the old payload or the old `crl/<ski>` subject, including filters for `va.role.crl.create` (see [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0#crl-settings-keyed-by-ca-id)).

@@ -1,5 +1,6 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 import { createElement } from "react";
+import { AutoplayToggle } from "@/components/autoplay-toggle";
 import { asset } from "@/lib/asset";
 
 export const gitConfig = {
@@ -34,6 +35,7 @@ export function baseOptions(): BaseLayoutProps {
         "Lamassu IoT Docs",
       ),
     },
+    links: [{ type: "custom", children: createElement(AutoplayToggle) }],
     githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
   };
 }

@@ -5,6 +5,7 @@ import { Airplay, Moon, Search, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router";
+import { AutoplayToggle } from "@/components/autoplay-toggle";
 import { docsPath } from "@/lib/base-path";
 import { cn } from "@/lib/cn";
 import { baseOptions } from "@/lib/layout.shared";
@@ -61,6 +62,7 @@ export function AppBar({
               <GitHubIcon />
             </a>
           )}
+          <AutoplayToggle className="max-md:hidden" />
           <SearchIconButton />
           <ThemeToggle className="max-md:hidden" />
         </div>

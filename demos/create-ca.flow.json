@@ -1,6 +1,6 @@
 {
   "title": "Create a root CA",
-  "url": "http://localhost:33065/",
+  "url": "http://localhost:32769/",
   "viewport": {
     "width": 1600,
     "height": 900
@@ -49,15 +49,14 @@
         "role": "combobox",
         "name": "Key Type"
       },
-      "tooltip": "Choose an algorithm supported by the engine."
+      "tooltip": "Open the key algorithm list and choose ECDSA."
     },
     {
       "action": "click",
       "target": {
         "role": "option",
         "name": "ECDSA"
-      },
-      "hotspot": false
+      }
     },
     {
       "action": "click",
@@ -65,22 +64,14 @@
         "role": "combobox",
         "name": "ECDSA Curve"
       },
-      "tooltip": "Choose the P-384 curve."
+      "tooltip": "Open the curve list and choose P-384."
     },
     {
       "action": "click",
       "target": {
         "role": "option",
         "name": "P-384"
-      },
-      "hotspot": false
-    },
-    {
-      "action": "fill",
-      "target": {
-        "label": "CA Name (Common Name)"
-      },
-      "value": "Acme Showcase Root CA"
+      }
     },
     {
       "action": "click",
@@ -92,6 +83,20 @@
     {
       "action": "fill",
       "target": {
+        "label": "CA Name (Common Name)"
+      },
+      "value": "Acme Showcase Root CA"
+    },
+    {
+      "action": "click",
+      "target": {
+        "label": "Country (C)"
+      },
+      "tooltip": "Country (C): optional two-letter country code of the subject."
+    },
+    {
+      "action": "fill",
+      "target": {
         "label": "Country (C)"
       },
       "value": "ES"
@@ -99,9 +104,9 @@
     {
       "action": "click",
       "target": {
-        "label": "Country (C)"
+        "label": "Organization (O)"
       },
-      "tooltip": "Complete the optional subject fields: country (C) and organization (O) in this example."
+      "tooltip": "Organization (O): optional organization name of the subject."
     },
     {
       "action": "fill",
@@ -109,6 +114,13 @@
         "label": "Organization (O)"
       },
       "value": "Acme"
+    },
+    {
+      "action": "click",
+      "target": {
+        "placeholder": "e.g., 10y, 365d, 2w"
+      },
+      "tooltip": "Set how long the CA certificate stays valid, for example 1y."
     },
     {
       "action": "fill",
@@ -123,15 +135,14 @@
         "role": "combobox",
         "name": "Issuance Profile"
       },
-      "tooltip": "Choose the default profile for issued certificates."
+      "tooltip": "Open the issuance profiles and choose Client Certificates as the default for issued certificates."
     },
     {
       "action": "click",
       "target": {
         "role": "option",
         "name": "Client Certificates"
-      },
-      "hotspot": false
+      }
     },
     {
       "action": "click",

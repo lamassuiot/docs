@@ -71,7 +71,7 @@ Breaking changes [#breaking-changes]
 | [Re-enrollment trust set](#re-enrollment-trust-set)                                   | Scripts and consoles that edit DMSs through the API                                  | Medium: an old-layout edit silently empties `validation_cas`  | Read the DMS before editing and use the new field                                                            |
 | [VA role signer field](#va-role-signer-field)                                         | Clients that create or update VA roles through the API                               | Medium: requests with the old field return an error           | Replace `crl_options.subject_key_id_signer` with the required `crl_options.signer_certificate_serial_number` |
 | [Device events](#device-events)                                                       | Consumers that read the device `events` field                                        | Medium: the field disappears                                  | Use the new event endpoints                                                                                  |
-| [VA CRL signer](#va-crl-signer)                                                       | Deployments with VA roles whose signer is not in the CA inventory                    | Medium: the VA migration aborts                               | Fix the affected roles before upgrading                                                                      |
+| [VA CRL signer](#va-crl-signer)                                                       | Deployments with VA roles whose signer cannot be resolved uniquely                   | Medium: the VA migration aborts                               | Fix the affected roles before upgrading                                                                      |
 | [Renamed and reshaped values](#renamed-and-reshaped-values)                           | Releases that override `toolbox`, `services.connectors`, ports, probes or scheduling | Low to medium: validation errors or changed defaults          | Update the values file                                                                                       |
 | [DMS update API](#dms-update-api)                                                     | Clients that send the DMS ID in the update body                                      | Low: the ID in the URL wins                                   | Send the ID in the URL                                                                                       |
 | [Certificate type values](#certificate-type-values)                                   | Consumers that match on certificate `type`                                           | Low: two values are renamed                                   | Adapt consumers                                                                                              |
@@ -137,7 +137,7 @@ Legacy CA keys in the KMS [#legacy-ca-keys-in-the-kms]
 
 CA certificates of type `MANAGED` or `IMPORTED_WITH_KEY` whose private keys predate the KMS service have the key stored only in the crypto engine, under the certificate's `subject_key_id`, with no KMS record. The `ca-to-kms-migration` tool registers them:
 
-* The `key_id` is the certificate's `subject_key_id` (SHA-256 of the public key).
+* The `key_id` is the certificate's `subject_key_id`<del className="lm-diff-del"> (</del><ins className="lm-diff-ins">; it matches the </ins>SHA-256 <ins className="lm-diff-ins">digest </ins>of the public key<del className="lm-diff-del">)</del><ins className="lm-diff-ins"> only when the SKI was computed that way</ins>.
 * The tool is idempotent: keys already in the KMS are skipped, so it can be run several times.
 * Certificates that cannot be read, or lack an engine or a subject key ID, are skipped with a warning. Review the logs and resolve the affected records.
 * When CA certificates sharing a `subject_key_id` declare conflicting `engine_id`s, the tool fails that key and exits with code `1`, which fails a Helm pre-upgrade hook. Resolve the conflict manually before rerunning.
@@ -229,7 +229,7 @@ VA role signer field [#va-role-signer-field]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  The VA migration resolves each role's signer automatically: when several CAs share the signer's key, it uses the oldest one and logs a warning, but it aborts with `cannot resolve signer certificate for VA role <ca-ski>, SKI <ski>` when no certificate with that SKI exists. Fix such roles before upgrading.
+  The VA migration resolves each role's signer from its stored SKI. It first looks for CA certificates with that SKI; if several match, it selects the oldest CA and logs a warning. If no CA certificate matches, it looks among all certificates with that SKI. The migration aborts with `cannot resolve signer certificate for VA role <ca-ski>, SKI <ski>` if that fallback finds zero or multiple candidates. Fix affected roles before upgrading.
 </div>
 
 Helm migration guide [#helm-migration-guide]
@@ -479,7 +479,11 @@ Without the chart's database job, no tool moves data between databases: the migr
 
 Run the migrations in the required order, one schema at a time: `kms` first, then the `ca-to-kms-migration` tool (needed only for legacy deployments whose CA keys are named by SKI), then `ca`, then `va`. The `devicemanager`, `dmsmanager` and `alerts` schemas are independent and can be migrated in any order. With Helm, the chart's pre-install job applies the schemas in the correct order automatically.
 
-The schemas reference each other, so the PostgreSQL role running the migrations needs cross-schema privileges: the `ca` schema needs `USAGE` on `kms` plus `SELECT`, `REFERENCES` and `INSERT` on `kms.kms_keys`, and the `va` schema needs `USAGE` on `ca` plus `SELECT` and `REFERENCES` on `ca.certificates` and `SELECT` on `ca.ca_certificates`. If your services connect with a different user than the one that ran the migrations, grant that user `SELECT` on `ca.certificates_view` after the migrations.
+<div className="lm-diff-ins lm-diff-block">
+  If `kms` has not been migrated, the `ca` migration fails with `kms schema not found: migrate the kms schema before the ca schema`. The `va` migration likewise requires `ca` to be migrated first.
+</div>
+
+The schemas reference each other, so the PostgreSQL role running the migrations needs cross-schema privileges: the `ca` schema needs `USAGE` on `kms` plus `SELECT`, `REFERENCES` and `INSERT` on `kms.kms_keys`, and the `va` schema needs `USAGE` on `ca` plus `SELECT` and `REFERENCES` on `ca.certificates` and `SELECT` on `ca.ca_certificates`. <del className="lm-diff-del">If your services connect with a different user than the one that ran the migrations, grant that user `SELECT` on `ca.certificates_view` after the migrations</del><ins className="lm-diff-ins">Without them the migration aborts; grant the missing privileges and rerun the failed schema. After migrating `ca`, if the CA service runs as a different user than the migration user, grant it `SELECT` on `ca.certificates_view` (`GRANT SELECT ON ca.certificates_view TO service_user`). Without this grant, certificate and CA reads fail with `permission denied for table certificates_view`</ins>.
 
 To apply migrations by hand, `goose-lamassu` must run against the `pki` database with `search_path=<schema>` in the connection string. The binary validates only `search_path`, not the database name, so check `dbname=pki` before running it, and repeat for `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` and `alerts`:
 
@@ -498,14 +502,6 @@ Point the tool's `storage` configuration at the `pki` database, where the CA and
 
 Both tools' READMEs document the 4.0.0 `pki` layout and match this page: `goose-lamassu` uses `dbname=pki` examples and does not validate the database name, and the `ca-to-kms-migration` README describes the single `pki` database and the migration order.
 
-<div className="lm-diff-ins lm-diff-block">
-  Apply the schema migrations in the order `kms` → `ca` → `va`; `devicemanager`, `dmsmanager` and `alerts` are independent and can run at any point. The `ca` migration fails with `kms schema not found: migrate the kms schema before the ca schema` while `kms` is not migrated yet, and `va` needs `ca` migrated. The `ca` and `va` migrations also read tables that belong to another schema, so the PostgreSQL role that runs them needs privileges on it: `USAGE` on the `kms` schema plus `SELECT`, `REFERENCES` and `INSERT` on `kms.kms_keys` for the `ca` migration, and `USAGE` on the `ca` schema plus `SELECT` and `REFERENCES` on `ca.certificates` and `SELECT` on `ca.ca_certificates` for the `va` migration. Without them the migration aborts; grant the missing privileges and run the failed schema again.
-</div>
-
-<div className="lm-diff-ins lm-diff-block">
-  After migrating `ca`, if the CA service runs as a different user than the migration user, grant that user `SELECT` on `ca.certificates_view` (`GRANT SELECT ON ca.certificates_view TO service_user`); the CA service reads certificates and CAs through that view, and without the grant every certificate and CA read fails with `permission denied for table certificates_view`.
-</div>
-
 Troubleshooting [#troubleshooting]
 
 * **KMS or VA pods crash with `no such file or directory` or `code=NotFound` right after the upgrade.** The pods are bound to the new, empty PVCs and the data migration has not run yet, or was copied into the wrong PVC. Follow [step 4](#step-4-migrate-the-kms-and-va-data) and check that all four claims exist.
@@ -517,7 +513,7 @@ Troubleshooting [#troubleshooting]
 * **Nobody can log in after the upgrade.** Check that `services.authz.jwkUrl` is reachable from the `authz` pod, that `services.authz.bootstrap` matches a role your OIDC provider actually assigns, and that the database job completed.
 * **A migration aborts with `kms schema not found`.** The schemas must be migrated in order: run the `kms` schema migration before the `ca` schema migration.
 * **A migration aborts with `ca schema not found`.** Run the `ca` schema migration before the `va` schema migration.
-* **The VA migration fails with `cannot resolve signer certificate for VA role ... N candidates`.** The migration cannot uniquely identify a signer certificate from the SKI stored on the role. Review the SKI and candidate certificates reported in the error; correct the pre-migration data with a verified backup and rerun the migration. The new `signer_certificate_serial_number` field is created during that migration, so it cannot be set through the VA API while the migration is failing.
+* **The VA migration fails with `cannot resolve signer certificate for VA role ... N candidates`.** <del className="lm-diff-del">The migration cannot uniquely identify a signer certificate from the SKI stored on the role. Review the SKI and candidate certificates</del><ins className="lm-diff-ins">No CA certificate matched the stored signer SKI, and the fallback search found zero or multiple certificates. Review the SKI and candidates</ins> reported in the error; correct the pre-migration data with a verified backup and rerun the migration. The new `signer_certificate_serial_number` field is created during that migration, so it cannot be set through the VA API while the migration is failing.
 * **A migration or service fails with `permission denied for table ...`.** The PostgreSQL role is missing the cross-schema privileges listed in [Deployments without Helm](#deployments-without-helm); this includes `certificates_view` when the post-migration `GRANT SELECT` was skipped. Grant the missing privileges and re-run.
 
 Validation checklist [#validation-checklist]

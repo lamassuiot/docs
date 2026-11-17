@@ -18,6 +18,10 @@ Ruta recomendada [#ruta-recomendada]
   <Card title="1. Crea tu primera CA" description="Crea una raíz de evaluación y guarda su certificado público como ca.pem." href="/docs/platform/pki/quickstarts/create-certificate-authority" />
 
   <Card title="2. Emite y verifica un certificado" description="Emite para device-001 y comprueba contenido, cadena y correspondencia de clave." href="/docs/platform/pki/quickstarts/issue-certificate" />
+
+  <div className="lm-diff-ins lm-diff-block">
+    <Card title="3. Revoca un certificado y comprueba la CRL" description="Revoca device-042 entre 100 certificados emitidos y confirma que aparece en la CRL de la CA." href="/docs/platform/pki/quickstarts/revoke-certificate" />
+  </div>
 </Cards>
 
 Usaremos `Acme Evaluation Root CA` y `device-001` como nombres de ejemplo. Si los sustituyes, conserva el mismo identificador de cliente en los pasos que quieras conectar.

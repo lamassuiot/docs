@@ -1414,3 +1414,16 @@ html[data-show-diff] .lm-diff-merged {
     display: none;
   }
 }
+
+/* Detailed guide beside an interactive demo: soft fade when the step changes. */
+@media (prefers-reduced-motion: no-preference) {
+  .demo-guide-step {
+    animation: demo-guide-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+@keyframes demo-guide-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

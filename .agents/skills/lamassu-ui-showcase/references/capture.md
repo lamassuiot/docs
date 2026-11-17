@@ -92,6 +92,47 @@ grep -c '"hotspot": false' path/to/flow.json   # must print 0
 Fix failures (add a tooltip, split steps, move the popup to the opening click)
 and record again before delivery.
 
+## Detailed guide beside the video
+
+Every demo ships a **detailed guide** that the site shows to the right of the
+video (below it on narrower screens) and keeps in sync with the current popup.
+A popup is one short sentence; the guide explains the nuance behind it.
+
+- Create `guide.<locale>.json` next to `<locale>.json` for **every supported
+  locale**: `{ "steps": [ { "title": "...", "body": "...", "note": "..." } ] }`.
+- There is **exactly one entry per popup, in the same order as the popups** of
+  the exported locale JSON (the n-th photo step with a hotspot). Re-recording
+  a demo or adding a popup means updating both guides to match.
+- `title`: 2–5 words naming the step. `body`: 1–3 sentences saying what the
+  step does and why. `note` (optional): one caveat, risk or nuance a reader
+  could miss (irreversibility, units, a dependency, what is *not* done).
+- Do not repeat the popup text. Add information: meaning of a field, accepted
+  formats, security or lifecycle consequences, what to verify afterwards.
+- **Only state facts you verified.** Take them from the documentation pages of
+  this repository, the product behaviour you observed while recording, or
+  standards (RFC 5280, ISO 3166). If unsure, leave it out; never invent
+  product behaviour. Translate into every locale (Spanish uses the register of
+  the existing pages) and keep product UI labels (button and tab names) as shown.
+- Check the counts after every export:
+
+  ```bash
+  python3 -I - public/demos/<name> <<'PY'
+  import json, sys
+  root = sys.argv[1]
+  for loc in ('en', 'es'):
+      d = json.load(open(f'{root}/{loc}.json'))
+      g = json.load(open(f'{root}/guide.{loc}.json'))['steps']
+      n = sum(1 for s in d['steps'] if s['type'] == 'photo' and s.get('hotspot'))
+      assert n == len(g), f'{loc}: {n} popups but {len(g)} guide entries'
+      assert all(e['title'].strip() and e['body'].strip() for e in g)
+  print('guide OK')
+  PY
+  ```
+
+The site component (`app/components/openshowcase-demo.tsx`) loads the guide by
+this name automatically; no page or component changes are needed for a new
+demo besides registering its wrapper component.
+
 ## Export assets: keep the stills
 
 The `step-N.avif` stills (and any `subject-*.png`-style extras) are **required

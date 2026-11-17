@@ -48,6 +48,7 @@ Several migrations run without intervention when you upgrade a Helm release:
 
 * Before any service starts, the chart's pre-install/pre-upgrade job prepares PostgreSQL. It creates the `pki`, `authz` and `wfx` databases when they do not exist, creates one schema per service inside `pki`, and imports each 3.8.0 per-service database into its schema. Each import runs as a single transaction, so a failed import leaves no partial schema and a retried job imports again. The job then runs the database migrations for every schema, migrates `authz`, preloads its policies and seeds the `services.authz.bootstrap` principals. It is idempotent and requires a PostgreSQL role allowed to create databases and schemas, as described in [Install with Helm](/docs/deployment/self-hosted/helm#before-you-begin).
 * Stored DMS configuration is rewritten to the 4.0.0 layout, and historical device events are transformed into the new store.
+* The KMS migration removes the stale `lamassu.io/kms/binded-resources` key metadata, and the VA migration resolves each role's CRL signer (see [VA CRL signer](#va-crl-signer)).
 * When `migrations.caToKms.enabled` is set, a pre-upgrade hook registers legacy CA keys in the KMS.
 
 Two things never migrate on their own: the KMS and VA data on local volumes, which stays on volumes the upgraded pods no longer use, and the values file, which you update by hand. Deployments that do not use the Helm chart also have to move their database data themselves; see [Deployments without Helm](#deployments-without-helm).
@@ -72,6 +73,7 @@ Breaking changes [#breaking-changes]
 | [<del className="lm-diff-del">VA role signer field</del>](#va-role-signer-field)[<ins className="lm-diff-ins">CRL signer field</ins>](#crl-signer-field) | Clients that create or update <del className="lm-diff-del">VA roles</del><ins className="lm-diff-ins">CRL settings</ins> through the API | Medium: requests with the old field return an error                            | Replace `crl_options.subject_key_id_signer` with the required <del className="lm-diff-del">`crl_options.signer_certificate_serial_number`</del><ins className="lm-diff-ins">`crl_options.signer_serial_number`</ins> |
 | [Renamed VA events](#renamed-va-events)                                                                                                                  | Alert subscriptions and consumers of the VA events                                                                                       | Medium: subscription types are renamed automatically, their conditions are not | Review conditions that filter on the old event payload                                                                                                                                                               |
 | [Device events](#device-events)                                                                                                                          | Consumers that read the device `events` field                                                                                            | Medium: the field disappears                                                   | Use the new event endpoints                                                                                                                                                                                          |
+| [VA CRL signer](#va-crl-signer)                                                                                                                          | Deployments with VA roles whose signer cannot be resolved uniquely                                                                       | Medium: the VA migration aborts                                                | Fix the affected roles before upgrading                                                                                                                                                                              |
 | [Renamed and reshaped values](#renamed-and-reshaped-values)                                                                                              | Releases that override `toolbox`, `services.connectors`, ports, probes or scheduling                                                     | Low to medium: validation errors or changed defaults                           | Update the values file                                                                                                                                                                                               |
 | [DMS update API](#dms-update-api)                                                                                                                        | Clients that send the DMS ID in the update body                                                                                          | Low: the ID in the URL wins                                                    | Send the ID in the URL                                                                                                                                                                                               |
 | [CA IDs are always assigned by the backend](#ca-ids-are-always-assigned-by-the-backend)                                                                  | Clients that send an `id` when creating or importing CAs                                                                                 | Low: the ID in the body is ignored, and the field is removed                   | Let the backend assign the ID and use the returned one                                                                                                                                                               |
@@ -138,16 +140,22 @@ Legacy CA keys in the KMS [#legacy-ca-keys-in-the-kms]
 
 CA certificates of type `MANAGED` or `IMPORTED_WITH_KEY` whose private keys predate the KMS service have the key stored only in the crypto engine, under the certificate's `subject_key_id`, with no KMS record. The `ca-to-kms-migration` tool registers them:
 
-* The `key_id` is the certificate's `subject_key_id` (SHA-256 of the public key).
+* The `key_id` is the certificate's `subject_key_id`; it matches the SHA-256 digest of the public key only when the SKI was computed that way.
 * The tool is idempotent: keys already in the KMS are skipped, so it can be run several times.
 * Certificates that cannot be read, or lack an engine or a subject key ID, are skipped with a warning. Review the logs and resolve the affected records.
 * When CA certificates sharing a `subject_key_id` declare conflicting `engine_id`s, the tool fails that key and exits with code `1`, which fails a Helm pre-upgrade hook. Resolve the conflict manually before rerunning.
 
+Once the keys are registered, certificates reference them in the database and the KMS refuses to delete a key that a certificate still uses (`409` `key is in use`). Deleting a certificate record removes it from the CRL and OCSP, so read [Before deleting a key](/docs/platform/pki/key-management#before-deleting-a-key) before freeing a key.
+
+Optionally, installations with imported CAs from before 3.7 can start the KMS once with `crypto_engines.migrate_keys_format: true`: the KMS renames those SKI-named legacy keys to the SHA-256 digest of their public key (the old name is kept as an alias, and the certificate references follow automatically). Run it once and disable the option again; running it again is safe.
+
 With Helm, enable the hook for the upgrade in [step 2](#step-2-update-the-values-file); without Helm, run the tool by hand.
 
-Once legacy keys are registered, starting the KMS with the backend configuration option `crypto_engines.migrate_keys_format` renames keys whose name is not the public-key SHA-256 digest, keeps the old name as an alias and moves certificate references along. It is safe to re-run and can be disabled afterwards.
+<div className="lm-diff-ins lm-diff-block">
+  <span id="references-between-certificates-keys-and-va-roles" />
+</div>
 
-References between certificates, keys and VA roles [#references-between-certificates-keys-and-va-roles]
+References between certificates, keys and VA rolesCRL settings [#references-between-certificates-keys-and-crl-settings]
 
 Certificates now reference their KMS key, and <del className="lm-diff-del">VA roles</del><ins className="lm-diff-ins">CRL settings</ins> reference their signer certificate, so a key or certificate in use cannot be deleted. The KMS migration drops the legacy `lamassu.io/kms/binded-resources` key metadata. Before 4.0.0, deleting a CA could remove its key while leaving key references in its retained certificate records. The CA migration registers those missing keys in the KMS with only their public key to satisfy the retained references. These entries cannot be deleted while the retained certificates reference them; they do not restore the private key. In 4.0.0, deleting a CA releases the references from its own current certificate and linked reissued certificates before attempting to delete the key; other certificates that still reference it prevent deletion.
 
@@ -262,7 +270,7 @@ VA roleCRL signer field [#crl-signer-field]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  **Custom authorization policies.** The entity `va_role` is renamed to `crl_settings`, with `ca_id` as its primary key and `signer_serial_number` as its relation to certificates. Policies that reference the old entity, or that filter on the signer by its former name `crl_signer_certificate_serial_number`, must be updated.
+  **Custom authorization policies.** The entity `va_role` is renamed to `crl_settings`, with `ca_id` as its primary key and `signer_serial_number` as its relation to certificates. Update policies referencing the old entity. Replace the 3.8.0 signer filter `crl_subject_key_id_signer` (or `crl_signer_certificate_serial_number` if used by an intermediate version) with `signer_serial_number`. Replace SKI filter values with the corresponding certificate serial numbers; renaming the filter alone is insufficient.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -280,6 +288,10 @@ VA roleCRL signer field [#crl-signer-field]
 <div className="lm-diff-ins lm-diff-block">
   Creating or importing a CA registers it under a backend-generated UUID. Any `id` sent in the request body is ignored, and the field is removed from the create and import bodies. Scripts that supplied their own IDs and addressed CAs by them must read the ID the backend returns instead.
 </div>
+
+VA CRL signer [#va-crl-signer]
+
+The VA migration resolves each role's signer from its stored SKI. It first looks for CA certificates with that SKI; if several match, it selects the oldest CA and logs a warning. If no CA certificate matches, it looks among all certificates with that SKI. The migration aborts with `cannot resolve signer certificate for VA role <ca-ski>, SKI <ski>` if that fallback finds zero or multiple candidates. Fix affected roles before upgrading.
 
 Helm migration guide [#helm-migration-guide]
 
@@ -544,7 +556,9 @@ Without the chart's database job, no tool moves data between databases: the migr
 
 Run the migrations in the required order, one schema at a time: `kms` first, then the `ca-to-kms-migration` tool (needed only for legacy deployments whose CA keys are named by SKI), then `ca`, then `va`. The `devicemanager`, `dmsmanager` and `alerts` schemas are independent and can be migrated in any order. With Helm, the chart's pre-install job applies the schemas in the correct order automatically.
 
-The schemas reference each other, so the PostgreSQL role running the migrations needs cross-schema privileges: the `ca` schema needs `USAGE` on `kms` plus `SELECT`, `REFERENCES` and `INSERT` on `kms.kms_keys`, and the `va` schema needs `USAGE` on `ca` plus `SELECT` and `REFERENCES` on `ca.certificates` and `SELECT` on `ca.ca_certificates`. If your services connect with a different user than the one that ran the migrations, grant that user `SELECT` on `ca.certificates_view` after the migrations.
+If `kms` has not been migrated, the `ca` migration fails with `kms schema not found: migrate the kms schema before the ca schema`. The `va` migration likewise requires `ca` to be migrated first.
+
+The schemas reference each other, so the PostgreSQL role running the migrations needs cross-schema privileges: the `ca` schema needs `USAGE` on `kms` plus `SELECT`, `REFERENCES` and `INSERT` on `kms.kms_keys`, and the `va` schema needs `USAGE` on `ca` plus `SELECT` and `REFERENCES` on `ca.certificates` and `SELECT` on `ca.ca_certificates`. Without them the migration aborts; grant the missing privileges and rerun the failed schema. After migrating `ca`, if the CA service runs as a different user than the migration user, grant it `SELECT` on `ca.certificates_view` (`GRANT SELECT ON ca.certificates_view TO service_user`). Without this grant, certificate and CA reads fail with `permission denied for table certificates_view`.
 
 To apply migrations by hand, `goose-lamassu` must run against the `pki` database with `search_path=<schema>` in the connection string. The binary validates only `search_path`, not the database name, so check `dbname=pki` before running it, and repeat for `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` and `alerts`:
 
@@ -574,7 +588,7 @@ Troubleshooting [#troubleshooting]
 * **Nobody can log in after the upgrade.** Check that `services.authz.jwkUrl` is reachable from the `authz` pod, that `services.authz.bootstrap` matches a role your OIDC provider actually assigns, and that the database job completed.
 * **A migration aborts with `kms schema not found`.** The schemas must be migrated in order: run the `kms` schema migration before the `ca` schema migration.
 * **A migration aborts with `ca schema not found`.** Run the `ca` schema migration before the `va` schema migration.
-* **The VA migration fails with `cannot resolve signer certificate for VA role ... N candidates`.** The migration cannot uniquely identify a signer certificate from the SKI stored on the role. Review the SKI and candidate certificates reported in the error; correct the pre-migration data with a verified backup and rerun the migration. The new <del className="lm-diff-del">`signer_certificate_serial_number`</del><ins className="lm-diff-ins">`crl_signer_certificate_serial_number`</ins> field is created during that migration, so it cannot be set through the VA API while the migration is failing.
+* **The VA migration fails with `cannot resolve signer certificate for VA role ... N candidates`.** <del className="lm-diff-del">No CA certificate matched the stored signer SKI, and the fallback search found zero or multiple certificates. Review the SKI and candidates </del><ins className="lm-diff-ins">The migration cannot uniquely identify a signer certificate from the SKI stored on the role. Review the SKI and candidate certificates </ins>reported in the error; correct the pre-migration data with a verified backup and rerun the migration. The new <del className="lm-diff-del">`signer_certificate_serial_number`</del><ins className="lm-diff-ins">`signer_serial_number`</ins> field is created during that migration, so it cannot be set through the VA API while the migration is failing.
 * **A migration or service fails with `permission denied for table ...`.** The PostgreSQL role is missing the cross-schema privileges listed in [Deployments without Helm](#deployments-without-helm); this includes `certificates_view` when the post-migration `GRANT SELECT` was skipped. Grant the missing privileges and re-run.
 
 Validation checklist [#validation-checklist]
@@ -586,7 +600,7 @@ After the upgrade, check in this order:
 3. **Existing KMS keys work.** Issue a certificate from a CA that existed before the upgrade. None of the other checks reads a KMS key, so this is the only one that proves the key material was copied.
 4. **Existing CRLs are served.** <del className="lm-diff-del">`GET /crl/<ca-ski>`</del><ins className="lm-diff-ins">`GET /crl/<ca-id>`</ins> on VA returns a previously issued CRL<ins className="lm-diff-ins">, and `GET /crl/<ca-ski>` with the legacy SKI of a certificate issued before the upgrade also resolves. The monitor republishes each CRL under the CA ID on its first run</ins>, and new CRLs are issued.
 5. **Renamed VA events.** Alert subscriptions to `va.role.update` and `va.role.crl.init` now subscribe to `va.crl-settings.update` and `va.crl-settings.init`, and their conditions have been reviewed against the new payload (`ca_id` instead of `ca_ski`). Direct consumers and audit searches use the new event names.
-6. **Legacy CA keys.** If the CA-to-KMS migration ran, review its report and warnings and confirm the expected keys appear in the KMS.
+6. **Legacy CA keys.** If the CA-to-KMS migration ran, review its report and warnings and confirm the expected keys appear in the KMS. Migrated CA certificates now report `key_id` and `has_private_key`, which you can use to confirm the registration.
 7. **Connectivity.** `helm test "$RELEASE" -n $NAMESPACE --logs` passes; the hook checks the CA, DMS Manager, Device Manager and VA health endpoints and the UI response.
 8. **Authorization.** Sign in as the bootstrap principal and confirm administration works, check that an identity without permissions receives `403`, and review client and integration permissions.
 9. **AMQP.** The backend connects to the broker with the expected TLS settings, and the cleanup policy for SSE queues is in place.

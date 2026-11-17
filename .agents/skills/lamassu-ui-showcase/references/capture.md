@@ -176,21 +176,31 @@ that a locale JSON references.** Deleting one breaks the demo.
 5. For extra stills you create, use meaningful names (for example
    `subject-cn.png`) and keep sizes reasonable (prefer AVIF/WebP over PNG).
 
-## Reduce capture load without shrinking the UI
+## Reach 60 fps without shrinking the UI
 
-A 1600 × 900 logical viewport captures 3200 × 1800 with the stock 0.6.2
-extension. On the observed host this caused severe stuttering; a temporary
-extension requesting one pixel per logical pixel produced 1600 × 900 with
-better frame rate. The CLI's Chromium `--force-device-scale-factor` alone did
-not fix the capture dimensions. Do not change the project dependency or the
-user's installed extension.
+Measured on the observed host (16 cores, no usable GPU in headless Chromium)
+with OpenShowcase 0.6.2 and a continuously animated test page at 1600 × 900:
 
-Only if the installed 0.6.2 extension still has the exact strings below, copy
-its built extension to the temporary directory and apply this guarded patch:
+| Setup | Output | Real fps |
+| --- | --- | --- |
+| Stock | 3200 × 1800 | about 21 |
+| Capture patch only (extension asks 1×) | 1600 × 900 | 24–27 |
+| `--force-device-scale-factor=1` only | 3200 × 1800 | about 21 |
+| **Both patches** | **1600 × 900** | **60** |
+
+Two causes add up. The extension asks for twice the viewport size, and the CLI
+launches Chromium with `--force-device-scale-factor=2`, so every frame is
+rendered at 3200 × 1800 and then downscaled. Fix **both**, only in the
+temporary recorder install (never in the documentation project or in the
+user's own installation). VP8 instead of VP9 gave only a small gain once both
+patches were applied (no difference at 60 fps), so do not change the codec.
 
 ```bash
 # RECORDER_DIR is the temporary npm project; WORK_DIR is the temporary workspace.
-cp -a "$RECORDER_DIR/node_modules/@rustrak/openshowcase-recorder/dist/extension" "$WORK_DIR/extension-1x"
+PKG="$RECORDER_DIR/node_modules/@rustrak/openshowcase-recorder"
+
+# 1. Extension: capture one pixel per logical pixel.
+cp -a "$PKG/dist/extension" "$WORK_DIR/extension-1x"
 python3 - "$WORK_DIR/extension-1x" <<'PY'
 from pathlib import Path
 import sys
@@ -210,20 +220,37 @@ for old, new in changes.items():
     source = source.replace(old, new, 1)
 path.write_text(source)
 PY
+
+# 2. CLI: render the page at 1x instead of 2x.
+python3 - "$PKG/dist/cli.js" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+source = path.read_text()
+old = '"--force-device-scale-factor=2"'
+if source.count(old) != 1:
+    raise SystemExit('CLI launch flags changed: inspect current version')
+path.write_text(source.replace(old, '"--force-device-scale-factor=1"', 1))
+PY
 ```
 
 Pass `--extension "$WORK_DIR/extension-1x"` to the recorder's `inspect`,
-`record`, and `export` commands. The extension still requests up to 60 fps;
-that does not guarantee 60 fps. Check actual exported dimensions and frame rate
-with `ffprobe` or another reliable media inspector, and inspect playback.
-If `ffprobe`/`ffmpeg` are not installed, note that Playwright's bundled
-`ffmpeg` cannot read MP4; instead read the MP4 boxes (`mdhd` duration and
-timescale, `stsz` sample count, `stsd` width/height) with a short script and
-report frames ÷ duration as the average fps. The stock average was 14–20 fps
-on the observed host (static pages produce fewer frames); report the measured
-value. If
-this patch no longer matches, stop and investigate the current extension rather
-than patching unrelated code. Mention the temporary modification in the report.
+`record`, and `export` commands. Apply the guarded patches only if the exact
+strings still exist in the installed version; if they do not match, stop and
+investigate the current implementation rather than patching unrelated code.
+Report both temporary modifications.
+
+Measure the result; never claim a frame rate without measuring. Check the
+exported dimensions and frame intervals with `ffprobe` or another reliable
+media inspector, and inspect playback. If `ffprobe`/`ffmpeg` are not installed,
+note that Playwright's bundled `ffmpeg` cannot read MP4: read the MP4 boxes
+with a short script instead (`mdhd` timescale and duration, `stts` frame
+deltas, `stsd` width and height). Report frames ÷ duration **and** the median
+frame interval. A recording of a mostly static page legitimately has a low
+average (the encoder emits few frames while nothing changes), so judge smoothness by the
+median interval during motion, or by benchmarking an animated page.
+Expect larger files at 60 fps; check the asset size before committing.
 
 ## Documentation integration
 

@@ -1,6 +1,6 @@
 {
   "title": "Create a root CA",
-  "url": "http://localhost:32769/",
+  "url": "http://localhost:32775/",
   "viewport": {
     "width": 1600,
     "height": 900
@@ -123,11 +123,16 @@
       "tooltip": "Set how long the CA certificate stays valid, for example 1y."
     },
     {
-      "action": "fill",
-      "target": {
-        "placeholder": "e.g., 10y, 365d, 2w"
-      },
-      "value": "1y"
+      "action": "press",
+      "key": "Control+A"
+    },
+    {
+      "action": "press",
+      "key": "1"
+    },
+    {
+      "action": "press",
+      "key": "y"
     },
     {
       "action": "click",

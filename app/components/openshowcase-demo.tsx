@@ -8,7 +8,7 @@ type Player =
   typeof import("@rustrak/openshowcase-player-react").InteractiveDemo;
 
 /** How long each popup stays on screen before Auto-play advances, in ms. */
-const AUTOPLAY_POPUP_MS = 2200;
+const AUTOPLAY_POPUP_MS = 4000;
 
 /**
  * Plain (no backdrop) OpenShowcase player for a demo exported under

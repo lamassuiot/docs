@@ -72,7 +72,7 @@ Dos cosas nunca migran solas: los datos del KMS y de la VA en volúmenes locales
 | [Conjunto de confianza del reenrolamiento](#conjunto-de-confianza-del-reenrolamiento) | Scripts y consolas que editan DMS por API | Media: una edición con el formato antiguo vacía `validation_cas` sin avisar | Leer el DMS antes de editarlo y usar el campo nuevo |
 | [Campo firmante del rol VA](#campo-firmante-del-rol-va) | Clientes que crean o actualizan roles VA por API | Media: las peticiones con el campo antiguo devuelven un error | Sustituir `crl_options.subject_key_id_signer` por el obligatorio `crl_options.signer_certificate_serial_number` |
 | [Eventos de dispositivo](#eventos-de-dispositivo) | Consumidores que leen el campo `events` del dispositivo | Media: el campo desaparece | Usar los nuevos endpoints de eventos |
-| [Firmante de CRL de la VA](#firmante-de-crl-de-la-va) | Despliegues con roles VA cuyo firmante no está en el inventario de CAs | Media: la migración de la VA aborta | Corregir los roles afectados antes de actualizar |
+| [Firmante de CRL de la VA](#firmante-de-crl-de-la-va) | Despliegues con roles VA cuyo firmante no puede resolverse de forma única | Media: la migración de la VA aborta | Corregir los roles afectados antes de actualizar |
 | [Values renombrados y reestructurados](#values-renombrados-y-reestructurados) | Releases que sobrescriben `toolbox`, `services.connectors`, puertos, sondas o planificación | Baja a media: errores de validación o cambios de valores por defecto | Actualizar el archivo de values |
 | [API de actualización del DMS](#api-de-actualización-del-dms) | Clientes que envían el ID del DMS en el cuerpo de la actualización | Baja: prevalece el ID de la URL | Enviar el ID en la URL |
 | [Valores de tipo de certificado](#valores-de-tipo-de-certificado) | Consumidores que comparan el `type` del certificado | Baja: dos valores cambian de nombre | Adaptar los consumidores |
@@ -138,7 +138,7 @@ Se elimina el motor de almacenamiento SQLite, y los motores `couch_db` y `dynamo
 
 Los certificados de CA de tipo `MANAGED` o `IMPORTED_WITH_KEY` cuyas claves privadas son anteriores al servicio KMS tienen la clave guardada solo en el motor criptográfico, bajo el `subject_key_id` del certificado, sin registro en el KMS. La herramienta `ca-to-kms-migration` los registra:
 
-- El `key_id` es el `subject_key_id` del certificado (SHA-256 de la clave pública).
+- El `key_id` es el `subject_key_id` del certificado; solo coincide con el resumen SHA-256 de la clave pública si el SKI se calculó de esa forma.
 - La herramienta es idempotente: las claves que ya están en el KMS se omiten, así que puede ejecutarse varias veces.
 - Los certificados que no pueden leerse, o que carecen de motor o de ID de clave de sujeto, se omiten con un aviso. Revisa los logs y resuelve los registros afectados.
 - Cuando certificados de CA que comparten un `subject_key_id` declaran `engine_id` en conflicto, la herramienta marca esa clave como fallida y sale con código `1`, lo que hace fallar un hook de preactualización de Helm. Resuelve el conflicto a mano antes de volver a ejecutarla.
@@ -219,7 +219,7 @@ Cuando la cabecera `Accept` de la petición incluye `text/event-stream`, el endp
 
 #### Firmante de CRL de la VA
 
-La migración de la VA resuelve automáticamente el firmante de cada rol: cuando varias CAs comparten la clave del firmante, usa la más antigua y registra un aviso, pero aborta con `cannot resolve signer certificate for VA role <ca-ski>, SKI <ski>` cuando no existe ningún certificado con ese SKI. Corrige esos roles antes de actualizar.
+La migración de la VA resuelve el firmante de cada rol a partir de su SKI guardado. Primero busca certificados de CA con ese SKI; si coinciden varios, selecciona la CA más antigua y registra un aviso. Si no coincide ningún certificado de CA, busca entre todos los certificados con ese SKI. La migración aborta con `cannot resolve signer certificate for VA role <ca-ski>, SKI <ski>` si esa búsqueda encuentra cero o varios candidatos. Corrige los roles afectados antes de actualizar.
 
 ## Guía de migración con Helm
 
@@ -468,7 +468,9 @@ Sin el job de base de datos del chart, ninguna herramienta mueve datos entre bas
 
 Ejecuta las migraciones en el orden obligatorio, un esquema cada vez: primero `kms`, después la herramienta `ca-to-kms-migration` (necesaria solo en despliegues heredados cuyas claves de CA se nombran por SKI), luego `ca` y por último `va`. Los esquemas `devicemanager`, `dmsmanager` y `alerts` son independientes y pueden migrarse en cualquier orden. Con Helm, el job de preinstalación del chart aplica los esquemas en el orden correcto automáticamente.
 
-Los esquemas se referencian entre sí, así que el rol de PostgreSQL que ejecuta las migraciones necesita privilegios entre esquemas: el esquema `ca` necesita `USAGE` sobre `kms` más `SELECT`, `REFERENCES` e `INSERT` sobre `kms.kms_keys`, y el esquema `va` necesita `USAGE` sobre `ca` más `SELECT` y `REFERENCES` sobre `ca.certificates` y `SELECT` sobre `ca.ca_certificates`. Si tus servicios se conectan con un usuario distinto del que ejecutó las migraciones, concédele tras las migraciones `SELECT` sobre `ca.certificates_view`.
+Si `kms` no se ha migrado, la migración de `ca` falla con `kms schema not found: migrate the kms schema before the ca schema`. La migración de `va` también requiere que `ca` se haya migrado primero.
+
+Los esquemas se referencian entre sí, así que el rol de PostgreSQL que ejecuta las migraciones necesita privilegios entre esquemas: el esquema `ca` necesita `USAGE` sobre `kms` más `SELECT`, `REFERENCES` e `INSERT` sobre `kms.kms_keys`, y el esquema `va` necesita `USAGE` sobre `ca` más `SELECT` y `REFERENCES` sobre `ca.certificates` y `SELECT` sobre `ca.ca_certificates`. Sin ellos la migración aborta; concede los privilegios que falten y vuelve a ejecutar el esquema fallido. Tras migrar `ca`, si el servicio de CA corre con un usuario distinto del usuario de migración, concédele `SELECT` sobre `ca.certificates_view` (`GRANT SELECT ON ca.certificates_view TO service_user`). Sin ese permiso, las lecturas de certificados y CAs fallan con `permission denied for table certificates_view`.
 
 Para aplicar las migraciones a mano, `goose-lamassu` debe ejecutarse contra la base `pki` con `search_path=<esquema>` en la cadena de conexión. El binario solo valida `search_path`, no el nombre de la base de datos, así que comprueba `dbname=pki` antes de ejecutarlo, y repítelo para `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` y `alerts`:
 
@@ -487,10 +489,6 @@ Apunta la configuración `storage` de la herramienta a la base `pki`, donde los 
 
 Los README de ambas herramientas documentan el formato de 4.0.0 con la base `pki` y coinciden con esta página: `goose-lamassu` usa ejemplos con `dbname=pki` y no valida el nombre de la base de datos, y el README de `ca-to-kms-migration` describe la base única `pki` y el orden de migración.
 
-Aplica las migraciones de esquema en el orden `kms` → `ca` → `va`; `devicemanager`, `dmsmanager` y `alerts` son independientes y pueden ejecutarse en cualquier momento. La migración de `ca` falla con `kms schema not found: migrate the kms schema before the ca schema` mientras `kms` no esté migrado, y `va` necesita `ca` migrado. Las migraciones de `ca` y `va` además leen tablas que pertenecen a otro esquema, así que el rol de PostgreSQL que las ejecuta necesita privilegios sobre él: `USAGE` sobre el esquema `kms` más `SELECT`, `REFERENCES` e `INSERT` sobre `kms.kms_keys` para la migración de `ca`, y `USAGE` sobre el esquema `ca` más `SELECT` y `REFERENCES` sobre `ca.certificates` y `SELECT` sobre `ca.ca_certificates` para la migración de `va`. Sin ellos la migración aborta; concede los privilegios que falten y vuelve a ejecutar el esquema fallido.
-
-Tras migrar `ca`, si el servicio de CA corre con un usuario distinto del usuario de migración, concédale `SELECT` sobre `ca.certificates_view` (`GRANT SELECT ON ca.certificates_view TO service_user`); el servicio de CA lee certificados y CAs a través de esa vista, y sin el permiso toda lectura de certificados y CAs falla con `permission denied for table certificates_view`.
-
 ### Solución de problemas
 
 - **Los pods del KMS o la VA fallan con `no such file or directory` o `code=NotFound` justo después de actualizar.** Los pods están enlazados a los PVC nuevos y vacíos y la migración de datos aún no se ha hecho, o se copió en el PVC equivocado. Sigue el [paso 4](#paso-4-migra-los-datos-del-kms-y-la-va) y comprueba que existen las cuatro PVC.
@@ -502,7 +500,7 @@ Tras migrar `ca`, si el servicio de CA corre con un usuario distinto del usuario
 - **Nadie puede iniciar sesión tras la actualización.** Comprueba que `services.authz.jwkUrl` es accesible desde el pod de `authz`, que `services.authz.bootstrap` coincide con un rol que tu proveedor OIDC asigna realmente y que el job de base de datos terminó.
 - **Una migración aborta con `kms schema not found`.** Los esquemas deben migrarse en orden: ejecuta la migración del esquema `kms` antes que la del esquema `ca`.
 - **Una migración aborta con `ca schema not found`.** Ejecuta la migración del esquema `ca` antes que la del esquema `va`.
-- **La migración de VA falla con `cannot resolve signer certificate for VA role ... N candidates`.** La migración no puede identificar un certificado firmante de forma única a partir del SKI guardado en el rol. Revisa el SKI y los certificados candidatos indicados en el error; corrige los datos anteriores a la migración con una copia de seguridad verificada y vuelve a ejecutar la migración. El nuevo campo `signer_certificate_serial_number` se crea durante esa migración, por lo que no se puede configurar mediante la API de VA mientras esta falla.
+- **La migración de VA falla con `cannot resolve signer certificate for VA role ... N candidates`.** Ningún certificado de CA coincide con el SKI guardado del firmante, y la búsqueda alternativa encontró cero o varios certificados. Revisa el SKI y los candidatos indicados en el error; corrige los datos anteriores a la migración con una copia de seguridad verificada y vuelve a ejecutar la migración. El nuevo campo `signer_certificate_serial_number` se crea durante esa migración, por lo que no se puede configurar mediante la API de VA mientras esta falla.
 - **Una migración o un servicio falla con `permission denied for table ...`.** Al rol de PostgreSQL le faltan los privilegios entre esquemas listados en [Despliegues sin Helm](#despliegues-sin-helm); incluye `certificates_view` cuando se omitió el `GRANT SELECT` posterior a la migración. Concede los privilegios que falten y vuelve a ejecutar.
 
 ## Checklist de validación

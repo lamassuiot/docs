@@ -708,8 +708,18 @@ body {
   background: none;
 }
 
+.platform-demo--plain {
+  border-radius: 1rem;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.16);
+}
+
 .platform-demo--plain .openshowcase-player .frame-window {
-  border-radius: 0.75rem;
+  border-radius: 1rem;
+  background: #fff;
+}
+
+.platform-demo--plain .openshowcase-player .stage {
+  background: #fff;
 }
 
 /* Center all images in doc content and hint they zoom in the lightbox */
@@ -721,6 +731,13 @@ article img,
   margin-right: auto;
   border-radius: 4px;
   cursor: zoom-in;
+}
+
+/* The player clips both its video and still frames at the frame boundary. */
+article .platform-demo .openshowcase-player img.media {
+  margin: 0;
+  border-radius: 0;
+  cursor: default;
 }
 
 /* Keep documentation copy easy to scan. Justified text creates uneven word

@@ -1,0 +1,174 @@
+{
+  "title": "Create a root CA",
+  "url": "http://localhost:33065/",
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "steps": [
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certification Authorities",
+        "exact": true
+      },
+      "tooltip": "Open the certification authorities inventory."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "Create New CA"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Create New CA",
+        "exact": true
+      },
+      "tooltip": "Start creating an authority."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "New Key Pair"
+      },
+      "tooltip": "Generate a new key managed by Lamassu."
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "combobox",
+        "name": "Key Type"
+      },
+      "tooltip": "Choose an algorithm supported by the engine."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "option",
+        "name": "ECDSA"
+      },
+      "hotspot": false
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "combobox",
+        "name": "ECDSA Curve"
+      },
+      "tooltip": "Choose the P-384 curve."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "option",
+        "name": "P-384"
+      },
+      "hotspot": false
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "CA Name (Common Name)"
+      },
+      "value": "Acme Showcase Root CA"
+    },
+    {
+      "action": "click",
+      "target": {
+        "label": "CA Name (Common Name)"
+      },
+      "tooltip": "The CA name becomes the certificate subject’s Common Name (CN)."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Country (C)"
+      },
+      "value": "ES"
+    },
+    {
+      "action": "click",
+      "target": {
+        "label": "Country (C)"
+      },
+      "tooltip": "Complete the optional subject fields: country (C) and organization (O) in this example."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "label": "Organization (O)"
+      },
+      "value": "Acme"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "placeholder": "e.g., 10y, 365d, 2w"
+      },
+      "value": "1y"
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "combobox",
+        "name": "Issuance Profile"
+      },
+      "tooltip": "Choose the default profile for issued certificates."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "option",
+        "name": "Client Certificates"
+      },
+      "hotspot": false
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Create Certification Authority"
+      },
+      "tooltip": "Create the root authority."
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Acme Showcase Root CA",
+        "exact": true
+      },
+      "tooltip": "Open the new active authority."
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "tab",
+        "name": "Certificate PEM"
+      },
+      "tooltip": "Access the public CA certificate."
+    },
+    {
+      "action": "wait",
+      "ms": 1000
+    }
+  ]
+}

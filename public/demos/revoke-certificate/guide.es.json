@@ -1,0 +1,45 @@
+{
+  "steps": [
+    {
+      "title": "El inventario de CA",
+      "body": "Abre Certification Authorities. Cada certificado pertenece a la CA que lo emitió, así que empieza por el emisor."
+    },
+    {
+      "title": "Abre la CA emisora",
+      "body": "Selecciona la CA que emitió el certificado que quieres revocar. La revocación la registra el emisor: si eliges otra CA, no encontrarás el certificado ni su serial."
+    },
+    {
+      "title": "Issued Certificates",
+      "body": "La pestaña Issued Certificates lista lo que ha firmado la CA. Aquí hay 100 certificados, así que desplazarse no es práctico.",
+      "note": "El certificado de la propia CA también aparece en esta pestaña; no los confundas."
+    },
+    {
+      "title": "Busca por Common Name",
+      "body": "Filtra por Common Name para encontrar device-042 entre los 100. Confirma siempre el número de serie antes de actuar sobre una coincidencia."
+    },
+    {
+      "title": "Acciones de la fila",
+      "body": "El menú More actions de la fila correspondiente agrupa lo que puedes hacer con ese certificado, como descargar su PEM o revocarlo."
+    },
+    {
+      "title": "Revoke Certificate",
+      "body": "Revoca cuando la clave está comprometida, el sujeto ya no está autorizado o la identidad debe dejar de aceptarse antes de caducar.",
+      "note": "Identifica quién usa esta identidad y prepara un reemplazo antes de revocar en producción."
+    },
+    {
+      "title": "Motivo de revocación",
+      "body": "Elige el motivo que describa el incidente. KeyCompromise encaja porque se considera expuesta la clave del dispositivo.",
+      "note": "Solo CertificateHold es reversible. Cualquier otro motivo es definitivo, y CertificateHold no debe usarse con una clave comprometida."
+    },
+    {
+      "title": "Confirma la revocación",
+      "body": "Al confirmar, el estado del certificado cambia de inmediato en Lamassu.",
+      "note": "Estado y publicación son pasos distintos: los validadores ven el cambio mediante OCSP o una CRL actualizada, que depende de su configuración de regeneración. Las sesiones ya establecidas no se cierran."
+    },
+    {
+      "title": "Lee el nuevo estado",
+      "body": "La fila muestra ahora REVOKED con el motivo y la hora de revocación. Vuelve a leer el registro en lugar de fiarte del diálogo.",
+      "note": "La revocación no elimina el certificado ni su clave."
+    }
+  ]
+}

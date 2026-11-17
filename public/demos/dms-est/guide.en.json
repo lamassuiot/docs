@@ -1,0 +1,44 @@
+{
+  "steps": [
+    {
+      "title": "Registration authorities",
+      "body": "Registration Authorities lists the registration authorities (DMS) of the instance. Each one defines how devices are admitted and which CA signs their identities."
+    },
+    {
+      "title": "Create a registration authority",
+      "body": "A DMS configures admission and the identity lifecycle for its devices. It acts as the registration authority; the CA you select signs the certificates."
+    },
+    {
+      "title": "Name and ID",
+      "body": "The ID is derived from the name (DMS Showcase becomes dms-showcase). EST endpoint URLs use this ID, not the display name.",
+      "note": "The ID cannot be changed later, so choose a recognizable name before creating."
+    },
+    {
+      "title": "Registration mode",
+      "body": "Just-in-time provisioning creates unknown devices automatically on their first enrollment. Pre-registration only lets devices registered beforehand enroll.",
+      "note": "Review Provisioning strategies before choosing for a fleet."
+    },
+    {
+      "title": "Enrollment CA",
+      "body": "The enrollment CA signs the identities that devices obtain. Pick an active CA with a usable key and an explicit profile suitable for end-entity certificates.",
+      "note": "Keep the certificate CN compatible with the Device ID."
+    },
+    {
+      "title": "Choose the enrollment CA",
+      "body": "In the example, DMS Enrollment CA signs the device identities. The test certificate should allow its intended use and expire within the issuer's validity."
+    },
+    {
+      "title": "Validation CAs",
+      "body": "Validation CAs are the CAs trusted to validate the initial credential a device presents when it first enrolls (the bootstrap credential). They are distinct from the CA that signs the final identity."
+    },
+    {
+      "title": "Choose the bootstrap CA",
+      "body": "DMS Bootstrap CA validates the initial credential. Add only the CAs you really trust for admission.",
+      "note": "Trust distribution is configured separately: it is not installed automatically."
+    },
+    {
+      "title": "Create and verify",
+      "body": "Creating the DMS does not prove that authentication and issuance work. After saving, read the configuration again, query /cacerts and test one allowed and one rejected enrollment, then inspect the device, serial and history."
+    }
+  ]
+}

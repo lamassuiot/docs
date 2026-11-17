@@ -1,0 +1,44 @@
+{
+  "steps": [
+    {
+      "title": "Autoridades de registro",
+      "body": "Registration Authorities lista las autoridades de registro (DMS) de la instancia. Cada una define cómo se admiten los dispositivos y qué CA firma sus identidades."
+    },
+    {
+      "title": "Crear una autoridad de registro",
+      "body": "Un DMS configura la admisión y el ciclo de vida de identidad de sus dispositivos. Actúa como autoridad de registro; la CA que selecciones firma los certificados."
+    },
+    {
+      "title": "Nombre e ID",
+      "body": "El ID se deriva del nombre (DMS Showcase pasa a ser dms-showcase). Las URL de los endpoints EST usan este ID, no el nombre visible.",
+      "note": "El ID no se puede cambiar después, así que elige un nombre reconocible antes de crear."
+    },
+    {
+      "title": "Modo de registro",
+      "body": "Just-in-time provisioning crea automáticamente los dispositivos desconocidos en su primer enrolamiento. Pre-registration solo permite enrolar dispositivos registrados de antemano.",
+      "note": "Revisa las estrategias de aprovisionamiento antes de elegir para una flota."
+    },
+    {
+      "title": "CA de enrolamiento",
+      "body": "La CA de enrolamiento firma las identidades que obtienen los dispositivos. Elige una CA activa con clave utilizable y un perfil explícito adecuado para certificados de entidad final.",
+      "note": "Mantén el CN del certificado compatible con el Device ID."
+    },
+    {
+      "title": "Elige la CA de enrolamiento",
+      "body": "En el ejemplo, DMS Enrollment CA firma las identidades de los dispositivos. El certificado de prueba debe permitir su uso previsto y caducar dentro de la validez del emisor."
+    },
+    {
+      "title": "CA de validación",
+      "body": "Las CA de validación son las CA en las que se confía para validar la credencial inicial que presenta un dispositivo al enrolarse por primera vez (la credencial de bootstrap). Son distintas de la CA que firma la identidad final."
+    },
+    {
+      "title": "Elige la CA de bootstrap",
+      "body": "DMS Bootstrap CA valida la credencial inicial. Añade solo las CA en las que confíes realmente para la admisión.",
+      "note": "La distribución de confianza se configura aparte: no se instala automáticamente."
+    },
+    {
+      "title": "Crea y verifica",
+      "body": "Crear el DMS no demuestra que la autenticación y la emisión funcionen. Tras guardar, vuelve a leer la configuración, consulta /cacerts y prueba un enrolamiento permitido y otro rechazado; después inspecciona el dispositivo, el serial y el historial."
+    }
+  ]
+}

@@ -2,16 +2,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
 You will create a root authority with a new key kept by a Lamassu engine. The result is an active CA and its public certificate in `ca.pem`, ready to verify issuance in the next path.
 
 Before you begin [#before-you-begin]
@@ -22,60 +12,82 @@ Before you begin [#before-you-begin]
 
 Use an evaluation instance or an authority intended for these tests. The example creates a root that issues directly; to design an operational hierarchy, see [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation).
 
-<Steps>
-  <Step>
-    Open the creation wizard [!toc] [#open-the-creation-wizard-toc]
+<div className="lm-diff-del lm-diff-block">
+  <Steps>
+    <Step>
+      Open the creation wizard [!toc]
 
-    In **Certification Authorities**, select **Create New CA** and choose to create a CA with a new key pair.
+      In **Certification Authorities**, select **Create New CA** and choose to create a CA with a new key pair.
 
-        <img alt="Create New CA method picker" src={__img0} placeholder="blur" />
+      ![Create New CA method picker](./create-ca/creation-method-picker.png)
 
-    The **Create New CA (Existing Key)** flow is explained in the [authorities guide](/docs/platform/pki/certificate-authorities).
-  </Step>
+      The **Create New CA (Existing Key)** flow is explained in the [authorities guide](/docs/platform/pki/certificate-authorities).
+    </Step>
 
-  <Step>
-    Select the key [!toc] [#select-the-key-toc]
+    <Step>
+      Select the key [!toc]
 
-    Choose the engine that will keep the key and an algorithm its capabilities allow. For this example, you can use **EC P-384** if available.
+      Choose the engine that will keep the key and an algorithm its capabilities allow. For this example, you can use **EC P-384** if available.
 
-        <img alt="Key type and curve selection" src={__img1} placeholder="blur" />
+      ![Key type and curve selection](./create-ca/key-type-and-curve.png)
 
-    The CA private key is used through the engine. In this path, you will download only the authority's public certificate.
-  </Step>
+      The CA private key is used through the engine. In this path, you will download only the authority's public certificate.
+    </Step>
 
-  <Step>
-    Define the authority [!toc] [#define-the-authority-toc]
+    <Step>
+      Define the authority [!toc]
 
-    Select **Root CA** and complete:
+      Select **Root CA** and complete:
 
-    * **CA Name**: `Acme Evaluation Root CA`.
-    * **Subject**: organization and country details for your evaluation.
-    * **CA Certificate Expiration**: for example, one year from creation.
-    * **Default End-Entity Certificate Issuance Expiration**: for example, 90 days, within the CA's lifetime.
+      * **CA Name**: `Acme Evaluation Root CA`.
+      * **Subject**: organization and country details for your evaluation.
+      * **CA Certificate Expiration**: for example, one year from creation.
+      * **Default End-Entity Certificate Issuance Expiration**: for example, 90 days, within the CA's lifetime.
 
-        <img alt="CA name and subject details" src={__img2} placeholder="blur" />
+      ![CA name and subject details](./create-ca/root-ca-name-and-subject.png)
 
-    The CA name becomes its `Common Name`. Keep the CA usages needed to sign certificates and CRLs.
-  </Step>
+      The CA name becomes its `Common Name`. Keep the CA usages needed to sign certificates and CRLs.
+    </Step>
 
-  <Step>
-    Review and create the CA [!toc] [#review-and-create-the-ca-toc]
+    <Step>
+      Review and create the CA [!toc]
 
-    Check the engine, algorithm, subject, root type and dates. Confirm creation and note the authority identifier so you can recognize it in the DMS or API.
+      Check the engine, algorithm, subject, root type and dates. Confirm creation and note the authority identifier so you can recognize it in the DMS or API.
 
-        <img alt="CA created successfully" src={__img3} placeholder="blur" />
-  </Step>
+      ![CA created successfully](./create-ca/ca-created-successfully.png)
+    </Step>
 
-  <Step>
-    Verify the result [!toc] [#verify-the-result-toc]
+    <Step>
+      Verify the result [!toc]
 
-    Open the new CA. It should appear active, show its certificate and allow access to **Issued Certificates**.
+      Open the new CA. It should appear active, show its certificate and allow access to **Issued Certificates**.
 
-        <img alt="CA detail with certificate PEM" src={__img4} placeholder="blur" />
+      ![CA detail with certificate PEM](./create-ca/ca-detail-certificate-pem.png)
 
-    Download or copy the authority's PEM certificate and save it as `ca.pem`. Check that the file contains the complete block, including `BEGIN CERTIFICATE` and `END CERTIFICATE`.
-  </Step>
-</Steps>
+      Download or copy the authority's PEM certificate and save it as `ca.pem`. Check that the file contains the complete block, including `BEGIN CERTIFICATE` and `END CERTIFICATE`.
+    </Step>
+  </Steps>
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Create the authority [#create-the-authority]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Follow the interactive walkthrough to create a root CA with a new ECDSA P-384 key, an example subject and a client-certificate issuance profile. The availability and lifetime of profiles depend on your environment; choose values appropriate for your CA.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <CreateCaDemo locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The example sets **CA Name** to `Acme Showcase Root CA`, which becomes the subject Common Name (CN). It also sets the optional subject fields **Country (C)** to `ES` and **Organization (O)** to `Acme`; use values appropriate for your authority.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Open the new CA and select **Certificate PEM**. Download or copy its public certificate to `ca.pem`, including the complete `BEGIN CERTIFICATE` and `END CERTIFICATE` block. The private key remains in the configured engine. To reuse an existing key instead, see the [authorities guide](/docs/platform/pki/certificate-authorities).
+</div>
 
 Check the CA certificate [#check-the-ca-certificate]
 

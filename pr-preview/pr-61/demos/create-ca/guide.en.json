@@ -2,30 +2,30 @@
   "steps": [
     {
       "title": "The CA inventory",
-      "body": "Certification Authorities lists every CA in this instance with its status and expiry. From here you create a new CA, bring in an existing one, or open one to inspect its certificate and settings."
+      "body": "Certification Authorities lists every CA in this instance with its status, type, key and expiry. From here you create a new CA, bring in an existing one, or open one to inspect its certificate and settings."
     },
     {
       "title": "Create a root of trust",
-      "body": "Create New CA builds a CA from scratch with a key that Lamassu generates and keeps. If the key is already registered in Lamassu, use Create New CA (Existing Key) instead.",
+      "body": "Create New CA opens a page that groups the options in two blocks: Create (New Key Pair or Reuse Existing Key) and Import (With Private Key or Certificate Only).",
       "note": "This example creates a root that issues directly. For an operational hierarchy, see Hierarchy and rotation."
     },
     {
       "title": "New key pair",
-      "body": "Lamassu generates the key pair inside a cryptographic engine and the private key stays there. You only download the public certificate.",
-      "note": "Which algorithms you can choose depends on what the engine supports."
+      "body": "New Key Pair is marked Recommended: a new key pair is generated and fully managed by the KMS, so you do not handle the private key.",
+      "note": "Which algorithms you can choose depends on what the crypto engine supports."
     },
     {
       "title": "Key algorithm",
-      "body": "Each engine defines the algorithms and sizes it supports, such as RSA or ECDSA. ECDSA gives shorter keys and signatures than RSA at a comparable security level."
+      "body": "Key Type offers the algorithm families RSA and ECDSA. ECDSA gives shorter keys and signatures than RSA at a comparable security level."
     },
     {
       "title": "Curve: P-384",
-      "body": "P-384 (secp384r1) offers roughly a 192-bit security level, above P-256, which makes it a common choice for long-lived roots.",
+      "body": "The curve list is labelled P-384 (NIST P-384, secp384r1). P-384 offers roughly a 192-bit security level, above P-256, which makes it a common choice for long-lived roots.",
       "note": "Check that the devices and validators that will verify this CA support the curve."
     },
     {
       "title": "CA name = Common Name",
-      "body": "The CA name must be unique and becomes the Common Name (CN) of the certificate subject. Because a root is self-signed, the same value is also its issuer.",
+      "body": "The CA name becomes the Common Name (CN) of the certificate subject. With CA Type set to Root CA the issuer is Self-signed, so the issuer of the new certificate carries the same name.",
       "note": "Name the authority after its purpose, not after a person."
     },
     {
@@ -35,17 +35,17 @@
     },
     {
       "title": "Organization (O)",
-      "body": "Optional. The organization or team that operates the CA. It appears in the subject and, for issued certificates, in the issuer field."
+      "body": "Optional. The organization or team that operates the CA. It appears in the subject of the CA certificate, which is also its issuer because the root is self-signed."
     },
     {
       "title": "CA validity",
-      "body": "Enter a duration such as 1y, 365d or 2w. A CA must outlive the certificates it issues, so plan its validity longer than theirs.",
-      "note": "1y is only for this evaluation. Issuance does not clamp a certificate to its issuer's expiry, so leave time to replace the CA."
+      "body": "The field starts with 10y; here it is set to 1y. Accepted units are y, w, d, h, m and s. A CA must outlive the certificates it issues, so plan its validity longer than theirs.",
+      "note": "1y is only for this evaluation. A CA created on 17/11/2026 with 1y expired on 16/11/2027 in this recording."
     },
     {
       "title": "Issuance profile",
-      "body": "The profile is the default policy for certificates this CA issues: validity, subject handling and usages such as ClientAuth. Client Certificates suits device and user identities.",
-      "note": "Available profiles and their lifetimes depend on your environment."
+      "body": "The Default Issuance Profile is the profile this CA uses by default when it issues certificates. Client Certificates (\"Profile for issuing client certificates\") has a validity of 1y1d and the DigitalSignature key usage.",
+      "note": "This is the profile for the certificates the CA issues, not for the CA's own certificate: that one is the separate CA Certificate Profile section, left on No Profile."
     },
     {
       "title": "Create the authority",
@@ -53,12 +53,12 @@
     },
     {
       "title": "Check the result",
-      "body": "Open the new CA and confirm its status is Active, plus its issuer, dates, engine and key."
+      "body": "Open the new CA and confirm the ACTIVE status, the issuer C=ES, O=Acme, CN=Acme Showcase Root CA, the validity dates and the ECDSA 384 key."
     },
     {
       "title": "Certificate PEM",
-      "body": "The Certificate PEM tab holds the public CA certificate: download it as ca.pem. The private key never leaves the engine.",
-      "note": "Verify it with OpenSSL: CA:TRUE and a key usage that allows certificate signing. A valid self-signature does not install trust in other systems; distribute the root explicitly."
+      "body": "The Certificate PEM tab shows the public CA certificate as PEM-encoded X.509, with Copy and .pem download buttons, plus the Full Chain bundle.",
+      "note": "Verify it with OpenSSL: CA:TRUE and a key usage that allows certificate signing (this CA has CertSign and CRLSign). A valid self-signature does not install trust in other systems; distribute the root explicitly."
     }
   ]
 }

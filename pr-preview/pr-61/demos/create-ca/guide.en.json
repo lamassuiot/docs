@@ -1,0 +1,64 @@
+{
+  "steps": [
+    {
+      "title": "The CA inventory",
+      "body": "Certification Authorities lists every CA in this instance with its status and expiry. From here you create a new CA, bring in an existing one, or open one to inspect its certificate and settings."
+    },
+    {
+      "title": "Create a root of trust",
+      "body": "Create New CA builds a CA from scratch with a key that Lamassu generates and keeps. If the key is already registered in Lamassu, use Create New CA (Existing Key) instead.",
+      "note": "This example creates a root that issues directly. For an operational hierarchy, see Hierarchy and rotation."
+    },
+    {
+      "title": "New key pair",
+      "body": "Lamassu generates the key pair inside a cryptographic engine and the private key stays there. You only download the public certificate.",
+      "note": "Which algorithms you can choose depends on what the engine supports."
+    },
+    {
+      "title": "Key algorithm",
+      "body": "Each engine defines the algorithms and sizes it supports, such as RSA or ECDSA. ECDSA gives shorter keys and signatures than RSA at a comparable security level."
+    },
+    {
+      "title": "Curve: P-384",
+      "body": "P-384 (secp384r1) offers roughly a 192-bit security level, above P-256, which makes it a common choice for long-lived roots.",
+      "note": "Check that the devices and validators that will verify this CA support the curve."
+    },
+    {
+      "title": "CA name = Common Name",
+      "body": "The CA name must be unique and becomes the Common Name (CN) of the certificate subject. Because a root is self-signed, the same value is also its issuer.",
+      "note": "Name the authority after its purpose, not after a person."
+    },
+    {
+      "title": "Country (C)",
+      "body": "Optional. Use the two-letter ISO 3166-1 code, here ES. Fill it only if your policy requires it.",
+      "note": "The subject is part of the signed certificate: changing it later means issuing a new certificate."
+    },
+    {
+      "title": "Organization (O)",
+      "body": "Optional. The organization or team that operates the CA. It appears in the subject and, for issued certificates, in the issuer field."
+    },
+    {
+      "title": "CA validity",
+      "body": "Enter a duration such as 1y, 365d or 2w. A CA must outlive the certificates it issues, so plan its validity longer than theirs.",
+      "note": "1y is only for this evaluation. Issuance does not clamp a certificate to its issuer's expiry, so leave time to replace the CA."
+    },
+    {
+      "title": "Issuance profile",
+      "body": "The profile is the default policy for certificates this CA issues: validity, subject handling and usages such as ClientAuth. Client Certificates suits device and user identities.",
+      "note": "Available profiles and their lifetimes depend on your environment."
+    },
+    {
+      "title": "Create the authority",
+      "body": "Lamassu generates the key in the engine and signs the self-signed root certificate. The values you entered are fixed in that certificate once it is signed."
+    },
+    {
+      "title": "Check the result",
+      "body": "Open the new CA and confirm its status is Active, plus its issuer, dates, engine and key."
+    },
+    {
+      "title": "Certificate PEM",
+      "body": "The Certificate PEM tab holds the public CA certificate: download it as ca.pem. The private key never leaves the engine.",
+      "note": "Verify it with OpenSSL: CA:TRUE and a key usage that allows certificate signing. A valid self-signature does not install trust in other systems; distribute the root explicitly."
+    }
+  ]
+}

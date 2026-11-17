@@ -1,0 +1,64 @@
+{
+  "steps": [
+    {
+      "title": "El inventario de CA",
+      "body": "Certification Authorities lista todas las CA de la instancia con su estado y caducidad. Desde aquí creas una CA nueva, importas una existente o abres una para ver su certificado y su configuración."
+    },
+    {
+      "title": "Crear una raíz de confianza",
+      "body": "Create New CA crea una CA desde cero con una clave que Lamassu genera y custodia. Si la clave ya está registrada en Lamassu, usa Create New CA (Existing Key).",
+      "note": "Este ejemplo crea una raíz que emite directamente. Para una jerarquía operativa, consulta Jerarquía y rotación."
+    },
+    {
+      "title": "Nuevo par de claves",
+      "body": "Lamassu genera el par de claves dentro de un motor criptográfico y la clave privada permanece allí. Solo descargas el certificado público.",
+      "note": "Los algoritmos disponibles dependen de lo que admita el motor."
+    },
+    {
+      "title": "Algoritmo de la clave",
+      "body": "Cada motor define los algoritmos y tamaños que admite, como RSA o ECDSA. ECDSA ofrece claves y firmas más cortas que RSA con un nivel de seguridad comparable."
+    },
+    {
+      "title": "Curva: P-384",
+      "body": "P-384 (secp384r1) ofrece un nivel de seguridad de unos 192 bits, superior a P-256, por lo que es una elección habitual para raíces de larga vida.",
+      "note": "Comprueba que los dispositivos y validadores que verificarán esta CA admiten la curva."
+    },
+    {
+      "title": "Nombre de la CA = Common Name",
+      "body": "El nombre de la CA debe ser único y se convierte en el Common Name (CN) del subject del certificado. Como una raíz es autofirmada, el mismo valor es también su emisor.",
+      "note": "Nombra la autoridad por su finalidad, no por una persona."
+    },
+    {
+      "title": "País (C)",
+      "body": "Opcional. Usa el código ISO 3166-1 de dos letras, aquí ES. Complétalo solo si tu política lo exige.",
+      "note": "El subject forma parte del certificado firmado: cambiarlo después implica emitir un certificado nuevo."
+    },
+    {
+      "title": "Organización (O)",
+      "body": "Opcional. La organización o el equipo que opera la CA. Aparece en el subject y, en los certificados emitidos, en el campo del emisor."
+    },
+    {
+      "title": "Validez de la CA",
+      "body": "Introduce una duración como 1y, 365d o 2w. Una CA debe durar más que los certificados que emite, así que planifica su validez por encima de la de ellos.",
+      "note": "1y es solo para esta evaluación. La emisión no recorta un certificado a la caducidad de su emisor, así que deja margen para reemplazar la CA."
+    },
+    {
+      "title": "Perfil de emisión",
+      "body": "El perfil es la política predeterminada de los certificados que emite esta CA: validez, tratamiento del subject y usos como ClientAuth. Client Certificates encaja con identidades de dispositivos y usuarios.",
+      "note": "Los perfiles disponibles y su vigencia dependen de tu entorno."
+    },
+    {
+      "title": "Crear la autoridad",
+      "body": "Lamassu genera la clave en el motor y firma el certificado raíz autofirmado. Los valores introducidos quedan fijados en ese certificado una vez firmado."
+    },
+    {
+      "title": "Comprueba el resultado",
+      "body": "Abre la CA nueva y confirma que su estado es Active, además de su emisor, fechas, motor y clave."
+    },
+    {
+      "title": "Certificate PEM",
+      "body": "La pestaña Certificate PEM contiene el certificado público de la CA: descárgalo como ca.pem. La clave privada no sale del motor.",
+      "note": "Verifícalo con OpenSSL: CA:TRUE y un uso de clave que permita firmar certificados. Una autofirma válida no instala la confianza en otros sistemas; distribuye la raíz de forma explícita."
+    }
+  ]
+}

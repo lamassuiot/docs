@@ -124,6 +124,10 @@ front door passthrough+-> Gateway interno B (termina pki.example.com)
 
 Esto requiere hostnames SNI distintos y configuración de red externa al chart de Lamassu.
 
+## Certificados de cliente y cabeceras de identidad
+
+El chart aplica automáticamente una `ClientTrafficPolicy` llamada `enable-mtls` a su Gateway compartido; ningún valor de Helm la activa ni la desactiva. La terminación TLS acepta peticiones con o sin certificado de cliente: los dispositivos pueden presentar uno, pero no están obligados a hacerlo. Antes de reenviar una petición, el Gateway elimina las cabeceras de identidad y de certificado que un cliente podría suministrarse por sí mismo: `X-Principal-Id`, `X-Lms-Source`, `X-Forwarded-Client-Cert`, `X-Forwarded-Cert`, `X-Forwarded-Tls-Client-Cert` (la grafía de Traefik), `Ssl-Client-Cert` y `X-Amzn-Mtls-Clientcert`. La grafía de Traefik se incluye porque los backends que aceptan `X-Forwarded-Tls-Client-Cert` directamente recibirían, si no, datos de identidad de certificado suministrados por el propio cliente sin haber presentado un certificado. Tras la eliminación, Envoy añade su propia cabecera `X-Forwarded-Client-Cert` con el certificado presentado y su cadena, de modo que los servicios que leen la identidad del certificado reciben solo valores generados por el Gateway. Ningún valor de Helm modifica la lista de cabeceras eliminadas. La página [Control de acceso](/docs/platform/administration/access-control) describe cómo aprovecha `authz` esta protección para mantener `X-Principal-ID` fuera del alcance de los clientes.
+
 ## Guía de decisión
 
 1. Si un Gateway puede gestionar TLS y el enrutamiento, usa el valor predeterminado del chart.

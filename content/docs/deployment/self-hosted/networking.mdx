@@ -124,6 +124,10 @@ front-door TLS passthrough+-> internal Gateway B (terminates pki.example.com)
 
 This requires distinct SNI hostnames and cluster networking outside the Lamassu chart.
 
+## Client certificates and identity headers
+
+The chart renders a `ClientTrafficPolicy` named `enable-mtls` on its shared Gateway automatically; no Helm value enables or disables it. TLS termination accepts requests with or without a client certificate: devices may present one, but they are not required to. Before forwarding a request, the Gateway removes identity and certificate headers that a client could otherwise supply itself: `X-Principal-Id`, `X-Lms-Source`, `X-Forwarded-Client-Cert`, `X-Forwarded-Cert`, `X-Forwarded-Tls-Client-Cert` (the Traefik spelling), `Ssl-Client-Cert` and `X-Amzn-Mtls-Clientcert`. The Traefik spelling is included because backends that accept `X-Forwarded-Tls-Client-Cert` directly would otherwise receive certificate identity data supplied by the client itself, without a client certificate having been presented. After stripping, Envoy adds its own `X-Forwarded-Client-Cert` carrying the presented certificate and its chain, so services that read certificate identity receive only gateway-generated values. No Helm value changes the list of stripped headers. The [Access control](/docs/platform/administration/access-control) page describes how `authz` uses this protection to keep `X-Principal-ID` out of reach of clients.
+
 ## Decision guide
 
 1. If one Gateway can own TLS and routing, use the chart default.

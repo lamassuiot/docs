@@ -33,6 +33,7 @@ import {
   type PageDiff,
 } from "@/components/diff-toggle";
 import { DmsEstDemo } from "@/components/dms-est-demo";
+import { EstEnrollmentDemo } from "@/components/est-enrollment-demo";
 import { HybridModelDemo } from "@/components/hybrid-model-demo";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { MdxCard, MdxLink } from "@/components/mdx-link";
@@ -323,6 +324,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               ArchitectureDiagram,
               CreateCaDemo,
               DmsEstDemo,
+              EstEnrollmentDemo,
               RevokeCertificateDemo,
               TrustDiagram,
               TrustModelsDemo,

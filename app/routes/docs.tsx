@@ -30,6 +30,7 @@ import {
 } from "@/components/diff-toggle";
 import { MdxCard, MdxLink } from "@/components/mdx-link";
 import { Mermaid } from "@/components/mermaid";
+import { PqcWelcome } from "@/components/pqc-welcome";
 import { ScalarIcon } from "@/components/scalar-icon";
 import { VersionSelector } from "@/components/version-selector";
 import { asset } from "@/lib/asset";
@@ -67,13 +68,13 @@ function renderBadgeTitle(title: string, compact = false): ReactNode {
   }
 
   const badgeClassName = compact
-    ? "inline-flex items-center rounded-full border border-fd-primary/20 bg-fd-primary/10 px-1.5 py-px text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-fd-primary"
-    : "inline-flex items-center rounded-full border border-fd-primary/20 bg-fd-primary/10 px-3 py-1 text-sm font-semibold uppercase tracking-[0.12em] text-fd-primary";
+    ? "inline-flex items-center rounded-[3px] bg-[var(--lm-badge-bg)] px-1.5 py-px text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-white"
+    : "inline-flex items-center rounded-[5px] bg-[var(--lm-badge-bg)] px-3 py-1 text-sm font-semibold uppercase tracking-[0.12em] text-white";
 
   return (
     <span>
-      <span className={`${badgeClassName} mr-2 align-middle`}>{badge}</span>
       <span>{text}</span>
+      <span className={`${badgeClassName} ml-2 align-middle`}>{badge}</span>
     </span>
   );
 }
@@ -243,8 +244,11 @@ const clientLoader = browserCollections.docs.createClientLoader({
           enabled: false,
         }}
         toc={filteredToc}
+        // `full: true` in the frontmatter drops the TOC and widens the column,
+        // for pages built around an embedded interactive page.
+        full={frontmatter.full}
         // Narrow, centred reading column between the sidebar and the TOC.
-        className="items-center *:w-full *:max-w-[47rem] xl:pt-12"
+        className={`items-center *:w-full xl:pt-12 ${frontmatter.full ? "*:max-w-[72rem]" : "*:max-w-[47rem]"}`}
       >
         <title>
           {titleParts.badge
@@ -315,6 +319,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               Steps,
               ArchitectureDiagram,
               Mermaid,
+              PqcWelcome,
             }}
           />
         </DocsBody>

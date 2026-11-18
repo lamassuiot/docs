@@ -1,0 +1,100 @@
+---
+title: Algorithms
+description: The post-quantum and composite signature algorithms Lamassu supports, how each is identified in API requests, and the standards they follow.
+---
+
+Lamassu supports four groups of signature algorithms beyond RSA and ECDSA: ML-DSA, SLH-DSA, composite ML-DSA and Ed25519. All of them come from the [Go PQC toolchain](/docs/platform/pqc/go-toolchain); the backend only selects the algorithm and delegates the cryptography.
+
+## How an algorithm is selected
+
+A key or CA is created with a key type and a size. For RSA and ECDSA the size is a bit length or a curve. For the post-quantum algorithms the same field carries a **parameter set identifier**, not a number of bits:
+
+| Key type (`algorithm` / `type`) | Value of `size` / `bits` | Meaning |
+| --- | --- | --- |
+| `RSA` | 2048, 3072, 4096 | Modulus length in bits. |
+| `ECDSA` | 256, 384, 521 | Curve size in bits (P-256, P-384, P-521). |
+| `Ed25519` | 256 | Fixed. Any other value is replaced by 256. |
+| `ML-DSA` | 44, 65, 87 | ML-DSA parameter set. |
+| `SLH-DSA` | 1 to 12 | SLH-DSA parameter set, in the order below. |
+| `Composite-ML-DSA-RSA` | 1 to 8 | Composite variant with an RSA component. |
+| `Composite-ML-DSA-ECDSA` | 9 to 13 | Composite variant with an ECDSA component. |
+| `Composite-ML-DSA-Ed25519` | 14 and 15 | Composite variant with an Ed25519 component. |
+
+An unknown key type string is not rejected when it is parsed; it becomes an unknown type and fails later. Use the exact strings above.
+
+## ML-DSA
+
+ML-DSA is the lattice-based signature scheme standardized in FIPS 204. Lamassu accepts the three parameter sets ML-DSA-44, ML-DSA-65 and ML-DSA-87, selected with `size` 44, 65 or 87. The implementation is the `crypto/mldsa` package of Go 1.27, so it is the standard library's own code and not part of the fork. In certificates the algorithm identifiers are `2.16.840.1.101.3.4.3.17`, `.18` and `.19` for ML-DSA-44, -65 and -87.
+
+| Parameter set | NIST security category |
+| --- | --- |
+| ML-DSA-44 | 2 |
+| ML-DSA-65 | 3 |
+| ML-DSA-87 | 5 |
+
+A higher category means larger keys and signatures in exchange for more security margin.
+
+Go reads ML-DSA private keys in PKCS#8 only when they contain the 32-byte seed. Keys written by OpenSSL in its default seed-plus-expanded form are rejected, so export them in the seed-only form before importing them.
+
+## SLH-DSA
+
+SLH-DSA is the hash-based scheme of FIPS 205. It offers twelve parameter sets that combine a hash family (SHA-2 or SHAKE), the parameter n of 128, 192 or 256 bits, which corresponds to NIST security categories 1, 3 and 5 and a trade-off between signature size and signing speed (`s` for small signatures, `f` for fast signing). The identifier written in `size` follows the order of the underlying library:
+
+| ID | Parameter set | ID | Parameter set |
+| --- | --- | --- | --- |
+| 1 | SLH-DSA-SHA2-128s | 7 | SLH-DSA-SHA2-192f |
+| 2 | SLH-DSA-SHAKE-128s | 8 | SLH-DSA-SHAKE-192f |
+| 3 | SLH-DSA-SHA2-128f | 9 | SLH-DSA-SHA2-256s |
+| 4 | SLH-DSA-SHAKE-128f | 10 | SLH-DSA-SHAKE-256s |
+| 5 | SLH-DSA-SHA2-192s | 11 | SLH-DSA-SHA2-256f |
+| 6 | SLH-DSA-SHAKE-192s | 12 | SLH-DSA-SHAKE-256f |
+
+The SLH-DSA implementation is provided by Cloudflare's [CIRCL](https://github.com/cloudflare/circl/) library, which the fork integrates so that SLH-DSA keys can be used in X.509 certificates. The object identifiers run from `2.16.840.1.101.3.4.3.20` to `.31`. SLH-DSA signatures are large, between about 8 and 50 KB depending on the parameter set, which matters for certificate chains and for any transport with a size limit. SLH-DSA is available for keys, CAs and certificates, but the fork has no TLS signature scheme for it, so an SLH-DSA certificate cannot authenticate a TLS connection.
+
+## Composite ML-DSA
+
+A composite key pairs an ML-DSA key with a traditional key. A composite signature is the concatenation of the ML-DSA signature and the traditional signature, both computed over a message representative that contains a fixed prefix, an algorithm label, an optional context and a hash of the message; verification fails if either component fails. The ML-DSA component is pure ML-DSA, with the label as its context. Lamassu implements the 15 algorithms of [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html) that rely only on algorithms available in Go. The identifiers sit under the arc `1.3.6.1.5.5.7.6`.
+
+| `size` | Algorithm | Final OID digit | Family |
+| --- | --- | --- | --- |
+| 1 | MLDSA44-RSA2048-PSS-SHA256 | 37 | RSA |
+| 2 | MLDSA44-RSA2048-PKCS15-SHA256 | 38 | RSA |
+| 3 | MLDSA65-RSA3072-PSS-SHA512 | 41 | RSA |
+| 4 | MLDSA65-RSA3072-PKCS15-SHA512 | 42 | RSA |
+| 5 | MLDSA65-RSA4096-PSS-SHA512 | 43 | RSA |
+| 6 | MLDSA65-RSA4096-PKCS15-SHA512 | 44 | RSA |
+| 7 | MLDSA87-RSA3072-PSS-SHA512 | 52 | RSA |
+| 8 | MLDSA87-RSA4096-PSS-SHA512 | 53 | RSA |
+| 9 | MLDSA44-ECDSA-P256-SHA256 | 40 | ECDSA |
+| 10 | MLDSA65-ECDSA-P256-SHA512 | 45 | ECDSA |
+| 11 | MLDSA65-ECDSA-P384-SHA512 | 46 | ECDSA |
+| 12 | MLDSA87-ECDSA-P384-SHA512 | 49 | ECDSA |
+| 13 | MLDSA87-ECDSA-P521-SHA512 | 54 | ECDSA |
+| 14 | MLDSA44-Ed25519-SHA512 | 39 | Ed25519 |
+| 15 | MLDSA65-Ed25519-SHA512 | 48 | Ed25519 |
+
+The key type must match the family of the variant: creating a `Composite-ML-DSA-ECDSA` key with `size` 3 fails with an error saying that the variant is not valid for that key type.
+
+The implementation was written against draft 19 of the specification, which was later published as RFC 10073, and has been checked against the published text. The object identifiers, the domain separator prefix, the hash used for each ECDSA component and the RFC 5915 encoding of ECDSA private keys match the RFC. Three algorithms of the specification are not implemented because Go has no Brainpool curves and no Ed448: the two Brainpool variants (`MLDSA65-ECDSA-brainpoolP256r1` and `MLDSA87-ECDSA-brainpoolP384r1`, with their hash suffix) and the Ed448 variant. The fork passes the test vectors of RFC 10073 Appendix E for the 15 algorithms it does implement, including the signatures with and without context. These checks cover the vectors and the points listed above; they are not a full conformance assessment.
+
+The composite parameters of keys and signatures must be absent from the `AlgorithmIdentifier`; certificates that carry them are rejected. ECDSA components must use a private scalar of the exact length of the curve.
+
+## Ed25519
+
+Ed25519 is not post-quantum, but support for it as a CA and certificate key type was added in the same work and is selected with the `Ed25519` key type. It is classified in the traditional family.
+
+## Choosing an algorithm
+
+- **Composite ML-DSA** is the most conservative option during the transition, because the signature stays valid only if both components verify and so keeps classical protection if a flaw is found in the new algorithm. Keys and signatures are larger than classical ones.
+- **ML-DSA** alone gives post-quantum protection with moderate sizes and fast operations.
+- **SLH-DSA** suits long-lived trust anchors where relying only on hash functions is valued. Signatures are considerably larger, and it cannot authenticate TLS connections.
+- **Ed25519** is not post-quantum; use it only where a classical algorithm is acceptable.
+
+## What is not covered
+
+Lamassu does not implement post-quantum key exchange of its own. The hybrid key exchanges offered by the TLS endpoint, such as `X25519MLKEM768`, are those of the Go 1.27 standard library. The Chameleon and delta-certificate designs explored in earlier iterations were removed and are not part of the implementation.
+
+<Cards>
+  <Card title="Go PQC toolchain" description="The fork that implements these algorithms and the API it adds." href="/docs/platform/pqc/go-toolchain" />
+  <Card title="Keys and certificate authorities" description="Use these parameters in KMS and CA requests." href="/docs/platform/pqc/keys-and-cas" />
+</Cards>

@@ -1,0 +1,64 @@
+---
+title: Integration tests overview
+description: Evidence that software outside Lamassu negotiates post-quantum key exchange and verifies post-quantum and composite certificates served by Lamassu.
+---
+
+Post-quantum certificates only help if the systems that consume them can use them. These integration tests check that clients and brokers that are not part of Lamassu, built on a different cryptographic library, can connect to a Lamassu TLS endpoint, negotiate post-quantum key exchange and verify post-quantum and composite certificates. Two protocols were tested: [HTTPS](/docs/platform/pqc/integration-tests/https) and [MQTTS](/docs/platform/pqc/integration-tests/mqtts).
+
+<Callout type="info" title="What these tests demonstrate">
+The certificates and CAs used in the tests were generated outside Lamassu, with standard tools, to show that the [Go PQC toolchain](/docs/platform/pqc/go-toolchain) implements the X.509 and TLS formats in an interoperable way. They show that certificates created externally work with Lamassu's TLS endpoint, and that independent software verifies them. They do not test certificates issued by a Lamassu CA.
+</Callout>
+
+## What was tested
+
+The server is the Traefik front proxy that terminates device TLS in Lamassu ([TLS front proxy with Traefik](/docs/platform/pqc/tls-front-proxy)). It is built with the Go PQC toolchain and was configured for each test with one key exchange class and one certificate class.
+
+The clients are independent implementations:
+
+- **OpenSSL 4.0.3 and 4.1.0**, with the native ML-KEM and ML-DSA support of OpenSSL 3.5 and later.
+- **The OpenSSL `hybrid-provider` module**, for composite ML-DSA. The build used was written against draft 19 of the specification, which was later published as [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html); the test vectors of both are identical, but the provider was not otherwise checked against the final text.
+- **`curl`** for HTTPS and **`mosquitto_pub` and `mosquitto_sub` 2.1.2** for MQTTS, both linked against that OpenSSL.
+
+## The test matrix
+
+Each combination of key exchange and certificate was tested separately, using the families that Lamassu uses elsewhere (T, PQ and PQ/T, see [Algorithms](/docs/platform/pqc/algorithms)).
+
+| Key exchange | Groups the server accepts |
+| --- | --- |
+| **T** | `X25519`, `CurveP256`, `CurveP384` |
+| **PQ** | `MLKEM1024` |
+| **PQ/T** | `X25519MLKEM768`, `SecP256r1MLKEM768`, `SecP384r1MLKEM1024` |
+
+| Certificate | Server certificate |
+| --- | --- |
+| **T** | ECDSA P-256 |
+| **PQ** | ML-DSA-65 |
+| **PQ/T** | Composite `MLDSA65-RSA3072-PSS-SHA512` |
+
+That gives nine combinations. Three more composite certificates were tested with PQ/T key exchange: `MLDSA44-ECDSA-P256-SHA256`, `MLDSA65-ECDSA-P256-SHA512` and `MLDSA65-Ed25519-SHA512`, for twelve cases in total. Every certificate was issued by a test CA with the same algorithm as the certificate.
+
+## What each case checks
+
+A case passes only if all of these hold:
+
+1. **Key exchange.** The group negotiated in the handshake is the one expected for the case.
+2. **Signature.** The signature scheme of the server's handshake signature is the one expected for the certificate.
+3. **Chain.** The client verifies the certificate chain against the CA of the case and the server name, with no verification error.
+4. **Application traffic.** The protocol works: an HTTP request returns `200`, or an MQTT message published to the broker reaches a subscriber.
+5. **Wrong key exchange is rejected.** A client that offers every group except those of the case's class fails with the TLS alert `handshake_failure`.
+6. **Wrong certificate scheme is rejected.** A client that offers every signature scheme except the certificate's fails with the same alert.
+
+The last two checks show that the server enforces its configuration, not just that it accepts a compatible client.
+
+## Behaviour to expect
+
+- **Composite code points had to be aligned.** The TLS signature schemes of composite algorithms use [private-use code points](/docs/platform/pqc/go-toolchain#tls-code-points). The `hybrid-provider` uses different values by default, so for the tests its code points were set to those of the Go PQC toolchain. A client that implements composite TLS must use the same values.
+- **Pure ML-DSA and ML-KEM need nothing extra.** They work with OpenSSL 3.5 or later as it is; only composite certificates need the provider.
+- **Some handshakes take an extra round trip.** A client sends the `X25519MLKEM768` key share first. When the server is configured for a class that does not include it (T and PQ), the server answers with a HelloRetryRequest and the handshake completes with the group it asks for.
+- **The client's signature preference decides the certificate.** When the server holds certificates of several classes for the same name, it serves the first one that matches the client's list of signature schemes. A default OpenSSL 3.5 or later client lists ML-DSA first, so it is served the ML-DSA certificate and must trust that CA.
+
+<Cards>
+  <Card title="HTTPS" description="A Lamassu API endpoint tested with openssl and curl." href="/docs/platform/pqc/integration-tests/https" />
+  <Card title="MQTTS" description="An MQTT broker behind the TLS front proxy, tested with mosquitto." href="/docs/platform/pqc/integration-tests/mqtts" />
+  <Card title="Known limitations" description="What is not covered by these tests or by the platform." href="/docs/platform/pqc/limitations" />
+</Cards>

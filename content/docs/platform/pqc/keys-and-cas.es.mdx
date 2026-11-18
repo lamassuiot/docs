@@ -1,0 +1,92 @@
+---
+title: Claves y autoridades de certificación
+description: Crear claves y CA poscuánticas, firmar con ellas y emitir certificados, con el soporte de motores, los valores de la API y las restricciones aplicables.
+---
+
+El backend de Lamassu trata las claves poscuánticas como un tipo más de clave del servicio de gestión de claves (KMS). Una autoridad de certificación creada con una clave así firma certificados y listas de revocación por las mismas rutas que una CA RSA o ECDSA, porque la firma la realiza el fork de Go. Esta página explica qué enviar a la API, qué motores criptográficos pueden custodiar las claves y dónde difiere el comportamiento respecto a las claves clásicas. El backend debe compilarse con el [toolchain de Go PQC](/docs/platform/pqc/go-toolchain).
+
+## Elegir un motor criptográfico compatible
+
+No todos los motores criptográficos pueden crear o custodiar claves poscuánticas. Solo pueden los motores que ejecutan la criptografía dentro del proceso de Lamassu.
+
+| Motor | ML-DSA, SLH-DSA, Composite, Ed25519 |
+| --- | --- |
+| Filesystem | Soportado |
+| Software (golang) | Soportado |
+| HashiCorp Vault KV2 | No soportado |
+| AWS Secrets Manager | No soportado |
+| AWS KMS | No soportado |
+| Azure Key Vault y Azure Secrets | No soportado |
+| PKCS#11 (HSM) | No soportado |
+
+En la práctica, las claves poscuánticas requieren por ahora el motor filesystem, que tiene nivel de seguridad 1. No hay claves con un nivel de garantía superior, en un módulo de seguridad hardware o en un KMS en la nube, para estos algoritmos.
+
+<Callout type="warn" title="Motores que anuncian más de lo que soportan">
+Los motores Vault KV2 y AWS Secrets Manager incluyen los tipos de clave poscuánticos entre los que dicen soportar, por lo que una petición supera la comprobación de compatibilidad. La creación falla después con un error `unsupported key type` del motor. Debe seleccionarse explícitamente un motor filesystem o software con `engine_id`.
+</Callout>
+
+## Crear una clave
+
+Una clave del KMS se crea con el algoritmo y el tamaño descritos en [Algoritmos](/docs/platform/pqc/algorithms):
+
+```bash
+curl -X POST https://<LAMASSU_HOST>/api/kms/v1/keys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{ "name": "mldsa-87-key", "algorithm": "ML-DSA", "size": 87, "engine_id": "<ENGINE_ID>" }'
+```
+
+Los parámetros inválidos se rechazan con un mensaje explícito: un tamaño de ML-DSA distinto de 44, 65 o 87, un identificador de SLH-DSA fuera del rango 1 a 12, una variante composite fuera del rango 1 a 15, o una variante composite que no pertenece a la familia solicitada. La importación de una clave privada en formato PKCS#8 detecta automáticamente el algoritmo y el conjunto de parámetros; admite claves ML-DSA, SLH-DSA, composite y Ed25519.
+
+## Crear una autoridad de certificación
+
+Una CA con clave poscuántica usa la misma petición que cualquier otra CA, enviada a `POST /api/ca/v1/cas`. Solo cambia `key_metadata`, donde `bits` transporta el conjunto de parámetros. Una CA raíz con ML-DSA-65:
+
+```json
+{
+  "id": "mldsa-root",
+  "subject": { "common_name": "ML-DSA Root CA", "organization": "Lamassu", "country": "ES" },
+  "key_metadata": { "type": "ML-DSA", "bits": 65 },
+  "ca_expiration": { "type": "Duration", "duration": "8760h" },
+  "profile_id": "<ISSUANCE_PROFILE_ID>",
+  "engine_id": "<ENGINE_ID>"
+}
+```
+
+Una CA raíz con clave composite de ML-DSA-44 y ECDSA P-256 usa `"key_metadata": { "type": "Composite-ML-DSA-ECDSA", "bits": 9 }`. Ed25519 usa `"type": "Ed25519", "bits": 256` y SLH-DSA usa `"type": "SLH-DSA", "bits": 1` para seleccionar SLH-DSA-SHA2-128s. Las CA subordinadas se crean del mismo modo: la subordinada firma su propia solicitud de certificado con la clave del KMS y la CA padre emite el certificado.
+
+Es posible importar CA existentes con una clave privada poscuántica en el caso de ML-DSA y Ed25519. La importación de una CA con clave SLH-DSA o composite no está soportada.
+
+## Combinar algoritmos en una jerarquía
+
+El backend no impone restricciones sobre qué algoritmo emite a cuál. Una CA con clave ML-DSA puede emitir certificados a sujetos RSA, ECDSA, Ed25519 y ML-DSA, y una CA RSA o ECDSA puede emitir certificados a sujetos poscuánticos. La batería de pruebas cubre a través de la API la matriz completa de ML-DSA y Ed25519, y cubre CA y hojas SLH-DSA y composite a nivel del motor de certificados. Esto permite introducir una CA poscuántica bajo una raíz clásica, o a la inversa, pero la parte que confía debe poder verificar todos los algoritmos de la cadena. En TLS, las firmas de la cadena de certificados se comprueban frente a la extensión `signature_algorithms_cert` del cliente, por lo que una cadena firmada con ML-DSA o con un algoritmo composite necesita un cliente que lo anuncie ahí.
+
+## Firmar y verificar con una clave
+
+El endpoint de firma del KMS acepta nuevos valores de `signature_algorithm`. El campo `message_type` se ignora en todos ellos. Los valores de ML-DSA, SLH-DSA y Ed25519 son «pure»: el mensaje se firma directamente, sin prehash (no son HashML-DSA, HashSLH-DSA ni Ed25519ph). Los valores composite calculan el hash del mensaje con el hash de la variante y firman un mensaje representativo que incluye una etiqueta fija y el contexto opcional.
+
+| Clave | `signature_algorithm` |
+| --- | --- |
+| ML-DSA-44, -65, -87 | `MLDSA_44_PURE`, `MLDSA_65_PURE`, `MLDSA_87_PURE` |
+| SLH-DSA | `SLHDSA_PURE` |
+| Composite | `COMPOSITE_MLDSA_RSA_PURE`, `COMPOSITE_MLDSA_ECDSA_PURE`, `COMPOSITE_MLDSA_ED25519_PURE` |
+| Ed25519 | `Ed25519_PURE` |
+
+El backend no comprueba que el algoritmo coincida con la clave; debe elegirse el valor que corresponde al tipo de clave. Cuando una CA firma un certificado o una lista de revocación, el algoritmo se selecciona automáticamente.
+
+## Restricciones a tener en cuenta
+
+Varias partes de la plataforma aún no gestionan claves poscuánticas. Se reúnen en [Limitaciones conocidas](/docs/platform/pqc/limitations); las que afectan a la operación diaria son las siguientes.
+
+Los perfiles de emisión aplican restricciones de clave solo a RSA y ECDSA, mediante `allow_rsa_keys` y `allow_ecdsa_keys`. Un perfil con la aplicación de restricciones activada no bloquea las claves poscuánticas, y no dispone de un interruptor para permitirlas o denegarlas.
+
+La fortaleza de clave registrada para un certificado cuya clave es poscuántica o Ed25519 solo se calcula para RSA y ECDSA, por lo que esos certificados se almacenan con tipo y tamaño de clave desconocidos y fortaleza baja.
+
+Las respuestas OCSP se firman con la biblioteca `golang.org/x/crypto/ocsp`, que solo admite claves de firma RSA y ECDSA. No cabe esperar, por tanto, que una CA con clave poscuántica, Ed25519 o composite pueda firmar respuestas OCSP; las CRL se generan con el fork y no se ven afectadas por este límite, aunque no tienen pruebas.
+
+La generación de claves en el servidor del DMS (la operación `serverkeygen` de EST) genera únicamente claves RSA y ECDSA.
+
+<Cards>
+  <Card title="Certificados relacionados" description="Vincular un certificado poscuántico a uno clásico existente." href="/docs/platform/pqc/related-certificates" />
+  <Card title="Dashboard" description="Crear los mismos objetos desde la interfaz web." href="/docs/platform/pqc/dashboard" />
+</Cards>

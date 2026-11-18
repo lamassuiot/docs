@@ -57,6 +57,8 @@
 :root {
   --lm-accent: #0100f8;
   --lm-accent-soft: rgb(1 0 248 / 0.12);
+  /* Softened accent for filled badges (white text). */
+  --lm-badge-bg: color-mix(in srgb, var(--lm-accent) 75%, white);
   --lm-surface: #fbfbfa;
   --lm-heading: #0e0f11;
   --lm-body: #3f3f3f;
@@ -87,6 +89,7 @@
 
   --lm-accent: #5b63ff;
   --lm-accent-soft: rgb(143 151 255 / 0.1);
+  --lm-badge-bg: var(--lm-accent);
   --lm-surface: #0e0f12;
   --lm-heading: #f3f3f4;
   --lm-body: #c9c9cc;
@@ -212,6 +215,15 @@ body {
 }
 
 /* ── Sidebar ───────────────────────────────────────────────────────────── */
+
+/* Wider sidebar than the Fumadocs default (268px), so long section titles and
+   their badges fit. Fumadocs sets the variable on the layout root through a
+   :has() selector, so the id inside :has() is needed to win on specificity. */
+@media (min-width: 768px) {
+  #nd-notebook-layout:has(#nd-sidebar) {
+    --fd-sidebar-width: 300px;
+  }
+}
 
 #nd-sidebar > div {
   border-inline-end: 1px solid var(--color-fd-border);

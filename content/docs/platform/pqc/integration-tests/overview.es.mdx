@@ -1,0 +1,64 @@
+---
+title: Resumen de las pruebas de integración
+description: Evidencia de que software ajeno a Lamassu negocia intercambio de claves poscuántico y verifica los certificados poscuánticos y composite que sirve Lamassu.
+---
+
+Los certificados poscuánticos solo sirven si los sistemas que los consumen pueden usarlos. Estas pruebas de integración comprueban que clientes y brokers que no forman parte de Lamassu, construidos sobre otra biblioteca criptográfica, pueden conectarse a un endpoint TLS de Lamassu, negociar un intercambio de claves poscuántico y verificar certificados poscuánticos y composite. Se probaron dos protocolos: [HTTPS](/docs/platform/pqc/integration-tests/https) y [MQTTS](/docs/platform/pqc/integration-tests/mqtts).
+
+<Callout type="info" title="Qué demuestran estas pruebas">
+Los certificados y las CAs de las pruebas se generaron fuera de Lamassu, con herramientas estándar, para mostrar que el [toolchain de Go PQC](/docs/platform/pqc/go-toolchain) implementa los formatos X.509 y TLS de forma interoperable. Demuestran que los certificados creados externamente funcionan con el endpoint TLS de Lamassu y que software independiente los verifica. No prueban certificados emitidos por una CA de Lamassu.
+</Callout>
+
+## Qué se probó
+
+El servidor es el proxy Traefik que termina el TLS de los dispositivos en Lamassu ([Proxy TLS con Traefik](/docs/platform/pqc/tls-front-proxy)). Está compilado con el toolchain de Go PQC y se configuró en cada prueba con una clase de intercambio de claves y una clase de certificado.
+
+Los clientes son implementaciones independientes:
+
+- **OpenSSL 4.0.3 y 4.1.0**, con el soporte nativo de ML-KEM y ML-DSA de OpenSSL 3.5 y posteriores.
+- **El módulo `hybrid-provider` de OpenSSL**, para ML-DSA composite. La versión usada se escribió contra el borrador 19 de la especificación, que después se publicó como [RFC 10073](https://www.rfc-editor.org/rfc/rfc10073.html); los vectores de prueba de ambos son idénticos, pero el provider no se contrastó de otro modo con el texto final.
+- **`curl`** para HTTPS y **`mosquitto_pub` y `mosquitto_sub` 2.1.2** para MQTTS, ambos enlazados con ese OpenSSL.
+
+## La matriz de pruebas
+
+Cada combinación de intercambio de claves y certificado se probó por separado, con las familias que Lamassu usa en el resto de la documentación (T, PQ y PQ/T, véase [Algoritmos](/docs/platform/pqc/algorithms)).
+
+| Intercambio de claves | Grupos que acepta el servidor |
+| --- | --- |
+| **T** | `X25519`, `CurveP256`, `CurveP384` |
+| **PQ** | `MLKEM1024` |
+| **PQ/T** | `X25519MLKEM768`, `SecP256r1MLKEM768`, `SecP384r1MLKEM1024` |
+
+| Certificado | Certificado del servidor |
+| --- | --- |
+| **T** | ECDSA P-256 |
+| **PQ** | ML-DSA-65 |
+| **PQ/T** | Composite `MLDSA65-RSA3072-PSS-SHA512` |
+
+Son nueve combinaciones. Se probaron además tres certificados composite con intercambio de claves PQ/T: `MLDSA44-ECDSA-P256-SHA256`, `MLDSA65-ECDSA-P256-SHA512` y `MLDSA65-Ed25519-SHA512`, hasta un total de doce casos. Cada certificado lo emitió una CA de pruebas con el mismo algoritmo que el certificado.
+
+## Qué comprueba cada caso
+
+Un caso se supera solo si se cumple todo lo siguiente:
+
+1. **Intercambio de claves.** El grupo negociado en el handshake es el esperado para el caso.
+2. **Firma.** El esquema de la firma del handshake del servidor es el esperado para el certificado.
+3. **Cadena.** El cliente verifica la cadena de certificados contra la CA del caso y el nombre del servidor, sin errores de verificación.
+4. **Tráfico de aplicación.** El protocolo funciona: una petición HTTP devuelve `200`, o un mensaje MQTT publicado en el broker llega a un suscriptor.
+5. **Se rechaza un intercambio de claves incorrecto.** Un cliente que ofrece todos los grupos salvo los de la clase del caso falla con la alerta TLS `handshake_failure`.
+6. **Se rechaza un esquema de certificado incorrecto.** Un cliente que ofrece todos los esquemas de firma salvo el del certificado falla con la misma alerta.
+
+Las dos últimas comprobaciones demuestran que el servidor impone su configuración, y no solo que acepta a un cliente compatible.
+
+## Comportamiento esperable
+
+- **Hubo que alinear los puntos de código composite.** Los esquemas de firma TLS de los algoritmos composite usan [puntos de código de uso privado](/docs/platform/pqc/go-toolchain#puntos-de-código-tls). El `hybrid-provider` usa por defecto otros valores, así que para las pruebas se igualaron a los del toolchain de Go PQC. Un cliente que implemente TLS composite debe usar los mismos valores.
+- **ML-DSA puro y ML-KEM no necesitan nada más.** Funcionan con OpenSSL 3.5 o posterior tal cual; solo los certificados composite necesitan el provider.
+- **Algunos handshakes requieren un viaje de ida y vuelta adicional.** El cliente envía primero el key share de `X25519MLKEM768`. Cuando el servidor está configurado para una clase que no lo incluye (T y PQ), responde con un HelloRetryRequest y el handshake termina con el grupo que pide.
+- **La preferencia de firma del cliente decide el certificado.** Cuando el servidor tiene certificados de varias clases para el mismo nombre, sirve el primero que coincide con la lista de esquemas de firma del cliente. Un cliente OpenSSL 3.5 o posterior con la configuración por defecto lista ML-DSA primero, de modo que recibe el certificado ML-DSA y debe confiar en esa CA.
+
+<Cards>
+  <Card title="HTTPS" description="Un endpoint de la API de Lamassu probado con openssl y curl." href="/docs/platform/pqc/integration-tests/https" />
+  <Card title="MQTTS" description="Un broker MQTT detrás del proxy TLS, probado con mosquitto." href="/docs/platform/pqc/integration-tests/mqtts" />
+  <Card title="Limitaciones conocidas" description="Qué no cubren estas pruebas ni la plataforma." href="/docs/platform/pqc/limitations" />
+</Cards>

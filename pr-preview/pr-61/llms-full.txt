@@ -4014,7 +4014,27 @@ The consumer keeps its own trust store. EST `/cacerts` can distribute the servic
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Each diagram below is a short sequence of steps you can play, pause or jump between. A CA is drawn as what it is — a key pair — with one row per certificate issued for that key: a root starts with its self-signed certificate and gains a second row when another CA cross-signs it, same subject and same key under a different issuer. Rows a later step will fill are outlined from the start. Solid arrows indicate certificate issuance; dashed arrows indicate configured trust or distribution, as labeled. The green trace is a validation path: it runs from the identity back to the anchor, opposite to the issuance arrows. An available path is not necessarily accepted by a validator.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   Single CA and hierarchy [#single-ca-and-hierarchy]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A single CA signs identities directly:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="single-ca" locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A hierarchy separates the root from issuing CAs:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="hierarchy" locale="en" />
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -4042,6 +4062,22 @@ The consumer keeps its own trust store. EST `/cacerts` can distribute the servic
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Bilateral cross-certification: each domain keeps its anchor. Validating B from A uses B’s certificate signed by A; the reverse direction requires the opposite signature.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="cross-sign" locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Example partial mesh: the C → A and C → B signatures are absent; reciprocity must not be assumed.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="mesh" locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   Cross-certification lets one CA issue a certificate for another CA's public key. A consumer trusting A can then build a path to an identity issued by B using B's certificate signed by A. B's self-signed certificate can remain available for its own consumers. For consumers trusting B to validate identities from A, a signature in the opposite direction and a path accepted by their validator are needed.
 </div>
 
@@ -4066,15 +4102,54 @@ The consumer keeps its own trust store. EST `/cacerts` can distribute the servic
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Two hierarchies keep their roots and A signs CA B. From anchor A, the chain to identity B includes B’s cross-certificate and intermediate B.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="hybrid" locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   A hybrid PKI combines hierarchies of subordinate CAs with cross-certification. It can arise when two organizations with their own hierarchies need to interoperate without replacing their roots. Each branch retains its structure, but paths between them make certificate distribution, revocation and policy interpretation more complex.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  A demo can start with roots A and B, an issuing intermediate under B, and the A → B link. From anchor A, the consumer needs B's certificate signed by A and B's intermediate to validate the final identity. Also check failure when a link is missing and look for alternative paths.
+  To demonstrate it, create roots A and B, an issuing intermediate under B and an identity issued by it, and add A → B. From anchor A, the consumer needs B's certificate signed by A and B's intermediate to validate the final identity. Also check failure when a link is missing and look for alternative paths.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The following walkthrough starts from those CAs, prepared before recording, and performs the A → B cross-signing with the **Cross Sign** operation. It then compares the authorities table, hierarchy and graph: B appears twice, as a self-signed root and under A, with the same key and a different issuer. Each step's guide describes the validations, which were performed outside the console.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <HybridModelDemo locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  With OpenSSL, using only A as the anchor and B's cross certificate plus the intermediate as auxiliary material, the path `identity → intermediate → B (cross) → A` validates:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```sh
+  cat A-signs-B.pem B-Issuing.pem > chain.pem
+  openssl verify -no-CApath -no-CAstore -CAfile A.pem -untrusted chain.pem identity.pem
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Validation fails if the cross certificate is omitted, if the intermediate is missing, or if an unrelated root is used as the anchor. If the validator also trusts B, it may choose the direct path, shorter and not going through A: the cross certificate does not make it unnecessary. The cross certificate has its own expiry (three years in the demo), earlier than root B's and the intermediate's, so the path through A stops validating the intermediate before the direct one does. The demo's certificates contain no certificate policies, name constraints, policy constraints or maximum path length, and this version's **Cross Sign** operation offers no controls for them. The demo therefore does not prove conformance with RFC 5217, only path building with the basic extensions.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
   Unifying trust point [#unifying-trust-point]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Relying parties validating both domains use the unifying CA as their anchor and the PCAs’ cross-certificates.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="unifying" locale="en" />
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -4094,6 +4169,14 @@ The consumer keeps its own trust store. EST `/cacerts` can distribute the servic
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Each domain keeps its anchor. Signatures in both directions allow paths A → bridge → B and B → bridge → A.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="bridge" locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   A bridge CA connects domains that retain their own anchors. To validate an identity from B using A as the anchor, the path can follow A → Bridge → B; the opposite direction requires the corresponding links. The bridge must not become a domain anchor and does not issue end-entity certificates except those required for its own operation.
 </div>
 
@@ -4107,6 +4190,22 @@ The consumer keeps its own trust store. EST `/cacerts` can distribute the servic
 
 <div className="lm-diff-ins lm-diff-block">
   Trust lists [#trust-lists]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Local list: the relying party configures both roots as anchors, without cross-signatures between them.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="trust-list-local" locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Trust authority: an entity maintains a shared list that relying parties use according to their configuration.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="trust-list-authority" locale="en" />
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

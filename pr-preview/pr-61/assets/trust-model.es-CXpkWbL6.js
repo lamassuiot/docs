@@ -1,0 +1,423 @@
+import{j as a}from"./index-DqgIL_Rv.js";let t=`
+
+En Lamassu, confianza no significa simplemente que un certificado exista en el inventario. Un consumidor confía en una identidad cuando puede construir una cadena hasta una raíz que reconoce, comprobar que el certificado sirve para el uso esperado y verificar que sigue vigente.
+
+Las cuatro decisiones de confianza [#las-cuatro-decisiones-de-confianza]
+
+Quién puede emitir [#quién-puede-emitir]
+
+La jerarquía de CAs define qué autoridades pueden firmar. Una CA raíz establece el ancla de confianza; las CAs intermedias separan ámbitos operativos y evitan utilizar la raíz para cada emisión.
+
+Qué puede emitirse [#qué-puede-emitirse]
+
+Los [perfiles de certificado](/docs/platform/pki/certificate-profiles) limitan validez, sujeto, usos, extensiones y parámetros criptográficos. La posesión de una CA no sustituye a una política de emisión.
+
+Quién puede solicitarlo [#quién-puede-solicitarlo]
+
+El DMS actúa como punto de enrolamiento. Puede autenticar una solicitud EST con certificado cliente, webhook externo o una combinación de ambos. Las CAs configuradas para validar al solicitante no tienen por qué ser la CA que emitirá la identidad nueva.
+
+Quién acepta el resultado [#quién-acepta-el-resultado]
+
+El consumidor mantiene su propio almacén de confianza. EST \`/cacerts\` puede distribuir el certificado TLS del servicio, la CA de enrolamiento y CAs gestionadas seleccionadas. La confianza inicial para autenticar ese servicio debe proceder de un canal ya confiable. Descarga e inspecciona el contenido: no asumas que es una cadena completa ni instales todas las entradas como raíces.
+
+<div className="lm-diff-ins lm-diff-block">
+  Arquitecturas de confianza e interoperabilidad [#arquitecturas-de-confianza-e-interoperabilidad]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El [RFC 5217](https://www.rfc-editor.org/rfc/rfc5217.html) distingue la estructura interna de una PKI de las relaciones entre dominios. En los esquemas siguientes, \`A → B\` significa que A firma un certificado de CA para B. La validación comienza en el ancla elegida por el consumidor; una firma en una dirección no implica confianza recíproca.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Modelo                        | Estructura                                                                                           | Qué tener en cuenta                                                                                                                                          |
+  | ----------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | CA única                      | \`CA → identidad\`.                                                                                    | La raíz emite directamente; su compromiso afecta a todas las identidades.                                                                                    |
+  | Jerárquico                    | \`Raíz → intermedia → identidad\`.                                                                     | Distribuye la raíz y presenta las intermedias; limita profundidad, usos y validez.                                                                           |
+  | Malla completa o parcial      | Varias CAs autofirmadas se certifican entre sí; en la parcial faltan enlaces.                        | Comprueba cada dirección y cada ancla: en una malla parcial puede no existir ruta a todos los dominios.                                                      |
+  | Híbrido                       | Combina jerarquías y enlaces cruzados.                                                               | Documenta rutas alternativas y restricciones; no todos los consumidores construyen o aceptan las mismas rutas.                                               |
+  | Punto de confianza unificador | \`Unificadora → PCA-A\` y \`Unificadora → PCA-B\`.                                                       | Para validar entre dominios, el consumidor confía en la unificadora y dispone de los certificados cruzados. Las PCA conservan sus certificados autofirmados. |
+  | Certificación cruzada directa | \`PCA-A → PCA-B\`; añade \`PCA-B → PCA-A\` para reciprocidad.                                            | Cada dominio conserva su ancla; prueba ambas direcciones y restringe rutas no deseadas.                                                                      |
+  | CA puente                     | \`PCA-A → Puente → PCA-B\`; añade las firmas inversas para el sentido contrario.                       | La puente no es ancla de los dominios y no emite identidades finales salvo para su operación. Acuerda políticas y restricciones.                             |
+  | Lista de confianza            | El consumidor confía en las raíces A y B, localmente o mediante una autoridad que gestiona la lista. | No requiere certificación cruzada. Distribuir certificados no equivale a instalar anclas; controla su actualización y retirada.                              |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  PCA es la CA principal designada para las relaciones entre PKIs; una identidad es un certificado de entidad final. Las primeras cuatro filas describen arquitecturas dentro de una PKI; las tres siguientes, relaciones entre dominios, y la última, un modelo externo a esas relaciones. Una intermedia ordinaria no demuestra por sí sola una CA unificadora.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Cada diagrama es una secuencia breve de pasos que puedes reproducir, pausar o recorrer. Una CA se dibuja como lo que es —un par de claves— con una fila por cada certificado emitido para esa clave: una raíz empieza con su certificado autofirmado y gana una segunda fila cuando otra CA la firma de forma cruzada, con el mismo sujeto y la misma clave bajo un emisor distinto. Las filas que completará un paso posterior aparecen perfiladas desde el principio. Las flechas continuas indican emisión de certificados; las discontinuas indican confianza configurada o distribución, según su etiqueta. El trazo verde es un camino de validación: va desde la identidad hasta el ancla, en sentido inverso a las flechas de emisión. La disponibilidad de un camino no garantiza que el verificador lo acepte.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  CA única y jerarquía [#ca-única-y-jerarquía]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una CA única firma directamente las identidades:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="single-ca" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una jerarquía separa la raíz de las CA emisoras:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="hierarchy" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una PKI de CA única utiliza una raíz autofirmada para emitir directamente las identidades. Es fácil de entender y resulta útil para una primera prueba, pero concentra la emisión y la confianza en una sola clave. Si esa clave se compromete, hay que sustituir el ancla y renovar las identidades afectadas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  En una jerarquía, la raíz firma una o varias CAs intermedias, que emiten las identidades. Esto permite separar, por ejemplo, producción y pruebas, o dispositivos y servicios, y restringir el uso de la raíz. Cada consumidor necesita confiar en la raíz y disponer de las intermedias para construir la cadena. El diseño debe prever la profundidad permitida, los usos y los vencimientos de cada CA.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  En Lamassu, crea una raíz y emite una identidad para el primer caso; para el segundo, crea una intermedia bajo otra raíz y emite desde ella. Descarga los certificados y comprueba las dos cadenas desde un consumidor, incluyendo una prueba con un ancla incorrecta.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El siguiente recorrido interactivo muestra ambos escenarios en la consola: la raíz aislada y la jerarquía, con los certificados públicos y los certificados de identidad descargados.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustModelsDemo locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Firma cruzada directa y malla [#firma-cruzada-directa-y-malla]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Firma cruzada bilateral: cada dominio conserva su ancla. Para validar B desde A se usa el certificado de B firmado por A; para el sentido inverso hace falta la firma opuesta.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="cross-sign" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Ejemplo de malla parcial: faltan las firmas C → A y C → B; no se debe asumir reciprocidad.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="mesh" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La firma cruzada permite que una CA emita un certificado para la clave pública de otra CA. Así, un consumidor que confía en A puede construir una ruta hacia una identidad emitida por B usando el certificado de B firmado por A. El certificado autofirmado de B puede seguir existiendo para sus propios consumidores. Para que los consumidores que confían en B también puedan validar identidades de A, hace falta una firma en el sentido contrario y una ruta aceptada por su validador.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una malla extiende esta relación a varias CAs: es completa cuando cada CA firma a todas las demás y parcial cuando faltan enlaces. La completa ofrece enlaces directos, pero aumenta el número de relaciones que administrar; la parcial reduce enlaces, aunque puede dejar rutas inexistentes o más difíciles de construir. No debe suponerse que una ruta es aceptable solo porque aparece en un grafo.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Para demostrarlo, crea raíces A, B y C y certificados de prueba. Empieza con A → B, valida una identidad de B desde A y comprueba que la dirección opuesta no está cubierta hasta añadir B → A. Añade enlaces para construir una malla parcial y compara las rutas disponibles. Controla los certificados que recibe el validador para detectar rutas alternativas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El siguiente recorrido muestra una malla parcial con A ↔ B, A → C y B → C. Los certificados se prepararon antes de la grabación; la guía describe las validaciones realizadas fuera de la consola.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <CrossSignDemo locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Modelo híbrido [#modelo-híbrido]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Dos jerarquías mantienen sus raíces y A firma la CA B. Desde el ancla A, la cadena hasta la identidad B incluye el certificado cruzado de B y la intermedia B.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="hybrid" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una PKI híbrida combina jerarquías de CAs subordinadas con certificaciones cruzadas. Puede aparecer, por ejemplo, cuando dos organizaciones con jerarquías propias necesitan interoperar sin reemplazar sus raíces. Las ramas mantienen su estructura, pero las rutas entre ellas añaden complejidad a la distribución de certificados, a la revocación y a la interpretación de políticas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Para demostrarlo, crea las raíces A y B, una intermedia emisora bajo B y una identidad emitida por ella, y añade A → B. Desde el ancla A, el consumidor debe disponer del certificado de B firmado por A y de la intermedia de B para validar la identidad final. Comprueba también el fallo cuando falta un enlace y las posibles rutas alternativas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El siguiente recorrido parte de esas CAs, ya preparadas antes de la grabación, y realiza la firma cruzada A → B con la operación **Cross Sign**. Después compara la tabla, la jerarquía y el grafo de autoridades: B aparece dos veces, como raíz autofirmada y bajo A, con la misma clave y distinto emisor. La guía de cada paso describe las validaciones, que se realizaron fuera de la consola.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <HybridModelDemo locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Con OpenSSL, usando solo A como ancla y el certificado cruzado de B junto con la intermedia como material auxiliar, la ruta \`identidad → intermedia → B (cruzado) → A\` valida:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  \`\`\`sh
+  cat A-signs-B.pem B-Issuing.pem > chain.pem
+  openssl verify -no-CApath -no-CAstore -CAfile A.pem -untrusted chain.pem identity.pem
+  \`\`\`
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La validación falla si se omite el certificado cruzado, si falta la intermedia o si se usa como ancla una raíz sin relación con A y B. Si el validador también confía en B, puede elegir la ruta directa, más corta y sin pasar por A: el certificado cruzado no la hace innecesaria. El cruzado tiene su propia caducidad (en la demo, tres años), anterior a la de la raíz B y a la de la intermedia, de modo que la ruta por A deja de validar a la intermedia antes que la directa. Los certificados de la demo no contienen políticas de certificado, restricciones de nombre, restricciones de política ni longitud máxima de ruta, y la operación **Cross Sign** de esta versión no ofrece controles para ellos. Por eso la demo no prueba conformidad con el RFC 5217, solo la construcción de la ruta con las extensiones básicas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Punto de confianza unificador [#punto-de-confianza-unificador]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Los verificadores que necesitan validar ambos dominios usan la CA unificadora como ancla y los certificados cruzados de las PCA.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="unifying" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Este modelo incorpora una CA superior que firma unilateralmente las PCA de los dominios participantes. Cada PCA puede conservar su certificado autofirmado y su funcionamiento anterior; los consumidores que necesiten validar entre dominios utilizan la CA unificadora como ancla y obtienen los certificados cruzados necesarios.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La ventaja es ofrecer un punto común de confianza sin reconstruir necesariamente las PKIs existentes. A cambio, hay que distribuir y gobernar esa nueva ancla, acordar políticas y evaluar el impacto de su compromiso o sustitución. Un consumidor que solo necesita su dominio puede continuar confiando en su PCA anterior.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  En la demo, crea primero dos PCA autofirmadas y después los enlaces Unificadora → PCA-A y Unificadora → PCA-B. Emite una identidad desde cada dominio y valida ambas desde el ancla unificadora; comprueba que los certificados cruzados corresponden a las mismas claves de las PCA originales.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  CA puente [#ca-puente]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Cada dominio mantiene su ancla. Las firmas en ambos sentidos permiten construir caminos A → puente → B y B → puente → A.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="bridge" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La CA puente conecta dominios que mantienen sus propias anclas. Para validar una identidad de B desde A, la ruta puede seguir A → Puente → B; para el sentido opuesto se necesitan los enlaces correspondientes. La puente no debe convertirse en el ancla de los dominios y no emite certificados de entidad final salvo los necesarios para su propia operación.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Centralizar relaciones en una puente puede reducir el número de acuerdos directos, pero exige gobierno compartido, políticas documentadas, mapeo de políticas y restricciones coherentes. También aumenta la importancia de que los validadores puedan descubrir y procesar correctamente rutas y extensiones.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Para la demo, crea dos PCA y una CA puente, establece los enlaces necesarios en ambos sentidos y valida una identidad de cada dominio desde el ancla del otro. Inspecciona las extensiones y documenta cualquier requisito del RFC que la versión o el validador no permitan verificar: un grafo conectado por sí solo no demuestra un modelo puente completo.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Listas de confianza [#listas-de-confianza]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Lista local: el verificador configura ambas raíces como anclas, sin firmas cruzadas entre ellas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="trust-list-local" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Autoridad de confianza: una entidad mantiene una lista compartida y los verificadores la utilizan conforme a su configuración.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="trust-list-authority" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una lista de confianza permite a un consumidor aceptar varias PKIs instalando explícitamente sus anclas, sin que las CAs se certifiquen entre sí. La lista puede administrarse localmente o por una autoridad de confianza para varios consumidores. Es un enfoque directo, aunque mantener las altas, bajas y actualizaciones resulta más difícil a medida que crece el número de consumidores.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  En la demo, crea dos raíces independientes y una identidad bajo cada una. Valida ambas con una lista que contenga las dos raíces; después retira una y comprueba que la identidad correspondiente deja de validarse. Si distribuyes certificados mediante EST \`/cacerts\`, muestra por separado la decisión del consumidor de instalarlos como anclas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Qué puede mostrar Lamassu [#qué-puede-mostrar-lamassu]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Puedes crear raíces e intermedias, emitir identidades y registrar CAs externas como se explica en [Autoridades](/docs/platform/pki/certificate-authorities). El código del dashboard también incluye una operación de firma cruzada que crea otro certificado para la clave existente de la CA destino, firmado por la CA seleccionada. Su disponibilidad depende de la versión desplegada. En ese flujo ambas CAs deben estar activas y tener su clave privada en el KMS; una importación solo con certificado no basta. Verifica la clave pública y que el sujeto del certificado cruzado reproduce el de la CA destino: algunos sujetos importados no pueden reproducirse exactamente.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La operación permite construir enlaces para estas topologías, pero el grafo o la emisión no prueban interoperabilidad ni conformidad completa con el RFC. Comprueba \`basicConstraints\`, \`keyCertSign\`, validez, longitud de ruta y restricciones de nombres y políticas. Verifica la disponibilidad y procesamiento de \`policyMappings\` y \`policyConstraints\` en la versión desplegada y en cada validador. Acuerda políticas, niveles de garantía, publicación y revocación entre dominios.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Para cada ruta, descarga la identidad y los certificados de CA necesarios. Valida desde el consumidor con su ancla explícita y las intermedias como material auxiliar; prueba también el sentido inverso y un caso que deba fallar. Repite con las comprobaciones de revocación y políticas realmente aplicadas por ese consumidor. Consulta [Validación](/docs/platform/pki/certificate-validation) y [Distribución de confianza](/docs/platform/iot-fleets/enrollment/trust-distribution).
+</div>
+
+Flujo de una identidad [#flujo-de-una-identidad]
+
+1. El dispositivo demuestra que puede enrolarse según la política del DMS.
+2. El DMS valida la solicitud y remite la CSR a la CA de enrolamiento.
+3. En el flujo con CSR generado en el dispositivo, la CA aplica el perfil y firma sin recibir su clave privada.
+4. El dispositivo instala el certificado y la cadena que necesita.
+5. El sistema que confía en el dispositivo valida cadena, fechas, usos y estado de revocación.
+
+<Callout type="info" title="Autenticación y autorización son límites distintos">
+  OIDC o X.509 identifica al operador que llama a Lamassu. El servicio de autorización decide qué acciones puede realizar. La jerarquía X.509, en cambio, determina si un certificado presentado por un dispositivo es confiable.
+</Callout>
+
+CAs de enrolamiento, validación y distribución [#cas-de-enrolamiento-validación-y-distribución]
+
+Un DMS relaciona tres conjuntos que conviene diseñar por separado:
+
+* **CA de enrolamiento:** firma las nuevas identidades.
+* **CAs de validación:** autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, la CA de enrolamiento siempre es confiable y Lamassu prueba después las CAs de validación configuradas en el bloque de re-enrolamiento; estas son opcionales.
+* **CAs distribuidas:** forman el contenido que el dispositivo obtiene mediante EST \`/cacerts\`. Puedes incluir el certificado TLS del servicio, la CA de enrolamiento y una lista explícita de CAs gestionadas. Incluir la CA emisora no añade automáticamente todos sus ascendientes.
+
+Esta separación permite migrar una flota: aceptas temporalmente certificados de la jerarquía anterior, emites con la nueva y distribuyes ambas cadenas durante el solapamiento.
+
+Validación y revocación [#validación-y-revocación]
+
+Una cadena válida no garantiza por sí sola que el certificado deba aceptarse. El consumidor también debe comprobar:
+
+* que la fecha actual está entre \`Not Before\` y \`Not After\`;
+* que \`Key Usage\` y \`Extended Key Usage\` permiten la operación;
+* que nombres, SANs y sujeto coinciden con la identidad esperada;
+* que el certificado no aparece revocado mediante [OCSP](/docs/platform/pki/ocsp) o una [CRL](/docs/platform/pki/crl).
+
+El estado \`Good\` de OCSP tampoco sustituye la comprobación de cadena, fechas, uso e identidad; [Validación](/docs/platform/pki/certificate-validation) reúne esos criterios.
+
+Durante la autenticación mTLS de un DMS, Lamassu intenta comprobar la revocación. Si el certificado no contiene información suficiente para efectuar esa comprobación, el backend registra una advertencia y continúa tratándolo como no revocado. Diseña los perfiles y puntos de distribución para evitar esa situación en producción.
+
+Límites de custodia [#límites-de-custodia]
+
+El KMS conserva la referencia de la clave y delega la operación al motor configurado. Con un HSM o un KMS cloud, la clave privada puede permanecer no exportable. Eso protege la custodia, pero no impide por sí solo el uso indebido: todavía debes restringir quién puede ordenar una firma y auditar esas operaciones.
+
+Patrón recomendado [#patrón-recomendado]
+
+* Mantén la raíz fuera de las operaciones diarias o con acceso muy restringido.
+* Emite desde CAs intermedias separadas por entorno o dominio de riesgo.
+* Asigna perfiles explícitos a cada caso de uso.
+* Distribuye la nueva confianza antes de comenzar una rotación.
+* Mantén solapamiento suficiente para renovar una flota desconectada.
+* Valida desde el sistema consumidor, no solo desde la consola de Lamassu.
+
+Continúa con [Jerarquía y rotación de CAs](/docs/platform/pki/ca-hierarchy-and-rotation) para convertir este modelo en un procedimiento operativo.
+`,u={title:"Modelo de confianza",description:"Entiende dónde nace la confianza, cómo se distribuye y qué valida cada componente."},m={isNew:!1,changes:58,title:void 0,description:void 0},p={contents:[{heading:void 0,content:"En Lamassu, confianza no significa simplemente que un certificado exista en el inventario. Un consumidor confía en una identidad cuando puede construir una cadena hasta una raíz que reconoce, comprobar que el certificado sirve para el uso esperado y verificar que sigue vigente."},{heading:"quién-puede-emitir",content:"La jerarquía de CAs define qué autoridades pueden firmar. Una CA raíz establece el ancla de confianza; las CAs intermedias separan ámbitos operativos y evitan utilizar la raíz para cada emisión."},{heading:"qué-puede-emitirse",content:"Los perfiles de certificado limitan validez, sujeto, usos, extensiones y parámetros criptográficos. La posesión de una CA no sustituye a una política de emisión."},{heading:"quién-puede-solicitarlo",content:"El DMS actúa como punto de enrolamiento. Puede autenticar una solicitud EST con certificado cliente, webhook externo o una combinación de ambos. Las CAs configuradas para validar al solicitante no tienen por qué ser la CA que emitirá la identidad nueva."},{heading:"quién-acepta-el-resultado",content:"El consumidor mantiene su propio almacén de confianza. EST `/cacerts` puede distribuir el certificado TLS del servicio, la CA de enrolamiento y CAs gestionadas seleccionadas. La confianza inicial para autenticar ese servicio debe proceder de un canal ya confiable. Descarga e inspecciona el contenido: no asumas que es una cadena completa ni instales todas las entradas como raíces."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"El RFC 5217 distingue la estructura interna de una PKI de las relaciones entre dominios. En los esquemas siguientes, `A → B` significa que A firma un certificado de CA para B. La validación comienza en el ancla elegida por el consumidor; una firma en una dirección no implica confianza recíproca."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Modelo"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Estructura"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Qué tener en cuenta"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"CA única"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"`CA → identidad`."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"La raíz emite directamente; su compromiso afecta a todas las identidades."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Jerárquico"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"`Raíz → intermedia → identidad`."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Distribuye la raíz y presenta las intermedias; limita profundidad, usos y validez."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Malla completa o parcial"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Varias CAs autofirmadas se certifican entre sí; en la parcial faltan enlaces."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Comprueba cada dirección y cada ancla: en una malla parcial puede no existir ruta a todos los dominios."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Híbrido"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Combina jerarquías y enlaces cruzados."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Documenta rutas alternativas y restricciones; no todos los consumidores construyen o aceptan las mismas rutas."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Punto de confianza unificador"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"`Unificadora → PCA-A` y `Unificadora → PCA-B`."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Para validar entre dominios, el consumidor confía en la unificadora y dispone de los certificados cruzados. Las PCA conservan sus certificados autofirmados."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Certificación cruzada directa"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"`PCA-A → PCA-B`; añade `PCA-B → PCA-A` para reciprocidad."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Cada dominio conserva su ancla; prueba ambas direcciones y restringe rutas no deseadas."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"CA puente"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"`PCA-A → Puente → PCA-B`; añade las firmas inversas para el sentido contrario."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"La puente no es ancla de los dominios y no emite identidades finales salvo para su operación. Acuerda políticas y restricciones."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Lista de confianza"},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"El consumidor confía en las raíces A y B, localmente o mediante una autoridad que gestiona la lista."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"No requiere certificación cruzada. Distribuir certificados no equivale a instalar anclas; controla su actualización y retirada."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"PCA es la CA principal designada para las relaciones entre PKIs; una identidad es un certificado de entidad final. Las primeras cuatro filas describen arquitecturas dentro de una PKI; las tres siguientes, relaciones entre dominios, y la última, un modelo externo a esas relaciones. Una intermedia ordinaria no demuestra por sí sola una CA unificadora."},{heading:"arquitecturas-de-confianza-e-interoperabilidad",content:"Cada diagrama es una secuencia breve de pasos que puedes reproducir, pausar o recorrer. Una CA se dibuja como lo que es —un par de claves— con una fila por cada certificado emitido para esa clave: una raíz empieza con su certificado autofirmado y gana una segunda fila cuando otra CA la firma de forma cruzada, con el mismo sujeto y la misma clave bajo un emisor distinto. Las filas que completará un paso posterior aparecen perfiladas desde el principio. Las flechas continuas indican emisión de certificados; las discontinuas indican confianza configurada o distribución, según su etiqueta. El trazo verde es un camino de validación: va desde la identidad hasta el ancla, en sentido inverso a las flechas de emisión. La disponibilidad de un camino no garantiza que el verificador lo acepte."},{heading:"ca-única-y-jerarquía",content:"Una CA única firma directamente las identidades:"},{heading:"ca-única-y-jerarquía",content:"Una jerarquía separa la raíz de las CA emisoras:"},{heading:"ca-única-y-jerarquía",content:"Una PKI de CA única utiliza una raíz autofirmada para emitir directamente las identidades. Es fácil de entender y resulta útil para una primera prueba, pero concentra la emisión y la confianza en una sola clave. Si esa clave se compromete, hay que sustituir el ancla y renovar las identidades afectadas."},{heading:"ca-única-y-jerarquía",content:"En una jerarquía, la raíz firma una o varias CAs intermedias, que emiten las identidades. Esto permite separar, por ejemplo, producción y pruebas, o dispositivos y servicios, y restringir el uso de la raíz. Cada consumidor necesita confiar en la raíz y disponer de las intermedias para construir la cadena. El diseño debe prever la profundidad permitida, los usos y los vencimientos de cada CA."},{heading:"ca-única-y-jerarquía",content:"En Lamassu, crea una raíz y emite una identidad para el primer caso; para el segundo, crea una intermedia bajo otra raíz y emite desde ella. Descarga los certificados y comprueba las dos cadenas desde un consumidor, incluyendo una prueba con un ancla incorrecta."},{heading:"ca-única-y-jerarquía",content:"El siguiente recorrido interactivo muestra ambos escenarios en la consola: la raíz aislada y la jerarquía, con los certificados públicos y los certificados de identidad descargados."},{heading:"firma-cruzada-directa-y-malla",content:"Firma cruzada bilateral: cada dominio conserva su ancla. Para validar B desde A se usa el certificado de B firmado por A; para el sentido inverso hace falta la firma opuesta."},{heading:"firma-cruzada-directa-y-malla",content:"Ejemplo de malla parcial: faltan las firmas C → A y C → B; no se debe asumir reciprocidad."},{heading:"firma-cruzada-directa-y-malla",content:"La firma cruzada permite que una CA emita un certificado para la clave pública de otra CA. Así, un consumidor que confía en A puede construir una ruta hacia una identidad emitida por B usando el certificado de B firmado por A. El certificado autofirmado de B puede seguir existiendo para sus propios consumidores. Para que los consumidores que confían en B también puedan validar identidades de A, hace falta una firma en el sentido contrario y una ruta aceptada por su validador."},{heading:"firma-cruzada-directa-y-malla",content:"Una malla extiende esta relación a varias CAs: es completa cuando cada CA firma a todas las demás y parcial cuando faltan enlaces. La completa ofrece enlaces directos, pero aumenta el número de relaciones que administrar; la parcial reduce enlaces, aunque puede dejar rutas inexistentes o más difíciles de construir. No debe suponerse que una ruta es aceptable solo porque aparece en un grafo."},{heading:"firma-cruzada-directa-y-malla",content:"Para demostrarlo, crea raíces A, B y C y certificados de prueba. Empieza con A → B, valida una identidad de B desde A y comprueba que la dirección opuesta no está cubierta hasta añadir B → A. Añade enlaces para construir una malla parcial y compara las rutas disponibles. Controla los certificados que recibe el validador para detectar rutas alternativas."},{heading:"firma-cruzada-directa-y-malla",content:"El siguiente recorrido muestra una malla parcial con A ↔ B, A → C y B → C. Los certificados se prepararon antes de la grabación; la guía describe las validaciones realizadas fuera de la consola."},{heading:"modelo-híbrido",content:"Dos jerarquías mantienen sus raíces y A firma la CA B. Desde el ancla A, la cadena hasta la identidad B incluye el certificado cruzado de B y la intermedia B."},{heading:"modelo-híbrido",content:"Una PKI híbrida combina jerarquías de CAs subordinadas con certificaciones cruzadas. Puede aparecer, por ejemplo, cuando dos organizaciones con jerarquías propias necesitan interoperar sin reemplazar sus raíces. Las ramas mantienen su estructura, pero las rutas entre ellas añaden complejidad a la distribución de certificados, a la revocación y a la interpretación de políticas."},{heading:"modelo-híbrido",content:"Para demostrarlo, crea las raíces A y B, una intermedia emisora bajo B y una identidad emitida por ella, y añade A → B. Desde el ancla A, el consumidor debe disponer del certificado de B firmado por A y de la intermedia de B para validar la identidad final. Comprueba también el fallo cuando falta un enlace y las posibles rutas alternativas."},{heading:"modelo-híbrido",content:"El siguiente recorrido parte de esas CAs, ya preparadas antes de la grabación, y realiza la firma cruzada A → B con la operación **Cross Sign**. Después compara la tabla, la jerarquía y el grafo de autoridades: B aparece dos veces, como raíz autofirmada y bajo A, con la misma clave y distinto emisor. La guía de cada paso describe las validaciones, que se realizaron fuera de la consola."},{heading:"modelo-híbrido",content:"Con OpenSSL, usando solo A como ancla y el certificado cruzado de B junto con la intermedia como material auxiliar, la ruta `identidad → intermedia → B (cruzado) → A` valida:"},{heading:"modelo-híbrido",content:"La validación falla si se omite el certificado cruzado, si falta la intermedia o si se usa como ancla una raíz sin relación con A y B. Si el validador también confía en B, puede elegir la ruta directa, más corta y sin pasar por A: el certificado cruzado no la hace innecesaria. El cruzado tiene su propia caducidad (en la demo, tres años), anterior a la de la raíz B y a la de la intermedia, de modo que la ruta por A deja de validar a la intermedia antes que la directa. Los certificados de la demo no contienen políticas de certificado, restricciones de nombre, restricciones de política ni longitud máxima de ruta, y la operación **Cross Sign** de esta versión no ofrece controles para ellos. Por eso la demo no prueba conformidad con el RFC 5217, solo la construcción de la ruta con las extensiones básicas."},{heading:"punto-de-confianza-unificador",content:"Los verificadores que necesitan validar ambos dominios usan la CA unificadora como ancla y los certificados cruzados de las PCA."},{heading:"punto-de-confianza-unificador",content:"Este modelo incorpora una CA superior que firma unilateralmente las PCA de los dominios participantes. Cada PCA puede conservar su certificado autofirmado y su funcionamiento anterior; los consumidores que necesiten validar entre dominios utilizan la CA unificadora como ancla y obtienen los certificados cruzados necesarios."},{heading:"punto-de-confianza-unificador",content:"La ventaja es ofrecer un punto común de confianza sin reconstruir necesariamente las PKIs existentes. A cambio, hay que distribuir y gobernar esa nueva ancla, acordar políticas y evaluar el impacto de su compromiso o sustitución. Un consumidor que solo necesita su dominio puede continuar confiando en su PCA anterior."},{heading:"punto-de-confianza-unificador",content:"En la demo, crea primero dos PCA autofirmadas y después los enlaces Unificadora → PCA-A y Unificadora → PCA-B. Emite una identidad desde cada dominio y valida ambas desde el ancla unificadora; comprueba que los certificados cruzados corresponden a las mismas claves de las PCA originales."},{heading:"ca-puente",content:"Cada dominio mantiene su ancla. Las firmas en ambos sentidos permiten construir caminos A → puente → B y B → puente → A."},{heading:"ca-puente",content:"La CA puente conecta dominios que mantienen sus propias anclas. Para validar una identidad de B desde A, la ruta puede seguir A → Puente → B; para el sentido opuesto se necesitan los enlaces correspondientes. La puente no debe convertirse en el ancla de los dominios y no emite certificados de entidad final salvo los necesarios para su propia operación."},{heading:"ca-puente",content:"Centralizar relaciones en una puente puede reducir el número de acuerdos directos, pero exige gobierno compartido, políticas documentadas, mapeo de políticas y restricciones coherentes. También aumenta la importancia de que los validadores puedan descubrir y procesar correctamente rutas y extensiones."},{heading:"ca-puente",content:"Para la demo, crea dos PCA y una CA puente, establece los enlaces necesarios en ambos sentidos y valida una identidad de cada dominio desde el ancla del otro. Inspecciona las extensiones y documenta cualquier requisito del RFC que la versión o el validador no permitan verificar: un grafo conectado por sí solo no demuestra un modelo puente completo."},{heading:"listas-de-confianza",content:"Lista local: el verificador configura ambas raíces como anclas, sin firmas cruzadas entre ellas."},{heading:"listas-de-confianza",content:"Autoridad de confianza: una entidad mantiene una lista compartida y los verificadores la utilizan conforme a su configuración."},{heading:"listas-de-confianza",content:"Una lista de confianza permite a un consumidor aceptar varias PKIs instalando explícitamente sus anclas, sin que las CAs se certifiquen entre sí. La lista puede administrarse localmente o por una autoridad de confianza para varios consumidores. Es un enfoque directo, aunque mantener las altas, bajas y actualizaciones resulta más difícil a medida que crece el número de consumidores."},{heading:"listas-de-confianza",content:"En la demo, crea dos raíces independientes y una identidad bajo cada una. Valida ambas con una lista que contenga las dos raíces; después retira una y comprueba que la identidad correspondiente deja de validarse. Si distribuyes certificados mediante EST `/cacerts`, muestra por separado la decisión del consumidor de instalarlos como anclas."},{heading:"qué-puede-mostrar-lamassu",content:"Puedes crear raíces e intermedias, emitir identidades y registrar CAs externas como se explica en Autoridades. El código del dashboard también incluye una operación de firma cruzada que crea otro certificado para la clave existente de la CA destino, firmado por la CA seleccionada. Su disponibilidad depende de la versión desplegada. En ese flujo ambas CAs deben estar activas y tener su clave privada en el KMS; una importación solo con certificado no basta. Verifica la clave pública y que el sujeto del certificado cruzado reproduce el de la CA destino: algunos sujetos importados no pueden reproducirse exactamente."},{heading:"qué-puede-mostrar-lamassu",content:"La operación permite construir enlaces para estas topologías, pero el grafo o la emisión no prueban interoperabilidad ni conformidad completa con el RFC. Comprueba `basicConstraints`, `keyCertSign`, validez, longitud de ruta y restricciones de nombres y políticas. Verifica la disponibilidad y procesamiento de `policyMappings` y `policyConstraints` en la versión desplegada y en cada validador. Acuerda políticas, niveles de garantía, publicación y revocación entre dominios."},{heading:"qué-puede-mostrar-lamassu",content:"Para cada ruta, descarga la identidad y los certificados de CA necesarios. Valida desde el consumidor con su ancla explícita y las intermedias como material auxiliar; prueba también el sentido inverso y un caso que deba fallar. Repite con las comprobaciones de revocación y políticas realmente aplicadas por ese consumidor. Consulta Validación y Distribución de confianza."},{heading:"flujo-de-una-identidad",content:"El dispositivo demuestra que puede enrolarse según la política del DMS."},{heading:"flujo-de-una-identidad",content:"El DMS valida la solicitud y remite la CSR a la CA de enrolamiento."},{heading:"flujo-de-una-identidad",content:"En el flujo con CSR generado en el dispositivo, la CA aplica el perfil y firma sin recibir su clave privada."},{heading:"flujo-de-una-identidad",content:"El dispositivo instala el certificado y la cadena que necesita."},{heading:"flujo-de-una-identidad",content:"El sistema que confía en el dispositivo valida cadena, fechas, usos y estado de revocación."},{heading:"flujo-de-una-identidad",content:"OIDC o X.509 identifica al operador que llama a Lamassu. El servicio de autorización decide qué acciones puede realizar. La jerarquía X.509, en cambio, determina si un certificado presentado por un dispositivo es confiable."},{heading:"cas-de-enrolamiento-validación-y-distribución",content:"Un DMS relaciona tres conjuntos que conviene diseñar por separado:"},{heading:"cas-de-enrolamiento-validación-y-distribución",content:"**CA de enrolamiento:** firma las nuevas identidades."},{heading:"cas-de-enrolamiento-validación-y-distribución",content:"**CAs de validación:** autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, la CA de enrolamiento siempre es confiable y Lamassu prueba después las CAs de validación configuradas en el bloque de re-enrolamiento; estas son opcionales."},{heading:"cas-de-enrolamiento-validación-y-distribución",content:"**CAs distribuidas:** forman el contenido que el dispositivo obtiene mediante EST `/cacerts`. Puedes incluir el certificado TLS del servicio, la CA de enrolamiento y una lista explícita de CAs gestionadas. Incluir la CA emisora no añade automáticamente todos sus ascendientes."},{heading:"cas-de-enrolamiento-validación-y-distribución",content:"Esta separación permite migrar una flota: aceptas temporalmente certificados de la jerarquía anterior, emites con la nueva y distribuyes ambas cadenas durante el solapamiento."},{heading:"validación-y-revocación",content:"Una cadena válida no garantiza por sí sola que el certificado deba aceptarse. El consumidor también debe comprobar:"},{heading:"validación-y-revocación",content:"que la fecha actual está entre `Not Before` y `Not After`;"},{heading:"validación-y-revocación",content:"que `Key Usage` y `Extended Key Usage` permiten la operación;"},{heading:"validación-y-revocación",content:"que nombres, SANs y sujeto coinciden con la identidad esperada;"},{heading:"validación-y-revocación",content:"que el certificado no aparece revocado mediante OCSP o una CRL."},{heading:"validación-y-revocación",content:"El estado `Good` de OCSP tampoco sustituye la comprobación de cadena, fechas, uso e identidad; Validación reúne esos criterios."},{heading:"validación-y-revocación",content:"Durante la autenticación mTLS de un DMS, Lamassu intenta comprobar la revocación. Si el certificado no contiene información suficiente para efectuar esa comprobación, el backend registra una advertencia y continúa tratándolo como no revocado. Diseña los perfiles y puntos de distribución para evitar esa situación en producción."},{heading:"límites-de-custodia",content:"El KMS conserva la referencia de la clave y delega la operación al motor configurado. Con un HSM o un KMS cloud, la clave privada puede permanecer no exportable. Eso protege la custodia, pero no impide por sí solo el uso indebido: todavía debes restringir quién puede ordenar una firma y auditar esas operaciones."},{heading:"patrón-recomendado",content:"Mantén la raíz fuera de las operaciones diarias o con acceso muy restringido."},{heading:"patrón-recomendado",content:"Emite desde CAs intermedias separadas por entorno o dominio de riesgo."},{heading:"patrón-recomendado",content:"Asigna perfiles explícitos a cada caso de uso."},{heading:"patrón-recomendado",content:"Distribuye la nueva confianza antes de comenzar una rotación."},{heading:"patrón-recomendado",content:"Mantén solapamiento suficiente para renovar una flota desconectada."},{heading:"patrón-recomendado",content:"Valida desde el sistema consumidor, no solo desde la consola de Lamassu."},{heading:"patrón-recomendado",content:"Continúa con Jerarquía y rotación de CAs para convertir este modelo en un procedimiento operativo."}],headings:[{id:"las-cuatro-decisiones-de-confianza",content:"Las cuatro decisiones de confianza"},{id:"quién-puede-emitir",content:"Quién puede emitir"},{id:"qué-puede-emitirse",content:"Qué puede emitirse"},{id:"quién-puede-solicitarlo",content:"Quién puede solicitarlo"},{id:"quién-acepta-el-resultado",content:"Quién acepta el resultado"},{id:"arquitecturas-de-confianza-e-interoperabilidad",content:"Arquitecturas de confianza e interoperabilidad"},{id:"ca-única-y-jerarquía",content:"CA única y jerarquía"},{id:"firma-cruzada-directa-y-malla",content:"Firma cruzada directa y malla"},{id:"modelo-híbrido",content:"Modelo híbrido"},{id:"punto-de-confianza-unificador",content:"Punto de confianza unificador"},{id:"ca-puente",content:"CA puente"},{id:"listas-de-confianza",content:"Listas de confianza"},{id:"qué-puede-mostrar-lamassu",content:"Qué puede mostrar Lamassu"},{id:"flujo-de-una-identidad",content:"Flujo de una identidad"},{id:"cas-de-enrolamiento-validación-y-distribución",content:"CAs de enrolamiento, validación y distribución"},{id:"validación-y-revocación",content:"Validación y revocación"},{id:"límites-de-custodia",content:"Límites de custodia"},{id:"patrón-recomendado",content:"Patrón recomendado"}]};const f=[{depth:2,url:"#las-cuatro-decisiones-de-confianza",title:a.jsx(a.Fragment,{children:"Las cuatro decisiones de confianza"})},{depth:3,url:"#quién-puede-emitir",title:a.jsx(a.Fragment,{children:"Quién puede emitir"})},{depth:3,url:"#qué-puede-emitirse",title:a.jsx(a.Fragment,{children:"Qué puede emitirse"})},{depth:3,url:"#quién-puede-solicitarlo",title:a.jsx(a.Fragment,{children:"Quién puede solicitarlo"})},{depth:3,url:"#quién-acepta-el-resultado",title:a.jsx(a.Fragment,{children:"Quién acepta el resultado"})},{depth:2,url:"#arquitecturas-de-confianza-e-interoperabilidad",title:a.jsx(a.Fragment,{children:"Arquitecturas de confianza e interoperabilidad"})},{depth:3,url:"#ca-única-y-jerarquía",title:a.jsx(a.Fragment,{children:"CA única y jerarquía"})},{depth:3,url:"#firma-cruzada-directa-y-malla",title:a.jsx(a.Fragment,{children:"Firma cruzada directa y malla"})},{depth:3,url:"#modelo-híbrido",title:a.jsx(a.Fragment,{children:"Modelo híbrido"})},{depth:3,url:"#punto-de-confianza-unificador",title:a.jsx(a.Fragment,{children:"Punto de confianza unificador"})},{depth:3,url:"#ca-puente",title:a.jsx(a.Fragment,{children:"CA puente"})},{depth:3,url:"#listas-de-confianza",title:a.jsx(a.Fragment,{children:"Listas de confianza"})},{depth:3,url:"#qué-puede-mostrar-lamassu",title:a.jsx(a.Fragment,{children:"Qué puede mostrar Lamassu"})},{depth:2,url:"#flujo-de-una-identidad",title:a.jsx(a.Fragment,{children:"Flujo de una identidad"})},{depth:2,url:"#cas-de-enrolamiento-validación-y-distribución",title:a.jsx(a.Fragment,{children:"CAs de enrolamiento, validación y distribución"})},{depth:2,url:"#validación-y-revocación",title:a.jsx(a.Fragment,{children:"Validación y revocación"})},{depth:2,url:"#límites-de-custodia",title:a.jsx(a.Fragment,{children:"Límites de custodia"})},{depth:2,url:"#patrón-recomendado",title:a.jsx(a.Fragment,{children:"Patrón recomendado"})}];function l(n){const e={a:"a",code:"code",div:"div",h2:"h2",h3:"h3",li:"li",ol:"ol",p:"p",pre:"pre",span:"span",strong:"strong",table:"table",tbody:"tbody",td:"td",th:"th",thead:"thead",tr:"tr",ul:"ul",...n.components},{Callout:s,CrossSignDemo:o,HybridModelDemo:r,TrustDiagram:i,TrustModelsDemo:c}=e;return s||d("Callout"),o||d("CrossSignDemo"),r||d("HybridModelDemo"),i||d("TrustDiagram"),c||d("TrustModelsDemo"),a.jsxs(a.Fragment,{children:[a.jsx(e.p,{children:"En Lamassu, confianza no significa simplemente que un certificado exista en el inventario. Un consumidor confía en una identidad cuando puede construir una cadena hasta una raíz que reconoce, comprobar que el certificado sirve para el uso esperado y verificar que sigue vigente."}),`
+`,a.jsx(e.h2,{id:"las-cuatro-decisiones-de-confianza",children:"Las cuatro decisiones de confianza"}),`
+`,a.jsx(e.h3,{id:"quién-puede-emitir",children:"Quién puede emitir"}),`
+`,a.jsx(e.p,{children:"La jerarquía de CAs define qué autoridades pueden firmar. Una CA raíz establece el ancla de confianza; las CAs intermedias separan ámbitos operativos y evitan utilizar la raíz para cada emisión."}),`
+`,a.jsx(e.h3,{id:"qué-puede-emitirse",children:"Qué puede emitirse"}),`
+`,a.jsxs(e.p,{children:["Los ",a.jsx(e.a,{href:"/docs/platform/pki/certificate-profiles",children:"perfiles de certificado"})," limitan validez, sujeto, usos, extensiones y parámetros criptográficos. La posesión de una CA no sustituye a una política de emisión."]}),`
+`,a.jsx(e.h3,{id:"quién-puede-solicitarlo",children:"Quién puede solicitarlo"}),`
+`,a.jsx(e.p,{children:"El DMS actúa como punto de enrolamiento. Puede autenticar una solicitud EST con certificado cliente, webhook externo o una combinación de ambos. Las CAs configuradas para validar al solicitante no tienen por qué ser la CA que emitirá la identidad nueva."}),`
+`,a.jsx(e.h3,{id:"quién-acepta-el-resultado",children:"Quién acepta el resultado"}),`
+`,a.jsxs(e.p,{children:["El consumidor mantiene su propio almacén de confianza. EST ",a.jsx(e.code,{children:"/cacerts"})," puede distribuir el certificado TLS del servicio, la CA de enrolamiento y CAs gestionadas seleccionadas. La confianza inicial para autenticar ese servicio debe proceder de un canal ya confiable. Descarga e inspecciona el contenido: no asumas que es una cadena completa ni instales todas las entradas como raíces."]}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.h2,{id:"arquitecturas-de-confianza-e-interoperabilidad",children:"Arquitecturas de confianza e interoperabilidad"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsxs(e.p,{children:["El ",a.jsx(e.a,{href:"https://www.rfc-editor.org/rfc/rfc5217.html",children:"RFC 5217"})," distingue la estructura interna de una PKI de las relaciones entre dominios. En los esquemas siguientes, ",a.jsx(e.code,{children:"A → B"})," significa que A firma un certificado de CA para B. La validación comienza en el ancla elegida por el consumidor; una firma en una dirección no implica confianza recíproca."]})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsxs(e.table,{children:[a.jsx(e.thead,{children:a.jsxs(e.tr,{children:[a.jsx(e.th,{children:"Modelo"}),a.jsx(e.th,{children:"Estructura"}),a.jsx(e.th,{children:"Qué tener en cuenta"})]})}),a.jsxs(e.tbody,{children:[a.jsxs(e.tr,{children:[a.jsx(e.td,{children:"CA única"}),a.jsxs(e.td,{children:[a.jsx(e.code,{children:"CA → identidad"}),"."]}),a.jsx(e.td,{children:"La raíz emite directamente; su compromiso afecta a todas las identidades."})]}),a.jsxs(e.tr,{children:[a.jsx(e.td,{children:"Jerárquico"}),a.jsxs(e.td,{children:[a.jsx(e.code,{children:"Raíz → intermedia → identidad"}),"."]}),a.jsx(e.td,{children:"Distribuye la raíz y presenta las intermedias; limita profundidad, usos y validez."})]}),a.jsxs(e.tr,{children:[a.jsx(e.td,{children:"Malla completa o parcial"}),a.jsx(e.td,{children:"Varias CAs autofirmadas se certifican entre sí; en la parcial faltan enlaces."}),a.jsx(e.td,{children:"Comprueba cada dirección y cada ancla: en una malla parcial puede no existir ruta a todos los dominios."})]}),a.jsxs(e.tr,{children:[a.jsx(e.td,{children:"Híbrido"}),a.jsx(e.td,{children:"Combina jerarquías y enlaces cruzados."}),a.jsx(e.td,{children:"Documenta rutas alternativas y restricciones; no todos los consumidores construyen o aceptan las mismas rutas."})]}),a.jsxs(e.tr,{children:[a.jsx(e.td,{children:"Punto de confianza unificador"}),a.jsxs(e.td,{children:[a.jsx(e.code,{children:"Unificadora → PCA-A"})," y ",a.jsx(e.code,{children:"Unificadora → PCA-B"}),"."]}),a.jsx(e.td,{children:"Para validar entre dominios, el consumidor confía en la unificadora y dispone de los certificados cruzados. Las PCA conservan sus certificados autofirmados."})]}),a.jsxs(e.tr,{children:[a.jsx(e.td,{children:"Certificación cruzada directa"}),a.jsxs(e.td,{children:[a.jsx(e.code,{children:"PCA-A → PCA-B"}),"; añade ",a.jsx(e.code,{children:"PCA-B → PCA-A"})," para reciprocidad."]}),a.jsx(e.td,{children:"Cada dominio conserva su ancla; prueba ambas direcciones y restringe rutas no deseadas."})]}),a.jsxs(e.tr,{children:[a.jsx(e.td,{children:"CA puente"}),a.jsxs(e.td,{children:[a.jsx(e.code,{children:"PCA-A → Puente → PCA-B"}),"; añade las firmas inversas para el sentido contrario."]}),a.jsx(e.td,{children:"La puente no es ancla de los dominios y no emite identidades finales salvo para su operación. Acuerda políticas y restricciones."})]}),a.jsxs(e.tr,{children:[a.jsx(e.td,{children:"Lista de confianza"}),a.jsx(e.td,{children:"El consumidor confía en las raíces A y B, localmente o mediante una autoridad que gestiona la lista."}),a.jsx(e.td,{children:"No requiere certificación cruzada. Distribuir certificados no equivale a instalar anclas; controla su actualización y retirada."})]})]})]})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"PCA es la CA principal designada para las relaciones entre PKIs; una identidad es un certificado de entidad final. Las primeras cuatro filas describen arquitecturas dentro de una PKI; las tres siguientes, relaciones entre dominios, y la última, un modelo externo a esas relaciones. Una intermedia ordinaria no demuestra por sí sola una CA unificadora."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Cada diagrama es una secuencia breve de pasos que puedes reproducir, pausar o recorrer. Una CA se dibuja como lo que es —un par de claves— con una fila por cada certificado emitido para esa clave: una raíz empieza con su certificado autofirmado y gana una segunda fila cuando otra CA la firma de forma cruzada, con el mismo sujeto y la misma clave bajo un emisor distinto. Las filas que completará un paso posterior aparecen perfiladas desde el principio. Las flechas continuas indican emisión de certificados; las discontinuas indican confianza configurada o distribución, según su etiqueta. El trazo verde es un camino de validación: va desde la identidad hasta el ancla, en sentido inverso a las flechas de emisión. La disponibilidad de un camino no garantiza que el verificador lo acepte."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.h3,{id:"ca-única-y-jerarquía",children:"CA única y jerarquía"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Una CA única firma directamente las identidades:"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(i,{model:"single-ca",locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Una jerarquía separa la raíz de las CA emisoras:"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(i,{model:"hierarchy",locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Una PKI de CA única utiliza una raíz autofirmada para emitir directamente las identidades. Es fácil de entender y resulta útil para una primera prueba, pero concentra la emisión y la confianza en una sola clave. Si esa clave se compromete, hay que sustituir el ancla y renovar las identidades afectadas."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"En una jerarquía, la raíz firma una o varias CAs intermedias, que emiten las identidades. Esto permite separar, por ejemplo, producción y pruebas, o dispositivos y servicios, y restringir el uso de la raíz. Cada consumidor necesita confiar en la raíz y disponer de las intermedias para construir la cadena. El diseño debe prever la profundidad permitida, los usos y los vencimientos de cada CA."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"En Lamassu, crea una raíz y emite una identidad para el primer caso; para el segundo, crea una intermedia bajo otra raíz y emite desde ella. Descarga los certificados y comprueba las dos cadenas desde un consumidor, incluyendo una prueba con un ancla incorrecta."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"El siguiente recorrido interactivo muestra ambos escenarios en la consola: la raíz aislada y la jerarquía, con los certificados públicos y los certificados de identidad descargados."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(c,{locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.h3,{id:"firma-cruzada-directa-y-malla",children:"Firma cruzada directa y malla"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Firma cruzada bilateral: cada dominio conserva su ancla. Para validar B desde A se usa el certificado de B firmado por A; para el sentido inverso hace falta la firma opuesta."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(i,{model:"cross-sign",locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Ejemplo de malla parcial: faltan las firmas C → A y C → B; no se debe asumir reciprocidad."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(i,{model:"mesh",locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"La firma cruzada permite que una CA emita un certificado para la clave pública de otra CA. Así, un consumidor que confía en A puede construir una ruta hacia una identidad emitida por B usando el certificado de B firmado por A. El certificado autofirmado de B puede seguir existiendo para sus propios consumidores. Para que los consumidores que confían en B también puedan validar identidades de A, hace falta una firma en el sentido contrario y una ruta aceptada por su validador."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Una malla extiende esta relación a varias CAs: es completa cuando cada CA firma a todas las demás y parcial cuando faltan enlaces. La completa ofrece enlaces directos, pero aumenta el número de relaciones que administrar; la parcial reduce enlaces, aunque puede dejar rutas inexistentes o más difíciles de construir. No debe suponerse que una ruta es aceptable solo porque aparece en un grafo."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Para demostrarlo, crea raíces A, B y C y certificados de prueba. Empieza con A → B, valida una identidad de B desde A y comprueba que la dirección opuesta no está cubierta hasta añadir B → A. Añade enlaces para construir una malla parcial y compara las rutas disponibles. Controla los certificados que recibe el validador para detectar rutas alternativas."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"El siguiente recorrido muestra una malla parcial con A ↔ B, A → C y B → C. Los certificados se prepararon antes de la grabación; la guía describe las validaciones realizadas fuera de la consola."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(o,{locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.h3,{id:"modelo-híbrido",children:"Modelo híbrido"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Dos jerarquías mantienen sus raíces y A firma la CA B. Desde el ancla A, la cadena hasta la identidad B incluye el certificado cruzado de B y la intermedia B."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(i,{model:"hybrid",locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Una PKI híbrida combina jerarquías de CAs subordinadas con certificaciones cruzadas. Puede aparecer, por ejemplo, cuando dos organizaciones con jerarquías propias necesitan interoperar sin reemplazar sus raíces. Las ramas mantienen su estructura, pero las rutas entre ellas añaden complejidad a la distribución de certificados, a la revocación y a la interpretación de políticas."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Para demostrarlo, crea las raíces A y B, una intermedia emisora bajo B y una identidad emitida por ella, y añade A → B. Desde el ancla A, el consumidor debe disponer del certificado de B firmado por A y de la intermedia de B para validar la identidad final. Comprueba también el fallo cuando falta un enlace y las posibles rutas alternativas."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsxs(e.p,{children:["El siguiente recorrido parte de esas CAs, ya preparadas antes de la grabación, y realiza la firma cruzada A → B con la operación ",a.jsx(e.strong,{children:"Cross Sign"}),". Después compara la tabla, la jerarquía y el grafo de autoridades: B aparece dos veces, como raíz autofirmada y bajo A, con la misma clave y distinto emisor. La guía de cada paso describe las validaciones, que se realizaron fuera de la consola."]})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(r,{locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsxs(e.p,{children:["Con OpenSSL, usando solo A como ancla y el certificado cruzado de B junto con la intermedia como material auxiliar, la ruta ",a.jsx(e.code,{children:"identidad → intermedia → B (cruzado) → A"})," valida:"]})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(a.Fragment,{children:a.jsx(e.pre,{className:"shiki shiki-themes github-light-default github-dark-default",style:{"--shiki-light":"#1f2328","--shiki-dark":"#e6edf3","--shiki-light-bg":"#ffffff","--shiki-dark-bg":"#0d1117"},tabIndex:"0",icon:'<svg viewBox="0 0 24 24"><path d="m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z" fill="currentColor" /></svg>',children:a.jsxs(e.code,{children:[a.jsxs(e.span,{className:"line",children:[a.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"cat"}),a.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" A-signs-B.pem"}),a.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" B-Issuing.pem"}),a.jsx(e.span,{style:{"--shiki-light":"#CF222E","--shiki-dark":"#FF7B72"},children:" >"}),a.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" chain.pem"})]}),`
+`,a.jsxs(e.span,{className:"line",children:[a.jsx(e.span,{style:{"--shiki-light":"#953800","--shiki-dark":"#FFA657"},children:"openssl"}),a.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" verify"}),a.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -no-CApath"}),a.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -no-CAstore"}),a.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -CAfile"}),a.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" A.pem"}),a.jsx(e.span,{style:{"--shiki-light":"#0550AE","--shiki-dark":"#79C0FF"},children:" -untrusted"}),a.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" chain.pem"}),a.jsx(e.span,{style:{"--shiki-light":"#0A3069","--shiki-dark":"#A5D6FF"},children:" identity.pem"})]})]})})})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsxs(e.p,{children:["La validación falla si se omite el certificado cruzado, si falta la intermedia o si se usa como ancla una raíz sin relación con A y B. Si el validador también confía en B, puede elegir la ruta directa, más corta y sin pasar por A: el certificado cruzado no la hace innecesaria. El cruzado tiene su propia caducidad (en la demo, tres años), anterior a la de la raíz B y a la de la intermedia, de modo que la ruta por A deja de validar a la intermedia antes que la directa. Los certificados de la demo no contienen políticas de certificado, restricciones de nombre, restricciones de política ni longitud máxima de ruta, y la operación ",a.jsx(e.strong,{children:"Cross Sign"})," de esta versión no ofrece controles para ellos. Por eso la demo no prueba conformidad con el RFC 5217, solo la construcción de la ruta con las extensiones básicas."]})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.h3,{id:"punto-de-confianza-unificador",children:"Punto de confianza unificador"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Los verificadores que necesitan validar ambos dominios usan la CA unificadora como ancla y los certificados cruzados de las PCA."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(i,{model:"unifying",locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Este modelo incorpora una CA superior que firma unilateralmente las PCA de los dominios participantes. Cada PCA puede conservar su certificado autofirmado y su funcionamiento anterior; los consumidores que necesiten validar entre dominios utilizan la CA unificadora como ancla y obtienen los certificados cruzados necesarios."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"La ventaja es ofrecer un punto común de confianza sin reconstruir necesariamente las PKIs existentes. A cambio, hay que distribuir y gobernar esa nueva ancla, acordar políticas y evaluar el impacto de su compromiso o sustitución. Un consumidor que solo necesita su dominio puede continuar confiando en su PCA anterior."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"En la demo, crea primero dos PCA autofirmadas y después los enlaces Unificadora → PCA-A y Unificadora → PCA-B. Emite una identidad desde cada dominio y valida ambas desde el ancla unificadora; comprueba que los certificados cruzados corresponden a las mismas claves de las PCA originales."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.h3,{id:"ca-puente",children:"CA puente"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Cada dominio mantiene su ancla. Las firmas en ambos sentidos permiten construir caminos A → puente → B y B → puente → A."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(i,{model:"bridge",locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"La CA puente conecta dominios que mantienen sus propias anclas. Para validar una identidad de B desde A, la ruta puede seguir A → Puente → B; para el sentido opuesto se necesitan los enlaces correspondientes. La puente no debe convertirse en el ancla de los dominios y no emite certificados de entidad final salvo los necesarios para su propia operación."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Centralizar relaciones en una puente puede reducir el número de acuerdos directos, pero exige gobierno compartido, políticas documentadas, mapeo de políticas y restricciones coherentes. También aumenta la importancia de que los validadores puedan descubrir y procesar correctamente rutas y extensiones."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Para la demo, crea dos PCA y una CA puente, establece los enlaces necesarios en ambos sentidos y valida una identidad de cada dominio desde el ancla del otro. Inspecciona las extensiones y documenta cualquier requisito del RFC que la versión o el validador no permitan verificar: un grafo conectado por sí solo no demuestra un modelo puente completo."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.h3,{id:"listas-de-confianza",children:"Listas de confianza"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Lista local: el verificador configura ambas raíces como anclas, sin firmas cruzadas entre ellas."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(i,{model:"trust-list-local",locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Autoridad de confianza: una entidad mantiene una lista compartida y los verificadores la utilizan conforme a su configuración."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(i,{model:"trust-list-authority",locale:"es"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.p,{children:"Una lista de confianza permite a un consumidor aceptar varias PKIs instalando explícitamente sus anclas, sin que las CAs se certifiquen entre sí. La lista puede administrarse localmente o por una autoridad de confianza para varios consumidores. Es un enfoque directo, aunque mantener las altas, bajas y actualizaciones resulta más difícil a medida que crece el número de consumidores."})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsxs(e.p,{children:["En la demo, crea dos raíces independientes y una identidad bajo cada una. Valida ambas con una lista que contenga las dos raíces; después retira una y comprueba que la identidad correspondiente deja de validarse. Si distribuyes certificados mediante EST ",a.jsx(e.code,{children:"/cacerts"}),", muestra por separado la decisión del consumidor de instalarlos como anclas."]})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsx(e.h3,{id:"qué-puede-mostrar-lamassu",children:"Qué puede mostrar Lamassu"})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsxs(e.p,{children:["Puedes crear raíces e intermedias, emitir identidades y registrar CAs externas como se explica en ",a.jsx(e.a,{href:"/docs/platform/pki/certificate-authorities",children:"Autoridades"}),". El código del dashboard también incluye una operación de firma cruzada que crea otro certificado para la clave existente de la CA destino, firmado por la CA seleccionada. Su disponibilidad depende de la versión desplegada. En ese flujo ambas CAs deben estar activas y tener su clave privada en el KMS; una importación solo con certificado no basta. Verifica la clave pública y que el sujeto del certificado cruzado reproduce el de la CA destino: algunos sujetos importados no pueden reproducirse exactamente."]})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsxs(e.p,{children:["La operación permite construir enlaces para estas topologías, pero el grafo o la emisión no prueban interoperabilidad ni conformidad completa con el RFC. Comprueba ",a.jsx(e.code,{children:"basicConstraints"}),", ",a.jsx(e.code,{children:"keyCertSign"}),", validez, longitud de ruta y restricciones de nombres y políticas. Verifica la disponibilidad y procesamiento de ",a.jsx(e.code,{children:"policyMappings"})," y ",a.jsx(e.code,{children:"policyConstraints"})," en la versión desplegada y en cada validador. Acuerda políticas, niveles de garantía, publicación y revocación entre dominios."]})}),`
+`,a.jsx(e.div,{className:"lm-diff-ins lm-diff-block",children:a.jsxs(e.p,{children:["Para cada ruta, descarga la identidad y los certificados de CA necesarios. Valida desde el consumidor con su ancla explícita y las intermedias como material auxiliar; prueba también el sentido inverso y un caso que deba fallar. Repite con las comprobaciones de revocación y políticas realmente aplicadas por ese consumidor. Consulta ",a.jsx(e.a,{href:"/docs/platform/pki/certificate-validation",children:"Validación"})," y ",a.jsx(e.a,{href:"/docs/platform/iot-fleets/enrollment/trust-distribution",children:"Distribución de confianza"}),"."]})}),`
+`,a.jsx(e.h2,{id:"flujo-de-una-identidad",children:"Flujo de una identidad"}),`
+`,a.jsxs(e.ol,{children:[`
+`,a.jsx(e.li,{children:"El dispositivo demuestra que puede enrolarse según la política del DMS."}),`
+`,a.jsx(e.li,{children:"El DMS valida la solicitud y remite la CSR a la CA de enrolamiento."}),`
+`,a.jsx(e.li,{children:"En el flujo con CSR generado en el dispositivo, la CA aplica el perfil y firma sin recibir su clave privada."}),`
+`,a.jsx(e.li,{children:"El dispositivo instala el certificado y la cadena que necesita."}),`
+`,a.jsx(e.li,{children:"El sistema que confía en el dispositivo valida cadena, fechas, usos y estado de revocación."}),`
+`]}),`
+`,a.jsx(s,{type:"info",title:"Autenticación y autorización son límites distintos",children:a.jsx(e.p,{children:"OIDC o X.509 identifica al operador que llama a Lamassu. El servicio de autorización decide qué acciones puede realizar. La jerarquía X.509, en cambio, determina si un certificado presentado por un dispositivo es confiable."})}),`
+`,a.jsx(e.h2,{id:"cas-de-enrolamiento-validación-y-distribución",children:"CAs de enrolamiento, validación y distribución"}),`
+`,a.jsx(e.p,{children:"Un DMS relaciona tres conjuntos que conviene diseñar por separado:"}),`
+`,a.jsxs(e.ul,{children:[`
+`,a.jsxs(e.li,{children:[a.jsx(e.strong,{children:"CA de enrolamiento:"})," firma las nuevas identidades."]}),`
+`,a.jsxs(e.li,{children:[a.jsx(e.strong,{children:"CAs de validación:"})," autentican certificados cliente usados para enrolamiento o migración. En re-enrolamiento, la CA de enrolamiento siempre es confiable y Lamassu prueba después las CAs de validación configuradas en el bloque de re-enrolamiento; estas son opcionales."]}),`
+`,a.jsxs(e.li,{children:[a.jsx(e.strong,{children:"CAs distribuidas:"})," forman el contenido que el dispositivo obtiene mediante EST ",a.jsx(e.code,{children:"/cacerts"}),". Puedes incluir el certificado TLS del servicio, la CA de enrolamiento y una lista explícita de CAs gestionadas. Incluir la CA emisora no añade automáticamente todos sus ascendientes."]}),`
+`]}),`
+`,a.jsx(e.p,{children:"Esta separación permite migrar una flota: aceptas temporalmente certificados de la jerarquía anterior, emites con la nueva y distribuyes ambas cadenas durante el solapamiento."}),`
+`,a.jsx(e.h2,{id:"validación-y-revocación",children:"Validación y revocación"}),`
+`,a.jsx(e.p,{children:"Una cadena válida no garantiza por sí sola que el certificado deba aceptarse. El consumidor también debe comprobar:"}),`
+`,a.jsxs(e.ul,{children:[`
+`,a.jsxs(e.li,{children:["que la fecha actual está entre ",a.jsx(e.code,{children:"Not Before"})," y ",a.jsx(e.code,{children:"Not After"}),";"]}),`
+`,a.jsxs(e.li,{children:["que ",a.jsx(e.code,{children:"Key Usage"})," y ",a.jsx(e.code,{children:"Extended Key Usage"})," permiten la operación;"]}),`
+`,a.jsx(e.li,{children:"que nombres, SANs y sujeto coinciden con la identidad esperada;"}),`
+`,a.jsxs(e.li,{children:["que el certificado no aparece revocado mediante ",a.jsx(e.a,{href:"/docs/platform/pki/ocsp",children:"OCSP"})," o una ",a.jsx(e.a,{href:"/docs/platform/pki/crl",children:"CRL"}),"."]}),`
+`]}),`
+`,a.jsxs(e.p,{children:["El estado ",a.jsx(e.code,{children:"Good"})," de OCSP tampoco sustituye la comprobación de cadena, fechas, uso e identidad; ",a.jsx(e.a,{href:"/docs/platform/pki/certificate-validation",children:"Validación"})," reúne esos criterios."]}),`
+`,a.jsx(e.p,{children:"Durante la autenticación mTLS de un DMS, Lamassu intenta comprobar la revocación. Si el certificado no contiene información suficiente para efectuar esa comprobación, el backend registra una advertencia y continúa tratándolo como no revocado. Diseña los perfiles y puntos de distribución para evitar esa situación en producción."}),`
+`,a.jsx(e.h2,{id:"límites-de-custodia",children:"Límites de custodia"}),`
+`,a.jsx(e.p,{children:"El KMS conserva la referencia de la clave y delega la operación al motor configurado. Con un HSM o un KMS cloud, la clave privada puede permanecer no exportable. Eso protege la custodia, pero no impide por sí solo el uso indebido: todavía debes restringir quién puede ordenar una firma y auditar esas operaciones."}),`
+`,a.jsx(e.h2,{id:"patrón-recomendado",children:"Patrón recomendado"}),`
+`,a.jsxs(e.ul,{children:[`
+`,a.jsx(e.li,{children:"Mantén la raíz fuera de las operaciones diarias o con acceso muy restringido."}),`
+`,a.jsx(e.li,{children:"Emite desde CAs intermedias separadas por entorno o dominio de riesgo."}),`
+`,a.jsx(e.li,{children:"Asigna perfiles explícitos a cada caso de uso."}),`
+`,a.jsx(e.li,{children:"Distribuye la nueva confianza antes de comenzar una rotación."}),`
+`,a.jsx(e.li,{children:"Mantén solapamiento suficiente para renovar una flota desconectada."}),`
+`,a.jsx(e.li,{children:"Valida desde el sistema consumidor, no solo desde la consola de Lamassu."}),`
+`]}),`
+`,a.jsxs(e.p,{children:["Continúa con ",a.jsx(e.a,{href:"/docs/platform/pki/ca-hierarchy-and-rotation",children:"Jerarquía y rotación de CAs"})," para convertir este modelo en un procedimiento operativo."]})]})}function v(n={}){const{wrapper:e}=n.components||{};return e?a.jsx(e,{...n,children:a.jsx(l,{...n})}):l(n)}function d(n,e){throw new Error("Expected component `"+n+"` to be defined: you likely forgot to import, pass, or provide it.")}const h=Object.freeze(Object.defineProperty({__proto__:null,_markdown:t,default:v,frontmatter:u,lmDiff:m,structuredData:p,toc:f},Symbol.toStringTag,{value:"Module"}));export{h as _};

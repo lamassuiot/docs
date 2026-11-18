@@ -48,7 +48,27 @@ El consumidor mantiene su propio almacén de confianza. EST `/cacerts` puede dis
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Cada diagrama es una secuencia breve de pasos que puedes reproducir, pausar o recorrer. Una CA se dibuja como lo que es —un par de claves— con una fila por cada certificado emitido para esa clave: una raíz empieza con su certificado autofirmado y gana una segunda fila cuando otra CA la firma de forma cruzada, con el mismo sujeto y la misma clave bajo un emisor distinto. Las filas que completará un paso posterior aparecen perfiladas desde el principio. Las flechas continuas indican emisión de certificados; las discontinuas indican confianza configurada o distribución, según su etiqueta. El trazo verde es un camino de validación: va desde la identidad hasta el ancla, en sentido inverso a las flechas de emisión. La disponibilidad de un camino no garantiza que el verificador lo acepte.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   CA única y jerarquía [#ca-única-y-jerarquía]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una CA única firma directamente las identidades:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="single-ca" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una jerarquía separa la raíz de las CA emisoras:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="hierarchy" locale="es" />
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -76,6 +96,22 @@ El consumidor mantiene su propio almacén de confianza. EST `/cacerts` puede dis
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Firma cruzada bilateral: cada dominio conserva su ancla. Para validar B desde A se usa el certificado de B firmado por A; para el sentido inverso hace falta la firma opuesta.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="cross-sign" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Ejemplo de malla parcial: faltan las firmas C → A y C → B; no se debe asumir reciprocidad.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="mesh" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   La firma cruzada permite que una CA emita un certificado para la clave pública de otra CA. Así, un consumidor que confía en A puede construir una ruta hacia una identidad emitida por B usando el certificado de B firmado por A. El certificado autofirmado de B puede seguir existiendo para sus propios consumidores. Para que los consumidores que confían en B también puedan validar identidades de A, hace falta una firma en el sentido contrario y una ruta aceptada por su validador.
 </div>
 
@@ -100,15 +136,54 @@ El consumidor mantiene su propio almacén de confianza. EST `/cacerts` puede dis
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Dos jerarquías mantienen sus raíces y A firma la CA B. Desde el ancla A, la cadena hasta la identidad B incluye el certificado cruzado de B y la intermedia B.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="hybrid" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   Una PKI híbrida combina jerarquías de CAs subordinadas con certificaciones cruzadas. Puede aparecer, por ejemplo, cuando dos organizaciones con jerarquías propias necesitan interoperar sin reemplazar sus raíces. Las ramas mantienen su estructura, pero las rutas entre ellas añaden complejidad a la distribución de certificados, a la revocación y a la interpretación de políticas.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Una demo puede partir de dos raíces A y B, con una intermedia emisora bajo B, y añadir A → B. Desde el ancla A, el consumidor debe disponer del certificado de B firmado por A y de la intermedia de B para validar la identidad final. Comprueba también el fallo cuando falta un enlace y las posibles rutas alternativas.
+  Para demostrarlo, crea las raíces A y B, una intermedia emisora bajo B y una identidad emitida por ella, y añade A → B. Desde el ancla A, el consumidor debe disponer del certificado de B firmado por A y de la intermedia de B para validar la identidad final. Comprueba también el fallo cuando falta un enlace y las posibles rutas alternativas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El siguiente recorrido parte de esas CAs, ya preparadas antes de la grabación, y realiza la firma cruzada A → B con la operación **Cross Sign**. Después compara la tabla, la jerarquía y el grafo de autoridades: B aparece dos veces, como raíz autofirmada y bajo A, con la misma clave y distinto emisor. La guía de cada paso describe las validaciones, que se realizaron fuera de la consola.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <HybridModelDemo locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Con OpenSSL, usando solo A como ancla y el certificado cruzado de B junto con la intermedia como material auxiliar, la ruta `identidad → intermedia → B (cruzado) → A` valida:
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```sh
+  cat A-signs-B.pem B-Issuing.pem > chain.pem
+  openssl verify -no-CApath -no-CAstore -CAfile A.pem -untrusted chain.pem identity.pem
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  La validación falla si se omite el certificado cruzado, si falta la intermedia o si se usa como ancla una raíz sin relación con A y B. Si el validador también confía en B, puede elegir la ruta directa, más corta y sin pasar por A: el certificado cruzado no la hace innecesaria. El cruzado tiene su propia caducidad (en la demo, tres años), anterior a la de la raíz B y a la de la intermedia, de modo que la ruta por A deja de validar a la intermedia antes que la directa. Los certificados de la demo no contienen políticas de certificado, restricciones de nombre, restricciones de política ni longitud máxima de ruta, y la operación **Cross Sign** de esta versión no ofrece controles para ellos. Por eso la demo no prueba conformidad con el RFC 5217, solo la construcción de la ruta con las extensiones básicas.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
   Punto de confianza unificador [#punto-de-confianza-unificador]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Los verificadores que necesitan validar ambos dominios usan la CA unificadora como ancla y los certificados cruzados de las PCA.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="unifying" locale="es" />
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -128,6 +203,14 @@ El consumidor mantiene su propio almacén de confianza. EST `/cacerts` puede dis
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
+  Cada dominio mantiene su ancla. Las firmas en ambos sentidos permiten construir caminos A → puente → B y B → puente → A.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="bridge" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
   La CA puente conecta dominios que mantienen sus propias anclas. Para validar una identidad de B desde A, la ruta puede seguir A → Puente → B; para el sentido opuesto se necesitan los enlaces correspondientes. La puente no debe convertirse en el ancla de los dominios y no emite certificados de entidad final salvo los necesarios para su propia operación.
 </div>
 
@@ -141,6 +224,22 @@ El consumidor mantiene su propio almacén de confianza. EST `/cacerts` puede dis
 
 <div className="lm-diff-ins lm-diff-block">
   Listas de confianza [#listas-de-confianza]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Lista local: el verificador configura ambas raíces como anclas, sin firmas cruzadas entre ellas.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="trust-list-local" locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Autoridad de confianza: una entidad mantiene una lista compartida y los verificadores la utilizan conforme a su configuración.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustDiagram model="trust-list-authority" locale="es" />
 </div>
 
 <div className="lm-diff-ins lm-diff-block">

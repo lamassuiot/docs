@@ -16,7 +16,7 @@ Plan the end date within the issuing CA’s validity and leave a renewal margin.
 
 CA certificate or end-entity certificate [#ca-certificate-or-end-entity-certificate]
 
-`Sign as CA` sets `IsCA` and the basic constraints needed for an authority. Enable it only in profiles intended to create or reissue subordinate CAs.
+`Sign as CA` sets `IsCA` and the basic constraints needed for an authority. Lamassu enforces this: a profile with `Sign as CA` is consumed only when creating or reissuing a CA. Any signing request that resolves to such a profile is rejected — direct signing with a CA, including certificate issuance requests on it, and DMS enrollment or re-enrollment. Nothing validates the profile when it is saved: if a CA's default profile or a DMS profile has `Sign as CA` enabled, the problem appears on the first signing request that resolves to it — for a DMS profile, when a device tries to enroll or re-enroll — and renewal stays blocked until the profile is changed.
 
 Key Usage and Extended Key Usage [#key-usage-and-extended-key-usage]
 

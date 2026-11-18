@@ -27,6 +27,8 @@ Reissuance and rotation are not the same [#reissuance-and-rotation-are-not-the-s
 
 **Reissuing a CA** creates a new certificate over the existing key. Lamassu generates a CSR with that key, self-signs it if it is a root or asks the parent CA to sign it if it is subordinate. The new certificate becomes active and the CA points to its serial number; the old and new certificates are linked through metadata.
 
+If the CRL settings of the CA are signed by the superseded CA certificate, reissuing moves the signer to the new certificate — provided it carries `cRLSign` — and republishes the CRL. Otherwise, and for settings signed by a different certificate, the signer is kept, so check the new certificate’s key usage after reissuing; see the [CRL guide](/docs/platform/pki/crl).
+
 **Rotating a CA** creates a successor key and authority. It is the right choice in the face of compromise, a cryptographic change, an engine migration or non-exportable key policies.
 
 Lamassu does not allow reissuing an already-revoked CA or a CA whose expiration date has passed. Plan ahead for both conditions.

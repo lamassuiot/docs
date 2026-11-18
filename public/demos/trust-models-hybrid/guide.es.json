@@ -1,0 +1,118 @@
+{
+  "steps": [
+    {
+      "title": "Abrir las autoridades",
+      "body": "La entrada Certification Authorities del menú PKI abre el inventario de CAs, con tres vistas: tabla, jerarquía y grafo.",
+      "note": "Los datos se prepararon por API antes de grabar, con nombres sintéticos y un sufijo único por ejecución."
+    },
+    {
+      "title": "Estado inicial",
+      "body": "La tabla muestra cuatro CAs, tres de ellas de nivel superior: Demo-Hybrid-A, Demo-Hybrid-B y una raíz ajena. La emisora cuelga de B. Todavía no existe ningún certificado que enlace A con B.",
+      "note": "La raíz ajena no tiene relación con A ni con B y se usa como ancla incorrecta en las pruebas externas."
+    },
+    {
+      "title": "Abrir Cross Sign",
+      "body": "El formulario emite a una CA existente un segundo certificado firmado por otra CA. La CA destinataria conserva su clave y su sujeto.",
+      "note": "Ambas CAs necesitan su clave privada en el KMS: el selector solo permite elegir CAs activas con clave disponible."
+    },
+    {
+      "title": "Elegir firmante",
+      "body": "El selector enumera las CAs con su jerarquía. La CA que se elija aquí será el emisor del nuevo certificado.",
+      "note": "Los nombres de las CAs de esta ejecución llevan un sufijo único para que cada repetición sea independiente."
+    },
+    {
+      "title": "A como firmante",
+      "body": "A firmará con su clave privada. Con la flecha A → B, A emite un certificado de CA para B.",
+      "note": "A no cambia: sigue siendo una raíz autofirmada."
+    },
+    {
+      "title": "Elegir destinataria",
+      "body": "La destinataria es la CA cuyo par de claves recibirá un segundo certificado. La lista excluye la CA ya elegida como firmante."
+    },
+    {
+      "title": "B como destinataria",
+      "body": "B es la raíz bajo la que cuelga la emisora. El certificado cruzado reutiliza la clave de B, de modo que lo que B ya emitió encadena por cualquiera de los dos emisores.",
+      "note": "Tras la firma habrá dos entradas con el nombre de B; las pruebas posteriores las distinguen por emisor y número de serie."
+    },
+    {
+      "title": "Vista previa del cruce",
+      "body": "El formulario muestra Subject, Issuer, Public key, Subject Key ID y Authority Key ID del certificado resultante. La clave pública figura como reutilizada de B.",
+      "note": "Es una previsión del formulario, no una validación: la identidad de claves se comprueba después sobre los PEM."
+    },
+    {
+      "title": "Caducidad del cruce",
+      "body": "Por defecto el certificado cruzado caduca como la CA destinataria, limitado por el firmante. Se elige una duración para que la validez del enlace A → B sea visible.",
+      "note": "La validez de una ruta la acota el certificado que caduca antes."
+    },
+    {
+      "title": "Duración de 3 años",
+      "body": "El campo acepta un número seguido de unidad (y, w, d, h, m, s). Con 3y el certificado cruzado caduca antes que la raíz B y que su emisora.",
+      "note": "El enlace A → B dejará de ser utilizable antes que la propia B; la ruta directa desde B no depende de él."
+    },
+    {
+      "title": "Emitir A → B",
+      "body": "Lamassu guarda el resultado como una nueva entrada de CA y abre su ficha. La CA B original, autofirmada, no se sustituye.",
+      "note": "La operación es real: modifica el servidor. Por eso cada ejecución parte de una instancia vacía."
+    },
+    {
+      "title": "Ficha del certificado cruzado",
+      "body": "La ficha de la nueva entrada llama B a la CA y muestra a A como emisor, con un periodo de validez de unos tres años desde la emisión.",
+      "note": "Aquí solo se observa la emisión. Que la ruta valide es una comprobación externa, no una acción de la interfaz."
+    },
+    {
+      "title": "Volver al inventario",
+      "body": "El inventario recoge ya la nueva entrada. Se revisa en las tres vistas: tabla, jerarquía y grafo."
+    },
+    {
+      "title": "Tabla tras el cruce",
+      "body": "La tabla tiene ahora cinco CAs. B figura como raíz autofirmada y como subordinada de A; la columna «Expires vs. parent» compara la caducidad de cada subordinada con la de su emisor.",
+      "note": "Las dos filas de B son certificados distintos de la misma clave."
+    },
+    {
+      "title": "Abrir la jerarquía",
+      "body": "La jerarquía dibuja cada CA como una tarjeta y une cada emisor con las CAs que emitió."
+    },
+    {
+      "title": "B en dos posiciones",
+      "body": "Las flechas van del emisor a las CAs que emitió. B aparece bajo A (certificado cruzado) y como raíz con su emisora, de modo que hay dos rutas posibles hacia la emisora.",
+      "note": "Qué ruta usa un validador depende de las anclas y de las intermedias que se le entreguen. La jerarquía no dibuja identidades finales."
+    },
+    {
+      "title": "Abrir el grafo",
+      "body": "En el grafo cada tarjeta es una clave y sus filas son los certificados que la acreditan; las flechas van de la clave firmante al certificado que firmó."
+    },
+    {
+      "title": "Grafo completo",
+      "body": "La clave de B reúne dos certificados, el autofirmado y el cruzado, y lleva la etiqueta Cross-signed. Hay flecha de A hacia B y de B hacia la emisora; la raíz ajena no tiene ninguna.",
+      "note": "Los nombres largos se truncan en las tarjetas; la tabla muestra los nombres completos. La ausencia de enlace con la ajena explica el fallo de validación con ella como ancla."
+    },
+    {
+      "title": "Filtrar el cruce",
+      "body": "El filtro Cross-signed deja solo las claves cuyos certificados, con el mismo sujeto, fueron firmados por más de una clave, y las claves que los firmaron.",
+      "note": "Es un filtro de la vista: no modifica ningún dato."
+    },
+    {
+      "title": "Enlace A → B aislado",
+      "body": "La clave de A firma uno de los dos certificados de la clave de B. Es el enlace que añade la firma cruzada.",
+      "note": "El otro certificado de B sigue siendo el autofirmado."
+    },
+    {
+      "title": "Abrir Certificates",
+      "body": "El listado Certificates reúne todos los certificados emitidos, incluidos los de CA, con su emisor y su caducidad."
+    },
+    {
+      "title": "Certificados implicados",
+      "body": "Cada fila muestra el certificado con su emisor y su caducidad. Los dos certificados de B tienen el mismo nombre y se distinguen por la columna CA Issuer: B y A; el cruzado caduca antes.",
+      "note": "El número de serie completo figura en la ficha de cada certificado."
+    },
+    {
+      "title": "Abrir la identidad",
+      "body": "La identidad es el certificado de entidad final cuya validez se comprueba desde A."
+    },
+    {
+      "title": "Identidad y validación externa",
+      "body": "La ficha muestra como emisor a la emisora de B. La validación desde A, hecha fuera de la grabación, aceptó la ruta identidad → emisora → B cruzado → A cuando se entregaron ambas intermedias.",
+      "note": "Sin el certificado cruzado, sin la emisora o con la raíz ajena como ancla la validación falló; con B como ancla hay una ruta alternativa más corta."
+    }
+  ]
+}

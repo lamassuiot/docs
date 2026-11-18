@@ -68,7 +68,20 @@ El siguiente recorrido muestra una malla parcial con A ↔ B, A → C y B → C.
 
 Una PKI híbrida combina jerarquías de CAs subordinadas con certificaciones cruzadas. Puede aparecer, por ejemplo, cuando dos organizaciones con jerarquías propias necesitan interoperar sin reemplazar sus raíces. Las ramas mantienen su estructura, pero las rutas entre ellas añaden complejidad a la distribución de certificados, a la revocación y a la interpretación de políticas.
 
-Una demo puede partir de dos raíces A y B, con una intermedia emisora bajo B, y añadir A → B. Desde el ancla A, el consumidor debe disponer del certificado de B firmado por A y de la intermedia de B para validar la identidad final. Comprueba también el fallo cuando falta un enlace y las posibles rutas alternativas.
+Para demostrarlo, crea las raíces A y B, una intermedia emisora bajo B y una identidad emitida por ella, y añade A → B. Desde el ancla A, el consumidor debe disponer del certificado de B firmado por A y de la intermedia de B para validar la identidad final. Comprueba también el fallo cuando falta un enlace y las posibles rutas alternativas.
+
+El siguiente recorrido parte de esas CAs, ya preparadas antes de la grabación, y realiza la firma cruzada A → B con la operación **Cross Sign**. Después compara la tabla, la jerarquía y el grafo de autoridades: B aparece dos veces, como raíz autofirmada y bajo A, con la misma clave y distinto emisor. La guía de cada paso describe las validaciones, que se realizaron fuera de la consola.
+
+<HybridModelDemo locale="es" />
+
+Con OpenSSL, usando solo A como ancla y el certificado cruzado de B junto con la intermedia como material auxiliar, la ruta `identidad → intermedia → B (cruzado) → A` valida:
+
+```sh
+cat A-signs-B.pem B-Issuing.pem > chain.pem
+openssl verify -no-CApath -no-CAstore -CAfile A.pem -untrusted chain.pem identity.pem
+```
+
+La validación falla si se omite el certificado cruzado, si falta la intermedia o si se usa como ancla una raíz sin relación con A y B. Si el validador también confía en B, puede elegir la ruta directa, más corta y sin pasar por A: el certificado cruzado no la hace innecesaria. El cruzado tiene su propia caducidad (en la demo, tres años), anterior a la de la raíz B y a la de la intermedia, de modo que la ruta por A deja de validar a la intermedia antes que la directa. Los certificados de la demo no contienen políticas de certificado, restricciones de nombre, restricciones de política ni longitud máxima de ruta, y la operación **Cross Sign** de esta versión no ofrece controles para ellos. Por eso la demo no prueba conformidad con el RFC 5217, solo la construcción de la ruta con las extensiones básicas.
 
 ### Punto de confianza unificador
 

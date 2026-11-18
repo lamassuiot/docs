@@ -40,7 +40,17 @@ The consumer keeps its own trust store. EST `/cacerts` can distribute the servic
 
 A PCA is the principal CA designated for relationships between PKIs; an identity is an end-entity certificate. The first four rows describe architectures within a PKI, the next three relationships between domains, and the last a trust model external to those relationships. An ordinary intermediate alone does not demonstrate a unifying CA.
 
+Each diagram below is a short sequence of steps you can play, pause or jump between. A CA is drawn as what it is — a key pair — with one row per certificate issued for that key: a root starts with its self-signed certificate and gains a second row when another CA cross-signs it, same subject and same key under a different issuer. Rows a later step will fill are outlined from the start. Solid arrows indicate certificate issuance; dashed arrows indicate configured trust or distribution, as labeled. The green trace is a validation path: it runs from the identity back to the anchor, opposite to the issuance arrows. An available path is not necessarily accepted by a validator.
+
 ### Single CA and hierarchy
+
+A single CA signs identities directly:
+
+<TrustDiagram model="single-ca" locale="en" />
+
+A hierarchy separates the root from issuing CAs:
+
+<TrustDiagram model="hierarchy" locale="en" />
 
 A single-CA PKI uses a self-signed root to issue identities directly. It is easy to understand and useful for an initial test, but concentrates issuance and trust in one key. If that key is compromised, the anchor must be replaced and affected identities renewed.
 
@@ -54,6 +64,14 @@ The following interactive walkthrough shows both scenarios in the console: the s
 
 ### Direct cross-certification and mesh
 
+Bilateral cross-certification: each domain keeps its anchor. Validating B from A uses B’s certificate signed by A; the reverse direction requires the opposite signature.
+
+<TrustDiagram model="cross-sign" locale="en" />
+
+Example partial mesh: the C → A and C → B signatures are absent; reciprocity must not be assumed.
+
+<TrustDiagram model="mesh" locale="en" />
+
 Cross-certification lets one CA issue a certificate for another CA's public key. A consumer trusting A can then build a path to an identity issued by B using B's certificate signed by A. B's self-signed certificate can remain available for its own consumers. For consumers trusting B to validate identities from A, a signature in the opposite direction and a path accepted by their validator are needed.
 
 A mesh extends this relationship to several CAs: it is full when every CA signs every other CA, and partial when some links are missing. A full mesh offers direct links but increases the number of relationships to manage; a partial mesh reduces links but may leave paths missing or harder to build. A path shown in a graph is not necessarily acceptable to a validator.
@@ -65,6 +83,10 @@ The following walkthrough shows a partial mesh with A ↔ B, A → C and B → C
 <CrossSignDemo locale="en" />
 
 ### Hybrid model
+
+Two hierarchies keep their roots and A signs CA B. From anchor A, the chain to identity B includes B’s cross-certificate and intermediate B.
+
+<TrustDiagram model="hybrid" locale="en" />
 
 A hybrid PKI combines hierarchies of subordinate CAs with cross-certification. It can arise when two organizations with their own hierarchies need to interoperate without replacing their roots. Each branch retains its structure, but paths between them make certificate distribution, revocation and policy interpretation more complex.
 
@@ -85,6 +107,10 @@ Validation fails if the cross certificate is omitted, if the intermediate is mis
 
 ### Unifying trust point
 
+Relying parties validating both domains use the unifying CA as their anchor and the PCAs’ cross-certificates.
+
+<TrustDiagram model="unifying" locale="en" />
+
 This model adds a superior CA that unilaterally signs the PCAs of participating domains. Each PCA can keep its self-signed certificate and existing operation; consumers that need cross-domain validation use the unifying CA as their anchor and obtain the required cross-certificates.
 
 The benefit is a common trust point without necessarily rebuilding existing PKIs. In exchange, participants must distribute and govern the new anchor, agree policies and assess the impact of its compromise or replacement. A consumer needing only its own domain can continue to trust its existing PCA.
@@ -93,6 +119,10 @@ For the demo, first create two self-signed PCAs, then the links Unifier → PCA-
 
 ### Bridge CA
 
+Each domain keeps its anchor. Signatures in both directions allow paths A → bridge → B and B → bridge → A.
+
+<TrustDiagram model="bridge" locale="en" />
+
 A bridge CA connects domains that retain their own anchors. To validate an identity from B using A as the anchor, the path can follow A → Bridge → B; the opposite direction requires the corresponding links. The bridge must not become a domain anchor and does not issue end-entity certificates except those required for its own operation.
 
 Centralizing relationships through a bridge can reduce direct agreements, but requires shared governance, documented policies, policy mapping and consistent constraints. It also increases the importance of validators discovering and processing paths and extensions correctly.
@@ -100,6 +130,14 @@ Centralizing relationships through a bridge can reduce direct agreements, but re
 For the demo, create two PCAs and a bridge CA, establish the links needed in both directions, and validate an identity from each domain using the other's anchor. Inspect the extensions and document any RFC requirement that the deployed version or validator cannot verify: a connected graph alone does not demonstrate a complete bridge model.
 
 ### Trust lists
+
+Local list: the relying party configures both roots as anchors, without cross-signatures between them.
+
+<TrustDiagram model="trust-list-local" locale="en" />
+
+Trust authority: an entity maintains a shared list that relying parties use according to their configuration.
+
+<TrustDiagram model="trust-list-authority" locale="en" />
 
 A trust list allows a consumer to accept several PKIs by explicitly installing their anchors, without the CAs cross-certifying one another. The list may be managed locally or by a trust authority for multiple consumers. This is a direct approach, although managing additions, removals and updates becomes harder as the number of consumers grows.
 

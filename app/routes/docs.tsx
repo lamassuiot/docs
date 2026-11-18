@@ -25,6 +25,7 @@ import { Navigate, useLocation } from "react-router";
 import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions";
 import { ArchitectureDiagram } from "@/components/architecture-diagram";
 import { CreateCaDemo } from "@/components/create-ca-demo";
+import { CrossSignDemo } from "@/components/cross-sign-demo";
 import {
   type AffectedPages,
   DiffText,
@@ -32,14 +33,14 @@ import {
   type PageDiff,
 } from "@/components/diff-toggle";
 import { DmsEstDemo } from "@/components/dms-est-demo";
+import { HybridModelDemo } from "@/components/hybrid-model-demo";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { MdxCard, MdxLink } from "@/components/mdx-link";
 import { Mermaid } from "@/components/mermaid";
 import { RevokeCertificateDemo } from "@/components/revoke-certificate-demo";
-import { TrustModelsDemo } from "@/components/trust-models-demo";
-import { CrossSignDemo } from "@/components/cross-sign-demo";
-import { HybridModelDemo } from "@/components/hybrid-model-demo";
 import { ScalarIcon } from "@/components/scalar-icon";
+import { TrustDiagram } from "@/components/trust-diagram";
+import { TrustModelsDemo } from "@/components/trust-models-demo";
 import { VersionSelector } from "@/components/version-selector";
 import { asset } from "@/lib/asset";
 import { DOCS_BASE_PATH, docsPath } from "@/lib/base-path";
@@ -323,6 +324,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               CreateCaDemo,
               DmsEstDemo,
               RevokeCertificateDemo,
+              TrustDiagram,
               TrustModelsDemo,
               CrossSignDemo,
               HybridModelDemo,

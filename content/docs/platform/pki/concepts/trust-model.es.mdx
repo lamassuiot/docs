@@ -40,7 +40,17 @@ El [RFC 5217](https://www.rfc-editor.org/rfc/rfc5217.html) distingue la estructu
 
 PCA es la CA principal designada para las relaciones entre PKIs; una identidad es un certificado de entidad final. Las primeras cuatro filas describen arquitecturas dentro de una PKI; las tres siguientes, relaciones entre dominios, y la última, un modelo externo a esas relaciones. Una intermedia ordinaria no demuestra por sí sola una CA unificadora.
 
+Cada diagrama es una secuencia breve de pasos que puedes reproducir, pausar o recorrer. Una CA se dibuja como lo que es —un par de claves— con una fila por cada certificado emitido para esa clave: una raíz empieza con su certificado autofirmado y gana una segunda fila cuando otra CA la firma de forma cruzada, con el mismo sujeto y la misma clave bajo un emisor distinto. Las filas que completará un paso posterior aparecen perfiladas desde el principio. Las flechas continuas indican emisión de certificados; las discontinuas indican confianza configurada o distribución, según su etiqueta. El trazo verde es un camino de validación: va desde la identidad hasta el ancla, en sentido inverso a las flechas de emisión. La disponibilidad de un camino no garantiza que el verificador lo acepte.
+
 ### CA única y jerarquía
+
+Una CA única firma directamente las identidades:
+
+<TrustDiagram model="single-ca" locale="es" />
+
+Una jerarquía separa la raíz de las CA emisoras:
+
+<TrustDiagram model="hierarchy" locale="es" />
 
 Una PKI de CA única utiliza una raíz autofirmada para emitir directamente las identidades. Es fácil de entender y resulta útil para una primera prueba, pero concentra la emisión y la confianza en una sola clave. Si esa clave se compromete, hay que sustituir el ancla y renovar las identidades afectadas.
 
@@ -54,6 +64,14 @@ El siguiente recorrido interactivo muestra ambos escenarios en la consola: la ra
 
 ### Firma cruzada directa y malla
 
+Firma cruzada bilateral: cada dominio conserva su ancla. Para validar B desde A se usa el certificado de B firmado por A; para el sentido inverso hace falta la firma opuesta.
+
+<TrustDiagram model="cross-sign" locale="es" />
+
+Ejemplo de malla parcial: faltan las firmas C → A y C → B; no se debe asumir reciprocidad.
+
+<TrustDiagram model="mesh" locale="es" />
+
 La firma cruzada permite que una CA emita un certificado para la clave pública de otra CA. Así, un consumidor que confía en A puede construir una ruta hacia una identidad emitida por B usando el certificado de B firmado por A. El certificado autofirmado de B puede seguir existiendo para sus propios consumidores. Para que los consumidores que confían en B también puedan validar identidades de A, hace falta una firma en el sentido contrario y una ruta aceptada por su validador.
 
 Una malla extiende esta relación a varias CAs: es completa cuando cada CA firma a todas las demás y parcial cuando faltan enlaces. La completa ofrece enlaces directos, pero aumenta el número de relaciones que administrar; la parcial reduce enlaces, aunque puede dejar rutas inexistentes o más difíciles de construir. No debe suponerse que una ruta es aceptable solo porque aparece en un grafo.
@@ -65,6 +83,10 @@ El siguiente recorrido muestra una malla parcial con A ↔ B, A → C y B → C.
 <CrossSignDemo locale="es" />
 
 ### Modelo híbrido
+
+Dos jerarquías mantienen sus raíces y A firma la CA B. Desde el ancla A, la cadena hasta la identidad B incluye el certificado cruzado de B y la intermedia B.
+
+<TrustDiagram model="hybrid" locale="es" />
 
 Una PKI híbrida combina jerarquías de CAs subordinadas con certificaciones cruzadas. Puede aparecer, por ejemplo, cuando dos organizaciones con jerarquías propias necesitan interoperar sin reemplazar sus raíces. Las ramas mantienen su estructura, pero las rutas entre ellas añaden complejidad a la distribución de certificados, a la revocación y a la interpretación de políticas.
 
@@ -85,6 +107,10 @@ La validación falla si se omite el certificado cruzado, si falta la intermedia 
 
 ### Punto de confianza unificador
 
+Los verificadores que necesitan validar ambos dominios usan la CA unificadora como ancla y los certificados cruzados de las PCA.
+
+<TrustDiagram model="unifying" locale="es" />
+
 Este modelo incorpora una CA superior que firma unilateralmente las PCA de los dominios participantes. Cada PCA puede conservar su certificado autofirmado y su funcionamiento anterior; los consumidores que necesiten validar entre dominios utilizan la CA unificadora como ancla y obtienen los certificados cruzados necesarios.
 
 La ventaja es ofrecer un punto común de confianza sin reconstruir necesariamente las PKIs existentes. A cambio, hay que distribuir y gobernar esa nueva ancla, acordar políticas y evaluar el impacto de su compromiso o sustitución. Un consumidor que solo necesita su dominio puede continuar confiando en su PCA anterior.
@@ -93,6 +119,10 @@ En la demo, crea primero dos PCA autofirmadas y después los enlaces Unificadora
 
 ### CA puente
 
+Cada dominio mantiene su ancla. Las firmas en ambos sentidos permiten construir caminos A → puente → B y B → puente → A.
+
+<TrustDiagram model="bridge" locale="es" />
+
 La CA puente conecta dominios que mantienen sus propias anclas. Para validar una identidad de B desde A, la ruta puede seguir A → Puente → B; para el sentido opuesto se necesitan los enlaces correspondientes. La puente no debe convertirse en el ancla de los dominios y no emite certificados de entidad final salvo los necesarios para su propia operación.
 
 Centralizar relaciones en una puente puede reducir el número de acuerdos directos, pero exige gobierno compartido, políticas documentadas, mapeo de políticas y restricciones coherentes. También aumenta la importancia de que los validadores puedan descubrir y procesar correctamente rutas y extensiones.
@@ -100,6 +130,14 @@ Centralizar relaciones en una puente puede reducir el número de acuerdos direct
 Para la demo, crea dos PCA y una CA puente, establece los enlaces necesarios en ambos sentidos y valida una identidad de cada dominio desde el ancla del otro. Inspecciona las extensiones y documenta cualquier requisito del RFC que la versión o el validador no permitan verificar: un grafo conectado por sí solo no demuestra un modelo puente completo.
 
 ### Listas de confianza
+
+Lista local: el verificador configura ambas raíces como anclas, sin firmas cruzadas entre ellas.
+
+<TrustDiagram model="trust-list-local" locale="es" />
+
+Autoridad de confianza: una entidad mantiene una lista compartida y los verificadores la utilizan conforme a su configuración.
+
+<TrustDiagram model="trust-list-authority" locale="es" />
 
 Una lista de confianza permite a un consumidor aceptar varias PKIs instalando explícitamente sus anclas, sin que las CAs se certifiquen entre sí. La lista puede administrarse localmente o por una autoridad de confianza para varios consumidores. Es un enfoque directo, aunque mantener las altas, bajas y actualizaciones resulta más difícil a medida que crece el número de consumidores.
 

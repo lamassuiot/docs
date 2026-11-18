@@ -36,6 +36,8 @@ import { ImageLightbox } from "@/components/image-lightbox";
 import { MdxCard, MdxLink } from "@/components/mdx-link";
 import { Mermaid } from "@/components/mermaid";
 import { RevokeCertificateDemo } from "@/components/revoke-certificate-demo";
+import { TrustModelsDemo } from "@/components/trust-models-demo";
+import { CrossSignDemo } from "@/components/cross-sign-demo";
 import { ScalarIcon } from "@/components/scalar-icon";
 import { VersionSelector } from "@/components/version-selector";
 import { asset } from "@/lib/asset";
@@ -320,6 +322,8 @@ const clientLoader = browserCollections.docs.createClientLoader({
               CreateCaDemo,
               DmsEstDemo,
               RevokeCertificateDemo,
+              TrustModelsDemo,
+              CrossSignDemo,
               Mermaid,
             }}
           />

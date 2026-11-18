@@ -1,0 +1,94 @@
+{
+  "steps": [
+    {
+      "title": "Abrir la lista de CAs",
+      "body": "La vista de Certification Authorities muestra cada autoridad de esta instancia de demostración. Se han preparado dos escenarios independientes: una CA raíz aislada y una jerarquía de dos niveles.",
+      "note": "Las CAs mostradas se prepararon antes de la grabación; las claves privadas nunca salen del KMS."
+    },
+    {
+      "title": "Vista de jerarquía",
+      "body": "La vista de jerarquía dibuja una flecha desde cada emisor hacia las CAs que firmó. Demo-Root → Demo-Issuing es la cadena del segundo escenario, mientras que Demo-Single queda aislada como ancla propia.",
+      "note": "Las flechas apuntan del emisor a la CA emitida, igual que la notación A → B de la documentación del modelo de confianza."
+    },
+    {
+      "title": "CA raíz aislada",
+      "body": "Demo-Single es una raíz autofirmada sin padre. Emite identidades de extremo directamente, sin nivel intermedio.",
+      "note": "En un modelo de CA única la profundidad de la cadena es uno; toda identidad se valida contra la propia raíz."
+    },
+    {
+      "title": "Certificado público de la CA",
+      "body": "La pestaña Certificate PEM muestra el certificado público de Demo-Single. Este es el material que una parte confidente instalaría como ancla de confianza.",
+      "note": "Solo se muestra el certificado público; la clave de firma permanece en el KMS."
+    },
+    {
+      "title": "Descargar el ancla",
+      "body": "Descargar el archivo .pem proporciona los bytes exactos para usarlos como CAfile en un validador externo como OpenSSL.",
+      "note": "La validación mostrada en esta guía se ejecutó fuera de la grabación: openssl verify devuelve OK para la identidad contra este ancla."
+    },
+    {
+      "title": "Certificados emitidos",
+      "body": "La vista de Certificates lista cada certificado de extremo. Ambas identidades de demostración aparecen aquí con su CA emisora.",
+      "note": "Los dispositivos de datos de ejemplo también aparecen en la tabla; las identidades de la demo son las dos entradas Demo*."
+    },
+    {
+      "title": "Identidad del escenario único",
+      "body": "Esta identidad fue emitida por Demo-Single. Su vista de detalle muestra el emisor, el periodo de validez y la cadena de dos certificados.",
+      "note": "La CSR se preparó antes de la grabación, por lo que la clave privada nunca se expuso en el flujo del navegador."
+    },
+    {
+      "title": "PEM del certificado hoja",
+      "body": "La pestaña Certificate PEM muestra el certificado hoja y la cadena completa, que en este escenario es hoja más raíz.",
+      "note": "El paquete de cadena completa ya contiene todo lo que OpenSSL necesita cuando la raíz no está instalada localmente."
+    },
+    {
+      "title": "Descargar la identidad",
+      "body": "Descargar el .pem del certificado hoja completa el par necesario para la validación externa: identidad más ancla.",
+      "note": "openssl verify -CAfile demo-single.pem identity.pem devuelve OK para este certificado."
+    },
+    {
+      "title": "Volver a la lista de CAs",
+      "body": "El segundo escenario usa una jerarquía de dos niveles, así que volvemos a Certification Authorities para inspeccionar Demo-Root.",
+      "note": "La vista de tabla se reinicia al navegar; se vuelve a pulsar el radio de jerarquía antes de abrir la siguiente CA."
+    },
+    {
+      "title": "Vista de jerarquía otra vez",
+      "body": "Volver a la vista de jerarquía mantiene visible la relación emisor-emitida mientras se abre la raíz.",
+      "note": "Esta vista se genera del inventario de CAs en vivo; refleja los mismos datos que la tabla."
+    },
+    {
+      "title": "Ancla de la jerarquía",
+      "body": "Demo-Root es el ancla autofirmada del segundo escenario. Firma a Demo-Issuing, que a su vez emite identidades de extremo.",
+      "note": "La CA intermedia tiene una validez menor (5y) que la raíz (10y), de forma que expira primero por diseño."
+    },
+    {
+      "title": "Certificados de nuevo",
+      "body": "De vuelta en la vista de Certificates, la identidad de la jerarquía aparece con Demo-Issuing como su CA.",
+      "note": "La columna CA Issuer muestra el emisor directo, no la raíz de la cadena."
+    },
+    {
+      "title": "Identidad de la jerarquía",
+      "body": "Esta identidad fue emitida por Demo-Issuing, un nivel por debajo del ancla. Su cadena tiene tres certificados: hoja, intermedia, raíz.",
+      "note": "Esta es la jerarquía estándar de profundidad 2 al estilo de las implementaciones de RFC 5217."
+    },
+    {
+      "title": "Cadena de tres certificados",
+      "body": "La pestaña Certificate PEM muestra la hoja y una cadena completa de dos certificados. La intermedia aquí es material auxiliar, no un ancla de confianza.",
+      "note": "Las partes confidentes instalan solo Demo-Root como ancla; la intermedia viaja como entrada no confiable al constructor de rutas."
+    },
+    {
+      "title": "Descargar la hoja de la jerarquía",
+      "body": "Descargar este .pem de hoja da el tercer archivo de la validación de la jerarquía: hoja, intermedia, ancla.",
+      "note": "openssl verify -CAfile demo-root.pem -untrusted demo-issuing.pem identity.pem devuelve OK."
+    },
+    {
+      "title": "Cierre",
+      "body": "Volvemos a la lista de CAs para cerrar con la vista de jerarquía, comparando ambos modelos de confianza lado a lado.",
+      "note": "La instancia de demostración es desechable; ninguno de estos datos se comparte con un entorno de producción."
+    },
+    {
+      "title": "Ambos modelos de un vistazo",
+      "body": "Demo-Root → Demo-Issuing forma la jerarquía; Demo-Single es un ancla independiente. Un validador anclado en Demo-Single rechaza la identidad de la jerarquía, y viceversa.",
+      "note": "El fallo con ancla incorrecta se verificó fuera de la grabación: OpenSSL informa 'unable to get local issuer certificate' cuando se usa Demo-Single para validar la identidad de la jerarquía."
+    }
+  ]
+}

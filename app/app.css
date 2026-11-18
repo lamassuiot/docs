@@ -1470,3 +1470,513 @@ html[data-show-diff] .lm-diff-merged {
   }
 }
 
+
+/* ── Trust model diagrams ────────────────────────────────────────────────
+   Animated replacements for the trust-model flowcharts, rendered by
+   app/components/trust-diagram.tsx from the scenes in app/lib/trust-models.ts.
+
+   The palette mirrors app/lib/mermaid-theme.ts so these diagrams and the
+   remaining mermaid ones read as the same family. Nodes carry their layout in
+   an SVG `transform` attribute, so CSS only ever animates `opacity` on them;
+   the groups that do move (certificate chips) are nested one level deeper,
+   where a CSS `transform` has nothing to override. */
+.lm-td {
+  --td-surface: #ffffff;
+  --td-surface-2: #f6f6f5;
+  --td-line: #9a9aa2;
+  --td-text: #171718;
+  --td-muted: #6b6b6b;
+  --td-accent: #0100f8;
+  --td-accent-soft: #e9e9ff;
+  --td-accent-fg: #ffffff;
+  --td-arrow: #5b5bd8;
+  --td-warm: #cc5411;
+  --td-green: #13804d;
+  --td-red: #c53030;
+  --td-red-soft: #fbeaea;
+
+  margin: 1.5rem 0;
+  border: 1px solid var(--color-fd-border);
+  background-color: var(--color-fd-background);
+}
+
+.dark .lm-td {
+  --td-surface: #0e0f12;
+  --td-surface-2: #16171b;
+  --td-line: #5a5b63;
+  --td-text: #f3f3f4;
+  --td-muted: #9f9fa3;
+  --td-accent: #8f97ff;
+  --td-accent-soft: #1b1e4d;
+  --td-accent-fg: #08090b;
+  --td-arrow: #7c84f0;
+  --td-warm: #ff9b4a;
+  --td-green: #5fd49a;
+  --td-red: #ff7a7a;
+  --td-red-soft: #2a1414;
+}
+
+.lm-td-stage {
+  padding: 0.75rem 0.75rem 0.25rem;
+  overflow-x: auto;
+}
+
+.lm-td-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Below this the labels stop being legible; the stage scrolls instead. */
+  min-width: 620px;
+}
+
+/* ── Nodes ──────────────────────────────────────────────────────────────── */
+
+.lm-td-node {
+  opacity: 0;
+  transition: opacity 420ms ease;
+}
+
+.lm-td-node.is-on {
+  opacity: 1;
+}
+
+.lm-td-card {
+  fill: var(--td-surface);
+  stroke: var(--td-line);
+  stroke-width: 1;
+  transition: stroke 300ms ease;
+}
+
+.lm-td-node.is-ca {
+  color: var(--td-accent);
+}
+
+.lm-td-node.is-ca .lm-td-card {
+  stroke: var(--td-accent);
+}
+
+.lm-td-node.is-party,
+.lm-td-node.is-list {
+  color: var(--td-warm);
+}
+
+.lm-td-node.is-party .lm-td-card,
+.lm-td-node.is-list .lm-td-card {
+  stroke: var(--td-warm);
+}
+
+.lm-td-node.is-leaf {
+  color: var(--td-muted);
+}
+
+.lm-td-node.is-leaf .lm-td-card {
+  fill: var(--td-surface-2);
+}
+
+.lm-td-node.is-fail .lm-td-card {
+  stroke: var(--td-red);
+}
+
+.lm-td-rule {
+  stroke: var(--td-line);
+  stroke-width: 1;
+  opacity: 0.35;
+}
+
+.lm-td-glyph circle,
+.lm-td-glyph path,
+.lm-td-glyph rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lm-td-title,
+.lm-td-sub,
+.lm-td-leaf-label,
+.lm-td-slot-label,
+.lm-td-edge-label {
+  dominant-baseline: middle;
+}
+
+.lm-td-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  fill: var(--td-text);
+}
+
+.lm-td-sub {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  fill: var(--td-muted);
+}
+
+.lm-td-leaf-label {
+  font-size: 12px;
+  font-weight: 500;
+  fill: var(--td-text);
+}
+
+/* The "ANCHOR" flag: which certificate the relying party starts from. */
+.lm-td-anchor-tag rect {
+  fill: var(--td-accent);
+}
+
+.lm-td-anchor-tag text {
+  fill: var(--td-accent-fg);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lm-td-anchor-tag {
+    animation: lm-td-pop 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes lm-td-pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Certificate chips ──────────────────────────────────────────────────
+   One row per certificate held by the same key. Rows a later phase will fill
+   are reserved from the start as a dashed outline, so the card never resizes
+   and the reader can see that a second certificate is possible before it
+   exists. */
+
+.lm-td-slot {
+  color: var(--td-muted);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: opacity 420ms ease;
+}
+
+/* The card this row belongs to does not exist yet. */
+.lm-td-slot.is-off {
+  opacity: 0;
+}
+
+.lm-td-slot rect {
+  fill: none;
+  stroke: var(--td-line);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.45;
+  transition:
+    fill 300ms ease,
+    stroke 300ms ease,
+    opacity 300ms ease;
+}
+
+.lm-td-slot .lm-td-glyph,
+.lm-td-slot-label {
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.lm-td-slot.is-on {
+  color: var(--td-accent);
+}
+
+.lm-td-slot.is-on rect {
+  fill: var(--td-accent-soft);
+  stroke: var(--td-accent);
+  stroke-dasharray: none;
+  opacity: 1;
+}
+
+.lm-td-slot.is-on .lm-td-glyph,
+.lm-td-slot.is-on .lm-td-slot-label {
+  opacity: 1;
+}
+
+.lm-td-slot-label {
+  font-size: 10.5px;
+  fill: var(--td-text);
+}
+
+.lm-td-slot.is-fail {
+  color: var(--td-red);
+}
+
+.lm-td-slot.is-fail rect {
+  fill: var(--td-red-soft);
+  stroke: var(--td-red);
+}
+
+.lm-td-strike {
+  stroke: var(--td-red);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+/* A certificate signed later flies in from the CA that signed it. */
+@media (prefers-reduced-motion: no-preference) {
+  .lm-td-slot.is-on.can-fly {
+    animation: lm-td-fly 760ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes lm-td-fly {
+  from {
+    opacity: 0;
+    transform: translate(var(--lm-td-dx, 0px), var(--lm-td-dy, 0px));
+  }
+  22% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+}
+
+/* ── Edges ──────────────────────────────────────────────────────────────
+   Solid is a signature, dashed is configured trust or distribution, and a
+   crossed-out dotted line is a link that deliberately does not exist. */
+
+.lm-td-edge {
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+
+.lm-td-edge.is-on {
+  opacity: 1;
+}
+
+.lm-td-line {
+  fill: none;
+  stroke: var(--td-arrow);
+  stroke-width: 1.4;
+}
+
+.lm-td-head {
+  fill: var(--td-arrow);
+}
+
+.lm-td-edge.is-trust .lm-td-line {
+  stroke: var(--td-line);
+  stroke-dasharray: 5 4;
+}
+
+.lm-td-edge.is-trust .lm-td-head {
+  fill: var(--td-line);
+}
+
+.lm-td-edge.is-ghost .lm-td-line {
+  stroke: var(--td-muted);
+  stroke-dasharray: 2 5;
+  opacity: 0.6;
+}
+
+.lm-td-edge.is-ghost .lm-td-head {
+  display: none;
+}
+
+.lm-td-edge.is-fail .lm-td-line {
+  stroke: var(--td-red);
+  opacity: 0.55;
+}
+
+.lm-td-edge.is-fail .lm-td-head {
+  fill: var(--td-red);
+}
+
+.lm-td-cross {
+  stroke: var(--td-red);
+  stroke-width: 2;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.lm-td-edge-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  fill: var(--td-muted);
+  text-anchor: middle;
+  stroke: var(--color-fd-background);
+  stroke-width: 5;
+  paint-order: stroke;
+}
+
+/* Signatures draw themselves along the arrow; everything else just fades. */
+@media (prefers-reduced-motion: no-preference) {
+  .lm-td-edge.is-issue .lm-td-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 680ms cubic-bezier(0.33, 1, 0.68, 1);
+  }
+
+  .lm-td-edge.is-issue.is-on .lm-td-line {
+    stroke-dashoffset: 0;
+  }
+
+  .lm-td-edge.is-issue .lm-td-head {
+    opacity: 0;
+    transition: opacity 240ms ease 440ms;
+  }
+
+  .lm-td-edge.is-issue.is-on .lm-td-head {
+    opacity: 1;
+  }
+}
+
+/* ── Validation path ────────────────────────────────────────────────────
+   One stroke per hop, drawn from the end-entity certificate back to the
+   anchor — the opposite direction to the issuance arrows it runs over. */
+
+.lm-td-trace {
+  fill: none;
+  stroke: var(--td-green);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lm-td-trace {
+    stroke-dasharray: 1;
+    stroke-dashoffset: -1;
+    animation: lm-td-trace 820ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  }
+}
+
+@keyframes lm-td-trace {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+
+.lm-td-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-top: 1px solid var(--color-fd-border);
+  background-color: var(--color-fd-muted);
+}
+
+.lm-td-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--color-fd-border);
+  background-color: var(--color-fd-background);
+  color: var(--color-fd-foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.lm-td-play:hover {
+  border-color: var(--td-accent);
+  color: var(--td-accent);
+}
+
+.lm-td-play svg {
+  width: 13px;
+  height: 13px;
+}
+
+.lm-td-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lm-td-steps li {
+  margin: 0;
+  padding: 0;
+}
+
+.lm-td-steps li::marker {
+  content: none;
+}
+
+.lm-td-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--color-fd-muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.lm-td-step:hover {
+  color: var(--color-fd-foreground);
+}
+
+.lm-td-step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1px solid var(--color-fd-border);
+  background-color: var(--color-fd-background);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+.lm-td-step.is-done .lm-td-step-n {
+  border-color: var(--td-accent);
+  color: var(--td-accent);
+}
+
+.lm-td-step.is-current {
+  border-color: var(--td-accent);
+  color: var(--color-fd-foreground);
+  font-weight: 500;
+}
+
+.lm-td-step.is-current .lm-td-step-n {
+  border-color: var(--td-accent);
+  background-color: var(--td-accent);
+  color: var(--td-accent-fg);
+}
+
+.lm-td-play:focus-visible,
+.lm-td-step:focus-visible {
+  outline: 2px solid var(--lm-control);
+  outline-offset: 2px;
+}
+
+.lm-td-caption {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-top: 1px solid var(--color-fd-border);
+  color: var(--color-fd-muted-foreground);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .lm-td-step-l {
+    display: none;
+  }
+}

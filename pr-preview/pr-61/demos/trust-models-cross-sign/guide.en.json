@@ -1,0 +1,50 @@
+{
+  "steps": [
+    {
+      "title": "Independent domains",
+      "body": "The three synthetic roots use different keys in the KMS. Each domain issued one identity."
+    },
+    {
+      "title": "Available operation",
+      "body": "Cross Sign lets you select a signing CA and a target CA. The screen states that both private keys must be in the KMS.",
+      "note": "The certificates were prepared through the API before recording; this demo does not perform the operation on screen."
+    },
+    {
+      "title": "Prepared inventory",
+      "body": "All three self-signed roots were retained and four additional certificates were created: A → B, B → A, A → C and B → C."
+    },
+    {
+      "title": "Hierarchy view",
+      "body": "The hierarchy shows each CA certificate as a separate entry under its issuing certificate. The self-signed versions remain roots."
+    },
+    {
+      "title": "Certificates and issuers",
+      "body": "Entries with the same subject name represent different certificates. The visible parent identifies which root signed each cross-certificate."
+    },
+    {
+      "title": "Key graph",
+      "body": "The graph groups certificates by key: A and B are joined by a double arrow and both point to C. C has no outgoing links."
+    },
+    {
+      "title": "Partial mesh",
+      "body": "Only A and B have reciprocal links. C → A and C → B are missing, so this is not a full mesh."
+    },
+    {
+      "title": "Certificate table",
+      "body": "The table distinguishes certificates by Common Name, CA Issuer and serial number, and also lists the issued identities."
+    },
+    {
+      "title": "B identity",
+      "body": "Demo-B issued B’s identity. Its details show the validity and the two-certificate chain selected by the interface."
+    },
+    {
+      "title": "Public certificate",
+      "body": "Certificate PEM displays the public certificate; the identity’s private key is not shown."
+    },
+    {
+      "title": "External validation",
+      "body": "OpenSSL validated B’s identity from A using A → B as an intermediate, and A’s identity from B using B → A. Before B → A was created, A’s identity did not validate from B when no intermediates were supplied.",
+      "note": "The observed profile supports validity, usages, subject, algorithm and CA type; controls for the examined policy and name constraint extensions were not observed. The explicit policy test failed."
+    }
+  ]
+}

@@ -22,6 +22,151 @@ Who accepts the result [#who-accepts-the-result]
 
 The consumer keeps its own trust store. EST `/cacerts` can distribute the service TLS certificate, the enrollment CA and selected managed CAs. Initial trust for authenticating that service must come from an already trusted channel. Download and inspect the contents: do not assume they form a complete chain or install every entry as a root.
 
+<div className="lm-diff-ins lm-diff-block">
+  Trust architectures and interoperability [#trust-architectures-and-interoperability]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  [RFC 5217](https://www.rfc-editor.org/rfc/rfc5217.html) distinguishes a PKI's internal structure from relationships between domains. Below, `A → B` means A signs a CA certificate for B. Validation starts at the relying party's chosen anchor; a signature in one direction does not imply reciprocal trust.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Model                      | Structure                                                                                  | Considerations                                                                                                                          |
+  | -------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+  | Single CA                  | `CA → identity`.                                                                           | The root issues identities directly; its compromise affects all of them.                                                                |
+  | Hierarchical               | `Root → intermediate → identity`.                                                          | Distribute the root and present intermediates; constrain depth, uses and validity.                                                      |
+  | Full or partial mesh       | Self-signed CAs cross-certify each other; a partial mesh has missing links.                | Check each direction and anchor: some domains may be unreachable in a partial mesh.                                                     |
+  | Hybrid                     | Combines hierarchies and cross-certification links.                                        | Document alternative paths and constraints; consumers may build or accept different paths.                                              |
+  | Unifying trust point       | `Unifying CA → PCA-A` and `Unifying CA → PCA-B`.                                           | Cross-domain validation requires trust in the unifying CA and access to cross-certificates. PCAs retain their self-signed certificates. |
+  | Direct cross-certification | `PCA-A → PCA-B`; add `PCA-B → PCA-A` for reciprocity.                                      | Each domain keeps its anchor; test both directions and restrict unwanted paths.                                                         |
+  | Bridge CA                  | `PCA-A → Bridge → PCA-B`; add reverse signatures for the opposite path.                    | The bridge is not a domain anchor and issues end-entity certificates only for its own operation. Agree policies and constraints.        |
+  | Trust list                 | The consumer trusts roots A and B, locally or through a trust authority managing the list. | Cross-certification is unnecessary. Distributing certificates does not install trust anchors; control updates and removal.              |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A PCA is the principal CA designated for relationships between PKIs; an identity is an end-entity certificate. The first four rows describe architectures within a PKI, the next three relationships between domains, and the last a trust model external to those relationships. An ordinary intermediate alone does not demonstrate a unifying CA.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Single CA and hierarchy [#single-ca-and-hierarchy]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A single-CA PKI uses a self-signed root to issue identities directly. It is easy to understand and useful for an initial test, but concentrates issuance and trust in one key. If that key is compromised, the anchor must be replaced and affected identities renewed.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  In a hierarchy, the root signs one or more intermediate CAs that issue identities. This separates, for example, production from testing or devices from services, and allows root usage to be restricted. Each consumer needs to trust the root and have the intermediates available to build the chain. The design must account for permitted depth, uses and expiration at each CA.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  In Lamassu, create a root and issue an identity for the first case; for the second, create an intermediate under another root and issue from it. Download the certificates and validate both chains from a consumer, including a test with an incorrect anchor.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The following interactive walkthrough shows both scenarios in the console: the standalone root and the hierarchy, with the public certificates and the downloaded identity certificates.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <TrustModelsDemo locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Direct cross-certification and mesh [#direct-cross-certification-and-mesh]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Cross-certification lets one CA issue a certificate for another CA's public key. A consumer trusting A can then build a path to an identity issued by B using B's certificate signed by A. B's self-signed certificate can remain available for its own consumers. For consumers trusting B to validate identities from A, a signature in the opposite direction and a path accepted by their validator are needed.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A mesh extends this relationship to several CAs: it is full when every CA signs every other CA, and partial when some links are missing. A full mesh offers direct links but increases the number of relationships to manage; a partial mesh reduces links but may leave paths missing or harder to build. A path shown in a graph is not necessarily acceptable to a validator.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  To demonstrate this, create roots A, B and C and test certificates. Start with A → B, validate an identity from B using A as the anchor, and check that the opposite direction is not covered until B → A is added. Add links to build a partial mesh and compare available paths. Control the certificates supplied to the validator so alternative paths can be identified.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The following walkthrough shows a partial mesh with A ↔ B, A → C and B → C. The certificates were prepared before recording; the guide describes validations performed outside the console.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <CrossSignDemo locale="en" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Hybrid model [#hybrid-model]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A hybrid PKI combines hierarchies of subordinate CAs with cross-certification. It can arise when two organizations with their own hierarchies need to interoperate without replacing their roots. Each branch retains its structure, but paths between them make certificate distribution, revocation and policy interpretation more complex.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A demo can start with roots A and B, an issuing intermediate under B, and the A → B link. From anchor A, the consumer needs B's certificate signed by A and B's intermediate to validate the final identity. Also check failure when a link is missing and look for alternative paths.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Unifying trust point [#unifying-trust-point]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  This model adds a superior CA that unilaterally signs the PCAs of participating domains. Each PCA can keep its self-signed certificate and existing operation; consumers that need cross-domain validation use the unifying CA as their anchor and obtain the required cross-certificates.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The benefit is a common trust point without necessarily rebuilding existing PKIs. In exchange, participants must distribute and govern the new anchor, agree policies and assess the impact of its compromise or replacement. A consumer needing only its own domain can continue to trust its existing PCA.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  For the demo, first create two self-signed PCAs, then the links Unifier → PCA-A and Unifier → PCA-B. Issue an identity from each domain and validate both from the unifying anchor; check that the cross-certificates correspond to the same keys as the original PCAs.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Bridge CA [#bridge-ca]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A bridge CA connects domains that retain their own anchors. To validate an identity from B using A as the anchor, the path can follow A → Bridge → B; the opposite direction requires the corresponding links. The bridge must not become a domain anchor and does not issue end-entity certificates except those required for its own operation.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Centralizing relationships through a bridge can reduce direct agreements, but requires shared governance, documented policies, policy mapping and consistent constraints. It also increases the importance of validators discovering and processing paths and extensions correctly.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  For the demo, create two PCAs and a bridge CA, establish the links needed in both directions, and validate an identity from each domain using the other's anchor. Inspect the extensions and document any RFC requirement that the deployed version or validator cannot verify: a connected graph alone does not demonstrate a complete bridge model.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Trust lists [#trust-lists]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A trust list allows a consumer to accept several PKIs by explicitly installing their anchors, without the CAs cross-certifying one another. The list may be managed locally or by a trust authority for multiple consumers. This is a direct approach, although managing additions, removals and updates becomes harder as the number of consumers grows.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  For the demo, create two independent roots and an identity under each. Validate both with a list containing both roots, then remove one root and check that the corresponding identity no longer validates. If you distribute certificates through EST `/cacerts`, show the consumer's decision to install them as anchors separately.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  What Lamassu can demonstrate [#what-lamassu-can-demonstrate]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  You can create roots and intermediates, issue identities and register external CAs as described in [Authorities](/docs/platform/pki/certificate-authorities). The dashboard code also includes a cross-signing operation that creates another certificate for the target CA's existing key, signed by the selected CA. Availability depends on the deployed version. In that flow both CAs must be active and have their private keys in the KMS; a certificate-only import is insufficient. Verify the public key and that the cross-certificate subject reproduces the target CA's subject: some imported subjects cannot be reproduced exactly.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  The operation can build links for these topologies, but the graph or issuance alone does not prove interoperability or full RFC conformance. Inspect `basicConstraints`, `keyCertSign`, validity, path length, and name and policy constraints. Verify `policyMappings` and `policyConstraints` availability and processing in the deployed version and each validator. Agree policies, assurance levels, publication and revocation across domains.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  For each path, download the identity and required CA certificates. Validate from the relying party with its explicit trust anchor and intermediates as auxiliary material; also test the reverse direction and a case that must fail. Repeat with the revocation and policy checks actually enforced by that consumer. See [Validation](/docs/platform/pki/certificate-validation) and [Trust distribution](/docs/platform/iot-fleets/enrollment/trust-distribution).
+</div>
+
 Identity flow [#identity-flow]
 
 1. The device proves it can enroll according to the DMS policy.

@@ -131,7 +131,7 @@ The re-enrollment trust set lives in `reenrollment_settings.est_rfc7030_settings
 
 Issuance profile [#issuance-profile]
 
-`settings.issuance_profile_id` takes precedence over `settings.issuance_profile`; without either, the CA default profile is used. Rules are documented once in [Profiles](/docs/platform/pki/certificate-profiles). DMS changes affect future requests; they do not modify signed certificates or install client trust.
+`settings.issuance_profile_id` takes precedence over `settings.issuance_profile`; without either, the CA default profile is used. The resolved profile — including the CA default used as fallback when the DMS defines none — must define an end-entity certificate: a `Sign as CA` profile is rejected at enrollment and re-enrollment time. Rules are documented once in [Profiles](/docs/platform/pki/certificate-profiles). DMS changes affect future requests; they do not modify signed certificates or install client trust.
 
 Re-enrollment configuration [#re-enrollment-configuration]
 

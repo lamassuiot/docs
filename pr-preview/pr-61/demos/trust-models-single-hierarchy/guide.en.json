@@ -1,0 +1,94 @@
+{
+  "steps": [
+    {
+      "title": "Open the CA list",
+      "body": "The Certification Authorities view lists every authority in this demo instance. Two independent scenarios are prepared: a standalone root CA and a two-level hierarchy.",
+      "note": "The CAs shown here were prepared before recording; the private keys never leave the KMS."
+    },
+    {
+      "title": "Hierarchy overview",
+      "body": "The hierarchy view draws an arrow from each issuer to the CAs it signed. Demo-Root → Demo-Issuing is the chain of the second scenario, while Demo-Single sits alone as its own anchor.",
+      "note": "Arrows point from issuer to issued CA, matching the A → B notation used in the trust-model documentation."
+    },
+    {
+      "title": "Standalone root CA",
+      "body": "Demo-Single is a self-signed root with no parent. It issues end-entity identities directly, with no intermediate level.",
+      "note": "A single-CA model keeps the chain depth at one; every identity can be validated against the root itself."
+    },
+    {
+      "title": "Public CA certificate",
+      "body": "The Certificate PEM tab shows the public certificate of Demo-Single. This is the material a relying party would install as a trust anchor.",
+      "note": "Only the public certificate is shown; the signing key stays inside the KMS."
+    },
+    {
+      "title": "Download the anchor",
+      "body": "Downloading the .pem file gives you the exact bytes to use as the CAfile in an external validator such as OpenSSL.",
+      "note": "The validation shown in this guide was run outside the recording: openssl verify returns OK for the identity against this anchor."
+    },
+    {
+      "title": "Issued certificates",
+      "body": "The Certificates view lists every end-entity certificate. Both demo identities appear here with their issuing CA.",
+      "note": "Sample-data devices also appear in this table; the demo identities are the two Demo* entries."
+    },
+    {
+      "title": "Single-scenario identity",
+      "body": "This identity was issued by Demo-Single. Its detail view shows the issuer, validity period and the two-certificate chain.",
+      "note": "The CSR was prepared before recording, so the private key was never exposed in the browser flow."
+    },
+    {
+      "title": "Leaf certificate PEM",
+      "body": "The Certificate PEM tab shows the leaf certificate and the full chain, which for this scenario is just leaf plus root.",
+      "note": "The full-chain bundle already contains everything OpenSSL needs when the root is not installed locally."
+    },
+    {
+      "title": "Download the identity",
+      "body": "Downloading the leaf certificate .pem completes the pair needed for external validation: identity plus anchor.",
+      "note": "openssl verify -CAfile demo-single.pem identity.pem returns OK for this certificate."
+    },
+    {
+      "title": "Back to the CA list",
+      "body": "The second scenario uses a two-level hierarchy, so we return to Certification Authorities to inspect Demo-Root.",
+      "note": "The table view resets on navigation; the hierarchy radio is clicked again before opening the next CA."
+    },
+    {
+      "title": "Hierarchy view again",
+      "body": "Switching back to the hierarchy view keeps the issuer-to-issued relationship visible while opening the root.",
+      "note": "This view is generated from the live CA inventory; it reflects the same data as the table."
+    },
+    {
+      "title": "Hierarchy trust anchor",
+      "body": "Demo-Root is the self-signed anchor of the second scenario. It signs Demo-Issuing, which in turn issues end-entity identities.",
+      "note": "The intermediate CA has a shorter validity (5y) than the root (10y), so it expires first by design."
+    },
+    {
+      "title": "Certificates again",
+      "body": "Back in the Certificates view, the hierarchy identity is listed with Demo-Issuing as its CA.",
+      "note": "The CA Issuer column here is the direct issuer, not the chain root."
+    },
+    {
+      "title": "Hierarchy identity",
+      "body": "This identity was issued by Demo-Issuing, one level below the anchor. Its chain has three certificates: leaf, intermediate, root.",
+      "note": "This is the standard depth-2 hierarchy from RFC 5217 style deployments."
+    },
+    {
+      "title": "Three-certifacte chain",
+      "body": "The Certificate PEM tab shows the leaf and a two-certificate full chain. The intermediate here is auxiliary material, not a trust anchor.",
+      "note": "Relying parties install only Demo-Root as anchor; the intermediate travels as untrusted input to the path builder."
+    },
+    {
+      "title": "Download the hierarchy leaf",
+      "body": "Downloading this leaf .pem gives the third file of the hierarchy validation: leaf, intermediate, anchor.",
+      "note": "openssl verify -CAfile demo-root.pem -untrusted demo-issuing.pem identity.pem returns OK."
+    },
+    {
+      "title": "Wrap up",
+      "body": "We return to the CA list to close with the hierarchy view, comparing both trust models side by side.",
+      "note": "The demo instance is disposable; none of this data is shared with a production environment."
+    },
+    {
+      "title": "Both models at a glance",
+      "body": "Demo-Root → Demo-Issuing forms the hierarchy; Demo-Single is a separate anchor. A validator anchored in Demo-Single rejects the hierarchy identity, and vice versa.",
+      "note": "The wrong-anchor failure was verified outside the recording: OpenSSL reports 'unable to get local issuer certificate' when Demo-Single is used to validate the hierarchy identity."
+    }
+  ]
+}

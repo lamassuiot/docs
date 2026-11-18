@@ -120,7 +120,7 @@ El conjunto de confianza del reenrolamiento vive en `reenrollment_settings.est_r
 
 ## Perfil de emisión
 
-`settings.issuance_profile_id` tiene precedencia sobre `settings.issuance_profile`; si ninguno existe, se utiliza el perfil predeterminado de la CA. Las reglas se documentan una sola vez en [Perfiles](/docs/platform/pki/certificate-profiles). Cambiar un DMS afecta a solicitudes futuras; no modifica certificados ya firmados ni instala confianza en clientes.
+`settings.issuance_profile_id` tiene precedencia sobre `settings.issuance_profile`; si ninguno existe, se utiliza el perfil predeterminado de la CA. El perfil resuelto — incluido el perfil predeterminado de la CA, que se usa como alternativa cuando el DMS no define ninguno — debe definir un certificado final: un perfil con `Sign as CA` se rechaza en el enrolamiento y en el reenrolamiento. Las reglas se documentan una sola vez en [Perfiles](/docs/platform/pki/certificate-profiles). Cambiar un DMS afecta a solicitudes futuras; no modifica certificados ya firmados ni instala confianza en clientes.
 
 ## Configuración de re-enrollment
 

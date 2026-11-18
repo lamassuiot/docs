@@ -19,7 +19,7 @@ Planifica la fecha final dentro de la vigencia de la CA emisora y deja margen pa
 
 ### Certificado de CA o certificado final
 
-`Sign as CA` establece `IsCA` y las restricciones básicas necesarias para una autoridad. Actívalo solo en perfiles destinados a crear o reemitir CAs subordinadas.
+`Sign as CA` establece `IsCA` y las restricciones básicas necesarias para una autoridad. Lamassu lo aplica: un perfil con `Sign as CA` solo se consume al crear o reemitir una CA. Toda solicitud de firma que resuelva a un perfil así se rechaza — la firma directa con una CA, incluidas las solicitudes de emisión de certificados sobre ella, y el enrolamiento o reenrolamiento del DMS. Nada valida el perfil al guardarlo: si el perfil predeterminado de una CA o el perfil de un DMS lo tiene activado, el problema aparece en la primera solicitud de firma que lo resuelva — en el caso de un DMS, cuando un dispositivo intenta enrolarse o reenrolarse — y la renovación sigue bloqueada hasta que se cambia el perfil.
 
 ### Key Usage y Extended Key Usage
 

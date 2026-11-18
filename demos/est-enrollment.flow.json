@@ -1,0 +1,422 @@
+{
+  "title": "Enroll a device with EST",
+  "url": "http://localhost:8090/?dashboard=http://localhost:32777/&terminal=http://localhost:8088/",
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "steps": [
+    {
+      "action": "wait",
+      "for": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> a:has-text(\"Registration Authorities\")"
+      }
+    },
+    {
+      "action": "wait",
+      "for": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-screen"
+      }
+    },
+    {
+      "action": "wait",
+      "ms": 6000
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> a:has-text(\"Home\")"
+      },
+      "tooltip": "Left: the Lamassu dashboard. The administrator configures enrollment here and checks the result."
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> button:has-text(\"Collapse\")"
+      },
+      "tooltip": "Collapse the sidebar to leave more room for both views."
+    },
+    {
+      "action": "wait",
+      "ms": 800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-screen"
+      },
+      "tooltip": "Right: the device terminal. It plays the device that requests its first certificate with OpenSSL and curl."
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> a[href=\"/registration-authorities\"]"
+      },
+      "tooltip": "Open Registration Authorities: each DMS defines how its devices enroll."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=EST Showcase"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=EST Showcase"
+      },
+      "tooltip": "Open EST Showcase, the DMS this device will enroll against."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=No authentication: any device can request a certificate."
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=Unknown devices are created automatically on their first enrollment."
+      },
+      "tooltip": "Registration mode: with JITP the device record is created on its first enrollment."
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=Signs every certificate issued through this RA."
+      },
+      "tooltip": "Acme Device CA signs the certificates with the Device Certificates profile."
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=No authentication: any device can request a certificate."
+      },
+      "tooltip": "Initial authentication is off in this demo, so the CSR alone is enough."
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "On the device, create a private working directory for the key."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "umask 077; mkdir sensor-0421 && cd sensor-0421"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "Set the DMS endpoint; the DMS ID est-showcase is part of the EST path."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "EST=http://host.docker.internal:8080/api/dmsmanager/.well-known/est/est-showcase"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "Ask the DMS for its CA certificates to confirm the endpoint answers."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "curl -sS $EST/cacerts | openssl base64 -d | openssl pkcs7 -inform DER -print_certs -noout | grep subject"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "Generate the device key pair; the private key stays on the device."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out device.key"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "Create the CSR. Its CN is the device ID that Lamassu will register."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "openssl req -new -sha256 -key device.key -subj /CN=sensor-0421 -out device.csr"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "Check the CSR signature and subject before sending it."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "openssl req -in device.csr -noout -verify -subject"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "Encode the CSR as Base64 DER, the format EST expects."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "openssl req -in device.csr -outform DER | openssl base64 -A > device.csr.b64"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "Send the CSR to simpleenroll; HTTP 200 means the DMS issued a certificate."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "curl -sS --fail-with-body -H 'Content-Type: application/pkcs10' --data-binary @device.csr.b64 -o enroll.b64 -w 'HTTP %{http_code}\\n' $EST/simpleenroll"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "Extract the certificate from the PKCS#7 response."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "openssl base64 -d -in enroll.b64 | openssl pkcs7 -inform DER -print_certs -quiet -out device.crt"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "#term-toggle"
+      },
+      "tooltip": "Expand the terminal so the long certificate lines fit."
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "tooltip": "Inspect the certificate received: subject, issuer, serial, dates and usages."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-helper-textarea"
+      },
+      "value": "openssl x509 -in device.crt -noout -subject -issuer -serial -dates -ext keyUsage,extendedKeyUsage"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 2200
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#terminal >> internal:control=enter-frame >> .xterm-screen"
+      },
+      "tooltip": "Result: a device certificate with CN sensor-0421, issued by Acme Device CA. Note the serial."
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "#term-toggle"
+      },
+      "tooltip": "Restore the joint view to look for the device in the dashboard."
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> a[href=\"/devices\"]"
+      },
+      "tooltip": "In the dashboard, open Devices to find the device created by JITP."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> input[placeholder=\"Filter by device ID...\"]"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> input[placeholder=\"Filter by device ID...\"]"
+      },
+      "tooltip": "Filter the inventory by the CN of the CSR."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> input[placeholder=\"Filter by device ID...\"]"
+      },
+      "value": "sensor-0421"
+    },
+    {
+      "action": "wait",
+      "for": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> button:has-text(\"sensor-0421\")"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> button:has-text(\"sensor-0421\")"
+      },
+      "tooltip": "Open the device: it was registered automatically with the CSR's CN."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=View certificate"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> p:text-is(\"Registration Authority\")"
+      },
+      "tooltip": "The device belongs to EST Showcase and its identity is Active."
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=View certificate"
+      },
+      "tooltip": "Open the certificate associated with the device identity."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=Serial number",
+        "nth": 0
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "iframe#dashboard >> internal:control=enter-frame >> text=Serial number",
+        "nth": 0
+      },
+      "tooltip": "The serial matches the one the terminal printed: same certificate."
+    }
+  ]
+}

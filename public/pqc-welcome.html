@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>PQC in Lamassu</title>
+<meta name="description" content="Post-quantum cryptography in Lamassu IoT: key exchange and authentication in T, PQ and PQ/T, from the Go toolchain to the device.">
+<link rel="icon" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script>
+  /* Hash parameters (see pqc-welcome/pqc-welcome.js): embed, theme=dark|light (or #dark / #light), docs=<prefix>.
+     Read before the stylesheet applies, so the page never flashes the wrong theme or layout. */
+  (function () {
+    var root = document.documentElement, P = {};
+    location.hash.slice(1).split('&').forEach(function (t) {
+      if (!t) return;
+      var i = t.indexOf('=');
+      P[i < 0 ? t : t.slice(0, i)] = i < 0 ? '' : decodeURIComponent(t.slice(i + 1));
+    });
+    var theme = P.theme || ('dark' in P ? 'dark' : 'light' in P ? 'light' : '');
+    if (theme === 'dark' || theme === 'light') root.setAttribute('data-theme', theme);
+    if ('embed' in P && window.parent !== window) root.setAttribute('data-embed', '');
+    window.PQC_PARAMS = P;
+  })();
+</script>
+<link rel="stylesheet" href="pqc-welcome/pqc-welcome.css">
+</head>
+<body>
+
+<nav class="topnav" aria-label="Sections">
+  <div class="wrap">
+    <a class="brand" href="#inicio">Lamassu <span class="tag">PQC</span></a>
+    <ul>
+      <li><a href="#por-que">Why</a></li>
+      <li><a href="#configurador">Configurator</a></li>
+      <li><a href="#arquitectura">Architecture</a></li>
+      <li><a href="#algoritmos">Algorithms</a></li>
+      <li><a href="#seleccion">Selection</a></li>
+      <li><a href="#relacionados">Related</a></li>
+      <li><a href="#pruebas">Tests</a></li>
+      <li><a href="#estado">Status</a></li>
+      <li><a href="#piezas">Components</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+<!-- ═══════════════════════════ 1. HERO ═══════════════════════════ -->
+<header class="hero" id="inicio">
+  <div class="wrap">
+    <h1><b>PQC</b> in both dimensions</h1>
+
+    <div class="dims">
+      <div class="dim">
+        <header><h3>Key exchange (KEX)</h3><span>Protects confidentiality</span></header>
+        <div class="dim-cards">
+          <button class="dim-card" type="button" data-f="T" data-set="kex:T"><b>T</b><span>Traditional</span><small>ECDHE · X25519, P-256, P-384</small></button>
+          <button class="dim-card" type="button" data-f="PQ" data-set="kex:PQ"><b>PQ</b><span>Post-quantum</span><small>ML-KEM-1024</small></button>
+          <button class="dim-card" type="button" data-f="PQ/T" data-set="kex:PQ/T"><b>PQ/T</b><span>Hybrid</span><small>X25519 + ML-KEM-768</small></button>
+        </div>
+      </div>
+      <div class="dim">
+        <header><h3>Authentication (AUTH)</h3><span>Proves who is on the other side</span></header>
+        <div class="dim-cards">
+          <button class="dim-card" type="button" data-f="T" data-set="auth:T"><b>T</b><span>Traditional</span><small>RSA · ECDSA · Ed25519</small></button>
+          <button class="dim-card" type="button" data-f="PQ" data-set="auth:PQ"><b>PQ</b><span>Post-quantum</span><small>ML-DSA · SLH-DSA*</small></button>
+          <button class="dim-card" type="button" data-f="PQ/T" data-set="auth:PQ/T"><b>PQ/T</b><span>Hybrid</span><small>Composite signatures (RFC 10073)</small></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="channel" aria-label="Channel between the device and Lamassu">
+      <div class="endpoint">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h6M9 11h6M11 17h2"/></svg>
+        <b>Device</b><span>TLS / mTLS client</span>
+      </div>
+      <div class="tube">
+        <div class="flow" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="badge">TLS 1.3 channel with PQC<small>Confidential · authenticated</small></div>
+      </div>
+      <div class="endpoint server">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+        <b>Lamassu</b><span>Traefik PQC</span>
+      </div>
+    </div>
+    <p class="note" style="margin-top:12px">* SLH-DSA works for keys, CAs and certificates, but it cannot authenticate TLS: the fork has no TLS signature scheme for it. Select a card to try that option in the configurator.</p>
+
+    <div class="pillars">
+      <div class="pillar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="10" width="14" height="10"/><path d="M8 10V7a4 4 0 018 0v3"/><circle cx="12" cy="15" r="1.4"/></svg>
+        <div><b>Quantum resistance</b><span>ML-KEM, ML-DSA and SLH-DSA (FIPS 203, 204 and 205).</span></div>
+      </div>
+      <div class="pillar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 21V11M12 11L6 4M12 11l6-7M6 4v4M6 4h4M18 4v4M18 4h-4"/></svg>
+        <div><b>Flexible adoption</b><span>T, PQ or PQ/T, chosen separately in each dimension.</span></div>
+      </div>
+      <div class="pillar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+        <div><b>Standards-based</b><span>NIST FIPS, RFC 10073 and RFC 9763. Tested with OpenSSL, curl and mosquitto.</span></div>
+      </div>
+      <div class="pillar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 001.3 2h12.4a1.5 1.5 0 001.3-2L14 9V3"/><path d="M7 15h10"/></svg>
+        <div><b>For pilots</b><span>Experimental: meant for laboratories and pilots, not for production fleets.</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════ 2. WHY NOW ═══════════════════════════ -->
+<section class="block" id="por-que" aria-labelledby="h-por-que">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Why now</span>
+      <h2 id="h-por-que">Today's devices will still be in the field in the quantum era.</h2>
+      <p class="lead">Device certificates last for years, and the devices that hold them are hard to replace. If a future quantum computer breaks a signature algorithm, the whole fleet would have to re-enroll. Issuing post-quantum or composite certificates today, and serving a TLS endpoint that accepts them, lets you validate the fleet against that risk before it becomes urgent.</p>
+    </div>
+    <div class="grid-2 reveal">
+      <div class="card tint-pq">
+        <span class="label">Key exchange</span>
+        <h3>"Harvest now, decrypt later"</h3>
+        <p>Traffic recorded today can be decrypted tomorrow. That threat already exists, and a key exchange with ML-KEM addresses it.</p>
+      </div>
+      <div class="card tint">
+        <span class="label">Signatures</span>
+        <h3>Lifetime sets the clock</h3>
+        <p>Signatures are not exposed to that attack. The urgency comes from how long certificates and devices last, not from recorded traffic.</p>
+      </div>
+    </div>
+
+    <div class="lifetime reveal">
+      <label for="life">Lifetime of a device installed today <output id="life-out" for="life">10 years</output></label>
+      <input id="life" type="range" min="3" max="20" step="1" value="10">
+      <div class="timeline" aria-hidden="true">
+        <div class="risk"><span>Window in which a cryptographically relevant quantum computer could arrive. Its date is uncertain.</span></div>
+        <div class="life" id="life-bar">Device in the field</div>
+        <div class="axis"><span>Today</span><span>+5</span><span>+10</span><span>+15</span><span>+20 years</span></div>
+      </div>
+      <p class="verdict" id="life-verdict"></p>
+    </div>
+
+    <div class="callout reveal" style="margin-top:20px">
+      <strong>Composite signature:</strong> it is valid only if both of its components verify. It holds as long as at least one of the two algorithms remains unbroken, provided the relying party requires the composite and does not accept a classical certificate instead.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 3. CONFIGURATOR ═══════════════════════════ -->
+<section class="block" id="configurador" aria-labelledby="h-config">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Channel configurator</span>
+      <h2 id="h-config">Choose how the channel is protected.</h2>
+      <p class="lead">KEX and AUTH are two independent negotiations. Combine them and see what is negotiated, which certificate Lamassu serves, how the combination did in the tests and how to deploy it.</p>
+    </div>
+
+    <div class="config">
+      <form class="controls" id="config-form" onsubmit="return false">
+        <fieldset>
+          <legend>Key exchange <small>KEX · --tls-kex</small></legend>
+          <div class="seg">
+            <label><input type="radio" name="kex" value="T"><b>T</b><small>Traditional</small></label>
+            <label><input type="radio" name="kex" value="PQ"><b>PQ</b><small>Post-quantum</small></label>
+            <label><input type="radio" name="kex" value="PQ/T" checked><b>PQ/T</b><small>Hybrid</small></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Authentication <small>AUTH · --tls-auth</small></legend>
+          <div class="seg">
+            <label><input type="radio" name="auth" value="T"><b>T</b><small>Traditional</small></label>
+            <label><input type="radio" name="auth" value="PQ"><b>PQ</b><small>Post-quantum</small></label>
+            <label><input type="radio" name="auth" value="PQ/T" checked><b>PQ/T</b><small>Composite</small></label>
+          </div>
+          <div class="variant-wrap">
+            <label for="variant">Composite variant</label>
+            <select id="variant"></select>
+          </div>
+        </fieldset>
+        <div class="callout">
+          <strong>Always:</strong> post-quantum protection covers the device ↔ Traefik hop. From Traefik inwards, TLS is classical.
+        </div>
+      </form>
+
+      <div class="result" aria-live="polite">
+        <div class="wire">
+          <div class="node">Device</div>
+          <div class="lanes">
+            <div class="lane" id="lane-kex"><span>KEX</span><div class="line"><code id="w-kex"></code></div></div>
+            <div class="lane" id="lane-auth"><span>AUTH</span><div class="line"><code id="w-auth"></code></div></div>
+          </div>
+          <div class="node srv">Traefik PQC</div>
+        </div>
+        <div class="result-body">
+          <div class="cell">
+            <span class="label">What is negotiated</span>
+            <dl class="kv">
+              <dt>Group</dt><dd><code id="r-group"></code></dd>
+              <dt>Signature</dt><dd><code id="r-scheme"></code></dd>
+              <dt>Minimum TLS</dt><dd id="r-tls"></dd>
+            </dl>
+            <span class="label" style="margin-top:12px">Groups the server accepts</span>
+            <div class="chips" id="r-groups"></div>
+          </div>
+          <div class="cell">
+            <span class="label">Certificate Lamassu serves</span>
+            <dl class="kv">
+              <dt>Algorithm</dt><dd id="r-cert"></dd>
+              <dt>Secret</dt><dd><code id="r-secret"></code></dd>
+              <dt>Source</dt><dd id="r-origin"></dd>
+            </dl>
+          </div>
+          <div class="cell full">
+            <span class="label">Result in the interoperability tests</span>
+            <div class="results-row" id="r-tests"></div>
+          </div>
+          <div class="cell full">
+            <span class="label">How to deploy it (laboratory)</span>
+            <div class="codebox"><button class="copy" type="button" data-copy="c-fastlane">Copy</button><pre id="c-fastlane"></pre></div>
+            <span class="label" style="margin-top:16px">How to check it</span>
+            <div class="codebox"><button class="copy" type="button" data-copy="c-openssl">Copy</button><pre id="c-openssl"></pre></div>
+          </div>
+          <div class="cell full notes" id="r-notes"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 4. ARCHITECTURE ═══════════════════════════ -->
+<section class="block" id="arquitectura" aria-labelledby="h-arch">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Architecture</span>
+      <h2 id="h-arch">Five codebases carry PQC from the device to the CA.</h2>
+      <p class="lead">The Go fork is the foundation: the backend and Traefik are compiled with it. Traefik negotiates post-quantum KEX and AUTH with the device and forwards to Envoy Gateway over classical TLS.</p>
+    </div>
+    <div class="arch-tools">
+      <ul class="legend" aria-label="Diagram legend">
+        <li><i class="sw solid" aria-hidden="true"></i>Compiled with the Go PQC fork</li>
+        <li><i class="sw pq" aria-hidden="true"></i>Post-quantum hop (KEX and AUTH)</li>
+        <li><i class="sw std" aria-hidden="true"></i>Standard component</li>
+        <li><i class="sw zone" aria-hidden="true"></i>Lamassu product on Kubernetes</li>
+      </ul>
+      <span class="note">Select any component to see its details.</span>
+    </div>
+    <div class="arch-scroll reveal">
+      <svg id="arch" viewBox="0 0 960 360" role="group" aria-label="Lamassu PQC architecture diagram">
+        <defs>
+          <marker id="ah-pq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrow-pq"/></marker>
+          <marker id="ah-cl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrow-cl"/></marker>
+        </defs>
+        <!-- product zone, on Kubernetes. Its edge runs through Traefik: the proxy is the boundary. -->
+        <rect class="zone" x="492" y="16" width="448" height="236" rx="16"/>
+        <image class="logo" href="images/kubernetes.svg" x="506" y="27" width="20" height="20"/>
+        <text class="t-k8s" x="532" y="42">Kubernetes</text>
+        <text class="t-zone" x="926" y="42" text-anchor="end">LAMASSU PRODUCT</text>
+
+        <!-- post-quantum hop: two independent negotiations -->
+        <path class="pq-link" d="M170 136 H 408" marker-end="url(#ah-pq)"/>
+        <path class="pq-link" d="M170 178 H 408" marker-end="url(#ah-pq)"/>
+        <text class="t-hop" x="290" y="110" text-anchor="middle"><tspan class="k">KEX</tspan>  T · PQ · PQ/T</text>
+        <text class="t-sub" x="290" y="126" text-anchor="middle">ML-KEM</text>
+        <text class="t-hop" x="290" y="198" text-anchor="middle"><tspan class="k">AUTH</tspan>  T · PQ · PQ/T</text>
+        <text class="t-sub" x="290" y="214" text-anchor="middle">ML-DSA, composite</text>
+        <rect class="hop-pill" x="190" y="228" width="200" height="22" rx="11"/>
+        <text class="t-pill" x="290" y="243" text-anchor="middle">Post-quantum protected hop</text>
+
+        <!-- classical TLS inside the product -->
+        <path class="cl-link" d="M572 156 H 597" marker-end="url(#ah-cl)"/>
+        <path class="cl-link" d="M750 156 H 775" marker-end="url(#ah-cl)"/>
+        <text class="t-sub" x="586" y="238" text-anchor="middle">Classical TLS</text>
+        <text class="t-sub" x="764" y="238" text-anchor="middle">Classical TLS</text>
+
+        <g class="nd bare" data-node="device" tabindex="0" role="button" aria-pressed="false" aria-label="IoT device">
+          <rect class="ring" x="15" y="51" width="160" height="180" rx="14"/>
+          <rect class="box" x="20" y="56" width="150" height="170" rx="10"/>
+          <g class="router" transform="translate(43 75) scale(1.15)">
+            <path class="ant" d="M21 49 L22.5 17.5 A2.5 2.5 0 0 1 27.5 17.5 L29 49 Z"/><path class="band" d="M21.9 27.9h6.2"/><rect class="hinge" x="19.5" y="47" width="11" height="5" rx="1.5"/>
+            <path class="ant" d="M32 49 L33.5 11.5 A2.5 2.5 0 0 1 38.5 11.5 L40 49 Z"/><path class="band" d="M32.9 24.2h6.2"/><rect class="hinge" x="30.5" y="47" width="11" height="5" rx="1.5"/>
+            <path class="ant" d="M43 49 L44.5 17.5 A2.5 2.5 0 0 1 49.5 17.5 L51 49 Z"/><path class="band" d="M43.9 27.9h6.2"/><rect class="hinge" x="41.5" y="47" width="11" height="5" rx="1.5"/>
+            <path class="wifi" d="M58 34a16 16 0 0 1 22 0M62 39a10 10 0 0 1 14 0"/>
+            <circle class="wifi-dot" cx="69" cy="44" r="3"/>
+            <path class="top" d="M14 51h62l6 8H8z"/>
+            <rect class="body" x="8" y="58" width="74" height="16" rx="3"/>
+            <rect class="port" x="22" y="61" width="11" height="9" rx="1"/>
+            <rect class="port" x="35" y="61" width="11" height="9" rx="1"/>
+            <circle class="led" cx="14" cy="62.5" r="2.2"/><circle class="led" cx="14" cy="69.5" r="2.2"/>
+            <circle class="led" cx="52" cy="62.5" r="2.2"/><circle class="led" cx="52" cy="69.5" r="2.2"/>
+            <circle class="led" cx="69" cy="62.5" r="2.2"/><circle class="led" cx="69" cy="69.5" r="2.2"/>
+            <path class="slot" d="M56 62.5h8M56 69.5h8M73 62.5h5M73 69.5h5"/>
+          </g>
+          <text class="t-title" x="95" y="186" text-anchor="middle">IoT device</text>
+          <text class="t-sub" x="95" y="205" text-anchor="middle">TLS / mTLS client</text>
+        </g>
+        <g class="nd solid pq" data-node="traefik" tabindex="0" role="button" aria-pressed="false" aria-label="Traefik PQC">
+          <rect class="ring" x="407" y="91" width="170" height="130" rx="14"/>
+          <rect class="box" x="412" y="96" width="160" height="120" rx="10"/>
+          <image class="logo" href="pqc-welcome/traefik.png" x="472" y="104" width="40" height="43"/>
+          <text class="t-title" x="492" y="168" text-anchor="middle">Traefik PQC</text>
+          <text class="t-sub" x="492" y="187" text-anchor="middle">Rebuilt fork,</text>
+          <text class="t-sub" x="492" y="203" text-anchor="middle">TLS front proxy</text>
+        </g>
+        <g class="nd std" data-node="envoy" tabindex="0" role="button" aria-pressed="false" aria-label="Envoy Gateway">
+          <rect class="ring" x="595" y="91" width="160" height="130" rx="14"/>
+          <rect class="box" x="600" y="96" width="150" height="120" rx="10"/>
+          <image class="logo" href="pqc-welcome/envoy.png" x="648" y="108" width="54" height="34"/>
+          <text class="t-title" x="675" y="172" text-anchor="middle">Envoy Gateway</text>
+          <text class="t-sub" x="675" y="192" text-anchor="middle">API gateway</text>
+        </g>
+        <g class="nd solid" data-node="backend" tabindex="0" role="button" aria-pressed="false" aria-label="Lamassu backend">
+          <rect class="ring" x="773" y="91" width="160" height="130" rx="14"/>
+          <rect class="box" x="778" y="96" width="150" height="120" rx="10"/>
+          <image class="logo lamassu" href="images/lamassu.svg" x="833" y="104" width="40" height="38"/>
+          <text class="t-title" x="853" y="172" text-anchor="middle">Lamassu backend</text>
+          <text class="t-sub" x="853" y="192" text-anchor="middle">KMS · CA · VA</text>
+        </g>
+        <g class="nd solid bar" data-node="go" tabindex="0" role="button" aria-pressed="false" aria-label="Go PQC toolchain">
+          <rect class="ring" x="15" y="263" width="930" height="46" rx="14"/>
+          <rect class="box" x="20" y="268" width="920" height="36" rx="10"/>
+          <text class="t-lab" x="480" y="291" text-anchor="middle">Go PQC toolchain (Go fork): compiles Traefik and the backend</text>
+        </g>
+        <g class="nd std bar" data-node="helm" tabindex="0" role="button" aria-pressed="false" aria-label="Helm chart">
+          <rect class="ring" x="15" y="309" width="930" height="46" rx="14"/>
+          <rect class="box" x="20" y="314" width="920" height="36" rx="10"/>
+          <text class="t-lab" x="480" y="337" text-anchor="middle">Helm chart: deploys the whole platform on Kubernetes</text>
+        </g>
+      </svg>
+    </div>
+    <p class="arch-hint">On narrow screens, swipe the diagram sideways.</p>
+    <div class="arch-detail" id="arch-detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 6. ALGORITHMS ═══════════════════════════ -->
+<section class="block" id="algoritmos" aria-labelledby="h-algos">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Algorithm explorer</span>
+      <h2 id="h-algos">Everything Lamassu can sign with.</h2>
+      <p class="lead">A key or a CA is created with a type and a size. For the post-quantum algorithms, the size (<code>size</code> or <code>bits</code>) carries the parameter set identifier, not a number of bits.</p>
+    </div>
+    <div class="filters">
+      <div class="chipset" role="radiogroup" aria-label="Family">
+        <label><input type="radio" name="fam" value="all" checked>All</label>
+        <label><input type="radio" name="fam" value="T">T</label>
+        <label><input type="radio" name="fam" value="PQ">PQ</label>
+        <label><input type="radio" name="fam" value="PQ/T">PQ/T</label>
+      </div>
+      <label class="toggle"><input type="checkbox" id="tls-only"> Only those that authenticate TLS</label>
+      <label><span class="vh">Search algorithms</span><input type="search" id="algo-q" placeholder="Search: ECDSA, 65, SHAKE…"></label>
+      <span class="count" id="algo-count" aria-live="polite"></span>
+    </div>
+    <div class="table-scroll">
+      <table id="algo-table">
+        <thead><tr><th>Family</th><th>Algorithm</th><th>Type and <code>size</code></th><th>OID</th><th>Signature</th><th>TLS</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="choose">
+      <div class="card flat"><span class="fam" data-f="PQ/T">PQ/T</span><h3 style="margin-top:10px">Composite</h3><p>The most conservative option during the transition: it keeps classical protection if a flaw is found in the new algorithm. Larger keys and signatures.</p></div>
+      <div class="card flat"><span class="fam" data-f="PQ">PQ</span><h3 style="margin-top:10px">ML-DSA</h3><p>Post-quantum protection with moderate sizes and fast operations.</p></div>
+      <div class="card flat"><span class="fam" data-f="PQ">PQ</span><h3 style="margin-top:10px">SLH-DSA</h3><p>For long-lived trust anchors that rely only on hash functions. Large signatures, and it cannot be used for TLS.</p></div>
+      <div class="card flat"><span class="fam" data-f="T">T</span><h3 style="margin-top:10px">Ed25519</h3><p>Not post-quantum. Added as a CA and certificate key type in the same work.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 7. SELECTION SIMULATOR ═══════════════════════════ -->
+<section class="block" id="seleccion" aria-labelledby="h-sel">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Inside Traefik PQC</span>
+      <h2 id="h-sel">One host, three certificates: the client decides.</h2>
+      <p class="lead">Traefik keeps several certificates for <code>lab.example.com</code> and serves the first one that matches the signature schemes the client announces, in the client's order. The server has no preference order of its own.</p>
+    </div>
+    <div class="sim">
+      <div>
+        <span class="label">Try a typical client</span>
+        <div class="presets">
+          <button class="btn" type="button" data-preset="openssl">Default OpenSSL ≥ 3.5</button>
+          <button class="btn" type="button" data-preset="classic">Classical client</button>
+          <button class="btn" type="button" data-preset="hybrid">With hybrid-provider</button>
+          <button class="btn" type="button" data-preset="tls12">TLS 1.2 client</button>
+          <button class="btn" type="button" data-preset="none">Announces no schemes</button>
+        </div>
+        <span class="label">Or adjust what the client announces in <code>signature_algorithms</code>, and in which order</span>
+        <ol class="schemes" id="schemes"></ol>
+        <fieldset class="tlsver">
+          <legend>TLS version</legend>
+          <div class="chipset">
+            <label><input type="radio" name="tlsv" value="1.3" checked>TLS 1.3</label>
+            <label><input type="radio" name="tlsv" value="1.2">TLS 1.2</label>
+          </div>
+        </fieldset>
+      </div>
+      <div>
+        <span class="label">Certificates for <code>lab.example.com</code> in Traefik</span>
+        <div class="certs" id="certs"></div>
+        <ol class="trace" id="trace" aria-live="polite"></ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 8. RELATED CERTIFICATES ═══════════════════════════ -->
+<section class="block" id="relacionados" aria-labelledby="h-rel">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Related certificates · RFC 9763</span>
+      <h2 id="h-rel">Migrate without breaking: bind the PQ certificate to the classical one.</h2>
+      <p class="lead">During the migration, the device holds two certificates. The new one carries the <code>id-pe-relatedCert</code> extension with the hash of the classical one, so a relying party knows that both identify the same entity.</p>
+    </div>
+    <div class="rel">
+      <div>
+        <div class="certpair">
+          <div class="certcard">
+            <header><b>Current certificate</b><span class="fam" data-f="T">T</span></header>
+            <div>ECDSA P-256 · already in use</div>
+            <div class="note">Consumers cannot validate PQ chains yet.</div>
+          </div>
+          <div class="link-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>
+            hash
+          </div>
+          <div class="certcard" style="border-color:var(--accent)">
+            <header><b>New certificate</b><span class="fam" data-f="PQ">PQ</span></header>
+            <div>ML-DSA-65 · issued by Lamassu</div>
+            <div class="ext">id-pe-relatedCert (1.3.6.1.5.5.7.1.36)<br>SHA-256(current certificate)</div>
+          </div>
+        </div>
+        <div class="callout" style="margin-top:16px"><strong>It links, it does not replace.</strong> Each certificate is validated against its own chain, and revoking the classical one does not revoke the bound one. Lamassu implements the issuing side.</div>
+      </div>
+      <div class="stepper" id="stepper">
+        <span class="label">What the CA does when it receives the request</span>
+        <ol></ol>
+        <div class="step-body" aria-live="polite"></div>
+        <div class="nav"><button class="btn" type="button" data-step="-1">← Previous</button><button class="btn primary" type="button" data-step="1">Next →</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 9. INTEROP ═══════════════════════════ -->
+<section class="block" id="pruebas" aria-labelledby="h-pruebas">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Direct interoperability</span>
+      <h2 id="h-pruebas">Independent software speaks PQC with Lamassu.</h2>
+      <p class="lead">Server: Traefik PQC. Clients: OpenSSL 4.0.3 and 4.1.0, <code>hybrid-provider</code> for the composite certificates, <code>curl</code>, and <code>mosquitto_pub</code> / <code>mosquitto_sub</code> 2.1.2 against an EMQX 5.8.9 broker behind Traefik.</p>
+    </div>
+    <div class="stats reveal">
+      <div class="stat"><b>12<em> / 12</em></b><span>HTTPS cases passed</span></div>
+      <div class="stat"><b>12<em> / 12</em></b><span>MQTTS cases passed</span></div>
+      <div class="stat"><b>6</b><span>checks per case</span></div>
+      <div class="stat"><b>2</b><span>protocols: HTTPS and MQTTS</span></div>
+    </div>
+    <div class="interop">
+      <div>
+        <fieldset class="proto">
+          <legend>Protocol</legend>
+          <div class="chipset">
+            <label><input type="radio" name="proto" value="https" checked>HTTPS</label>
+            <label><input type="radio" name="proto" value="mqtts">MQTTS</label>
+          </div>
+        </fieldset>
+        <div class="matrix" id="matrix" role="group" aria-label="Test matrix: key exchange by certificate"></div>
+        <p class="note" style="margin-top:10px">Rows: key exchange. Columns: server certificate. Select a cell.</p>
+        <span class="label" style="margin-top:20px">Additional composite certificates (with PQ/T KEX)</span>
+        <div class="table-scroll compact">
+          <table>
+            <thead><tr><th>Algorithm</th><th>Scheme</th><th>HTTPS</th><th>MQTTS</th></tr></thead>
+            <tbody>
+              <tr><td><code>MLDSA44-ECDSA-P256-SHA256</code></td><td><code>mldsa44_ecdsa_p256</code></td><td class="ok">✓</td><td class="ok">✓</td></tr>
+              <tr><td><code>MLDSA65-ECDSA-P256-SHA512</code></td><td><code>mldsa65_ecdsa_p256</code></td><td class="ok">✓</td><td class="ok">✓</td></tr>
+              <tr><td><code>MLDSA65-Ed25519-SHA512</code></td><td><code>mldsa65_ed25519</code></td><td class="ok">✓</td><td class="ok">✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="detail-box" id="case-detail" aria-live="polite"></div>
+        <div class="cmd" id="case-cmd"></div>
+      </div>
+    </div>
+    <div class="callout warn" style="margin-top:24px">
+      <strong>The fine print.</strong> The test certificates were generated outside Lamassu with standard tools: they show that the fork's X.509 and TLS formats are interoperable, but they do not test certificates issued by a Lamassu CA. For the composite certificates, the <code>hybrid-provider</code> code points had to be aligned with the fork's.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 10. OPENVPN ═══════════════════════════ -->
+<section class="block" id="openvpn" aria-labelledby="h-openvpn">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Indirect interoperability</span>
+      <h2 id="h-openvpn">OpenVPN with Lamassu certificates.</h2>
+    </div>
+    <div class="soon">
+      <b>Coming soon</b>
+      <p style="margin:0">We are documenting the indirect tests with OpenVPN. This section will cover:</p>
+      <ul>
+        <li>The scenario: what Lamassu issues and which OpenVPN and OpenSSL versions were used.</li>
+        <li>The tested matrix of key exchanges and certificates.</li>
+        <li>The results and the limitations found.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 11. STATUS ═══════════════════════════ -->
+<section class="block" id="estado" aria-labelledby="h-estado">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Current status</span>
+      <h2 id="h-estado">Ready for pilots, not yet for production.</h2>
+      <p class="lead">PQC support lives in development branches and in forks of Go and Traefik, not in the upstream projects or in the standard Lamassu images. These are its known limitations.</p>
+    </div>
+    <div class="accordion" aria-label="Limitations by component">
+      <details>
+        <summary><b>Standards</b><span class="sum">Private composite TLS code points; no Brainpool or Ed448.</span></summary>
+        <div class="content"><ul>
+          <li>The composite TLS signature schemes use private-use code points (<code>0xFE00</code>–<code>0xFE0E</code>): they interoperate only with peers built from the same fork or with an aligned <code>hybrid-provider</code>.</li>
+          <li>RFC 10073: the implementation passes its test vectors, but it has not had a full conformance assessment. The two Brainpool variants and Ed448 are missing.</li>
+          <li>The composite RSA PKCS#1 v1.5 variants cannot sign the TLS handshake. SLH-DSA has no TLS signature scheme.</li>
+          <li>The related-certificate request attribute has not been checked against other implementations of RFC 9763.</li>
+        </ul></div>
+      </details>
+      <details>
+        <summary><b>Keys</b><span class="sum">Only the filesystem and software engines: no HSM or cloud KMS yet.</span></summary>
+        <div class="content"><ul>
+          <li>PQ, composite and Ed25519 keys work only with the <em>filesystem</em> and <em>software</em> engines.</li>
+          <li>Vault KV2 and AWS Secrets Manager announce support and then fail at creation. AWS KMS, Azure and PKCS#11 do not support them.</li>
+          <li>Engines developed outside the Lamassu repository must implement the new <code>CryptoEngine</code> methods.</li>
+        </ul></div>
+      </details>
+      <details>
+        <summary><b>CA and validation</b><span class="sum">OCSP does not work with PQ CAs; EST has no tests with PQ keys.</span></summary>
+        <div class="content"><ul>
+          <li>OCSP responses cannot be signed by PQ, Ed25519 or composite CAs. CRLs use the fork, but have no tests with these keys.</li>
+          <li>Issuance profiles cannot allow or deny PQ algorithms. Key strength is computed only for RSA and ECDSA.</li>
+          <li><code>serverkeygen</code> (EST) generates only RSA and ECDSA keys. There are no EST enrollment tests with PQ keys.</li>
+          <li>A CA with an SLH-DSA or composite key cannot be imported. The backend issues the related-certificate extension but does not evaluate it.</li>
+        </ul></div>
+      </details>
+      <details>
+        <summary><b>Dashboard</b><span class="sum">Browser-generated SLH-DSA keys map identifiers 2 to 12 incorrectly.</span></summary>
+        <div class="content"><ul>
+          <li>For SLH-DSA keys generated in the browser, identifiers 2 to 12 do not match the selected parameter set. Create SLH-DSA keys with the KMS.</li>
+          <li>Key type names are not the same on every screen. There is no experimental notice and no translation.</li>
+        </ul></div>
+      </details>
+      <details>
+        <summary><b>Deployment</b><span class="sum">Non-upstream forks, mutable tags, no renewal of PQ certificates.</span></summary>
+        <div class="content"><ul>
+          <li>Everything depends on forks of Go and Traefik that are not upstream, and the proxy image has a mutable tag.</li>
+          <li>The Traefik → Envoy hop does not verify certificates. The installer's PQ certificates last 365 days and are not renewed.</li>
+          <li>The chart uses fixed names: one release per namespace. The installer needs Linux and runs <code>helm install</code>, not <code>upgrade</code>.</li>
+          <li>The KMS OpenAPI specification does not reflect the new key types yet.</li>
+        </ul></div>
+      </details>
+      <details>
+        <summary><b>PQ scope</b><span class="sum">Only the device ↔ Traefik hop.</span></summary>
+        <div class="content"><ul>
+          <li>Traefik terminates the post-quantum TLS and opens a second, classical connection to Envoy Gateway. Envoy never sees a post-quantum handshake.</li>
+          <li>Lamassu implements no post-quantum KEX of its own: the hybrid groups are those of the Go 1.27 standard library.</li>
+        </ul></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 5. COMPONENTS (TABS) ═══════════════════════════ -->
+<section class="block" id="piezas" aria-labelledby="h-piezas">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">What we built</span>
+      <h2 id="h-piezas">The components, one by one.</h2>
+    </div>
+    <div class="tabs" id="pieces">
+      <div role="tablist" aria-label="Components of the PQC work">
+        <button type="button" role="tab" id="tab-go" aria-selected="true" tabindex="0">Go toolchain</button>
+        <button type="button" role="tab" id="tab-backend" aria-selected="false" tabindex="-1">Backend</button>
+        <button type="button" role="tab" id="tab-dashboard" aria-selected="false" tabindex="-1">Dashboard</button>
+        <button type="button" role="tab" id="tab-traefik" aria-selected="false" tabindex="-1">Traefik PQC</button>
+        <button type="button" role="tab" id="tab-helm" aria-selected="false" tabindex="-1">Helm</button>
+      </div>
+
+      <!-- Go -->
+      <div role="tabpanel" aria-labelledby="tab-go" id="panel-go">
+        <div class="panel-inner">
+          <div class="panel-head">
+            <h3>We extended <code>crypto/x509</code> and <code>crypto/tls</code> with post-quantum signatures.</h3>
+          </div>
+          <div class="facts">
+            <div class="fact"><b>Go 1.27 fork</b><span>Branch <code>release-branch.go1.27</code>. We have maintained PQC support since Go 1.25 and 1.26, and we update the fork with each release.</span></div>
+            <div class="fact"><b>Underlying algorithm implementations</b><span>ML-DSA and ML-KEM: Go's official ones (<code>crypto/mldsa</code> and the standard library's hybrid groups). SLH-DSA: Cloudflare CIRCL, vendored.</span></div>
+          </div>
+          <span class="label">Evolution</span>
+          <ol class="steps-line">
+            <li><b>Go 1.25 + PQC</b>First support</li>
+            <li><b>Go 1.26 + PQC</b>Updated</li>
+            <li class="now"><b>Go 1.27 + PQC</b>Current version</li>
+          </ol>
+          <ol class="steps-line">
+            <li class="gone"><b>Chameleon certificates</b>Dropped: the draft expired</li>
+            <li><b>Composite, draft 19</b>First implementation</li>
+            <li class="now"><b>RFC 10073</b>Published and checked</li>
+          </ol>
+          <div class="two-col">
+            <div>
+              <h4>crypto/x509</h4>
+              <ul>
+                <li><b>Composite ML-DSA signatures.</b> <code>CompositePublicKey</code> and <code>CompositePrivateKey</code> (<code>crypto.Signer</code>), 15 <code>CompositeAlgorithm</code> values, PKCS#8, certificates, CSRs and CRLs.</li>
+                <li><b>SLH-DSA in X.509.</b> 12 <code>PureSLHDSA…</code> algorithms for parsing and verifying.</li>
+                <li><b>Related certificates (RFC 9763).</b> <code>CreateBoundCertificate</code>, <code>VerifyRelatedCertificate</code> and the <code>relatedCertRequest</code> attribute.</li>
+              </ul>
+            </div>
+            <div>
+              <h4>crypto/tls</h4>
+              <ul>
+                <li><b>15 composite signature schemes</b> for TLS 1.3, tested with mutual authentication.</li>
+                <li><b>Private-use code points</b> <code>0xFE00</code>–<code>0xFE0E</code>, because IANA has not assigned any yet.</li>
+                <li><b>KEX unchanged from upstream:</b> <code>X25519MLKEM768</code>, <code>SecP256r1MLKEM768</code>, <code>SecP384r1MLKEM1024</code> and <code>MLKEM1024</code>.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="callout" style="margin-bottom:12px"><strong>Validation:</strong> the composite signatures pass the test vectors of RFC 10073 Appendix E for the 15 algorithms implemented, with and without context.</div>
+              <p class="note">Distribution: the multi-architecture image <code>ghcr.io/lamassuiot/golang-pqc</code> (tags <code>go1.27</code> and <code>latest</code>), with the toolchain in <code>/usr/local/go-pqc</code>. The backend requires <code>go 1.27.3</code>.</p>
+            </div>
+            <div class="codebox"><button class="copy" type="button" data-copy="c-go">Copy</button><pre id="c-go">alg := x509.MLDSA65_ECDSA_P384_SHA512
+pub, priv, _ := alg.GenerateCompositeKey(rand.Reader)
+
+der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, pub, priv)
+keyDER, _ := x509.MarshalPKCS8PrivateKey(priv)
+
+cfg := &amp;tls.Config{
+    Certificates: []tls.Certificate{cert},
+    MinVersion:   tls.VersionTLS13,
+}</pre></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backend -->
+      <div role="tabpanel" aria-labelledby="tab-backend" id="panel-backend" hidden>
+        <div class="panel-inner">
+          <div class="panel-head"><h3>The KMS and the CA manage PQ and PQ/T identities with the same API.</h3></div>
+          <div class="cards">
+            <div class="card flat"><h3>KMS</h3><p>Generates and holds ML-DSA, SLH-DSA, composite and Ed25519 keys. For now only in the <em>filesystem</em> and <em>software</em> engines: software-protected keys.</p></div>
+            <div class="card flat"><h3>Post-quantum CAs</h3><p>PQ and PQ/T root and subordinate CAs. ML-DSA, SLH-DSA and composite keys work as CA keys, not only as leaf keys. Algorithms can be mixed in a hierarchy.</p></div>
+            <div class="card flat"><h3>Issuance through the API</h3><p>The same REST endpoints for all three families. Only <code>key_metadata</code> changes: <code>bits</code> carries the parameter set.</p></div>
+            <div class="card flat"><h3>Sign and verify</h3><p><code>MLDSA_{44,65,87}_PURE</code>, <code>SLHDSA_PURE</code>, <code>COMPOSITE_MLDSA_{RSA,ECDSA,ED25519}_PURE</code> and <code>Ed25519_PURE</code>.</p></div>
+            <div class="card flat"><h3>Revocation</h3><p>CRLs are signed with the fork and are expected to work, although they have no tests. OCSP responses cannot be signed by a PQ CA yet.</p></div>
+          </div>
+          <div class="grid-2">
+            <div class="codebox"><button class="copy" type="button" data-copy="c-ca">Copy</button><pre id="c-ca">POST /api/ca/v1/cas
+{
+  "id": "mldsa-root",
+  "subject": { "common_name": "ML-DSA Root CA",
+               "organization": "Lamassu", "country": "ES" },
+  "key_metadata": { "type": "ML-DSA", "bits": 65 },
+  "ca_expiration": { "type": "Duration", "duration": "8760h" },
+  "profile_id": "&lt;ISSUANCE_PROFILE_ID&gt;",
+  "engine_id": "&lt;ENGINE_ID&gt;"
+}</pre></div>
+            <div>
+              <table>
+                <thead><tr><th>For a CA with…</th><th><code>key_metadata</code></th></tr></thead>
+                <tbody>
+                  <tr><td>ML-DSA-65</td><td><code>{"type":"ML-DSA","bits":65}</code></td></tr>
+                  <tr><td>ML-DSA-44 + ECDSA P-256</td><td><code>{"type":"Composite-ML-DSA-ECDSA","bits":9}</code></td></tr>
+                  <tr><td>SLH-DSA-SHA2-128s</td><td><code>{"type":"SLH-DSA","bits":1}</code></td></tr>
+                  <tr><td>Ed25519</td><td><code>{"type":"Ed25519","bits":256}</code></td></tr>
+                </tbody>
+              </table>
+              <p class="note" style="margin-top:10px">Select a <em>filesystem</em> or <em>software</em> engine with <code>engine_id</code>: Vault KV2 and AWS Secrets Manager advertise the PQ key types but fail when creating the key.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard -->
+      <div role="tabpanel" aria-labelledby="tab-dashboard" id="panel-dashboard" hidden>
+        <div class="panel-inner">
+          <div class="panel-head"><h3>Every key, CA and certificate is labelled T, PQ or PQ/T.</h3></div>
+          <div class="facts">
+            <div class="fact"><b>Choosing the algorithm</b><span>A <em>Key type</em> selector grouped by family, with a <em>Key specification</em> that depends on the type. Composite keys show two strength bars: classical (C) and post-quantum (PQ).</span></div>
+            <div class="fact"><b>Keys generated in the browser</b><span>ML-DSA and SLH-DSA with <code>@noble</code>. The Lamassu team implemented composite key generation, so a composite CSR is created entirely in the browser.</span></div>
+            <div class="fact"><b>The family at a glance</b><span>A <em>PQC</em> column in the CA table, a badge on the cards and in the graph, and an <em>Algorithm</em> column for certificates.</span></div>
+            <div class="fact"><b>Related certificates</b><span>The whole flow, from the issuance profile to the bound certificate, without API requests.</span></div>
+          </div>
+          <div class="gallery" id="gallery">
+            <div class="track" tabindex="0" aria-label="Dashboard screenshots">
+              <figure><img loading="lazy" src="pqc-welcome/key-list-families.png" width="1645" height="617" alt="KMS key list with RSA, ECDSA, Ed25519, ML-DSA and composite keys, with strength indicators"><figcaption>KMS key list: each family with its strength indicator; composite keys with two.</figcaption></figure>
+              <figure><img loading="lazy" src="pqc-welcome/browser-key-types.png" width="1456" height="886" alt="Key type selector with RSA, ECDSA, Ed25519, ML-DSA, SLH-DSA and Composite ML-DSA"><figcaption>Issuing with a key generated in the browser, composite included.</figcaption></figure>
+              <figure><img loading="lazy" src="pqc-welcome/issued-certificates-algorithm.png" width="1580" height="586" alt="Issued certificates table with the Algorithm column showing T, PQ and PQ/T"><figcaption><em>Algorithm</em> column: a T certificate, a PQ certificate and the composite CA (PQ/T) that issued them.</figcaption></figure>
+              <figure><img loading="lazy" src="pqc-welcome/composite-sign-verify.png" width="1558" height="918" alt="Sign / Verify tab of a composite key with the composite algorithm selected"><figcaption>Signing and verifying with the key of a composite CA.</figcaption></figure>
+              <figure><img loading="lazy" src="pqc-welcome/certificate-issued.png" width="1567" height="868" alt="Issued certificate and generated private key, with a warning to save the key"><figcaption>The private key is shown only once; Lamassu does not keep it.</figcaption></figure>
+              <figure><img loading="lazy" src="pqc-welcome/profile-related-form.png" width="1902" height="792" alt="Issuance profile form with the Related Certificates section enabled"><figcaption>Issuance profile with related certificates: allowed hosts and maximum age.</figcaption></figure>
+              <figure><img loading="lazy" src="pqc-welcome/bind-related-certificate.png" width="1357" height="858" alt="Bind to a related certificate panel"><figcaption>Binding the new certificate to the classical one the device already holds.</figcaption></figure>
+              <figure><img loading="lazy" src="pqc-welcome/related-certificate-details.png" width="1632" height="757" alt="Certificate details with the Related Certificate row and its SHA-256 hash"><figcaption>The bound certificate shows the hash of the related certificate.</figcaption></figure>
+            </div>
+            <div class="nav"><button class="btn" type="button" data-gal="-1">← Previous</button><button class="btn" type="button" data-gal="1">Next →</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Traefik -->
+      <div role="tabpanel" aria-labelledby="tab-traefik" id="panel-traefik" hidden>
+        <div class="panel-inner">
+          <div class="panel-head"><h3>Rebuilt with the PQC toolchain and improved to serve several identities at once.</h3></div>
+          <div class="table-scroll" style="margin-bottom:22px">
+            <table>
+              <thead><tr><th style="width:30%">Improvement</th><th>What it does</th></tr></thead>
+              <tbody>
+                <tr><td><b>Several certificates per host</b></td><td>Upstream keeps one per set of names. The fork keeps them all (ECDSA, ML-DSA, composite) and picks one per client according to its <code>signature_algorithms</code>. <a href="#seleccion">Try it in the simulator</a>.</td></tr>
+                <tr><td><b>TLS options on Gateway API listeners</b></td><td>Reads <code>traefik.io/tls-options</code> on the listener (HTTPS, and TLS in <code>Terminate</code> mode). Without it the KEX groups and mTLS cannot be controlled, and devices that need mTLS fail.</td></tr>
+                <tr><td><b><code>mlkem1024</code> in <code>curvePreferences</code></b></td><td>Enables pure post-quantum KEX.</td></tr>
+                <tr><td><b>mTLS with composite certificates</b></td><td>Verification is done by the fork's TLS stack, tested with composite client certificates in TLS 1.3.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="facts">
+            <div class="fact"><b>Base and image</b><span>Traefik 3.7.15 · <code>ghcr.io/lamassuiot/traefik:pqc-3.7.15</code>. The tag is mutable: pin the digest.</span></div>
+            <div class="fact"><b>Build</b><span><code>build.sh</code> on top of a compiled checkout of the Go fork (<code>GO_FORK_ROOT</code>), with <code>CGO_ENABLED=0</code> and <code>docker buildx</code>.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Helm -->
+      <div role="tabpanel" aria-labelledby="tab-helm" id="panel-helm" hidden>
+        <div class="panel-inner">
+          <div class="panel-head"><h3>One command sets up the whole PQC laboratory.</h3>
+            <p class="note" style="margin:0">The chart's <code>pqc</code> branch, with the <code>traefikFrontProxy</code> block. The <code>scripts/lamassu-fast-lane.sh</code> installer deploys everything.</p></div>
+          <div class="grid-2">
+            <div class="terminal">
+              <div class="bar"><span>Simulated installation</span><button class="btn" type="button" id="term-play">▶ Play</button></div>
+              <pre id="term" aria-live="off"></pre>
+            </div>
+            <div>
+              <div class="codebox" style="margin-bottom:14px"><button class="copy" type="button" data-copy="c-values">Copy</button><pre id="c-values">traefikFrontProxy:
+  enabled: true
+  domain: lab.example.com
+  webSecurePort: 8443
+  tls:
+    type: certManager
+    certManagerOptions:
+      addresses: ["10.0.0.5"]
+    additionalSecretNames:
+      - edge-cert-pq
+      - edge-cert-pqt</pre></div>
+              <p class="note">The installer creates the PQ and PQ/T certificates with OpenSSL 3.5 or later and <code>hybrid-provider</code>, and writes the ML-DSA keys in the seed-only form that Go accepts. The <code>--tls-kex</code> and <code>--tls-auth</code> flags are the ones in the <a href="#configurador">configurator</a>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ 12. NEXT ═══════════════════════════ -->
+<section class="block" id="siguiente" aria-labelledby="h-next">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Where to go next</span>
+      <h2 id="h-next">Pick your path through the docs.</h2>
+    </div>
+    <div class="next">
+      <a href="/docs/platform/pqc/overview" data-doc="/platform/pqc/overview" target="_top"><span>I want to understand the support</span><b>Overview</b><small>The components, how they fit together, and the algorithms.</small></a>
+      <a href="/docs/platform/pqc/go-toolchain" data-doc="/platform/pqc/go-toolchain" target="_top"><span>I write a client</span><b>Go PQC toolchain</b><small>The fork's API, the TLS code points and how to build it.</small></a>
+      <a href="/docs/platform/pqc/keys-and-cas" data-doc="/platform/pqc/keys-and-cas" target="_top"><span>I run a PKI</span><b>Keys and CAs</b><small>Create PQ keys and CAs and issue certificates through the API.</small></a>
+      <a href="/docs/platform/pqc/deployment" data-doc="/platform/pqc/deployment" target="_top"><span>I deploy the platform</span><b>Deployment with the Helm chart</b><small>The chart, the installer and the TLS front proxy.</small></a>
+      <a href="/docs/platform/pqc/integration-tests/overview" data-doc="/platform/pqc/integration-tests/overview" target="_top"><span>I want to see the tests</span><b>Integration tests</b><small>HTTPS and MQTTS, with commands to reproduce them.</small></a>
+      <a href="/docs/platform/pqc/limitations" data-doc="/platform/pqc/limitations" target="_top"><span>Before a pilot</span><b>Known limitations</b><small>What is incomplete, non-standard or unverified.</small></a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">Lamassu IoT · Experimental PQC support, meant for laboratories and pilots. Source: the <code>/docs/platform/pqc</code> documentation.</div>
+</footer>
+
+<div class="vh" id="announcer" aria-live="polite"></div>
+
+<script>
+window.PQC_I18N = {
+  docsBase: '/docs',
+  years: (n) => `${n} years`,
+  verdict: (year, n) => `A certificate issued to that device today will still be in use in <strong>${year}</strong>. ` +
+    (n >= 6 ? 'Its lifetime reaches into the risk window: it should be able to authenticate with PQ or PQ/T.'
+            : 'Even with a short lifetime, traffic recorded today already calls for a post-quantum KEX.'),
+  installerSuffix: ' (installer)',
+  secretExtra: 'additional secret (tls.additionalSecretNames)',
+  origin: {
+    T: 'cert-manager, or the files given with --tls-crt and --tls-key',
+    PQ: 'Created by the installer with OpenSSL ≥ 3.5',
+    PQTmain: 'Created by the installer with OpenSSL ≥ 3.5 and hybrid-provider',
+    PQTextra: 'Test certificate loaded as an additional secret; the installer only creates the RSA3072-PSS variant',
+  },
+  testsOk: (g, s) => `<span class="pill ok">✓ HTTPS · 200 OK</span><span class="pill ok">✓ MQTTS · message delivered</span>
+    <span class="note" style="align-self:center">Group <code>${g}</code> and scheme <code>${s}</code> observed in the handshake.</span>`,
+  testsUntested: `<span class="pill untested">Not tested in this combination</span>
+    <span class="note" style="align-self:center">This composite variant was only tested with PQ/T KEX.</span>`,
+  notes: {
+    composite: (cp) => `<div class="callout"><strong>Composite client:</strong> it needs the OpenSSL <code>hybrid-provider</code> module with the fork's code points. This variant uses <code>${cp}</code>. Pure ML-DSA and ML-KEM work with OpenSSL 3.5 or later with nothing extra.</div>`,
+    mldsa: '<div class="callout"><strong>Pure ML-DSA:</strong> works with OpenSSL 3.5 or later as it is. In TLS it uses Go 1.27\'s native <code>0x0905</code> scheme.</div>',
+    hrr: '<div class="callout"><strong>An extra round trip:</strong> clients send an <code>X25519MLKEM768</code> key share first. If the server does not accept it, it answers with a HelloRetryRequest and the handshake completes with the group it asks for.</div>',
+    classic: '<div class="callout warn"><strong>Classical only:</strong> this is the only combination in which the installer allows TLS 1.2. There is no post-quantum protection in either dimension.</div>',
+  },
+  nodes: {
+    device: { title: 'IoT device', text: 'Outside the product. A TLS 1.3 or mTLS client that negotiates KEX and AUTH with Traefik separately.',
+      items: ['Tested with OpenSSL, curl and mosquitto, with no Lamassu code.', 'For composite certificates it needs hybrid-provider with the fork\'s code points.', 'It must trust the CA of every class of certificate it may receive.'],
+      go: { label: 'See the tests', href: '#pruebas' } },
+    traefik: { title: 'Traefik PQC', text: 'The public edge. Terminates the device\'s TLS with T, PQ or PQ/T KEX and certificates, and forwards to Envoy over classical TLS.',
+      items: ['Traefik 3.7.15 fork compiled with the Go PQC toolchain.', 'Serves several certificates per host and chooses according to the client.', 'mTLS: with RequestClientCert it forwards the client certificate to the backend in a header.'],
+      go: { label: 'See Traefik', tab: 'tab-traefik' } },
+    envoy: { title: 'Envoy Gateway', text: 'Receives Traefik\'s traffic over HTTPS with the chart\'s classical certificate, which Traefik does not verify. It never sees a post-quantum handshake.',
+      items: ['Routes to the Lamassu services with HTTPRoutes and ext-authz.', 'Shared across namespaces; installed once per cluster.'],
+      go: { label: 'See the deployment', tab: 'tab-helm' } },
+    backend: { title: 'Lamassu backend', text: 'KMS, CA and VA. Creates and holds the keys, issues certificates and signs revocation data.',
+      items: ['Compiled with the Go PQC toolchain (golang-pqc image).', 'PQ keys in the filesystem and software engines.', 'The same REST endpoints for T, PQ and PQ/T.'],
+      go: { label: 'See the backend', tab: 'tab-backend' } },
+    go: { title: 'Go PQC toolchain', text: 'The foundation: a Go 1.27 fork that adds composite signatures, SLH-DSA and related certificates to X.509, and composite schemes to TLS 1.3.',
+      items: ['Standard Go has no composite or SLH-DSA certificates.', 'Traefik and the backend are compiled with it.'],
+      go: { label: 'See the toolchain', tab: 'tab-go' } },
+    helm: { title: 'Helm chart', text: 'The pqc branch adds the Traefik front proxy and the lamassu-fast-lane.sh installer, which sets up the whole laboratory.',
+      items: ['traefikFrontProxy values block.', '--tls-kex and --tls-auth flags to choose T, PQ and PQ/T.'],
+      go: { label: 'See Helm', tab: 'tab-helm' } },
+  },
+  term: [
+    ['ps', '$ ./scripts/lamassu-fast-lane.sh -d lab.example.com --tls-kex PQ,PQ/T --tls-auth PQ,PQ/T'],
+    ['', '▸ Gateway API CRDs 1.6.3 (experimental channel)'],
+    ['', '▸ Envoy Gateway 1.8.0'],
+    ['', '▸ Traefik (chart 41.0.2) · image ghcr.io/lamassuiot/traefik:pqc-3.7.15'],
+    ['', '▸ TLS option default · curvePreferences:'],
+    ['mut', '    MLKEM1024, X25519MLKEM768,'],
+    ['mut', '    SecP256r1MLKEM768, SecP384r1MLKEM1024'],
+    ['', '▸ Certificates with OpenSSL ≥ 3.5 + hybrid-provider:'],
+    ['mut', '    edge-cert-pq   ML-DSA-65'],
+    ['mut', '    edge-cert-pqt  MLDSA65-RSA3072-PSS-SHA512'],
+    ['', '▸ PostgreSQL · Keycloak · RabbitMQ'],
+    ['', '▸ Lamassu with :pqc images · traefikFrontProxy.enabled=true'],
+    ['okl', '✓ Done. CA that devices must trust:'],
+    ['mut', "  kubectl get secret edge-cert-pq -o jsonpath='{.data.ca\\.crt}'"],
+  ],
+  bytes: (n) => `${n.toLocaleString('en-US')} B`,
+  algo: {
+    standard: 'standard',
+    nistCat: (c) => `NIST category ${c}`,
+    noTls: 'cannot authenticate TLS',
+    chainOnly: 'chain only',
+    none: 'No algorithm matches the filter.',
+    count: (n, t) => `${n} of ${t}`,
+    sigComposite: 'ML-DSA + classical',
+  },
+  sim: {
+    sni: '1. The SNI <code>lab.example.com</code> matches 3 certificates.',
+    many: '2–3. There is more than one candidate: one must be chosen.',
+    noSchemes: (name) => `5. The client announces no schemes: the first compatible certificate is served, ${name}.`,
+    walk: (tls12) => `4. Walks the schemes in the client's order${tls12 ? ' (TLS 1.2 never selects ML-DSA or composite)' : ''}:`,
+    fits: (s, name) => `→ <code>${s}</code> matches ${name}: it is served.`,
+    notValid: (s, tls) => `→ <code>${s}</code> is not valid in TLS ${tls}.`,
+    noneCompat: 'None is compatible: the first candidate is returned and the handshake fails.',
+    trust: (f) => `The client must trust the CA of the ${f} certificate.`,
+    served: 'SERVED',
+    up: (s) => `Move ${s} up`,
+    down: (s) => `Move ${s} down`,
+    position: (s, n) => `${s} in position ${n}`,
+  },
+  stepLabel: (n) => `Step ${n}`,
+  steps: [
+    { t: 'Profile', h: 'Checks the issuance profile', b: 'The profile must enable related certificates (<code>related_certificate.enabled</code>). Otherwise a request that carries the attribute is rejected.',
+      l: ['A request without the attribute is processed as usual.', 'Defaults: <code>enabled: false</code>, <code>max_age: 5m</code>.'] },
+    { t: 'Download', h: 'Downloads the related certificate', b: 'Reads the locations in the <code>relatedCertRequest</code> attribute in order and downloads the first certificate it can retrieve.',
+      l: ['A <code>data:</code> URI with a base64 PKCS#7 is always accepted.', 'An <code>http</code> or <code>https</code> URL only if its host is in <code>allowed_hosts</code>.', 'No redirects, a ten-second timeout and at most 1 MiB.'] },
+    { t: 'Verify', h: 'Verifies proof of possession', b: 'Checks that the issuer and serial number match, that the request time is within <code>max_age</code> and that the signature is valid with the downloaded certificate\'s key.',
+      l: ['The signature covers the issuer, the serial number and the time, not the location.', 'The new certificate\'s key is proven by the signature of the CSR itself.'] },
+    { t: 'Issue', h: 'Issues the certificate with the extension', b: 'Adds <code>id-pe-relatedCert</code> with the hash of the related certificate: SHA-256, SHA-384 or SHA-512, matching its signature algorithm.',
+      l: ['Neither certificate may be a CA, and the related one must be valid.', 'The requested key usages must be a subset of those of the related certificate.'] },
+  ],
+  matrix: {
+    corner: 'KEX ↓ / AUTH →',
+    cellLabel: (r, c) => `KEX ${r}, AUTH ${c}: passed`,
+    route: 'Path', group: 'Group', cert: 'Certificate', result: 'Result', passed: 'Passed',
+    routeHttps: 'Client → Traefik → Envoy Gateway → CA service',
+    routeMqtts: 'mosquitto → Traefik :8883 → EMQX 5.8.9',
+    checks: (g, s, https, wrong) => [
+      ['KEX', `the negotiated group is <code>${g}</code>.`],
+      ['Signature', `the handshake signature scheme is <code>${s}</code>.`],
+      ['Chain', 'the client verifies the chain against the case\'s CA and the server name.'],
+      ['Traffic', https ? '<code>GET /api/ca/health</code> returns <code>200 OK</code>.' : 'the subscriber receives the published message: <code>CONNACK (0)</code>.'],
+      ['Wrong KEX', `offering only other groups (for example <code>${wrong}</code>) fails with <code>handshake_failure</code>.`],
+      ['Wrong scheme', 'offering every scheme except the certificate\'s fails with <code>handshake_failure</code>.'],
+    ],
+    blocks: { handshake: 'Handshake with OpenSSL', curl: 'Request with curl', pubsub: 'Subscribe and publish' },
+  },
+  copy: { copy: 'Copy', copied: 'Copied', unavailable: 'Unavailable', announce: 'Copied to the clipboard' },
+};
+</script>
+<script src="pqc-welcome/pqc-welcome.js"></script>
+</body>
+</html>

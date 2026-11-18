@@ -30,6 +30,7 @@ import {
 } from "@/components/diff-toggle";
 import { MdxCard, MdxLink } from "@/components/mdx-link";
 import { Mermaid } from "@/components/mermaid";
+import { PqcWelcome } from "@/components/pqc-welcome";
 import { ScalarIcon } from "@/components/scalar-icon";
 import { VersionSelector } from "@/components/version-selector";
 import { asset } from "@/lib/asset";
@@ -243,8 +244,11 @@ const clientLoader = browserCollections.docs.createClientLoader({
           enabled: false,
         }}
         toc={filteredToc}
+        // `full: true` in the frontmatter drops the TOC and widens the column,
+        // for pages built around an embedded interactive page.
+        full={frontmatter.full}
         // Narrow, centred reading column between the sidebar and the TOC.
-        className="items-center *:w-full *:max-w-[47rem] xl:pt-12"
+        className={`items-center *:w-full xl:pt-12 ${frontmatter.full ? "*:max-w-[72rem]" : "*:max-w-[47rem]"}`}
       >
         <title>
           {titleParts.badge
@@ -315,6 +319,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               Steps,
               ArchitectureDiagram,
               Mermaid,
+              PqcWelcome,
             }}
           />
         </DocsBody>

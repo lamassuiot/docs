@@ -68,7 +68,20 @@ The following walkthrough shows a partial mesh with A ↔ B, A → C and B → C
 
 A hybrid PKI combines hierarchies of subordinate CAs with cross-certification. It can arise when two organizations with their own hierarchies need to interoperate without replacing their roots. Each branch retains its structure, but paths between them make certificate distribution, revocation and policy interpretation more complex.
 
-A demo can start with roots A and B, an issuing intermediate under B, and the A → B link. From anchor A, the consumer needs B's certificate signed by A and B's intermediate to validate the final identity. Also check failure when a link is missing and look for alternative paths.
+To demonstrate it, create roots A and B, an issuing intermediate under B and an identity issued by it, and add A → B. From anchor A, the consumer needs B's certificate signed by A and B's intermediate to validate the final identity. Also check failure when a link is missing and look for alternative paths.
+
+The following walkthrough starts from those CAs, prepared before recording, and performs the A → B cross-signing with the **Cross Sign** operation. It then compares the authorities table, hierarchy and graph: B appears twice, as a self-signed root and under A, with the same key and a different issuer. Each step's guide describes the validations, which were performed outside the console.
+
+<HybridModelDemo locale="en" />
+
+With OpenSSL, using only A as the anchor and B's cross certificate plus the intermediate as auxiliary material, the path `identity → intermediate → B (cross) → A` validates:
+
+```sh
+cat A-signs-B.pem B-Issuing.pem > chain.pem
+openssl verify -no-CApath -no-CAstore -CAfile A.pem -untrusted chain.pem identity.pem
+```
+
+Validation fails if the cross certificate is omitted, if the intermediate is missing, or if an unrelated root is used as the anchor. If the validator also trusts B, it may choose the direct path, shorter and not going through A: the cross certificate does not make it unnecessary. The cross certificate has its own expiry (three years in the demo), earlier than root B's and the intermediate's, so the path through A stops validating the intermediate before the direct one does. The demo's certificates contain no certificate policies, name constraints, policy constraints or maximum path length, and this version's **Cross Sign** operation offers no controls for them. The demo therefore does not prove conformance with RFC 5217, only path building with the basic extensions.
 
 ### Unifying trust point
 

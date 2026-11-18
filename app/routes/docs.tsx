@@ -38,6 +38,7 @@ import { Mermaid } from "@/components/mermaid";
 import { RevokeCertificateDemo } from "@/components/revoke-certificate-demo";
 import { TrustModelsDemo } from "@/components/trust-models-demo";
 import { CrossSignDemo } from "@/components/cross-sign-demo";
+import { HybridModelDemo } from "@/components/hybrid-model-demo";
 import { ScalarIcon } from "@/components/scalar-icon";
 import { VersionSelector } from "@/components/version-selector";
 import { asset } from "@/lib/asset";
@@ -324,6 +325,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
               RevokeCertificateDemo,
               TrustModelsDemo,
               CrossSignDemo,
+              HybridModelDemo,
               Mermaid,
             }}
           />
@@ -368,7 +370,10 @@ export default function Page({ loaderData }: Route.ComponentProps) {
       tabMode="navbar"
       i18n
       tree={pageTree}
-      sidebar={{ banner: <VersionSelector />, tabs, collapsible: false }}
+      // Collapsible: from 768px the sidebar is a fixed column (below that it
+      // is a drawer), which leaves little room on an iPad or a phone held
+      // sideways. The toggle sits in the top bar from that width up.
+      sidebar={{ banner: <VersionSelector />, tabs, collapsible: true }}
     >
       {content}
     </DocsLayout>

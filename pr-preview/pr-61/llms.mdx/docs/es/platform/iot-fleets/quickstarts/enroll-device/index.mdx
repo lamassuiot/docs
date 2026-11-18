@@ -66,6 +66,18 @@ La descarga debe ser satisfactoria y contener la raíz de enrolamiento prevista.
 
 Enrola el dispositivo [#enrola-el-dispositivo]
 
+<div className="lm-diff-ins lm-diff-block">
+  El recorrido muestra el enrolamiento completo desde ambos lados: el dashboard de Lamassu a la izquierda, donde se revisa el DMS y se localiza el dispositivo nuevo, y la terminal del dispositivo a la derecha, donde se crean la clave y la CSR y se envía la petición EST. Se ejecuta en un entorno desechable con datos sintéticos, un DMS llamado `est-showcase` y un dispositivo llamado `sensor-0421`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <EstEnrollmentDemo locale="es" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  El DMS de la demo tiene la autenticación inicial desactivada y se accede a él por HTTP, así que sus comandos `curl` no llevan `--cert` ni `--key`. No copies esa configuración: los comandos siguientes usan la credencial de bootstrap y HTTPS, tal como los preparó este quickstart.
+</div>
+
 Genera una clave nueva y una CSR con el identificador elegido:
 
 ```bash

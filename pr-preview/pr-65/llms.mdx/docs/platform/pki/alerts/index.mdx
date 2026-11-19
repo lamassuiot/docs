@@ -114,5 +114,5 @@ Use the catalog shown in the console as the source for the types available in yo
 Since 4.0.0, `va.crl-settings.init` and `va.crl-settings.update` carry the CRL settings of a CA (`ca_id`) and replace `va.role.crl.init` and `va.role.update`. The upgrade migration renames the types of existing subscriptions automatically, but it does not rewrite their conditions: review filters that read the old payload or the old `crl/<ski>` subject, including filters for `va.role.crl.create` (see [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0#crl-settings-keyed-by-ca-id)).
 
 <div className="lm-diff-ins lm-diff-block">
-  The VA also publishes `va.crl-settings.finalize` when a CA is revoked or expires, `va.crl-settings.archive` when the CA is deleted, and `va.crl-settings.delete` when archived settings are removed.
+  The VA also publishes `va.crl-settings.finalize` when a CA is revoked permanently or expires, `va.crl-settings.archive` when the CA is deleted, and `va.crl-settings.delete` when archived settings are removed.
 </div>

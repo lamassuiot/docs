@@ -206,6 +206,10 @@ Rules can follow relations declared between entities. For example, the schema kn
 
 This lets you express models like "can operate the devices of this DMS" without maintaining an individual list of every device. When a resource is added under that relation, it inherits the scope planned by the policy.
 
+A rule can only follow relations that the data schema declares between its two entities. You can reference the relation by its name or by its foreign-key column — both spellings are equivalent, and it is the schema that decides which column the query uses. When you save a policy, `authz` checks every relation against the loaded schemas: one that no schema declares, or one pointing at an entity that is not loaded, is rejected at that moment.
+
+Policies stored before this validation may still carry relations the schemas do not declare. Such a relation grants nothing: `authz` logs a warning, `skipping relation that grants nothing`, naming the policy and the relation, and continues evaluating the rest of the policy. The reference is always resolved against the schema before any query is built, so an undeclared relation can never alter it. If inherited access narrows after an upgrade, check the `authz` logs for this warning and correct the relation of the affected policy.
+
 ### Attribute-filtered access
 
 `column_filters` applies conditions to columns the schema has declared filterable. All filters of the same rule are combined with AND.
@@ -418,6 +422,8 @@ The credential could be processed but did not produce a positive authorization. 
 6. that the identifier, relation, column filter or HTTP constraint includes the real resource.
 
 In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure. With OpenTelemetry tracing enabled, a request that reaches the policy engine produces an `engine.CheckHTTPRequest` span whose attributes record `authz.allowed`, the matched policy and the matched principal. Correlation with the Gateway trace requires trace context to be propagated to authz.
+
+If a policy that relied on inherited access stopped granting it after an upgrade, look in the `authz` logs for `skipping relation that grants nothing`: the warning names the policy and the relation the schemas no longer declare. Correct that policy's relation so it matches the current schemas.
 
 ### Everything returns 403
 

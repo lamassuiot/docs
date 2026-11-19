@@ -16,7 +16,7 @@ Los ajustes de CRL de una CA guardan la configuración y los metadatos de su úl
 | Campo | Función |
 |---|---|
 | `ca_id` | ID de la CA a la que pertenecen los ajustes. |
-| `status` | Los ajustes `ACTIVE` generan CRLs. Los `ARCHIVED` pertenecen a una CA que ya no existe: su última CRL sigue sirviéndose, pero nunca se regenera. |
+| `status` | Los ajustes `ACTIVE` generan CRLs. Los `FINAL` pertenecen a una CA que fue revocada o ha expirado: su última CRL, si la hay, se publica y no se genera ninguna nueva. Los `ARCHIVED` pertenecen a una CA eliminada: su última CRL sigue sirviéndose, pero nunca se regenera. |
 | `legacy_ski` | Solo lectura. SKI por el que los ajustes estaban indexados antes de la migración de 4.0.0; solo lo tienen los migrados, y `/crl/<ski>` sigue resolviendo a ellos. |
 | `latest_crl` | Versión, inicio y fin de validez de la última lista publicada. Solo lectura. |
 
@@ -36,10 +36,10 @@ Una CA cuyo firmante no tiene `cRLSign` no puede generar su CRL, y una actualiza
 <span id="casos-en-los-que-los-ajustes-dejan-de-poder-editarse" />
 
 <Callout type="warn" title="Casos en los que los ajustes dejan de poder editarse">
-  Eliminar una CA conserva sus ajustes de CRL, que no pueden borrarse por API. Qué ocurre después depende de cuándo se eliminó la CA:
+  Los ajustes cuyo `status` es `FINAL` o `ARCHIVED` son de solo lectura: cualquier `PUT` devuelve 409. Eliminar una CA conserva sus ajustes de CRL:
 
-  - La migración de la actualización a 4.0.0 archiva los ajustes de las CAs que se habían eliminado antes de la actualización. Su `status` es `ARCHIVED` y su `ca_id` es `legacy-<ski>`: la última CRL sigue sirviéndose, pero nunca se regenera, cualquier `PUT` devuelve 409 y no hay forma de volver a `ACTIVE` por API.
-  - Una CA eliminada con 4.0.0 en marcha deja ajustes `ACTIVE`. La última CRL sigue sirviéndose, pero una vez vencida nada la regenera: el trabajo de renovación registra `something went wrong while calculating CRL for CA <ca-id>` en cada ciclo porque ya no puede resolver la CA. Las opciones siguen editándose mientras el firmante no cambie; cambiarlo falla, porque ya no queda ninguna CA con la que coincidir.
+  - La migración de la actualización a 4.0.0 archiva los ajustes de las CAs que se habían eliminado antes de la actualización. Su `status` es `ARCHIVED` y su `ca_id` es `legacy-<ski>`: la última CRL sigue sirviéndose, pero nunca se regenera.
+  - Los ajustes `ARCHIVED` de una CA eliminada pueden borrarse, con `DELETE` o desde la página Verification Authorities de la consola. Esa CRL deja de servirse — quien compruebe sus certificados contra ella dejará de encontrarla —, mientras que las CRLs ya publicadas permanecen en el bucket. La acción no puede deshacerse.
 
   Ajusta validez y firmante antes de eliminar una CA.
 
@@ -75,7 +75,7 @@ La frecuencia del trabajo se configura en Helm con `services.va.job.crl.frequenc
 
 Si la generación falla (por ejemplo, porque no puede resolver la CA o el firmante es inválido), el trabajo registra el aviso `something went wrong while calculating CRL for CA <ca-id>` y lo reintenta en el ciclo siguiente. No hay otra vía de renovación hasta corregir la causa, y la última lista publicada se sigue sirviendo hasta vencer. Todo ello depende de que el trabajo, el almacenamiento y la firma funcionen.
 
-Los ajustes con `status` `ARCHIVED` se omiten: nada regenera su CRL.
+Los ajustes con `status` `FINAL` o `ARCHIVED` se omiten: nada regenera su CRL.
 
 Con `regenerate_on_revoke`, el manejador de eventos solicita una nueva CRL cuando recibe una revocación o la reactivación de un certificado desde `CertificateHold` a `ACTIVE`. Es un paso posterior al cambio de estado, con sus propios posibles errores: si falla la generación (por ejemplo, por un firmante inválido), el evento se reintenta y, agotados los reintentos, pasa a la cola de eventos fallidos. Si la CA emisora no tiene ajustes de CRL, no hay CRL que regenerar: el evento se da por atendido sin reintento, la VA registra un aviso y no aparece nada en la cola de eventos fallidos. Confirmar la revocación no demuestra que la CRL nueva ya esté publicada ni que todos los clientes la hayan descargado.
 
@@ -133,8 +133,9 @@ Los paths siguientes son relativos al servicio VA; el prefijo público debe conf
 | `GET` | `/v1/crl-settings` | Listar los ajustes de CRL; filtrable al menos por `ca_id`, `status` y `legacy_ski`. |
 | `GET` | `/v1/crl-settings/{ca-id}` | Consultar los `crl_options` y `latest_crl` de una CA. |
 | `PUT` | `/v1/crl-settings/{ca-id}` | Sustituir la configuración de CRL de una CA. |
+| `DELETE` | `/v1/crl-settings/{ca-id}` | Borrar los ajustes de una CA cuyos ajustes están `ARCHIVED`; sus CRLs publicadas permanecen en el bucket pero dejan de servirse. |
 
-Necesitas autenticación y permisos de lectura o actualización de los ajustes de CRL. Consulta la [Referencia API](/docs/api-reference) y el [control de acceso](/docs/platform/administration/access-control) de tu instalación. Lee la configuración actual antes de actualizarla y envía el objeto completo esperado por el contrato — `refresh_interval`, `validity`, `signer_serial_number` y `regenerate_on_revoke`: el backend sustituye los cuatro; no fusiona campos omitidos. `status`, `legacy_ski` y `latest_crl` son de solo lectura. Un `PUT` devuelve 409 cuando los ajustes no están `ACTIVE`, valida el firmante solo cuando cambia y no regenera la CRL.
+Necesitas autenticación y permisos de lectura, actualización o borrado de los ajustes de CRL. Consulta la [Referencia API](/docs/api-reference) y el [control de acceso](/docs/platform/administration/access-control) de tu instalación. Lee la configuración actual antes de actualizarla y envía el objeto completo esperado por el contrato — `refresh_interval`, `validity`, `signer_serial_number` y `regenerate_on_revoke`: el backend sustituye los cuatro; no fusiona campos omitidos. `status`, `legacy_ski` y `latest_crl` son de solo lectura. Un `PUT` devuelve 409 cuando los ajustes no están `ACTIVE`, valida el firmante solo cuando cambia y no regenera la CRL. Un `DELETE` devuelve 409 salvo que los ajustes estén `ARCHIVED`.
 
 Después de un cambio, comprueba la configuración guardada y la siguiente lista efectivamente publicada. Modificar los ajustes no prueba por sí solo regeneración ni aceptación por el cliente.
 
@@ -142,7 +143,7 @@ Después de un cambio, comprueba la configuración guardada y la siguiente lista
 
 | Síntoma | Causa | Acción |
 |---|---|---|
-| `PUT /v1/crl-settings/{ca-id}` devuelve 409. | Los ajustes no están `ACTIVE`: la migración los archivó porque su CA se eliminó antes de la actualización. | No hay vuelta a `ACTIVE` por API. La última CRL sigue sirviéndose. |
+| `PUT /v1/crl-settings/{ca-id}` devuelve 409. | Los ajustes no están `ACTIVE`: son `FINAL` o `ARCHIVED` (consulta la tabla del campo `status` en [Ajustes de CRL](#ajustes-de-crl)). | No hay vuelta a `ACTIVE` por API. La última CRL sigue sirviéndose. |
 | `PUT` devuelve 400. | El firmante nuevo no tiene `cRLSign`, o su sujeto y su clave pública no coinciden con los de la CA. | Asigna el número de serie de un certificado válido de esa CA. |
 | `PUT` devuelve 404. | La CA o el certificado firmante nuevo no existen (por ejemplo, la CA se eliminó), o la CA no tiene ajustes de CRL (por ejemplo, una CA importada). | Revisa el ID de CA y el número de serie del firmante. |
 | `PUT` devuelve 400 desde un cliente de 3.x. | `crl_options.subject_key_id_signer` se sustituyó por `crl_options.signer_serial_number`, que es obligatorio. | Actualiza el cliente para enviar el campo nuevo. |
@@ -151,19 +152,23 @@ Después de un cambio, comprueba la configuración guardada y la siguiente lista
 
 ## Desde la interfaz
 
-Los ajustes de CRL de una CA se editan en la pestaña **Validation Authority** de la vista de la CA y en la página **Verification Authorities** de la consola. Ambos los leen y actualizan por ID de CA en `/v1/crl-settings/{ca-id}`, que requiere un backend 4.0.0.
+Los ajustes de CRL de una CA se editan en la pestaña **Validation Authority** de la vista de la CA, a la que se llega con **Configure VA** desde la página **Verification Authorities** de la consola. Ambas leen los ajustes por ID de CA en `/v1/crl-settings/{ca-id}`, que requiere un backend 4.0.0. La página Verification Authorities no edita los ajustes: lista los de todas las CA para revisarlos y, en los `ARCHIVED`, permite borrarlos.
 
 Si el backend aún no tiene ajustes para una CA, la pestaña muestra un panel **No CRL Settings** que indica que los ajustes de CRL se crean junto con la CA y que, si la CA se acaba de crear, pueden seguir inicializándose, con un botón **Retry**. Mientras cargan los ajustes, muestra **Loading CRL Settings...**; si falla la consulta, muestra **Error Loading CRL Settings**, también con un botón **Retry**. La fila 404 de [Errores frecuentes de los ajustes de CRL](#errores-frecuentes-de-los-ajustes-de-crl) enumera cuándo puede una CA no tener ajustes.
 
-Los ajustes cuya CA se eliminó antes de la actualización a 4.0.0 quedan `ARCHIVED`: la interfaz los muestra en solo lectura dentro de un aviso de advertencia, y la página Verification Authorities marca la CA con la insignia **Archived**. Su última CRL sigue sirviéndose, pero nunca se regenera, y los ajustes no pueden editarse — consulta [Casos en los que los ajustes dejan de poder editarse](#casos-en-los-que-los-ajustes-dejan-de-poder-editarse). Los ajustes migrados del modelo indexado por SKI muestran una nota con su URL de CRL heredada `/crl/<legacy-ski>`, que sigue resolviendo a la lista de esta CA.
+En la vista de la CA, la sección **Latest Generated CRL** va primero y **CRL Configuration** al final. Los ajustes que no están `ACTIVE` se muestran en solo lectura: su insignia de estado (`Active`, `Final` o `Archived`) aparece junto a la última CRL, con un aviso de advertencia — **Final CRL Settings** o **Archived CRL Settings** — que explica que los ajustes no pueden editarse; consulta [Casos en los que los ajustes dejan de poder editarse](#casos-en-los-que-los-ajustes-dejan-de-poder-editarse). Los ajustes migrados del modelo indexado por SKI muestran una nota con su URL de CRL heredada `/crl/<legacy-ski>`, que sigue resolviendo a la lista de esta CA.
 
-El campo **CRL Refresh Interval** acepta `0`. Entonces un aviso informativo explica que no se genera una CRL nueva solo porque pase el tiempo — una se genera únicamente poco antes de que venza la actual — y, con **Regenerate CRL Immediately on Revocation** desactivado, que las revocaciones no se publican hasta entonces. El resumen de la página Verification Authorities muestra **Disabled** para un intervalo de renovación de `0`; la semántica está descrita en [Regeneración periódica y automática](#regeneración-periódica-y-automática). El campo **CRL Max Validity / Cache Duration** sigue exigiendo una duración positiva y rechaza `0`.
+La página **Verification Authorities** lista los ajustes de CRL y la última CRL de cada Certification Authority, incluidas las eliminadas cuya última CRL aún se sirve. Tiene un botón **Refresh**, un filtro de texto por nombre, DN o ID de la CA y un filtro de estado con **All**, **Active**, **Final** y **Archived**. La tabla lista cada CA con su insignia de estado, la versión y la validez (**Valid From** / **Valid Until**) de su última CRL y su intervalo de renovación — muestra **Disabled** para `0` —, con acciones por fila: **Configure VA** (abre la pestaña Validation Authority de la vista de la CA; oculta en las filas archivadas), **Fetch & Show CRL**, **Download CRL** (cuando existe una última CRL) y, en las filas `ARCHIVED`, **Delete CRL Settings**. Las filas de CAs eliminadas muestran **Deleted CA** con el ID de la CA en lugar del nombre. Al borrar se abre un diálogo de confirmación que advierte de que la CRL de la CA eliminada dejará de servirse — quien compruebe sus certificados contra ella dejará de encontrarla —, de que las CRLs ya publicadas permanecen en el bucket y de que la acción no puede deshacerse.
+
+**Fetch & Show CRL**, desde la vista de la CA o desde la página Verification Authorities, abre un panel — acoplado a la parte inferior de la página en escritorio, lateral en móvil — que carga la CRL de esta CA al abrirse; introduce otra URL para inspeccionar cualquier CRL. Muestra el DN del emisor, la ventana de actualización (**This update** / **Next update**, con una barra de progreso), el número de CRL y el número de certificados revocados desglosado por las tres razones más frecuentes. Una CRL cuyo **Next update** ha pasado muestra la insignia **Out of date** y un aviso de advertencia; en caso contrario la insignia indica **Current**, y no hay insignia cuando la CRL no define próxima actualización. La tabla de certificados revocados puede filtrarse por número de serie o razón, y su visualización se limita a 200 filas, con un aviso que sugiere filtrar por número de serie para localizar un certificado concreto. Los números de serie enlazan a los detalles del certificado. El fichero descargado se llama `<ca-id>.crl`; compara versión, emisor y tiempos con la copia descargada desde el endpoint público. Un fallo de carga muestra el aviso **Could not load the CRL** con el estado HTTP o un mensaje de que la respuesta no es una CRL DER válida, y un botón **Retry**. Cuando la consola se sirve por HTTPS y la URL de la CRL usa `http://`, aparece un aviso de URL insegura, porque el navegador puede bloquear la petición HTTP sin cifrar o convertirla a HTTPS.
+
+El campo **CRL Refresh Interval** acepta `0`. Entonces un aviso informativo explica que no se genera una CRL nueva solo porque pase el tiempo — una se genera únicamente poco antes de que venza la actual — y, con **Regenerate CRL Immediately on Revocation** desactivado, que las revocaciones no se publican hasta entonces. La tabla de la página Verification Authorities muestra **Disabled** para un intervalo de renovación de `0`; la semántica está descrita en [Regeneración periódica y automática](#regeneración-periódica-y-automática). El campo **CRL Max Validity / Cache Duration** sigue exigiendo una duración positiva y rechaza `0`.
 
 La edición es tolerante: un campo muestra su error solo cuando lo abandonas. **Save CRL Settings** siempre está activado; si al guardar hay campos no válidos, la interfaz los marca todos, muestra los errores y enfoca el primero no válido en lugar de dejar desactivado el botón.
 
-El firmante seleccionado aparece como una tarjeta con su emisor (el DN completo en un tooltip que se abre al pasar el ratón y al enfocar con el teclado, y cuyo nombre enlaza a su CA cuando existe su registro), su fecha de vencimiento, su algoritmo de clave, sus chips de usos y su número de serie, bajo el pie **CRL signer — Signs the CRLs of this CA**. El selector de certificados solo ofrece certificados que tienen clave privada y el uso de clave `cRLSign`. Si el certificado de un firmante configurado no puede resolverse, la interfaz muestra `Unknown Certificate (Serial: X)` o `Certificate details unavailable (Serial: X)`.
+El firmante seleccionado aparece como una tarjeta con su emisor (el DN completo en un tooltip que se abre al pasar el ratón, y cuyo nombre enlaza a su CA cuando existe su registro), su fecha de vencimiento, su algoritmo de clave, sus chips de usos y su número de serie, bajo el pie **CRL signer — Signs the CRLs of this CA**. El selector de certificados solo ofrece certificados que tienen clave privada y el uso de clave `cRLSign`. Si el certificado de un firmante configurado no puede resolverse, la interfaz muestra `Unknown Certificate (Serial: X)` o `Certificate details unavailable (Serial: X)`.
 
-La vista de la CA permite inspeccionar y descargar la lista disponible; el fichero descargado se llama `<ca-id>.crl`. Compara versión, emisor y tiempos con la copia descargada desde el endpoint público. Para diagnosticar una diferencia, sigue [Diagnóstico PKI](/docs/platform/pki/troubleshooting).
+Para diagnosticar una diferencia entre la consola y el endpoint público, sigue [Diagnóstico PKI](/docs/platform/pki/troubleshooting).
 
 ## Referencias
 

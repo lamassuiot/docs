@@ -639,6 +639,10 @@ front-door TLS passthrough+-> internal Gateway B (terminates pki.example.com)
 
 This requires distinct SNI hostnames and cluster networking outside the Lamassu chart.
 
+Client certificates and identity headers [#client-certificates-and-identity-headers]
+
+The chart renders a `ClientTrafficPolicy` named `enable-mtls` on its shared Gateway automatically; no Helm value enables or disables it. TLS termination accepts requests with or without a client certificate: devices may present one, but they are not required to. Before forwarding a request, the Gateway removes identity and certificate headers that a client could otherwise supply itself: `X-Principal-Id`, `X-Lms-Source`, `X-Forwarded-Client-Cert`, `X-Forwarded-Cert`, `X-Forwarded-Tls-Client-Cert` (the Traefik spelling), `Ssl-Client-Cert` and `X-Amzn-Mtls-Clientcert`. The Traefik spelling is included because backends that accept `X-Forwarded-Tls-Client-Cert` directly would otherwise receive certificate identity data supplied by the client itself, without a client certificate having been presented. After stripping, Envoy adds its own `X-Forwarded-Client-Cert` carrying the presented certificate and its chain, so services that read certificate identity receive only gateway-generated values. No Helm value changes the list of stripped headers. The [Access control](/docs/platform/administration/access-control) page describes how `authz` uses this protection to keep `X-Principal-ID` out of reach of clients.
+
 Decision guide [#decision-guide]
 
 1. If one Gateway can own TLS and routing, use the chart default.
@@ -966,7 +970,7 @@ The decision is made **before forwarding the request to the service**:
 7. If the route declares constraints, it compares request data with the normalized attributes of the same principal contributing the policy; the policy's own `param_constraints` also pin the granted action to literal request values.
 8. A satisfying result lets Envoy forward the request; any other response blocks it at the Gateway.
 
-When it allows access, `authz` returns the selected principal in the `X-Principal-ID` response header. The Gateway can propagate that header to the service to preserve the identity context.
+When it allows access, `authz` returns the selected principal in the `X-Principal-ID` response header. The Gateway can propagate that header to the service to preserve the identity context. Clients cannot forge this header: the Gateway removes client-supplied `X-Principal-Id` (and the other forwarded identity and certificate headers) before forwarding, so only `authz` can set it. See [Expose the Gateway](/docs/deployment/self-hosted/networking) for the full list of stripped headers.
 
 HTTP rules primarily answer **"can this identity call this API operation?"**. On their own they do not produce filters over the external service's database. To limit a route to a specific device, tenant or client, either the schema declares a constraint relating a request value to a normalized attribute of the principal, or the policy pins the request value to a literal with `param_constraints`. The first scopes each identity to its own resources through a single grant; the second restricts a grant to a fixed value regardless of who holds it.
 
@@ -1917,7 +1921,7 @@ The re-enrollment trust set lives in `reenrollment_settings.est_rfc7030_settings
 
 Issuance profile [#issuance-profile]
 
-`settings.issuance_profile_id` takes precedence over `settings.issuance_profile`; without either, the CA default profile is used. Rules are documented once in [Profiles](/docs/platform/pki/certificate-profiles). DMS changes affect future requests; they do not modify signed certificates or install client trust.
+`settings.issuance_profile_id` takes precedence over `settings.issuance_profile`; without either, the CA default profile is used. The resolved profile — including the CA default used as fallback when the DMS defines none — must define an end-entity certificate: a `Sign as CA` profile is rejected at enrollment and re-enrollment time. Rules are documented once in [Profiles](/docs/platform/pki/certificate-profiles). DMS changes affect future requests; they do not modify signed certificates or install client trust.
 
 Re-enrollment configuration [#re-enrollment-configuration]
 
@@ -3623,7 +3627,7 @@ Plan the end date within the issuing CA’s validity and leave a renewal margin.
 
 CA certificate or end-entity certificate [#ca-certificate-or-end-entity-certificate]
 
-`Sign as CA` sets `IsCA` and the basic constraints needed for an authority. Enable it only in profiles intended to create or reissue subordinate CAs.
+`Sign as CA` sets `IsCA` and the basic constraints needed for an authority. Lamassu enforces this: a profile with `Sign as CA` is consumed only when creating or reissuing a CA. Any signing request that resolves to such a profile is rejected — direct signing with a CA, including certificate issuance requests on it, and DMS enrollment or re-enrollment. Nothing validates the profile when it is saved: if a CA's default profile or a DMS profile has `Sign as CA` enabled, the problem appears on the first signing request that resolves to it — for a DMS profile, when a device tries to enroll or re-enroll — and renewal stays blocked until the profile is changed.
 
 Key Usage and Extended Key Usage [#key-usage-and-extended-key-usage]
 
@@ -4188,7 +4192,7 @@ From the interface [#from-the-interface]
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
-  Settings whose CA was deleted are `ARCHIVED`: the interface shows them read-only inside a warning alert, and the Verification Authorities page marks the CA with an **Archived** badge. Their last CRL is still served but never regenerated, and the settings cannot be edited — see [Cases in which the settings can no longer be edited](#cases-in-which-the-settings-can-no-longer-be-edited). Settings migrated from the SKI-keyed model show a note with their legacy CRL URL `/crl/<legacy-ski>`, which still resolves to this CA’s list.
+  Settings whose CA was deleted before the 4.0.0 upgrade are `ARCHIVED`: the interface shows them read-only inside a warning alert, and the Verification Authorities page marks the CA with an **Archived** badge. Their last CRL is still served but never regenerated, and the settings cannot be edited — see [Cases in which the settings can no longer be edited](#cases-in-which-the-settings-can-no-longer-be-edited). Settings migrated from the SKI-keyed model show a note with their legacy CRL URL `/crl/<legacy-ski>`, which still resolves to this CA’s list.
 </div>
 
 <div className="lm-diff-ins lm-diff-block">
@@ -4199,7 +4203,7 @@ From the interface [#from-the-interface]
   Editing is forgiving: a field shows its error only after you leave it. **Save CRL Settings** is always clickable; if any field is invalid when you save, the interface marks all of them, shows the errors and focuses the first invalid field instead of keeping the button disabled.
 </div>
 
-The <del className="lm-diff-del">CA view lets you inspect and download the available list. Compare version, issuer and timestamps with the copy downloaded from the public endpoint. The CA’s VA settings also let you select the CRL signer: the</del><ins className="lm-diff-ins">selected signer appears as a card with its issuer (the full DN in a tooltip on hover and keyboard focus, and the issuer name links to its CA), its expiry, key algorithm, usage chips and serial number, under the footer </ins>**<ins className="lm-diff-ins">CRL signer — Signs the CRLs of this CA</ins>**<ins className="lm-diff-ins">. The</ins> certificate picker only offers certificates that have a private key and carry the `cRLSign` key usage. If a configured signer’s certificate cannot be resolved, the interface shows `Unknown Certificate (Serial: X)` or `Certificate details unavailable (Serial: X)`<del className="lm-diff-del">. Diagnose differences using </del>[<del className="lm-diff-del">PKI troubleshooting</del>](/docs/platform/pki/troubleshooting).
+The <del className="lm-diff-del">CA view lets you inspect and download the available list. Compare version, issuer and timestamps with the copy downloaded from the public endpoint. The CA’s VA settings also let you select the CRL signer: the </del><ins className="lm-diff-ins">selected signer appears as a card with its issuer (the full DN in a tooltip on hover and keyboard focus, and the issuer name links to its CA when its record is available), its expiry, key algorithm, usage chips and serial number, under the footer </ins>**<ins className="lm-diff-ins">CRL signer — Signs the CRLs of this CA</ins>**<ins className="lm-diff-ins">. The </ins>certificate picker only offers certificates that have a private key and carry the `cRLSign` key usage. If a configured signer’s certificate cannot be resolved, the interface shows `Unknown Certificate (Serial: X)` or `Certificate details unavailable (Serial: X)`<del className="lm-diff-del">. Diagnose differences using </del>[<del className="lm-diff-del">PKI troubleshooting</del>](/docs/platform/pki/troubleshooting).
 
 <div className="lm-diff-ins lm-diff-block">
   The CA view lets you inspect and download the available list; the downloaded file is named `<ca-id>.crl`. Compare version, issuer and timestamps with the copy downloaded from the public endpoint. Diagnose differences using [PKI troubleshooting](/docs/platform/pki/troubleshooting).

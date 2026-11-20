@@ -1,4 +1,4 @@
-# Control de acceso (/docs/pr-preview/pr-68/es/platform/administration/access-control)
+# Visión general del control de acceso (/docs/pr-preview/pr-68/es/platform/administration/access-control)
 
 
 
@@ -204,6 +204,12 @@ Acceso heredado por relaciones [#acceso-heredado-por-relaciones]
 Las reglas pueden seguir relaciones declaradas entre entidades. Por ejemplo, el esquema conoce la relación de un certificado con su CA emisora, la de un dispositivo con su DMS y la de un certificado con la clave KMS que almacena su clave privada, de modo que un grant sobre la clave también cubre los certificados que la utilizan. Una política puede conceder acceso a un recurso padre y propagar acciones seleccionadas hacia sus recursos relacionados.
 
 Esto permite expresar modelos como “puede operar los dispositivos de este DMS” sin mantener una lista individual de cada dispositivo. Cuando se añade un recurso bajo esa relación, hereda el alcance previsto por la política.
+
+El [modelo de datos](/docs/platform/administration/access-control/data-model) muestra cómo se conectan los recursos sobre los que se aplican las reglas de entidad.
+
+Una regla solo puede seguir relaciones que el esquema de datos declare entre sus dos entidades. Puedes referenciar la relación por su nombre o por su columna de clave foránea —ambas formas son equivalentes— y es el esquema el que decide qué columna utiliza la consulta. Al guardar una política, `authz` comprueba cada relación contra los esquemas cargados: una que ningún esquema declare, o que apunte a una entidad no cargada, se rechaza en ese momento.
+
+Las políticas almacenadas antes de esta validación pueden contener todavía relaciones que los esquemas no declaran. Esa relación no concede nada: `authz` registra una advertencia, `skipping relation that grants nothing`, indicando la política y la relación, y continúa evaluando el resto de la política. La referencia siempre se resuelve contra el esquema antes de construir cualquier consulta, por lo que una relación no declarada nunca puede alterarla. Si el acceso heredado se reduce tras una actualización, busca esta advertencia en los logs de `authz` y corrige la relación de la política afectada.
 
 Acceso filtrado por atributos [#acceso-filtrado-por-atributos]
 
@@ -417,6 +423,8 @@ La credencial pudo procesarse, pero no produjo una autorización positiva. Revis
 6. que el identificador, relación, filtro de columna o restricción HTTP incluya el recurso real.
 
 En los logs de `authz`, una decisión del endpoint externo incluye `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` y el código de estado. Estos campos permiten separar un fallo de coincidencia de un fallo de permisos. Con las trazas OpenTelemetry habilitadas, una solicitud que llega al motor de políticas genera un span `engine.CheckHTTPRequest` cuyos atributos registran `authz.allowed`, la política coincidente y el principal coincidente. Para correlacionarlo con la traza del Gateway, el contexto de traza debe propagarse hasta authz.
+
+Si una política que dependía de acceso heredado dejó de concederlo tras una actualización, busca en los logs de `authz` el mensaje `skipping relation that grants nothing`: la advertencia indica la política y la relación que los esquemas ya no declaran. Corrige la relación de esa política para que coincida con los esquemas actuales.
 
 Todo devuelve 403 [#todo-devuelve-403]
 

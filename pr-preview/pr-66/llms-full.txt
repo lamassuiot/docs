@@ -912,7 +912,91 @@ Before closing an incident, record:
 * the preventive action and its owner.
 
 
-# Access control (/docs/pr-preview/pr-66/platform/administration/access-control)
+# Data model (/docs/pr-preview/pr-66/platform/administration/access-control/data-model)
+
+
+
+<div className="lm-diff-ins lm-diff-block">
+  The `connectors/authz/pki.json` schema defines the entities in the `pki` authorization namespace. A policy identifies a resource type through `namespace: pki`, `schema_name` and `entity_type`. For example, `ca.certificate` identifies the `certificate` entity type in the `ca` schema.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Schema relationships [#schema-relationships]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Each arrow starts at the entity that declares the relationship and points to its `target_entity`. The value of `foreign_key`, the source column, appears below the label. In `pki.json`, each relationship's `name` matches that column. Select the diagram to enlarge it and scroll through it.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  ```mermaid
+  flowchart TB
+      accTitle: Relationships in the pki.json schema
+      accDescr: Nine relationships declared in pki.json, with the source column below each arrow label.
+
+      CA["ca.ca_certificate"]
+      CERT["ca.certificate"]
+      PROFILE["ca.issuance_profile"]
+      DEVICE["devicemanager.device"]
+      DMS["dmsmanager.dms"]
+      KEY["kms.kms_key"]
+      CRL["va.crl_settings"]
+
+      CA -->|"Issuance profile<br/><code>profile_id</code>"| PROFILE
+      CA -->|"Current certificate<br/><code>serial_number</code>"| CERT
+      CERT -->|"Issuing CA by ID<br/><code>issuer_meta_id</code>"| CA
+      CERT -->|"Issuer serial reference<br/><code>issuer_meta_serial_number</code>"| CA
+      CERT -->|"Device by Common Name<br/><code>subject_common_name</code>"| DEVICE
+      CERT -->|"Certificate key<br/><code>key_id</code>"| KEY
+      DEVICE -->|"Owning DMS<br/><code>dms_owner</code>"| DMS
+      CRL -->|"Signer certificate<br/><code>signer_serial_number</code>"| CERT
+      CRL -->|"Signer key<br/><code>signer_key_id</code>"| KEY
+  ```
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  A policy can propagate actions from the referenced entity to the one that declares the relationship. For example, to grant read access to a DMS's devices, a rule starts from `dmsmanager.dms`, targets `devicemanager.device` and specifies `via: dms_owner`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  When filtering inherited access, `authz` matches the `foreign_key` column against the first `primary_key` column of the referenced entity. For example, it matches `subject_common_name` to `device.id`, `issuer_meta_serial_number` to `ca_certificate.id` and the links to `kms_key` to `kms_key.key_id`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Schema entities [#schema-entities]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  | Entity (`schema_name.entity_type`) | Table (`table_name`) | Key (`primary_key`)   |
+  | ---------------------------------- | -------------------- | --------------------- |
+  | `alerts.event`                     | `events`             | `event_type`          |
+  | `alerts.subscription`              | `subscriptions`      | `id`                  |
+  | `ca.ca_certificate`                | `ca_certificates`    | `id`                  |
+  | `ca.certificate`                   | `certificates`       | `serial_number`       |
+  | `ca.issuance_profile`              | `issuance_profiles`  | `id`                  |
+  | `devicemanager.device_group`       | `device_groups`      | `id`                  |
+  | `devicemanager.device`             | `devices`            | `id`                  |
+  | `dmsmanager.dms`                   | `dms`                | `id`                  |
+  | `kms.kms_key`                      | `kms_keys`           | `key_id`, `engine_id` |
+  | `va.crl_settings`                  | `crl_settings`       | `ca_id`               |
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Events, subscriptions and device groups have their own actions and filters. Their `relations` lists are empty and they have zero incoming references in the schema. For `ca.certificate`, `view_tables` also lists `certificates_view`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Each entity declares instance-level operations in `atomic_actions`, operations that require no resource ID in `global_actions`, and the columns and types accepted by `column_filters` in `filterable`.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <Cards>
+    <Card title="Access inherited through relations" href="/docs/platform/administration/access-control#access-inherited-through-relations" />
+  </Cards>
+</div>
+
+
+# Access control overview (/docs/pr-preview/pr-66/platform/administration/access-control)
 
 
 
@@ -1118,6 +1202,10 @@ Access inherited through relations [#access-inherited-through-relations]
 Rules can follow relations declared between entities. For example, the schema knows the relation of a certificate to its issuing CA, of a device to its DMS and of a certificate to the KMS key that stores its private key, so a grant on the key also covers the certificates that use it. A policy can grant access to a parent resource and propagate selected actions to its related resources.
 
 This lets you express models like "can operate the devices of this DMS" without maintaining an individual list of every device. When a resource is added under that relation, it inherits the scope planned by the policy.
+
+<div className="lm-diff-ins lm-diff-block">
+  The [data model](/docs/platform/administration/access-control/data-model) shows how the resources used in entity rules are connected.
+</div>
 
 <div className="lm-diff-ins lm-diff-block">
   A rule can only follow relations that the data schema declares between its two entities. You can reference the relation by its name or by its foreign-key column — both spellings are equivalent, and it is the schema that decides which column the query uses. When you save a policy, `authz` checks every relation against the loaded schemas: one that no schema declares, or one pointing at an entity that is not loaded, is rejected at that moment.
@@ -1467,12 +1555,14 @@ Event families [#event-families]
 * **Profiles:** `profile.issuance.create`, `profile.issuance.update` and `profile.issuance.delete`.
 * **Enrollment:** `dms.create`, `dms.update`, `dms.enroll` and `dms.reenroll`.
 * **Devices:** `device.create`, `device.identity.update` and `device.status.update`.
-* **Validation:** `va.role.crl.create`, `va.crl-settings.init` and `va.crl-settings.update`.
+* **Validation:** `va.role.crl.create`, `va.crl-settings.init`, `va.crl-settings.update`, `va.crl-settings.finalize`, `va.crl-settings.archive` and `va.crl-settings.delete`.
 * **Keys:** `kms.create`, `kms.import`, `kms.sign` and `kms.delete`.
 
 Use the catalog shown in the console as the source for the types available in your deployed version.
 
 Since 4.0.0, `va.crl-settings.init` and `va.crl-settings.update` carry the CRL settings of a CA (`ca_id`) and replace `va.role.crl.init` and `va.role.update`. The upgrade migration renames the types of existing subscriptions automatically, but it does not rewrite their conditions: review filters that read the old payload or the old `crl/<ski>` subject, including filters for `va.role.crl.create` (see [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0#crl-settings-keyed-by-ca-id)).
+
+The VA also publishes `va.crl-settings.finalize` when a CA is revoked permanently or expires, `va.crl-settings.archive` when the CA is deleted, and `va.crl-settings.delete` when archived settings are removed.
 
 
 # Audit logs (/docs/pr-preview/pr-66/platform/administration/audit-logs)
@@ -3616,9 +3706,11 @@ Delete a CA [#delete-a-ca]
 
 Permanent deletion is only available with the CA revoked or expired; a CA imported without a key can be deleted in any state. Delete the record only when your retention and audit policy allows it.
 
-The CA’s CRL settings are kept, and they cannot be removed through the API. The last CRL keeps being served but is never regenerated once the CA is gone, so adjust its validity and signer beforehand (see [CRL](/docs/platform/pki/crl)). The CA’s key is released, but the KMS keeps it while other certificates still reference it.
+The CA’s CRL settings are kept. A deletion is refused with a `409` error while they are still `ACTIVE`: the VA must first publish the CA’s final CRL, which can take up to about an hour after revocation with the default job schedule, so retry after the final CRL is published. An expired CA is finalized without a final CRL, and a CA on hold (`CertificateHold`) is refused with a message asking you to revoke it permanently first. The deletion is also refused with a `409` when the CA’s key signs the CRLs of another CA: the error names that CA, so change its CRL signer, or delete or revoke it, before deleting this one. The CA and all its descendants are checked before anything is deleted; nothing changes if any of them cannot be deleted.
 
-Lamassu keeps the certificate record of a deleted CA. If that same certificate is imported again, the import succeeds and reuses the record: it updates the type, issuer and key but keeps the status, so the CA reappears in the state it had when deleted (normally revoked or expired). A different certificate with the same serial number is rejected with a 400 error, and a certificate that already belongs to an existing CA with a 409 error. To avoid inheriting the previous status, use a certificate with a different serial number and check the result after importing. The reimported CA is registered under a new, backend-generated CA ID and does not inherit the CRL settings of the deleted CA: those keep serving their last CRL at the CA ID URL, and at `/crl/<ski>` — the URL that certificates issued before the 4.0.0 upgrade carry — when the settings were migrated by that upgrade; when they are archived, they can no longer be edited (see [CRL](/docs/platform/pki/crl)).
+After the deletion, the settings are archived and the last CRL keeps being served but is never regenerated; you can remove them once no certificate issued by the CA still needs revocation evidence, using `DELETE /v1/crl-settings/{ca-id}` or the console's **Verification Authorities** page. Deleting them stops the CRL from being served and cannot be undone. Adjust the validity and signer before revoking or deleting the CA (see [CRL](/docs/platform/pki/crl)). The CA’s key is released, but the KMS keeps it while other certificates still reference it.
+
+Lamassu keeps the certificate record of a deleted CA. If that same certificate is imported again, the import succeeds and reuses the record: it updates the type, issuer and key but keeps the status, so the CA reappears in the state it had when deleted (normally revoked or expired). A different certificate with the same serial number is rejected with a 400 error, and a certificate that already belongs to an existing CA with a 409 error. To avoid inheriting the previous status, use a certificate with a different serial number and check the result after importing. The reimported CA is registered under a new, backend-generated CA ID and does not inherit the CRL settings of the deleted CA: until those settings are deleted, those keep serving their last CRL at the CA ID URL, and at `/crl/<ski>` — the URL that certificates issued before the 4.0.0 upgrade carry — when the settings were migrated by that upgrade; when they are archived, they can no longer be edited (see [CRL](/docs/platform/pki/crl)).
 
 
 # Certificate profiles (/docs/pr-preview/pr-66/platform/pki/certificate-profiles)
@@ -4055,12 +4147,12 @@ CRL settings [#crl-settings]
 
 The CRL settings of a CA store the configuration and metadata of its latest published list. Each CA has its own settings, keyed by its CA ID — even when two CAs share a key: they share the SKI, not the CRL. Generation requires a usable issuer key; do not assume an imported CA without a key has an available CRL.
 
-| Field        | Purpose                                                                                                                                         |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ca_id`      | ID of the CA the settings belong to.                                                                                                            |
-| `status`     | `ACTIVE` settings generate CRLs. `ARCHIVED` ones belong to a CA that no longer exists: their last CRL is still served, but never regenerated.   |
-| `legacy_ski` | Read-only. SKI the settings were keyed by before the 4.0.0 migration; only migrated settings have it, and `/crl/<ski>` keeps resolving to them. |
-| `latest_crl` | Version, validity start and end of the last published list. Read-only.                                                                          |
+| Field        | Purpose                                                                                                                                                                                                                                                                                                                                               |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ca_id`      | ID of the CA the settings belong to.                                                                                                                                                                                                                                                                                                                  |
+| `status`     | Lifecycle of the settings. `ACTIVE` ones generate CRLs. `FINAL` ones belong to a CA revoked permanently or expired: the first publishes one final CRL, valid until the CA's current certificate expires, and the second is turned `FINAL` without one. `ARCHIVED` ones belong to a deleted CA: their last CRL is still served, but never regenerated. |
+| `legacy_ski` | Read-only. SKI the settings were keyed by before the 4.0.0 migration; only migrated settings have it, and `/crl/<ski>` keeps resolving to them.                                                                                                                                                                                                       |
+| `latest_crl` | Version, validity start and end of the last published list. Read-only.                                                                                                                                                                                                                                                                                |
 
 | `crl_options` field    | Purpose                                                                                                                                                                                                                                                           | Initial value                                  |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
@@ -4073,17 +4165,21 @@ The signer must be an existing certificate with the `cRLSign` key usage and the 
 
 When a CA is reissued and the signer is the superseded CA certificate, the VA moves the signer to the new certificate — provided it carries `cRLSign` — and republishes the CRL. If the new certificate lacks `cRLSign`, the VA keeps the previous signer and logs a warning. If the signer is any other certificate with the CA’s subject and key, it is deliberately left unchanged; the previous certificate then cannot be deleted while the settings use it (the API returns `409` `certificate is in use`), and to retire it you update the signer with `PUT`.
 
+<Callout type="info" title="Lifecycle decisions use the CA's current certificate">
+  The CRL lifecycle decisions — when publication stops and when the final CRL expires — use only the CA's current certificate. If a reissued certificate expires earlier than an older certificate that is still valid, CRL publication can stop, or the final CRL can expire, while the older certificate is still valid. This is an accepted limitation of the current behavior.
+</Callout>
+
 A CA whose signer lacks `cRLSign` cannot generate its CRL, and an update that selects a signer without `cRLSign` is rejected (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and update the settings to use it as the signer. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages, and without `cRLSign` the settings keep their previous signer.
 
 <span id="cases-in-which-the-settings-can-no-longer-be-edited" />
 
 <Callout type="warn" title="Cases in which the settings can no longer be edited">
-  Deleting a CA keeps its CRL settings, and they cannot be removed through the API. What happens next depends on when the CA was deleted:
+  Deleting a CA keeps its CRL settings; they remain until you delete the archived ones through the API or from the console's Verification Authorities page (see [CRL settings API](#crl-settings-api)). What happens to them depends on how the CA ended:
 
   * The 4.0.0 upgrade migration archives the settings of the CAs that had been deleted before the upgrade. Their `status` is `ARCHIVED` and their `ca_id` is `legacy-<ski>`: the last CRL keeps being served, but it is never regenerated, any `PUT` returns 409, and there is no API way back to `ACTIVE`.
-  * A CA deleted while running 4.0.0 leaves `ACTIVE` settings. The last CRL keeps being served, but once it expires nothing regenerates it: the renewal job logs `something went wrong while calculating CRL for CA <ca-id>` on every cycle because it can no longer resolve the CA. The options can still be edited while the signer is unchanged; changing the signer fails, because there is no CA left to match it.
+  * Revoking a CA permanently or letting it expire finalizes its settings: their `status` becomes `FINAL`, any `PUT` returns 409, and no new CRL is generated. A permanently revoked CA publishes one final CRL, valid until the CA's current certificate expires; an expired CA gets none. Deleting the CA afterwards archives its settings, which then behave like the archived ones of the migration.
 
-  Adjust validity and signer before deleting a CA.
+  The settings can no longer be edited while their `status` is not `ACTIVE`. Adjust validity and signer before revoking or deleting a CA.
 
   `PUT` validates the signer only when the request changes it. If the stored signer is no longer valid, the other options can still be edited, but the CRL cannot be regenerated until a valid signer is set.
 </Callout>
@@ -4117,7 +4213,7 @@ The job frequency is set in Helm with `services.va.job.crl.frequency` (default `
 
 If generation fails (for example, because the CA cannot be resolved or the signer is invalid), the job logs the warning `something went wrong while calculating CRL for CA <ca-id>` and retries on the next cycle. There is no other renewal path until the cause is fixed, and the last published list keeps being served until it expires. All of this depends on working jobs, storage and signing.
 
-Settings whose `status` is `ARCHIVED` are skipped: nothing regenerates their CRL.
+Settings whose `status` is not `ACTIVE` — `FINAL` or `ARCHIVED` — are skipped: nothing regenerates their CRL.
 
 With `regenerate_on_revoke`, the event handler requests a new CRL upon revocation or reactivation from `CertificateHold` to `ACTIVE`. This happens after the status change and has its own failure paths: if generation fails (for example, because of an invalid signer), the event is retried and, once retries are exhausted, moves to the failed-events queue. If the issuing CA has no CRL settings, there is no CRL to regenerate: the event is acknowledged without retry, the VA logs a warning, and nothing appears in the failed-events queue. Confirming revocation does not establish that the new CRL is already published or that all clients have downloaded it.
 
@@ -4170,42 +4266,30 @@ CRL settings API [#crl-settings-api]
 
 The following paths are relative to the VA service; confirm the public prefix in the Gateway. They are not the URLs of the public OCSP and CRL endpoints.
 
-| Method | Relative path              | Operation                                                                         |
-| ------ | -------------------------- | --------------------------------------------------------------------------------- |
-| `GET`  | `/v1/crl-settings`         | List the CRL settings; filterable at least by `ca_id`, `status` and `legacy_ski`. |
-| `GET`  | `/v1/crl-settings/{ca-id}` | Read the `crl_options` and `latest_crl` of a CA.                                  |
-| `PUT`  | `/v1/crl-settings/{ca-id}` | Replace the CRL configuration of a CA.                                            |
+| Method   | Relative path              | Operation                                                                         |
+| -------- | -------------------------- | --------------------------------------------------------------------------------- |
+| `GET`    | `/v1/crl-settings`         | List the CRL settings; filterable at least by `ca_id`, `status` and `legacy_ski`. |
+| `GET`    | `/v1/crl-settings/{ca-id}` | Read the `crl_options` and `latest_crl` of a CA.                                  |
+| `PUT`    | `/v1/crl-settings/{ca-id}` | Replace the CRL configuration of a CA.                                            |
+| `DELETE` | `/v1/crl-settings/{ca-id}` | Remove the archived CRL settings of a CA.                                         |
 
-You need authentication and CRL settings read or update permissions. Consult your installation’s [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract — `refresh_interval`, `validity`, `signer_serial_number` and `regenerate_on_revoke`: the backend replaces all four; it does not merge omitted fields. `status`, `legacy_ski` and `latest_crl` are read-only. A `PUT` returns 409 when the settings are not `ACTIVE`, validates the signer only when it changes, and does not regenerate the CRL.
+You need authentication and CRL settings read, update or delete permissions. Consult your installation’s [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract — `refresh_interval`, `validity`, `signer_serial_number` and `regenerate_on_revoke`: the backend replaces all four; it does not merge omitted fields. `status`, `legacy_ski` and `latest_crl` are read-only. A `PUT` returns 409 when the settings are not `ACTIVE`, validates the signer only when it changes, and does not regenerate the CRL.
+
+Archived settings, whose CA no longer exists, can be removed with `DELETE`: the call returns 204 on success, 404 when the CA has no settings and 409 while the settings are not yet archived. After the deletion, the public `/crl/{id}` endpoint and any legacy `/crl/<ski>` endpoint stop serving the CA’s list, although the published CRL files remain in the bucket. Keep the archived settings while any certificate issued by the CA may still need revocation evidence: `DELETE` stops serving the list immediately, regardless of `latest_crl` validity. The action cannot be undone.
 
 After a change, check saved configuration and the next list actually published. Updating the settings alone does not establish regeneration or client acceptance.
 
 Common CRL settings errors [#common-crl-settings-errors]
 
-| Symptom                                               | Cause                                                                                                                                               | Action                                                                                                                                                                                |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PUT /v1/crl-settings/{ca-id}` returns 409.           | The settings are not `ACTIVE`: the migration archived them because their CA was deleted before the upgrade.                                         | There is no API way back to `ACTIVE`. The last CRL keeps being served.                                                                                                                |
-| `PUT` returns 400.                                    | The new signer lacks `cRLSign`, or its subject and public key do not match the CA.                                                                  | Set the serial number of a valid certificate of that CA.                                                                                                                              |
-| `PUT` returns 404.                                    | The CA or the new signer certificate does not exist (for example, the CA was deleted), or the CA has no CRL settings (for example, an imported CA). | Check the CA ID and the signer serial number.                                                                                                                                         |
-| `PUT` returns 400 from a 3.x client.                  | `crl_options.subject_key_id_signer` was replaced by `crl_options.signer_serial_number`, which is required.                                          | Update the client to send the new field.                                                                                                                                              |
-| The CRL does not change after revoking a certificate. | `regenerate_on_revoke` is `false`, the issuing CA has no CRL settings, or generation failed because of an invalid signer.                           | Check the VA logs. Missing settings only produce a warning (no retry, no failed-events entry); an invalid signer also leaves the event in the failed-events queue, so fix the signer. |
-| A verifier rejects the CRL because of the issuer.     | The list was fetched through a legacy `/crl/<ski>` URL and belongs to the CA that owned that SKI when the upgrade ran.                              | Use the CDP of the certificate being validated: certificates issued in 4.0.0 carry `/crl/<ca-id>` URLs.                                                                               |
-
-From the interface [#from-the-interface]
-
-A CA’s CRL settings are edited in the **Validation Authority** tab of the CA view and on the console’s **Verification Authorities** page. Both read and update them by CA ID at `/v1/crl-settings/{ca-id}`, which requires a 4.0.0 backend.
-
-If the backend has no settings for a CA yet, the tab shows a **No CRL Settings** panel stating that CRL settings are created when the CA is and may still be initializing, with a **Retry** button. While the settings load, it shows **Loading CRL Settings...**; a failed fetch shows **Error Loading CRL Settings**, also with a **Retry** button. The 404 row of [Common CRL settings errors](#common-crl-settings-errors) lists when a CA can have no settings.
-
-Settings whose CA was deleted before the 4.0.0 upgrade are `ARCHIVED`: the interface shows them read-only inside a warning alert, and the Verification Authorities page marks the CA with an **Archived** badge. Their last CRL is still served but never regenerated, and the settings cannot be edited — see [Cases in which the settings can no longer be edited](#cases-in-which-the-settings-can-no-longer-be-edited). Settings migrated from the SKI-keyed model show a note with their legacy CRL URL `/crl/<legacy-ski>`, which still resolves to this CA’s list.
-
-The **CRL Refresh Interval** field accepts `0`. An info alert then explains that no new CRL is generated just because time has passed — one is only generated shortly before the current one expires — and, with **Regenerate CRL Immediately on Revocation** off, that revocations are not published until then. The Verification Authorities summary shows **Disabled** for a refresh interval of `0`; the semantics are described in [Periodic and automatic regeneration](#periodic-and-automatic-regeneration). The **CRL Max Validity / Cache Duration** field still requires a positive duration and rejects `0`.
-
-Editing is forgiving: a field shows its error only after you leave it. **Save CRL Settings** is always clickable; if any field is invalid when you save, the interface marks all of them, shows the errors and focuses the first invalid field instead of keeping the button disabled.
-
-The selected signer appears as a card with its issuer (the full DN in a tooltip on hover and keyboard focus, and the issuer name links to its CA when its record is available), its expiry, key algorithm, usage chips and serial number, under the footer **CRL signer — Signs the CRLs of this CA**. The certificate picker only offers certificates that have a private key and carry the `cRLSign` key usage. If a configured signer’s certificate cannot be resolved, the interface shows `Unknown Certificate (Serial: X)` or `Certificate details unavailable (Serial: X)`.
-
-The CA view lets you inspect and download the available list; the downloaded file is named `<ca-id>.crl`. Compare version, issuer and timestamps with the copy downloaded from the public endpoint. Diagnose differences using [PKI troubleshooting](/docs/platform/pki/troubleshooting).
+| Symptom                                               | Cause                                                                                                                                                                           | Action                                                                                                                                                                                |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUT /v1/crl-settings/{ca-id}` returns 409.           | The settings are not `ACTIVE`: revoking the CA permanently or letting it expire finalized them, or the migration archived them because their CA was deleted before the upgrade. | There is no API way back to `ACTIVE`. The last CRL keeps being served.                                                                                                                |
+| `DELETE /v1/crl-settings/{ca-id}` returns 409.        | The settings are not yet `ARCHIVED`: the CA has not been deleted.                                                                                                               | Delete the CA first; deleting it archives its settings.                                                                                                                               |
+| `PUT` returns 400.                                    | The new signer lacks `cRLSign`, or its subject and public key do not match the CA.                                                                                              | Set the serial number of a valid certificate of that CA.                                                                                                                              |
+| `PUT` returns 404.                                    | The CA or the new signer certificate does not exist, or the CA has no CRL settings (for example, an imported CA).                                                               | Check the CA ID and the signer serial number.                                                                                                                                         |
+| `PUT` returns 400 from a 3.x client.                  | `crl_options.subject_key_id_signer` was replaced by `crl_options.signer_serial_number`, which is required.                                                                      | Update the client to send the new field.                                                                                                                                              |
+| The CRL does not change after revoking a certificate. | `regenerate_on_revoke` is `false`, the issuing CA has no CRL settings, or generation failed because of an invalid signer.                                                       | Check the VA logs. Missing settings only produce a warning (no retry, no failed-events entry); an invalid signer also leaves the event in the failed-events queue, so fix the signer. |
+| A verifier rejects the CRL because of the issuer.     | The list was fetched through a legacy `/crl/<ski>` URL and belongs to the CA that owned that SKI when the upgrade ran.                                                          | Use the CDP of the certificate being validated: certificates issued in 4.0.0 carry `/crl/<ca-id>` URLs.                                                                               |
 
 References [#references]
 
@@ -4423,7 +4507,7 @@ Before deleting a key [#before-deleting-a-key]
 
 Review **Related Entities** and locate CAs, certificates and validation processes that still need signatures. Revoking a CA does not remove the need to publish status during its retention period. Deleting a key does not automatically revoke its certificates either. Plan replacement and retention before using **Delete Key**; provider deletion behavior depends on the engine.
 
-The KMS refuses to delete a key that certificates still reference, with `409` `key is in use`. Revoking a certificate or letting it expire does not release its key reference. Deleting a CA releases the references from its own current certificate and linked reissued certificates, which stay in place to back the CRL and OCSP, and then attempts to delete the key. If other certificates still reference the key, such as another CA sharing it, the KMS keeps it. The certificates the CA issued keep their own key references, even when revoked. The API lets you delete such a certificate only once its issuer CA no longer exists, and deleting it removes it from the CRL and OCSP responses, so keep revoked certificates for their retention period and delete only expired or superseded ones. Legacy references retained by the upgrade migration are described in the [upgrade guide](/docs/upgrades/3-8-0-to-4-0-0#references-between-certificates-keys-and-crl-settings).
+The KMS refuses to delete a key that certificates still reference, with `409` `key is in use`. Revoking a certificate or letting it expire does not release its key reference. Deleting a CA releases the references from its own current certificate and linked reissued certificates, which stay in place to back the CRL and OCSP, and then attempts to delete the key. If other certificates still reference the key, such as another CA sharing it, the KMS keeps it. The certificates the CA issued keep their own key references, even when revoked. The API lets you delete such a certificate only once its issuer CA no longer exists, and deleting it removes it from the CRL and OCSP responses, so keep revoked certificates for their retention period and delete only expired or superseded ones. The KMS also refuses to delete a key that signs the CRL of a CA whose CRL settings are still `ACTIVE`, with the same `409` `key is in use`; that reference is released when the settings are finalized, after the CA is revoked permanently or expires (see [CRL](/docs/platform/pki/crl)). Legacy references retained by the upgrade migration are described in the [upgrade guide](/docs/upgrades/3-8-0-to-4-0-0#references-between-certificates-keys-and-crl-settings).
 
 
 # Online validation with OCSP (/docs/pr-preview/pr-66/platform/pki/ocsp)
@@ -5174,13 +5258,14 @@ CRL settings keyed by CA ID [#crl-settings-keyed-by-ca-id]
 
 In 3.8.0 the VA keyed each CRL by the CA's SKI, and `GET`/`PUT /v1/roles/{ca-ski}` read and updated it. In 4.0.0 the CRL settings of a CA are keyed by its CA ID, and every CA has its own, even when two CAs share a key:
 
-| Route                          | Operation                                                                          |
-| ------------------------------ | ---------------------------------------------------------------------------------- |
-| `GET /v1/crl-settings`         | Lists the CRL settings; filterable at least by `ca_id`, `status` and `legacy_ski`. |
-| `GET /v1/crl-settings/{ca-id}` | Reads the settings of a CA.                                                        |
-| `PUT /v1/crl-settings/{ca-id}` | Replaces `crl_options`.                                                            |
+| Route                             | Operation                                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| `GET /v1/crl-settings`            | Lists the CRL settings; filterable at least by `ca_id`, `status` and `legacy_ski`. |
+| `GET /v1/crl-settings/{ca-id}`    | Reads the settings of a CA.                                                        |
+| `PUT /v1/crl-settings/{ca-id}`    | Replaces `crl_options`.                                                            |
+| `DELETE /v1/crl-settings/{ca-id}` | Removes the archived settings of a CA.                                             |
 
-The options keep their meaning and their defaults: 7 days of `validity`, 6 days and 23 hours of `refresh_interval`, and `regenerate_on_revoke` `true`. `status` (`ACTIVE` or `ARCHIVED`), `legacy_ski` and `latest_crl` are read-only. A `PUT` validates the signer only when it changes, does not regenerate the CRL, and returns `409` when the settings are not `ACTIVE`.
+The options keep their meaning and their defaults: 7 days of `validity`, 6 days and 23 hours of `refresh_interval`, and `regenerate_on_revoke` `true`. `status` (`ACTIVE`, `FINAL` or `ARCHIVED`), `legacy_ski` and `latest_crl` are read-only. A `PUT` validates the signer only when it changes, does not regenerate the CRL, and returns `409` when the settings are not `ACTIVE`.
 
 The public endpoint `GET /crl/{id}` takes the CA ID — the form the CDPs of newly issued certificates use — and keeps resolving the SKI form of certificates issued before the upgrade. Certificates issued before the upgrade keep their `/crl/<ski>` distribution points; newly issued ones carry `/crl/<ca-id>`, and both resolve to the same settings. The VA scheduled CRL job requests a new list on its first run, and the new list includes both URLs in its *Issuing Distribution Point*. Until it succeeds, the old list has only the legacy `/crl/<ski>` IDP: verifiers that compare it with the CDP of newly issued certificates cannot validate those certificates. The default schedule can delay the first run by up to about an hour; failures can extend the window.
 
@@ -5198,7 +5283,7 @@ The migration aborts, and the upgrade fails, on five kinds of data:
 
 The settings of a CA deleted before the upgrade are migrated as `ARCHIVED`, with a `legacy-<ski>` ID and no signer: their last CRL is still served, but never regenerated, and `PUT` returns `409`. There is no API way back to `ACTIVE`. The [CRL guide](/docs/platform/pki/crl) describes the full behavior.
 
-**Custom authorization policies.** The entity `va_role` is renamed to `crl_settings`, with `ca_id` as its primary key and `signer_serial_number` as its relation to certificates. Update policies referencing the old entity. Replace the 3.8.0 signer filter `crl_subject_key_id_signer` (or `crl_signer_certificate_serial_number` if used by an intermediate version) with `signer_serial_number`. Replace SKI filter values with the corresponding certificate serial numbers; renaming the filter alone is insufficient.
+**Custom authorization policies.** The entity `va_role` is renamed to `crl_settings`, with `ca_id` as its primary key and `signer_serial_number` as its relation to certificates. Update policies referencing the old entity. The entity gains the `delete` atomic action, a `signer_key_id` relation to KMS keys, and the filterable columns `signer_engine_id` and `signer_key_id`; grant the new action to whoever may delete archived CRL settings. Replace the 3.8.0 signer filter `crl_subject_key_id_signer` (or `crl_signer_certificate_serial_number` if used by an intermediate version) with `signer_serial_number`. Replace SKI filter values with the corresponding certificate serial numbers; renaming the filter alone is insufficient.
 
 Renamed VA events [#renamed-va-events]
 
@@ -5469,9 +5554,9 @@ Without the chart's database job, no tool moves data between databases: the migr
 
 Run the migrations in the required order, one schema at a time: `kms` first, then the `ca-to-kms-migration` tool (needed only for legacy deployments whose CA keys are named by SKI), then `ca`, then `va`. The `devicemanager`, `dmsmanager` and `alerts` schemas are independent and can be migrated in any order. With Helm, the chart's pre-install job applies the schemas in the correct order automatically.
 
-If `kms` has not been migrated, the `ca` migration fails with `kms schema not found: migrate the kms schema before the ca schema`. The `va` migration likewise requires `ca` to be migrated first.
+If `kms` has not been migrated, the `ca` migration fails with `kms schema not found: migrate the kms schema before the ca schema`. The `va` migration requires `ca` and `kms` to be migrated first: it fails with `ca schema not found: migrate the ca schema before the va schema` or `kms schema not found: migrate the kms schema before the va schema` if one of them is missing.
 
-The schemas reference each other, so the PostgreSQL role running the migrations needs cross-schema privileges: the `ca` schema needs `USAGE` on `kms` plus `SELECT`, `REFERENCES` and `INSERT` on `kms.kms_keys`, and the `va` schema needs `USAGE` on `ca` plus `SELECT` and `REFERENCES` on `ca.certificates` and `SELECT` on `ca.ca_certificates`. Without them the migration aborts; grant the missing privileges and rerun the failed schema. After migrating `ca`, if the CA service runs as a different user than the migration user, grant it `SELECT` on `ca.certificates_view` (`GRANT SELECT ON ca.certificates_view TO service_user`). Without this grant, certificate and CA reads fail with `permission denied for table certificates_view`.
+The schemas reference each other, so the PostgreSQL role running the migrations needs cross-schema privileges: the `ca` schema needs `USAGE` on `kms` plus `SELECT`, `REFERENCES` and `INSERT` on `kms.kms_keys`, and the `va` schema needs `USAGE` on `ca` plus `SELECT` and `REFERENCES` on `ca.certificates`, `SELECT` on `ca.ca_certificates`, and `USAGE` on `kms` plus `SELECT` and `REFERENCES` on `kms.kms_keys`. Without them the migration aborts; grant the missing privileges and rerun the failed schema. After migrating `ca`, if the CA service runs as a different user than the migration user, grant it `SELECT` on `ca.certificates_view` (`GRANT SELECT ON ca.certificates_view TO service_user`). Without this grant, certificate and CA reads fail with `permission denied for table certificates_view`. After migrating `va`, if the CA service runs as a different user, grant it `USAGE` on the `va` schema and `SELECT` on `va.crl_settings` (`GRANT USAGE ON SCHEMA va TO service_user; GRANT SELECT ON va.crl_settings TO service_user`): the CA service reads `va.crl_settings` when it deletes a CA, and without these grants every deletion of a CA that has a crypto engine fails with `permission denied for schema va` (or `for table crl_settings`).
 
 To apply migrations by hand, `goose-lamassu` must run against the `pki` database with `search_path=<schema>` in the connection string. The binary validates only `search_path`, not the database name, so check `dbname=pki` before running it, and repeat for `kms`, `ca`, `va`, `devicemanager`, `dmsmanager` and `alerts`:
 
@@ -5499,10 +5584,10 @@ Troubleshooting [#troubleshooting]
 * **The upgrade fails at the database job.** The PostgreSQL role cannot create databases or schemas, or a schema migration aborted: on duplicate CA IDs or missing `engine_id` values, or in the VA schema on a CA ID containing `/`, an SKI shared by more than one CA (the error asks you to recreate all but one of them on a different key), a role whose signer certificate has no key, a CA ID reserved for the archived settings of another role, or a CA ID equal to another role's SKI. The abort message names the offending objects; fix them and re-run the upgrade.
 * **The upgrade fails at the CA-to-KMS hook.** CA certificates that share a `subject_key_id` declare conflicting `engine_id`s. Resolve the conflict and re-run.
 * **Nobody can log in after the upgrade.** Check that `services.authz.jwkUrl` is reachable from the `authz` pod, that `services.authz.bootstrap` matches a role your OIDC provider actually assigns, and that the database job completed.
-* **A migration aborts with `kms schema not found`.** The schemas must be migrated in order: run the `kms` schema migration before the `ca` schema migration.
+* **A migration aborts with `kms schema not found`.** The schemas must be migrated in order: run the `kms` schema migration before the `ca` and `va` schema migrations.
 * **A migration aborts with `ca schema not found`.** Run the `ca` schema migration before the `va` schema migration.
 * **The VA migration fails with `cannot resolve signer certificate for VA role ... N candidates`.** The migration cannot uniquely identify a signer certificate from the SKI stored on the role. Review the SKI and candidate certificates reported in the error; correct the pre-migration data with a verified backup and rerun the migration. The new `signer_serial_number` field is created during that migration, so it cannot be set through the VA API while the migration is failing.
-* **A migration or service fails with `permission denied for table ...`.** The PostgreSQL role is missing the cross-schema privileges listed in [Deployments without Helm](#deployments-without-helm); this includes `certificates_view` when the post-migration `GRANT SELECT` was skipped. Grant the missing privileges and re-run.
+* **A migration or service fails with `permission denied for table ...` or `permission denied for schema ...`.** The PostgreSQL role is missing the cross-schema privileges listed in [Deployments without Helm](#deployments-without-helm); this includes `certificates_view` when the post-migration `GRANT SELECT` was skipped, and `permission denied for schema va` (or `for table crl_settings`) when deleting a CA without the `va` grants. Grant the missing privileges and re-run.
 
 Validation checklist [#validation-checklist]
 

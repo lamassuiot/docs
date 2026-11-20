@@ -912,7 +912,69 @@ Before closing an incident, record:
 * the preventive action and its owner.
 
 
-# Access control (/docs/platform/administration/access-control)
+# Data model (/docs/platform/administration/access-control/data-model)
+
+
+
+The `connectors/authz/pki.json` schema defines the entities in the `pki` authorization namespace. A policy identifies a resource type through `namespace: pki`, `schema_name` and `entity_type`. For example, `ca.certificate` identifies the `certificate` entity type in the `ca` schema.
+
+Schema relationships [#schema-relationships]
+
+Each arrow starts at the entity that declares the relationship and points to its `target_entity`. The value of `foreign_key`, the source column, appears below the label. In `pki.json`, each relationship's `name` matches that column. Select the diagram to enlarge it and scroll through it.
+
+<Mermaid
+  chart="flowchart TB
+    accTitle: Relationships in the pki.json schema
+    accDescr: Nine relationships declared in pki.json, with the source column below each arrow label.
+
+    CA[&#x22;ca.ca_certificate&#x22;]
+    CERT[&#x22;ca.certificate&#x22;]
+    PROFILE[&#x22;ca.issuance_profile&#x22;]
+    DEVICE[&#x22;devicemanager.device&#x22;]
+    DMS[&#x22;dmsmanager.dms&#x22;]
+    KEY[&#x22;kms.kms_key&#x22;]
+    CRL[&#x22;va.crl_settings&#x22;]
+
+    CA -->|&#x22;Issuance profile<br/><code>profile_id</code>&#x22;| PROFILE
+    CA -->|&#x22;Current certificate<br/><code>serial_number</code>&#x22;| CERT
+    CERT -->|&#x22;Issuing CA by ID<br/><code>issuer_meta_id</code>&#x22;| CA
+    CERT -->|&#x22;Issuer serial reference<br/><code>issuer_meta_serial_number</code>&#x22;| CA
+    CERT -->|&#x22;Device by Common Name<br/><code>subject_common_name</code>&#x22;| DEVICE
+    CERT -->|&#x22;Certificate key<br/><code>key_id</code>&#x22;| KEY
+    DEVICE -->|&#x22;Owning DMS<br/><code>dms_owner</code>&#x22;| DMS
+    CRL -->|&#x22;Signer certificate<br/><code>signer_serial_number</code>&#x22;| CERT
+    CRL -->|&#x22;Signer key<br/><code>signer_key_id</code>&#x22;| KEY"
+/>
+
+A policy can propagate actions from the referenced entity to the one that declares the relationship. For example, to grant read access to a DMS's devices, a rule starts from `dmsmanager.dms`, targets `devicemanager.device` and specifies `via: dms_owner`.
+
+When filtering inherited access, `authz` matches the `foreign_key` column against the first `primary_key` column of the referenced entity. For example, it matches `subject_common_name` to `device.id`, `issuer_meta_serial_number` to `ca_certificate.id` and the links to `kms_key` to `kms_key.key_id`.
+
+Schema entities [#schema-entities]
+
+| Entity (`schema_name.entity_type`) | Table (`table_name`) | Key (`primary_key`)   |
+| ---------------------------------- | -------------------- | --------------------- |
+| `alerts.event`                     | `events`             | `event_type`          |
+| `alerts.subscription`              | `subscriptions`      | `id`                  |
+| `ca.ca_certificate`                | `ca_certificates`    | `id`                  |
+| `ca.certificate`                   | `certificates`       | `serial_number`       |
+| `ca.issuance_profile`              | `issuance_profiles`  | `id`                  |
+| `devicemanager.device_group`       | `device_groups`      | `id`                  |
+| `devicemanager.device`             | `devices`            | `id`                  |
+| `dmsmanager.dms`                   | `dms`                | `id`                  |
+| `kms.kms_key`                      | `kms_keys`           | `key_id`, `engine_id` |
+| `va.crl_settings`                  | `crl_settings`       | `ca_id`               |
+
+Events, subscriptions and device groups have their own actions and filters. Their `relations` lists are empty and they have zero incoming references in the schema. For `ca.certificate`, `view_tables` also lists `certificates_view`.
+
+Each entity declares instance-level operations in `atomic_actions`, operations that require no resource ID in `global_actions`, and the columns and types accepted by `column_filters` in `filterable`.
+
+<Cards>
+  <Card title="Access inherited through relations" href="/docs/platform/administration/access-control#access-inherited-through-relations" />
+</Cards>
+
+
+# Access control overview (/docs/platform/administration/access-control)
 
 
 
@@ -1118,6 +1180,12 @@ Access inherited through relations [#access-inherited-through-relations]
 Rules can follow relations declared between entities. For example, the schema knows the relation of a certificate to its issuing CA, of a device to its DMS and of a certificate to the KMS key that stores its private key, so a grant on the key also covers the certificates that use it. A policy can grant access to a parent resource and propagate selected actions to its related resources.
 
 This lets you express models like "can operate the devices of this DMS" without maintaining an individual list of every device. When a resource is added under that relation, it inherits the scope planned by the policy.
+
+The [data model](/docs/platform/administration/access-control/data-model) shows how the resources used in entity rules are connected.
+
+A rule can only follow relations that the data schema declares between its two entities. You can reference the relation by its name or by its foreign-key column — both spellings are equivalent, and it is the schema that decides which column the query uses. When you save a policy, `authz` checks every relation against the loaded schemas: one that no schema declares, or one pointing at an entity that is not loaded, is rejected at that moment.
+
+Policies stored before this validation may still carry relations the schemas do not declare. Such a relation grants nothing: `authz` logs a warning, `skipping relation that grants nothing`, naming the policy and the relation, and continues evaluating the rest of the policy. The reference is always resolved against the schema before any query is built, so an undeclared relation can never alter it. If inherited access narrows after an upgrade, check the `authz` logs for this warning and correct the relation of the affected policy.
 
 Attribute-filtered access [#attribute-filtered-access]
 
@@ -1331,6 +1399,8 @@ The credential could be processed but did not produce a positive authorization. 
 6. that the identifier, relation, column filter or HTTP constraint includes the real resource.
 
 In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure. With OpenTelemetry tracing enabled, a request that reaches the policy engine produces an `engine.CheckHTTPRequest` span whose attributes record `authz.allowed`, the matched policy and the matched principal. Correlation with the Gateway trace requires trace context to be propagated to authz.
+
+If a policy that relied on inherited access stopped granting it after an upgrade, look in the `authz` logs for `skipping relation that grants nothing`: the warning names the policy and the relation the schemas no longer declare. Correct that policy's relation so it matches the current schemas.
 
 Everything returns 403 [#everything-returns-403]
 

@@ -3,11 +3,17 @@
  * comes from here instead of mermaid's built-in light/dark palettes.
  *
  * Sources of truth (keep in sync when they change):
- * - docs/app/app.css  → neutral surfaces, hairline borders, blue accent,
- *   square corners, Inter + JetBrains Mono.
- * - landing/src/styles/landing-tokens.css → warm orange accent, used here
- *   only for emphasis (notes, error/terminal states, composite headers) so
- *   diagrams read as part of the same product family as the landing.
+ * - docs/app/app.css → neutral surfaces, hairline borders, Lamassu blue
+ *   (--lm-accent / --color-fd-primary), square corners, Inter + JetBrains Mono.
+ * - landing/src/styles/landing-tokens.css → the brand gradient
+ *   (violet #5a1ff0 → indigo #4d41f6 → blue #3d78f6 → cyan #4ac2f5) and the
+ *   semantic green / gold / red (--lp-green, --lp-gold, --lp-red).
+ * - dashboard/src/app/globals.css → product blue (--primary, hsl 217 100% 53%),
+ *   which sits between the docs blue and the landing cyan.
+ *
+ * The result is one brand family: blue carries the structure, violet and cyan
+ * (the two ends of the gradient) tell neighbours apart and mark start/end
+ * states, and green / gold / red are reserved for meaning (ok, note, error).
  *
  * Mermaid renders to a string of SVG, outside React and Tailwind, so the
  * values are literal hex (themeVariables must be colors it can parse, not
@@ -15,39 +21,49 @@
  * it inherits the fonts the page already loaded.
  */
 
+/** One hue as stroke + tinted fill + mid-tone border. */
+type Swatch = {
+  /** Stroke, arrowheads and text-on-background. */
+  ink: string;
+  /** Node fill. Body text (--color-fd-foreground) stays legible on it. */
+  soft: string;
+  /** Softer stroke for secondary outlines (clusters, composite states). */
+  line: string;
+};
+
 type Palette = {
   dark: boolean;
   /** Page / diagram background (--color-fd-background). */
   bg: string;
-  /** Node fill (--lm-surface). */
+  /** Node fill for neutral boxes (--lm-surface). */
   surface: string;
-  /** Slightly raised fill for clusters and alternating rows. */
+  /** Slightly raised fill for clusters and alternating rows (--color-fd-accent). */
   surface2: string;
   /** Hairline stroke for nodes and clusters. */
   border: string;
-  /** Stronger stroke for hover-free emphasis and actors. */
+  /** Stronger neutral stroke. */
   borderStrong: string;
   /** Body text inside nodes (--color-fd-foreground). */
   text: string;
-  /** Secondary text: cluster titles, sequence numbers. */
+  /** Secondary text: cluster titles, loop labels. */
   muted: string;
-  /** Edges and arrowheads. */
-  line: string;
-  /** Docs accent (--lm-accent / --color-fd-primary). */
-  accent: string;
-  accentSoft: string;
-  accentBorder: string;
-  /** Landing accent, warm orange. */
-  warm: string;
-  warmSoft: string;
-  warmBorder: string;
-  /** Semantic colors from the landing palette. */
-  green: string;
-  greenSoft: string;
-  gold: string;
-  goldSoft: string;
-  red: string;
-  redSoft: string;
+  /** Edges and arrowheads: the blue, slightly desaturated so nodes lead. */
+  edge: string;
+  /** Text on a solid brand fill (sequence numbers, pie slices). */
+  onInk: string;
+
+  /** Lamassu blue (docs accent). The default for every node. */
+  blue: Swatch;
+  /** Gradient start, landing --lp-grad. */
+  violet: Swatch;
+  /** Gradient end, landing --lp-cyan. */
+  cyan: Swatch;
+  /** Semantic: success, active, valid. */
+  green: Swatch;
+  /** Semantic: notes, warnings, pending. */
+  gold: Swatch;
+  /** Semantic: errors, revoked, failed. */
+  red: Swatch;
 };
 
 const LIGHT: Palette = {
@@ -59,19 +75,15 @@ const LIGHT: Palette = {
   borderStrong: "#8f8f8b",
   text: "#171718",
   muted: "#6b6b6b",
-  line: "#5b5bd8",
-  accent: "#0100f8",
-  accentSoft: "#e4e4ff",
-  accentBorder: "#7d7dfa",
-  warm: "#cc5411",
-  warmSoft: "#ffe9d6",
-  warmBorder: "#e8b88f",
-  green: "#13804d",
-  greenSoft: "#d9f1e4",
-  gold: "#a86b00",
-  goldSoft: "#fbefc8",
-  red: "#c53030",
-  redSoft: "#fbeaea",
+  edge: "#4d4dd6",
+  onInk: "#ffffff",
+
+  blue: { ink: "#0100f8", soft: "#e7e7ff", line: "#8a8afb" },
+  violet: { ink: "#5a1ff0", soft: "#eee7fe", line: "#a88bf6" },
+  cyan: { ink: "#1b8fd0", soft: "#e0f2fb", line: "#86c5ea" },
+  green: { ink: "#13804d", soft: "#dcf2e6", line: "#80c4a3" },
+  gold: { ink: "#a86b00", soft: "#fbf0cc", line: "#dcb766" },
+  red: { ink: "#c53030", soft: "#fbeaea", line: "#e39494" },
 };
 
 const DARK: Palette = {
@@ -83,19 +95,15 @@ const DARK: Palette = {
   borderStrong: "#63646c",
   text: "#f3f3f4",
   muted: "#9f9fa3",
-  line: "#7c84f0",
-  accent: "#8f97ff",
-  accentSoft: "#1b1e4d",
-  accentBorder: "#4a51c9",
-  warm: "#ff9b4a",
-  warmSoft: "#35200d",
-  warmBorder: "#8a5426",
-  green: "#5fd49a",
-  greenSoft: "#0f3322",
-  gold: "#f2be67",
-  goldSoft: "#33270a",
-  red: "#ff7a7a",
-  redSoft: "#2a1414",
+  edge: "#7c84f0",
+  onInk: "#08090b",
+
+  blue: { ink: "#8f97ff", soft: "#191c4a", line: "#4a51c9" },
+  violet: { ink: "#9d8bff", soft: "#21194a", line: "#5b46c4" },
+  cyan: { ink: "#4ac2f5", soft: "#0b2737", line: "#1f6f96" },
+  green: { ink: "#5fd49a", soft: "#0f3322", line: "#2b7a54" },
+  gold: { ink: "#e7b500", soft: "#302606", line: "#7d6312" },
+  red: { ink: "#ff7a7a", soft: "#2c1414", line: "#8a3a3a" },
 };
 
 const SANS = "Inter, ui-sans-serif, system-ui, sans-serif";
@@ -109,85 +117,100 @@ function themeVariables(p: Palette) {
     fontSize: "14px",
 
     // Core palette (flowchart, class, ER, requirement…).
-    primaryColor: p.accentSoft,
+    primaryColor: p.blue.soft,
     primaryTextColor: p.text,
-    primaryBorderColor: p.accent,
-    secondaryColor: p.accentSoft,
+    primaryBorderColor: p.blue.ink,
+    secondaryColor: p.violet.soft,
     secondaryTextColor: p.text,
-    secondaryBorderColor: p.accentBorder,
+    secondaryBorderColor: p.violet.ink,
     tertiaryColor: p.surface2,
     tertiaryTextColor: p.text,
     tertiaryBorderColor: p.border,
-    lineColor: p.line,
+    lineColor: p.edge,
     textColor: p.text,
-    mainBkg: p.accentSoft,
-    nodeBorder: p.accent,
+    mainBkg: p.blue.soft,
+    nodeBorder: p.blue.ink,
     nodeTextColor: p.text,
     border2: p.border,
-    arrowheadColor: p.line,
+    arrowheadColor: p.edge,
 
     // Flowchart / clusters / edge labels.
     clusterBkg: p.surface2,
     clusterBorder: p.border,
     titleColor: p.text,
     edgeLabelBackground: p.bg,
-    defaultLinkColor: p.line,
+    defaultLinkColor: p.edge,
 
     // State diagrams.
-    stateBkg: p.accentSoft,
+    stateBkg: p.blue.soft,
     stateLabelColor: p.text,
     labelBackgroundColor: p.bg,
-    transitionColor: p.line,
+    transitionColor: p.edge,
     transitionLabelColor: p.text,
-    specialStateColor: p.warm,
+    specialStateColor: p.violet.ink,
     compositeBackground: p.surface2,
     compositeBorder: p.border,
     compositeTitleBackground: p.surface2,
     altBackground: p.surface2,
-    innerEndBackground: p.warm,
-    errorBkgColor: p.redSoft,
-    errorTextColor: p.red,
+    innerEndBackground: p.violet.ink,
+    errorBkgColor: p.red.soft,
+    errorTextColor: p.red.ink,
 
-    // Notes: warm, like the landing's highlighter marks.
-    noteBkgColor: p.warmSoft,
+    // Notes: gold, like a highlighter mark in the margin.
+    noteBkgColor: p.gold.soft,
     noteTextColor: p.text,
-    noteBorderColor: p.warmBorder,
+    noteBorderColor: p.gold.line,
 
     // Sequence diagrams.
-    actorBkg: p.accentSoft,
-    actorBorder: p.accent,
+    actorBkg: p.blue.soft,
+    actorBorder: p.blue.ink,
     actorTextColor: p.text,
     actorLineColor: p.border,
-    signalColor: p.accent,
+    signalColor: p.edge,
     signalTextColor: p.text,
-    labelBoxBkgColor: p.surface2,
-    labelBoxBorderColor: p.border,
+    labelBoxBkgColor: p.violet.soft,
+    labelBoxBorderColor: p.violet.line,
     labelTextColor: p.text,
     loopTextColor: p.muted,
-    activationBkgColor: p.accentSoft,
-    activationBorderColor: p.accent,
-    sequenceNumberColor: p.dark ? "#08090b" : "#ffffff",
+    activationBkgColor: p.cyan.soft,
+    activationBorderColor: p.cyan.ink,
+    sequenceNumberColor: p.onInk,
 
     // Class / ER.
     classText: p.text,
     attributeBackgroundColorOdd: p.surface,
     attributeBackgroundColorEven: p.surface2,
 
-    // Categorical series (pie, gantt, journey, git…): blue first, then the
-    // landing's warm and semantic colors so adjacent slices stay distinct.
-    pie1: p.accent,
-    pie2: p.warm,
-    pie3: p.green,
-    pie4: p.borderStrong,
-    pie5: p.red,
-    pie6: p.accentBorder,
-    pie7: p.warmBorder,
+    // Categorical series (pie, gantt, journey, git…): walk the brand gradient
+    // first, then the semantic colors, so adjacent slices stay distinct.
+    pie1: p.blue.ink,
+    pie2: p.violet.ink,
+    pie3: p.cyan.ink,
+    pie4: p.green.ink,
+    pie5: p.gold.ink,
+    pie6: p.red.ink,
+    pie7: p.borderStrong,
     pieTitleTextColor: p.text,
-    pieSectionTextColor: p.dark ? "#08090b" : "#ffffff",
+    pieSectionTextColor: p.onInk,
     pieStrokeColor: p.bg,
     pieOuterStrokeColor: p.border,
     pieLegendTextColor: p.text,
+
+    // Git graphs follow the same order.
+    git0: p.blue.ink,
+    git1: p.violet.ink,
+    git2: p.cyan.ink,
+    git3: p.green.ink,
+    git4: p.gold.ink,
+    git5: p.red.ink,
+    git6: p.blue.line,
+    git7: p.violet.line,
   };
+}
+
+/** Fill + stroke for a node painted with one swatch. */
+function paint(s: Swatch) {
+  return `fill: ${s.soft}; stroke: ${s.ink};`;
 }
 
 /**
@@ -236,46 +259,47 @@ function themeCSS(p: Palette) {
       letter-spacing: -0.01em;
     }
 
-    /* Start and end markers: solid ink, no halo. */
-    .start-state, .state-start, .end-state-inner { fill: ${p.warm}; stroke: none; }
-    .end-state-outer, .state-end { fill: ${p.bg}; stroke: ${p.warm}; stroke-width: 1.5px; }
-    .node .outer-path path { fill: ${p.bg} !important; stroke: ${p.warm} !important; stroke-width: 1.5px; }
-    .node .inner-path path { fill: ${p.warm} !important; stroke: ${p.warm} !important; }
+    /* Start and end markers: the gradient's violet end, no halo. */
+    .start-state, .state-start, .end-state-inner { fill: ${p.violet.ink}; stroke: none; }
+    .end-state-outer, .state-end { fill: ${p.bg}; stroke: ${p.violet.ink}; stroke-width: 1.5px; }
+    .node .outer-path path { fill: ${p.bg} !important; stroke: ${p.violet.ink} !important; stroke-width: 1.5px; }
+    .node .inner-path path { fill: ${p.violet.ink} !important; stroke: ${p.violet.ink} !important; }
 
-    /* Arrows in the docs accent. */
-    .transition, .edgePath .path, .flowchart-link { stroke: ${p.line}; }
-    marker path, .arrowMarkerPath { fill: ${p.line}; stroke: ${p.line}; }
+    /* Edges in a softened Lamassu blue. */
+    .transition, .edgePath .path, .flowchart-link { stroke: ${p.edge}; }
+    marker path, .arrowMarkerPath { fill: ${p.edge}; stroke: ${p.edge}; }
 
-    /* Nodes cycle through the docs blue and the landing's orange, green and
-       gold so neighbouring states are told apart at a glance. Blue is the
-       default fill; the other three override it by position. */
-    .nodes > .node:nth-child(4n+2) .label-container { fill: ${p.warmSoft}; stroke: ${p.warm}; }
-    .nodes > .node:nth-child(4n+3) .label-container { fill: ${p.greenSoft}; stroke: ${p.green}; }
-    .nodes > .node:nth-child(4n+4) .label-container { fill: ${p.goldSoft}; stroke: ${p.gold}; }
+    /* Nodes walk the brand gradient (blue → violet → cyan) and then a neutral
+       surface, so neighbouring nodes are told apart without borrowing the
+       semantic colors. Blue is the default fill; the others go by position. */
     .node .label-container { stroke-width: 1.5px; }
+    .nodes > .node:nth-child(4n+2) .label-container { ${paint(p.violet)} }
+    .nodes > .node:nth-child(4n+3) .label-container { ${paint(p.cyan)} }
+    .nodes > .node:nth-child(4n+4) .label-container { fill: ${p.surface}; stroke: ${p.borderStrong}; }
 
-    /* Composite states and clusters: raised surface, accent title. */
-    .statediagram-cluster rect.outer { fill: ${p.surface2}; stroke: ${p.warmBorder}; }
+    /* Composite states and clusters: raised surface, violet title. */
+    .statediagram-cluster rect.outer { fill: ${p.surface2}; stroke: ${p.violet.line}; }
     .statediagram-cluster .cluster-label, .cluster-label span, .cluster text {
-      color: ${p.warm};
-      fill: ${p.warm};
+      color: ${p.violet.ink};
+      fill: ${p.violet.ink};
       font-size: 12px;
       font-weight: 600;
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
 
-    /* The "highlight" class is the one escape hatch for emphasis. */
-    .node.highlight rect, .node.highlight polygon, g.highlight rect {
-      fill: ${p.accentSoft};
-      stroke: ${p.accent};
-    }
-    .node.warm rect, g.warm rect {
-      fill: ${p.warmSoft};
-      stroke: ${p.warm};
-    }
-    .node.ok rect, g.ok rect { fill: ${p.greenSoft}; stroke: ${p.green}; }
-    .node.danger rect, g.danger rect { fill: ${p.redSoft}; stroke: ${p.red}; }
+    /* Explicit classes win over the positional colors above:
+         class X ok        → green (valid, active, issued)
+         class X warn      → gold  (pending, expiring, note)
+         class X danger    → red   (revoked, failed, error)
+         class X highlight → blue  (the node the text is about)
+         class X violet / cyan → brand colors without a meaning */
+    .nodes > .node.highlight .label-container, g.highlight rect { ${paint(p.blue)} }
+    .nodes > .node.violet .label-container, g.violet rect { ${paint(p.violet)} }
+    .nodes > .node.cyan .label-container, g.cyan rect { ${paint(p.cyan)} }
+    .nodes > .node.ok .label-container, g.ok rect { ${paint(p.green)} }
+    .nodes > .node.warn .label-container, g.warn rect { ${paint(p.gold)} }
+    .nodes > .node.danger .label-container, g.danger rect { ${paint(p.red)} }
   `;
 }
 

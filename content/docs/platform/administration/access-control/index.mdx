@@ -1,6 +1,8 @@
 ---
-title: Access control
+title: Access control overview
 description: Design who can access Lamassu through principals, policies, resource permissions and HTTP route authorization.
+sidebar:
+  label: Overview
 ---
 
 Lamassu access control turns an authenticated identity into concrete permissions. The OIDC provider or the client certificate proves **who** makes a request; the `authz` service decides **what that identity can do** and **over which resources**.
@@ -205,6 +207,12 @@ A rule identifies the domain (`namespace`), the data schema (`schema_name`) and 
 Rules can follow relations declared between entities. For example, the schema knows the relation of a certificate to its issuing CA, of a device to its DMS and of a certificate to the KMS key that stores its private key, so a grant on the key also covers the certificates that use it. A policy can grant access to a parent resource and propagate selected actions to its related resources.
 
 This lets you express models like "can operate the devices of this DMS" without maintaining an individual list of every device. When a resource is added under that relation, it inherits the scope planned by the policy.
+
+The [data model](/docs/platform/administration/access-control/data-model) shows how the resources used in entity rules are connected.
+
+A rule can only follow relations that the data schema declares between its two entities. You can reference the relation by its name or by its foreign-key column — both spellings are equivalent, and it is the schema that decides which column the query uses. When you save a policy, `authz` checks every relation against the loaded schemas: one that no schema declares, or one pointing at an entity that is not loaded, is rejected at that moment.
+
+Policies stored before this validation may still carry relations the schemas do not declare. Such a relation grants nothing: `authz` logs a warning, `skipping relation that grants nothing`, naming the policy and the relation, and continues evaluating the rest of the policy. The reference is always resolved against the schema before any query is built, so an undeclared relation can never alter it. If inherited access narrows after an upgrade, check the `authz` logs for this warning and correct the relation of the affected policy.
 
 ### Attribute-filtered access
 
@@ -418,6 +426,8 @@ The credential could be processed but did not produce a positive authorization. 
 6. that the identifier, relation, column filter or HTTP constraint includes the real resource.
 
 In the `authz` logs, an external endpoint decision includes `allowed`, `reason`, `matched_principals`, `evaluated_policy_ids`, `matched_policy_id` and the status code. These fields let you separate a matching failure from a permissions failure. With OpenTelemetry tracing enabled, a request that reaches the policy engine produces an `engine.CheckHTTPRequest` span whose attributes record `authz.allowed`, the matched policy and the matched principal. Correlation with the Gateway trace requires trace context to be propagated to authz.
+
+If a policy that relied on inherited access stopped granting it after an upgrade, look in the `authz` logs for `skipping relation that grants nothing`: the warning names the policy and the relation the schemas no longer declare. Correct that policy's relation so it matches the current schemas.
 
 ### Everything returns 403
 

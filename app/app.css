@@ -1305,6 +1305,17 @@ html[data-show-diff] .lm-diff-merged {
   margin: auto;
 }
 
+/* Keep relationship labels legible in the zoom view on narrow screens. A block
+   frame keeps the left and top edges within the scrollable area. */
+.mermaid-zoom-frame:has(> svg[aria-roledescription="flowchart-v2"]) {
+  display: block;
+}
+
+.mermaid-zoom-frame > svg[aria-roledescription="flowchart-v2"] {
+  display: block;
+  min-width: 60rem;
+}
+
 /* ── Image lightbox ──────────────────────────────────────────────────────
    Fullscreen overlay opened by clicking any doc image. FLIP zoom: the first
    frame reproduces the clicked thumbnail's rect exactly (--lb-start-* set by

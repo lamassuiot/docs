@@ -1,6 +1,8 @@
 ---
-title: Access control
+title: Access control overview
 description: Design who can access Lamassu through principals, policies, resource permissions and HTTP route authorization.
+sidebar:
+  label: Overview
 ---
 
 Lamassu access control turns an authenticated identity into concrete permissions. The OIDC provider or the client certificate proves **who** makes a request; the `authz` service decides **what that identity can do** and **over which resources**.
@@ -205,6 +207,8 @@ A rule identifies the domain (`namespace`), the data schema (`schema_name`) and 
 Rules can follow relations declared between entities. For example, the schema knows the relation of a certificate to its issuing CA, of a device to its DMS and of a certificate to the KMS key that stores its private key, so a grant on the key also covers the certificates that use it. A policy can grant access to a parent resource and propagate selected actions to its related resources.
 
 This lets you express models like "can operate the devices of this DMS" without maintaining an individual list of every device. When a resource is added under that relation, it inherits the scope planned by the policy.
+
+The [data model](/docs/platform/administration/access-control/data-model) shows how the resources used in entity rules are connected.
 
 A rule can only follow relations that the data schema declares between its two entities. You can reference the relation by its name or by its foreign-key column — both spellings are equivalent, and it is the schema that decides which column the query uses. When you save a policy, `authz` checks every relation against the loaded schemas: one that no schema declares, or one pointing at an entity that is not loaded, is rejected at that moment.
 

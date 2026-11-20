@@ -174,6 +174,35 @@ The AMQP client loads certificates at startup, so restart the consuming pods aft
   Per the migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: in 3.8.0 `amqp.tls` was not applied and event-bus clients used plaintext AMQP; from 4.0.0, `amqp.tls: true` switches them to AMQPS. Set `amqp.port` to the broker TLS listener before upgrading, or set `amqp.tls: false` to keep plaintext AMQP. `amqp.tls: false` sends the broker credentials and all event-bus traffic in cleartext.
 </Callout>
 
+### Credential environment variables
+
+The services read an explicit catalog of credential environment variables when they load their configuration at startup. A set, non-empty variable overrides the corresponding YAML value; an unset variable leaves the YAML value in place, so a deployment configured only through YAML keeps working unchanged. A variable can also supply a credential the values file does not define. Variables outside this catalog are ignored — other `LAMASSU_*` variables are not picked up automatically.
+
+| Variables | Configures |
+| --- | --- |
+| `LAMASSU_POSTGRES_USERNAME`, `LAMASSU_POSTGRES_PASSWORD` | PostgreSQL storage credentials |
+| `LAMASSU_AUTHZ_DB_USERNAME`, `LAMASSU_AUTHZ_DB_PASSWORD` | the authz service's own database credentials |
+| `LAMASSU_AMQP_USERNAME`, `LAMASSU_AMQP_PASSWORD` | one pair applied to every event-bus connection: publisher, subscriber and dead-letter queues. There is no per-queue split. |
+| `LAMASSU_SMTP_USERNAME`, `LAMASSU_SMTP_PASSWORD` | SMTP credentials used by alert email delivery |
+| `LAMASSU_AUTHZ_CREDENTIALS_<SCHEMA>_USERNAME`, `LAMASSU_AUTHZ_CREDENTIALS_<SCHEMA>_PASSWORD` | one pair per schema defined in the `services.authz.credentials` map |
+
+Setting a catalog variable to the empty string never overrides anything. If the YAML (or default) value is non-empty, the service fails at startup with an error that names the variable and the configuration key, such as `LAMASSU_POSTGRES_PASSWORD is set but empty`. An empty variable combined with an empty or absent YAML value is allowed.
+
+For the authz schemas, `<SCHEMA>` is the YAML schema name uppercased with every non-alphanumeric character replaced by `_`: `pki` maps to `PKI`, and both `pki-v2` and `pki.v2` map to `PKI_V2`. Bindings exist only for schemas present in the YAML credentials map, so variables for schemas that are not listed are ignored. Two schemas that normalize to the same name (`pki-v2` and `pki.v2`) conflict: if a variable of either pair is set, the service fails at startup; if the variables are unset, a warning is logged and the YAML values are used.
+
+These variables are designed to be sourced from Kubernetes Secrets, so credentials no longer need to be written into the rendered YAML. For example, inject a pair into a service pod with the standard Kubernetes `secretKeyRef` mechanism:
+
+```yaml
+env:
+  - name: LAMASSU_POSTGRES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: lamassu-postgres-credentials
+        key: password
+```
+
+Because the variables are read when the service loads its configuration at startup, changing the underlying Secret requires restarting the consuming pods for the new values to take effect.
+
 ### Provision the first administrator
 
 There is no implicit superuser. Create the role or group expected by `services.authz.bootstrap` in the OIDC provider and assign it to at least one administrator before exposing Lamassu.

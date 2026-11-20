@@ -16,7 +16,7 @@ The CRL settings of a CA store the configuration and metadata of its latest publ
 | Field | Purpose |
 |---|---|
 | `ca_id` | ID of the CA the settings belong to. |
-| `status` | `ACTIVE` settings generate CRLs. `ARCHIVED` ones belong to a CA that no longer exists: their last CRL is still served, but never regenerated. |
+| `status` | `ACTIVE` settings generate CRLs. `FINAL` ones belong to a CA that was revoked or has expired: its final CRL, if any, is published and no new one is generated. `ARCHIVED` ones belong to a deleted CA: their last CRL is still served, but never regenerated. |
 | `legacy_ski` | Read-only. SKI the settings were keyed by before the 4.0.0 migration; only migrated settings have it, and `/crl/<ski>` keeps resolving to them. |
 | `latest_crl` | Version, validity start and end of the last published list. Read-only. |
 
@@ -36,10 +36,10 @@ A CA whose signer lacks `cRLSign` cannot generate its CRL, and an update that se
 <span id="cases-in-which-the-settings-can-no-longer-be-edited" />
 
 <Callout type="warn" title="Cases in which the settings can no longer be edited">
-  Deleting a CA keeps its CRL settings, and they cannot be removed through the API. What happens next depends on when the CA was deleted:
+  Settings whose `status` is `FINAL` or `ARCHIVED` are read-only: any `PUT` returns 409. Deleting a CA keeps its CRL settings:
 
-  - The 4.0.0 upgrade migration archives the settings of the CAs that had been deleted before the upgrade. Their `status` is `ARCHIVED` and their `ca_id` is `legacy-<ski>`: the last CRL keeps being served, but it is never regenerated, any `PUT` returns 409, and there is no API way back to `ACTIVE`.
-  - A CA deleted while running 4.0.0 leaves `ACTIVE` settings. The last CRL keeps being served, but once it expires nothing regenerates it: the renewal job logs `something went wrong while calculating CRL for CA <ca-id>` on every cycle because it can no longer resolve the CA. The options can still be edited while the signer is unchanged; changing the signer fails, because there is no CA left to match it.
+  - The 4.0.0 upgrade migration archives the settings of the CAs that had been deleted before the upgrade. Their `status` is `ARCHIVED` and their `ca_id` is `legacy-<ski>`: the last CRL keeps being served, but it is never regenerated.
+  - `ARCHIVED` settings of a deleted CA can be deleted, with `DELETE` or from the console's Verification Authorities page. That CRL stops being served — anyone checking its certificates against it will no longer find it — while the CRLs already published remain in the bucket. The action cannot be undone.
 
   Adjust validity and signer before deleting a CA.
 
@@ -75,7 +75,7 @@ The job frequency is set in Helm with `services.va.job.crl.frequency` (default `
 
 If generation fails (for example, because the CA cannot be resolved or the signer is invalid), the job logs the warning `something went wrong while calculating CRL for CA <ca-id>` and retries on the next cycle. There is no other renewal path until the cause is fixed, and the last published list keeps being served until it expires. All of this depends on working jobs, storage and signing.
 
-Settings whose `status` is `ARCHIVED` are skipped: nothing regenerates their CRL.
+Settings whose `status` is `FINAL` or `ARCHIVED` are skipped: nothing regenerates their CRL.
 
 With `regenerate_on_revoke`, the event handler requests a new CRL upon revocation or reactivation from `CertificateHold` to `ACTIVE`. This happens after the status change and has its own failure paths: if generation fails (for example, because of an invalid signer), the event is retried and, once retries are exhausted, moves to the failed-events queue. If the issuing CA has no CRL settings, there is no CRL to regenerate: the event is acknowledged without retry, the VA logs a warning, and nothing appears in the failed-events queue. Confirming revocation does not establish that the new CRL is already published or that all clients have downloaded it.
 
@@ -133,8 +133,9 @@ The following paths are relative to the VA service; confirm the public prefix in
 | `GET` | `/v1/crl-settings` | List the CRL settings; filterable at least by `ca_id`, `status` and `legacy_ski`. |
 | `GET` | `/v1/crl-settings/{ca-id}` | Read the `crl_options` and `latest_crl` of a CA. |
 | `PUT` | `/v1/crl-settings/{ca-id}` | Replace the CRL configuration of a CA. |
+| `DELETE` | `/v1/crl-settings/{ca-id}` | Delete the settings of a CA whose settings are `ARCHIVED`; its published CRLs stay in the bucket but stop being served. |
 
-You need authentication and CRL settings read or update permissions. Consult your installation’s [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract — `refresh_interval`, `validity`, `signer_serial_number` and `regenerate_on_revoke`: the backend replaces all four; it does not merge omitted fields. `status`, `legacy_ski` and `latest_crl` are read-only. A `PUT` returns 409 when the settings are not `ACTIVE`, validates the signer only when it changes, and does not regenerate the CRL.
+You need authentication and CRL settings read, update or delete permissions. Consult your installation's [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract — `refresh_interval`, `validity`, `signer_serial_number` and `regenerate_on_revoke`: the backend replaces all four; it does not merge omitted fields. `status`, `legacy_ski` and `latest_crl` are read-only. A `PUT` returns 409 when the settings are not `ACTIVE`, validates the signer only when it changes, and does not regenerate the CRL. A `DELETE` returns 409 unless the settings are `ARCHIVED`.
 
 After a change, check saved configuration and the next list actually published. Updating the settings alone does not establish regeneration or client acceptance.
 
@@ -142,28 +143,12 @@ After a change, check saved configuration and the next list actually published. 
 
 | Symptom | Cause | Action |
 |---|---|---|
-| `PUT /v1/crl-settings/{ca-id}` returns 409. | The settings are not `ACTIVE`: the migration archived them because their CA was deleted before the upgrade. | There is no API way back to `ACTIVE`. The last CRL keeps being served. |
+| `PUT /v1/crl-settings/{ca-id}` returns 409. | The settings are not `ACTIVE`: they are `FINAL` or `ARCHIVED` (see the `status` table in [CRL settings](#crl-settings)). | There is no API way back to `ACTIVE`. The last CRL keeps being served. |
 | `PUT` returns 400. | The new signer lacks `cRLSign`, or its subject and public key do not match the CA. | Set the serial number of a valid certificate of that CA. |
-| `PUT` returns 404. | The CA or the new signer certificate does not exist (for example, the CA was deleted), or the CA has no CRL settings (for example, an imported CA). | Check the CA ID and the signer serial number. |
+| `PUT` returns 404. | The CA or the new signer certificate does not exist, or the CA has no CRL settings (for example, an imported CA). | Check the CA ID and the signer serial number. |
 | `PUT` returns 400 from a 3.x client. | `crl_options.subject_key_id_signer` was replaced by `crl_options.signer_serial_number`, which is required. | Update the client to send the new field. |
 | The CRL does not change after revoking a certificate. | `regenerate_on_revoke` is `false`, the issuing CA has no CRL settings, or generation failed because of an invalid signer. | Check the VA logs. Missing settings only produce a warning (no retry, no failed-events entry); an invalid signer also leaves the event in the failed-events queue, so fix the signer. |
 | A verifier rejects the CRL because of the issuer. | The list was fetched through a legacy `/crl/<ski>` URL and belongs to the CA that owned that SKI when the upgrade ran. | Use the CDP of the certificate being validated: certificates issued in 4.0.0 carry `/crl/<ca-id>` URLs. |
-
-## From the interface
-
-A CA’s CRL settings are edited in the **Validation Authority** tab of the CA view and on the console’s **Verification Authorities** page. Both read and update them by CA ID at `/v1/crl-settings/{ca-id}`, which requires a 4.0.0 backend.
-
-If the backend has no settings for a CA yet, the tab shows a **No CRL Settings** panel stating that CRL settings are created when the CA is and may still be initializing, with a **Retry** button. While the settings load, it shows **Loading CRL Settings...**; a failed fetch shows **Error Loading CRL Settings**, also with a **Retry** button. The 404 row of [Common CRL settings errors](#common-crl-settings-errors) lists when a CA can have no settings.
-
-Settings whose CA was deleted before the 4.0.0 upgrade are `ARCHIVED`: the interface shows them read-only inside a warning alert, and the Verification Authorities page marks the CA with an **Archived** badge. Their last CRL is still served but never regenerated, and the settings cannot be edited — see [Cases in which the settings can no longer be edited](#cases-in-which-the-settings-can-no-longer-be-edited). Settings migrated from the SKI-keyed model show a note with their legacy CRL URL `/crl/<legacy-ski>`, which still resolves to this CA’s list.
-
-The **CRL Refresh Interval** field accepts `0`. An info alert then explains that no new CRL is generated just because time has passed — one is only generated shortly before the current one expires — and, with **Regenerate CRL Immediately on Revocation** off, that revocations are not published until then. The Verification Authorities summary shows **Disabled** for a refresh interval of `0`; the semantics are described in [Periodic and automatic regeneration](#periodic-and-automatic-regeneration). The **CRL Max Validity / Cache Duration** field still requires a positive duration and rejects `0`.
-
-Editing is forgiving: a field shows its error only after you leave it. **Save CRL Settings** is always clickable; if any field is invalid when you save, the interface marks all of them, shows the errors and focuses the first invalid field instead of keeping the button disabled.
-
-The selected signer appears as a card with its issuer (the full DN in a tooltip on hover and keyboard focus, and the issuer name links to its CA when its record is available), its expiry, key algorithm, usage chips and serial number, under the footer **CRL signer — Signs the CRLs of this CA**. The certificate picker only offers certificates that have a private key and carry the `cRLSign` key usage. If a configured signer’s certificate cannot be resolved, the interface shows `Unknown Certificate (Serial: X)` or `Certificate details unavailable (Serial: X)`.
-
-The CA view lets you inspect and download the available list; the downloaded file is named `<ca-id>.crl`. Compare version, issuer and timestamps with the copy downloaded from the public endpoint. Diagnose differences using [PKI troubleshooting](/docs/platform/pki/troubleshooting).
 
 ## References
 

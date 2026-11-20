@@ -107,9 +107,11 @@ Las suscripciones creadas con versiones anteriores de la consola pueden guardar 
 - **Perfiles:** `profile.issuance.create`, `profile.issuance.update` y `profile.issuance.delete`.
 - **Enrolamiento:** `dms.create`, `dms.update`, `dms.enroll` y `dms.reenroll`.
 - **Dispositivos:** `device.create`, `device.identity.update` y `device.status.update`.
-- **Validación:** `va.role.crl.create`, `va.crl-settings.init` y `va.crl-settings.update`.
+- **Validación:** `va.role.crl.create`, `va.crl-settings.init`, `va.crl-settings.update`, `va.crl-settings.finalize`, `va.crl-settings.archive` y `va.crl-settings.delete`.
 - **Claves:** `kms.create`, `kms.import`, `kms.sign` y `kms.delete`.
 
 Utiliza el catálogo que muestra la consola como fuente para los tipos disponibles en la versión que tienes desplegada.
 
 Desde 4.0.0, `va.crl-settings.init` y `va.crl-settings.update` transportan los ajustes de CRL de una CA (`ca_id`) y sustituyen a `va.role.crl.init` y `va.role.update`. La migración de la actualización renombra automáticamente los tipos de las suscripciones existentes, pero no reescribe sus condiciones: revisa los filtros que lean el payload antiguo o el subject antiguo `crl/<ski>`, incluidos los de `va.role.crl.create` (consulta [3.8.0 a 4.0.0](/docs/upgrades/3-8-0-to-4-0-0#ajustes-de-crl-indexados-por-id-de-ca)).
+
+La VA publica además `va.crl-settings.finalize` cuando una CA se revoca de forma permanente o caduca, `va.crl-settings.archive` cuando la CA se elimina, y `va.crl-settings.delete` cuando se eliminan ajustes archivados.

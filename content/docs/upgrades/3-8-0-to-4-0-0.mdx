@@ -323,7 +323,7 @@ services:
 ```
 
 - `jwkUrl` is fetched from the `authz` pod, not from the gateway, so a Service in the release namespace can be referenced by its short name. The default points at a Keycloak Service named `auth-keycloak`; set it explicitly if your identity provider lives anywhere else.
-- `authz` is the authorization service's own storage for principals, grants and policies. `pki` is the database the authorization engine queries when it evaluates policies against entities. Only the `database` field of each entry is read; the connection always uses the global `postgres.hostname`, `postgres.port`, `postgres.username` and `postgres.password` values.
+- `authz` is the authorization service's own storage for principals, grants and policies. `pki` is the database the authorization engine queries when it evaluates policies against entities. Only the `database` field of each entry is read; the connection always uses the global `postgres.hostname`, `postgres.port`, `postgres.username` and `postgres.password` values. Each schema can also supply its own username and password through the `LAMASSU_AUTHZ_CREDENTIALS_<SCHEMA>_USERNAME` and `LAMASSU_AUTHZ_CREDENTIALS_<SCHEMA>_PASSWORD` environment variables, which when set override the username and password that the global `postgres.username` and `postgres.password` values contribute to that schema's rendered connection. See [Credential environment variables](/docs/deployment/self-hosted/helm#credential-environment-variables).
 - If you kept the 3.8.0 role defaults (`realm_access.roles` and `pki-admin`), the default `services.authz.bootstrap` already matches them.
 
 **Delete the gateway token validation blocks.** Remove `auth.oidc.apiGateway` and `auth.authorization` once their settings are in `services.authz`:

@@ -102,11 +102,15 @@ Revisa primero <code>kubectl describe pod</code>. Las causas habituales son:
 
 - credenciales o DNS incorrectos para PostgreSQL o RabbitMQ;
 - un Secret de CA o de certificado de cliente de AMQP inexistente referenciado por `amqp.ca.secretName` o `amqp.client.secretName`;
+- una variable de entorno de credenciales definida con la cadena vacía mientras el valor correspondiente del YAML no está vacío: el servicio falla al arrancar y nombra la variable y la clave de configuración, por ejemplo `LAMASSU_POSTGRES_PASSWORD is set but empty`;
+- para authz, dos schemas del mapa de credenciales que se reducen al mismo nombre de variable de entorno (por ejemplo `pki-v2` y `pki.v2`): el arranque falla cuando hay una variable de credenciales definida para cualquiera de los dos; si las variables no están definidas, el servicio registra un warning y usa los valores del YAML.
 - volumen persistente sin enlazar;
 - imagen inaccesible o política de pull incorrecta;
 - configuración inválida del motor criptográfico;
 - límites de CPU o memoria demasiado bajos;
 - migración previa incompleta.
+
+Estos fallos de arranque provienen de las variables de entorno para credenciales descritas en [Variables de entorno para credenciales](/docs/deployment/self-hosted/helm#variables-de-entorno-para-credenciales).
 
 Los valores genéricos solicitan 100 mCPU y 128 MiB y limitan a 500 mCPU y 512 MiB. Ajusta por servicio cuando haya OOMKills, throttling o arranques lentos.
 

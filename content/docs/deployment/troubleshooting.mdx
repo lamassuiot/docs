@@ -102,11 +102,15 @@ Review <code>kubectl describe pod</code> first. Common causes are:
 
 - wrong credentials or DNS for PostgreSQL or RabbitMQ;
 - a missing AMQP CA or client certificate Secret referenced by `amqp.ca.secretName` or `amqp.client.secretName`;
+- a credential environment variable set to the empty string while its YAML value is non-empty: the service fails at startup and names the variable and the configuration key, e.g. `LAMASSU_POSTGRES_PASSWORD is set but empty`;
+- for authz, two schemas in the credentials map that normalize to the same environment-variable name (for example `pki-v2` and `pki.v2`): startup fails when a credential variable for either schema is set; with the variables unset the service logs a warning and uses the YAML values.
 - unbound persistent volume;
 - inaccessible image or incorrect pull policy;
 - invalid cryptographic engine configuration;
 - CPU or memory limits set too low;
 - an incomplete prior migration.
+
+These startup failures come from the credential environment variables described in [Credential environment variables](/docs/deployment/self-hosted/helm#credential-environment-variables).
 
 Generic values request 100 mCPU and 128 MiB and limit to 500 mCPU and 512 MiB. Tune per service when you see OOMKills, throttling or slow startups.
 

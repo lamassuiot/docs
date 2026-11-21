@@ -35,20 +35,44 @@ examples in a managed terminal; adapt lifecycle handling to the agent runtime.
   authentication on an existing instance. Startup/debug logs can contain
   credentials and sensitive payloads: keep logs local and redact reports.
 
-## Launch
+## 1. Clone and select v4
 
-For a safe host with no competing monolithic instance, build from the backend
-root, then run in an owned temporary directory to keep generated proxy keys out
-of the repository. Verify that `go.mod` declares
-`github.com/lamassuiot/lamassuiot/v4`; locate a v4 checkout if it does not.
+Always use a fresh, temporary clone for a local monolithic demo. Do not switch,
+reset, or modify the user's existing checkout. Clone and explicitly check out
+`v4`; a Go module path ending in `/v4` is not evidence of the Git branch.
+
+```bash
+set -e
+LAMASSU_RUN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/lamassu-showcase.XXXXXX")
+LAMASSU_BACKEND="$LAMASSU_RUN_DIR/lamassuiot"
+git clone --branch v4 --single-branch https://github.com/lamassuiot/lamassuiot.git "$LAMASSU_BACKEND"
+git -C "$LAMASSU_BACKEND" checkout v4
+git -C "$LAMASSU_BACKEND" branch --show-current
+git -C "$LAMASSU_BACKEND" rev-parse HEAD
+```
+
+Confirm the branch prints exactly `v4` and the module path in `go.mod` is
+`github.com/lamassuiot/lamassuiot/v4`. Record the revision. Stop and diagnose
+clone, checkout, toolchain, or build failures; do not continue with another branch.
+
+## 2. Configure and launch monolithic
+
+Monolithic starts PostgreSQL and the UI container itself. **Do not run a separate
+UI container**. Configure the UI it launches as `ghcr.io/lamassuiot/lamassu-ui:dev`
+and its browser-facing API as `http://localhost:8080/api`. Re-read the current
+entry point and inspect image, environment and cleanup code before adapting it.
+Run only after the ownership and exclusive-host checks above have passed.
+
 The inspected development entry point hardcodes the UI image tag and API URL.
 The following makes a temporary copy of that entry point and changes only those
 defaults, without altering the backend checkout. If its source changes and the
 checks fail, inspect it and adapt the launch before continuing:
 
 ```bash
+set -e
 cd "$LAMASSU_BACKEND" &&
-RUN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/lamassu-doc-demo.XXXXXX") &&
+RUN_DIR="$LAMASSU_RUN_DIR/runtime" &&
+mkdir -p "$RUN_DIR" &&
 python3 - "$RUN_DIR" <<'PY'
 from pathlib import Path
 import sys
@@ -76,9 +100,8 @@ chmod 600 "$RUN_DIR/runtime.log" &&
 
 Use standard Docker ports by default. If occupied, identify the owner and
 coordinate with the user; do not silently select nonstandard ports or stop the
-other service. A separately managed dashboard container may still use an
-ephemeral internal-facing host port; inspect actual mappings rather than
-assuming the flag fixes every container port.
+other service. The UI container started by monolithic can have ephemeral host ports even
+with this flag. Inspect its actual mappings as described below.
 
 Keep the temporary run directory private and the log at mode `0600`, but use
 `umask 022` for the process. A process-wide `umask 077` makes generated Postgres
@@ -94,9 +117,11 @@ and unrelated WFX; omit `-disable-wfx` only for workflows that need WFX. The
 default filesystem engine is suitable for local PKI demos. Do not enable AWS,
 Azure, or other paid/external connectors unless specifically authorized.
 
-Use `http://localhost:8080` for the dashboard and API by default. Use the
-browser's host/port-forwarding equivalent for remote environments, ensuring the
-dashboard API configuration points to the corresponding reachable HTTP URL.
+Use `http://localhost:8080/api` for the API by default. Discover the actual
+dashboard HTTP origin using the next section; do not assume the dashboard and
+API have the same host port. For remote environments use the corresponding
+HTTP host/port-forwarding address and ensure the dashboard API configuration
+points to a browser-reachable HTTP URL.
 Use `https://localhost:8443` only if the user explicitly requests HTTPS; allow
 self-signed TLS only for this identified local runtime, not globally.
 
@@ -127,33 +152,30 @@ edit global app configuration, weaken authentication, proxy unrelated origins,
 or bundle a rewrite into the documentation artifact. Report a browser blocker
 if the requested connection cannot be used safely.
 
-## Readiness and Version
+## 3. Discover the UI and verify readiness
 
-- A ready banner can precede sample-data population. Wait for successful
-  population and required synthetic resources, not just the banner or a timer.
-- Use bounded HTTP readiness retries with a deadline, then browser assertions:
-
-  ```bash
-  curl --fail --silent --show-error --connect-timeout 2 --max-time 10 http://localhost:8080/ -o /dev/null
-  curl --fail --silent --show-error --connect-timeout 2 --max-time 10 http://localhost:8080/api/ca/health
-  ```
-
-  Confirm the health route against current routes; test other relevant services
-  similarly. These are individual probes; wrap retries in the runtime's bounded
-  readiness facility with an overall deadline, not an unbounded shell loop.
-  A successful root request may be only the SPA shell. Open the
-  inventory and confirm data loads without API or console errors. On failure,
-  inspect relevant redacted logs rather than retrying indefinitely.
-- Confirm the running UI container's configured image is
-  `ghcr.io/lamassuiot/lamassu-ui:dev`, and record its actual image ID/digest,
-  the v4 backend revision, and dashboard revision when known. Do not equate a
-  tag with an immutable version or assume it matches the local checkout. If the
-  target requires local dashboard changes, use its documented Vite workflow and
-  runtime API configuration after checking CORS/auth. Do not silently retag an
-  image, change global config, or claim local source equals the running image.
-- An unexpected login screen is a blocker to investigate, not permission to
-  bypass auth. Let the user enter secrets directly; never request passwords or
-  tokens through chat, embed them in commands, or include them in captures.
+1. Identify the UI container started by this run using the label and image; record
+   its ID and image ID. Check the configured image is exactly
+   `ghcr.io/lamassuiot/lamassu-ui:dev`. The tag is not an immutable version.
+2. Inspect its port mappings with `docker port <owned-ui-container-id>` and
+   probe the mapped ports using HTTP. Do not start another container. In one
+   observed `:dev` build the mapping for container port 80 led to a gateway
+   502, while its mapped port **8085** served the UI; this is a diagnostic
+   example, not a stable port. Probe both the gateway and mapped ports and use
+   the one that actually serves the UI. Do not assume `localhost:8080/` is the
+   dashboard or that an exposed port is listening inside the container.
+3. Verify the UI's `config.js` points to the reachable HTTP API. Verify
+   `http://localhost:8080/api/ca/health` or the current equivalent; a 200 on
+   the UI shell alone is insufficient. Use bounded retries and a deadline.
+4. Wait for sample-data population, then check in a browser that the relevant
+   inventory loads and contains data with no failed API requests or console
+   errors. A ready banner can precede population. If the dashboard or API is
+   unavailable, inspect the owned container and redacted runtime logs; diagnose
+   the actual cause before changing ports or retrying.
+5. Set the OpenShowcase flow URL to the discovered UI HTTP origin. The mapped
+   port is ephemeral: rediscover it and update the persisted JSON on later runs.
+   If a login screen appears unexpectedly, diagnose it; never bypass auth or ask
+   the user to paste credentials into chat.
 
 ## Cleanup
 

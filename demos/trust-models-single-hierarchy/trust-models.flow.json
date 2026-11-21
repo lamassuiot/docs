@@ -1,0 +1,235 @@
+{
+  "title": "Trust Models: Single CA and Hierarchy",
+  "url": "http://localhost:32769/",
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "steps": [
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certification Authorities"
+      },
+      "tooltip": "Open Certification Authorities to show the two trust-model scenarios."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "Hierarchy view"
+      },
+      "tooltip": "Show the hierarchy view: Demo-Root issues Demo-Issuing; Demo-Single stands alone."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Demo-Single RSA (2048 bit) · exp. 2036-11-05 ACTIVE Root"
+      },
+      "tooltip": "Select Demo-Single, the standalone root CA of the first scenario."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "tab",
+        "name": "Certificate PEM"
+      },
+      "tooltip": "Open the Certificate PEM tab to view the public certificate of Demo-Single."
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": ".pem",
+        "nth": 0
+      },
+      "tooltip": "Download the public CA certificate as a .pem file for external validation."
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certificates"
+      },
+      "tooltip": "Go to the Certificates view to see the identities issued by both scenarios."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Single-Scenario Device",
+        "nth": 0
+      },
+      "tooltip": "Open the identity issued by Demo-Single for the single-CA scenario."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "tab",
+        "name": "Certificate PEM"
+      },
+      "tooltip": "View the leaf certificate of this identity and its full chain."
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": ".pem",
+        "nth": 0
+      },
+      "tooltip": "Download the leaf certificate as a .pem file to validate it against its root."
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certification Authorities"
+      },
+      "tooltip": "Return to Certification Authorities for the hierarchy scenario."
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "Hierarchy view"
+      },
+      "tooltip": "Switch back to the hierarchy view for the second scenario."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Demo-Root RSA (2048 bit) · exp. 2036-11-05 ACTIVE Root"
+      },
+      "tooltip": "Open Demo-Root, the trust anchor of the hierarchy scenario."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certificates"
+      },
+      "tooltip": "Go back to Certificates to inspect the hierarchy identity."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Hier-Scenario Device",
+        "nth": 0
+      },
+      "tooltip": "Open the identity issued by Demo-Issuing, one level below the root."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "tab",
+        "name": "Certificate PEM"
+      },
+      "tooltip": "Show the leaf certificate; the full chain here includes the untrusted intermediate."
+    },
+    {
+      "action": "wait",
+      "ms": 2000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": ".pem",
+        "nth": 0
+      },
+      "tooltip": "Download the leaf certificate; the intermediate travels as auxiliary untrusted material."
+    },
+    {
+      "action": "wait",
+      "ms": 1500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certification Authorities"
+      },
+      "tooltip": "Finish by showing the hierarchy view again with both scenarios visible."
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "Hierarchy view"
+      },
+      "tooltip": "Final hierarchy overview: Demo-Root → Demo-Issuing, and Demo-Single as an independent anchor."
+    },
+    {
+      "action": "wait",
+      "ms": 3000
+    }
+  ]
+}

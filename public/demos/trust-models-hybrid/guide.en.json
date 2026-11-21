@@ -1,0 +1,118 @@
+{
+  "steps": [
+    {
+      "title": "Open the authorities",
+      "body": "The Certification Authorities entry of the PKI menu opens the CA inventory, with three views: table, hierarchy and graph.",
+      "note": "The data was prepared through the API before recording, with synthetic names and a unique suffix per run."
+    },
+    {
+      "title": "Initial state",
+      "body": "The table shows four CAs, three of them top-level: Demo-Hybrid-A, Demo-Hybrid-B and an unrelated root. The issuing CA sits under B. No certificate links A to B yet.",
+      "note": "The unrelated root has no relationship with A or B and serves as the wrong anchor in the external tests."
+    },
+    {
+      "title": "Open Cross Sign",
+      "body": "The form issues an existing CA a second certificate signed by another CA. The target CA keeps its key and its subject.",
+      "note": "Both CAs need their private key in the KMS: the picker only offers active CAs whose key is available."
+    },
+    {
+      "title": "Choose the signer",
+      "body": "The picker lists the CAs with their hierarchy. The CA chosen here becomes the issuer of the new certificate.",
+      "note": "The CA names of this run carry a unique suffix so that every repetition is independent."
+    },
+    {
+      "title": "A as signer",
+      "body": "A will sign with its private key. In the A → B notation, A issues a CA certificate for B.",
+      "note": "A does not change: it remains a self-signed root."
+    },
+    {
+      "title": "Choose the target",
+      "body": "The target is the CA whose key pair receives a second certificate. The list excludes the CA already chosen as signer."
+    },
+    {
+      "title": "B as target",
+      "body": "B is the root that has the issuing CA beneath it. The cross certificate reuses B's key, so what B already issued chains through either issuer.",
+      "note": "After signing there will be two entries named B; later tests tell them apart by issuer and serial number."
+    },
+    {
+      "title": "Cross certificate preview",
+      "body": "The form shows Subject, Issuer, Public key, Subject Key ID and Authority Key ID of the resulting certificate. The public key is listed as reused from B.",
+      "note": "This is the form's preview, not a validation: key identity is checked afterwards on the PEM files."
+    },
+    {
+      "title": "Cross certificate expiry",
+      "body": "By default the cross certificate expires like the target CA, capped by the signer. A duration is chosen so that the validity of the A → B link is visible.",
+      "note": "A path's validity is bounded by the certificate that expires first."
+    },
+    {
+      "title": "3-year duration",
+      "body": "The field takes a number followed by a unit (y, w, d, h, m, s). With 3y the cross certificate expires before root B and before its issuing CA.",
+      "note": "The A → B link stops being usable before B itself; the direct path from B does not depend on it."
+    },
+    {
+      "title": "Issue A → B",
+      "body": "Lamassu stores the result as a new CA entry and opens its page. The original, self-signed B is not replaced.",
+      "note": "The operation is real: it changes the server. That is why every run starts from an empty instance."
+    },
+    {
+      "title": "Cross certificate page",
+      "body": "The page of the new entry names the CA B and shows A as issuer, with a validity period of about three years from issuance.",
+      "note": "Only the issuance is observed here. Whether the path validates is an external check, not a UI action."
+    },
+    {
+      "title": "Back to the inventory",
+      "body": "The inventory now includes the new entry. It is reviewed in the three views: table, hierarchy and graph."
+    },
+    {
+      "title": "Table after the cross-signing",
+      "body": "The table now has five CAs. B is listed as a self-signed root and as a subordinate of A; the 'Expires vs. parent' column compares each subordinate's expiry with its issuer's.",
+      "note": "The two B rows are different certificates of the same key."
+    },
+    {
+      "title": "Open the hierarchy",
+      "body": "The hierarchy draws each CA as a card and joins each issuer with the CAs it issued."
+    },
+    {
+      "title": "B in two positions",
+      "body": "Arrows go from an issuer to the CAs it issued. B appears under A (cross certificate) and as a root with its issuing CA, so there are two possible paths to the issuing CA.",
+      "note": "Which path a validator uses depends on the anchors and intermediates it is given. The hierarchy does not draw end-entity identities."
+    },
+    {
+      "title": "Open the graph",
+      "body": "In the graph each card is a key and its rows are the certificates attesting it; arrows go from the signing key to the certificate it signed."
+    },
+    {
+      "title": "Whole graph",
+      "body": "B's key gathers two certificates, the self-signed and the cross one, and carries the Cross-signed badge. There is an arrow from A to B and from B to the issuing CA; the unrelated root has none.",
+      "note": "Long names are truncated on the cards; the table shows the full names. The missing link to the unrelated root explains the validation failure with it as anchor."
+    },
+    {
+      "title": "Filter the cross-signing",
+      "body": "The Cross-signed filter keeps only the keys whose certificates with the same subject were signed by more than one key, plus the keys that signed them.",
+      "note": "It is a view filter: it does not change any data."
+    },
+    {
+      "title": "Isolated A → B link",
+      "body": "A's key signs one of the two certificates of B's key. It is the link that the cross-signing adds.",
+      "note": "B's other certificate is still the self-signed one."
+    },
+    {
+      "title": "Open Certificates",
+      "body": "The Certificates list gathers all issued certificates, CA ones included, with their issuer and expiry."
+    },
+    {
+      "title": "Certificates involved",
+      "body": "Each row shows the certificate with its issuer and expiry. B's two certificates share a name and differ in the CA Issuer column: B and A; the cross one expires earlier.",
+      "note": "The full serial number appears on each certificate's page."
+    },
+    {
+      "title": "Open the identity",
+      "body": "The identity is the end-entity certificate whose validity is checked from A."
+    },
+    {
+      "title": "Identity and external validation",
+      "body": "The page shows B's issuing CA as issuer. The validation from A, done outside the recording, accepted the path identity → issuing → B cross → A when both intermediates were supplied.",
+      "note": "Without the cross certificate, without the issuing CA, or with the unrelated root as anchor, validation failed; with B as anchor there is a shorter alternative path."
+    }
+  ]
+}

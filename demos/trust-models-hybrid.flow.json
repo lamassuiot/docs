@@ -1,0 +1,349 @@
+{
+  "title": "Modelo híbrido: firma cruzada A → B y raíz B con su emisora",
+  "url": "http://localhost:32839/",
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "steps": [
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certification Authorities"
+      },
+      "tooltip": "Abra Certification Authorities para ver el estado de partida."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "Cross Sign"
+      }
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "row",
+        "name": "Demo-Hybrid-Issuing-g6h1 CN=Demo-Hybrid-Issuing-g6h1"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "Table view"
+      },
+      "tooltip": "Tabla inicial: A, B y la raíz ajena son raíces y la emisora cuelga de B."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Cross Sign"
+      },
+      "tooltip": "Inicie la firma cruzada: una CA existente recibirá un segundo certificado firmado por otra."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "Select signer CA..."
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Select signer CA..."
+      },
+      "tooltip": "Abra el selector de la CA que firma."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "row",
+        "name": "Demo-Hybrid-A-g6h1 CN=Demo-Hybrid-A-g6h1"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "row",
+        "name": "Demo-Hybrid-A-g6h1 CN=Demo-Hybrid-A-g6h1"
+      },
+      "tooltip": "Elija Demo-Hybrid-A: será el emisor del certificado cruzado."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "Select target CA..."
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Select target CA..."
+      },
+      "tooltip": "Abra el selector de la CA que recibe el certificado."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "row",
+        "name": "Demo-Hybrid-B-g6h1 1 sub-CA"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "row",
+        "name": "Demo-Hybrid-B-g6h1 1 sub-CA"
+      },
+      "tooltip": "Elija Demo-Hybrid-B: conservará su clave y su sujeto."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "heading",
+        "name": "Cross-sign Certification Authority"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "text": "Resulting Certificate"
+      },
+      "tooltip": "Compruebe la vista previa: sujeto de B, emisor A y la clave de B reutilizada."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "combobox",
+        "name": "Cross Certificate Expiration"
+      },
+      "tooltip": "Abra el tipo de caducidad y elija Duration."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "option",
+        "name": "Duration"
+      }
+    },
+    {
+      "action": "wait",
+      "ms": 1200
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "textbox",
+        "name": "e.g., 10y, 365d, 2w"
+      },
+      "tooltip": "Indique la duración del certificado cruzado: 3y."
+    },
+    {
+      "action": "press",
+      "key": "Control+a",
+      "target": {
+        "role": "textbox",
+        "name": "e.g., 10y, 365d, 2w"
+      }
+    },
+    {
+      "action": "press",
+      "key": "3",
+      "target": {
+        "role": "textbox",
+        "name": "e.g., 10y, 365d, 2w"
+      }
+    },
+    {
+      "action": "press",
+      "key": "y",
+      "target": {
+        "role": "textbox",
+        "name": "e.g., 10y, 365d, 2w"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Cross-sign"
+      },
+      "tooltip": "Emita el certificado cruzado A → B."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "tab",
+        "name": "Certificate PEM"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "tab",
+        "name": "Information"
+      },
+      "tooltip": "Revise la nueva entrada: emisor A, sujeto B y caducidad a tres años."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certification Authorities"
+      },
+      "tooltip": "Vuelva al inventario de autoridades."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "Cross Sign"
+      }
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "row",
+        "name": "Demo-Hybrid-Issuing-g6h1 CN=Demo-Hybrid-Issuing-g6h1"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "Table view"
+      },
+      "tooltip": "Tabla tras el cruce: B aparece dos veces, como raíz y bajo A."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "radio",
+        "name": "Hierarchy view"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "Hierarchy view"
+      },
+      "tooltip": "Cambie a la vista de jerarquía."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "Fit to view"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Fit to view"
+      },
+      "tooltip": "En la jerarquía, B cuelga de A y también es raíz con su emisora."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "Graph view"
+      },
+      "tooltip": "Cambie a la vista de grafo, que agrupa los certificados por clave."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "Fit to view"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Fit to view"
+      },
+      "tooltip": "El grafo completo: A → B (Cross-signed) → emisora, y la raíz ajena aislada."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Cross-signed 1"
+      },
+      "tooltip": "Filtre por claves con certificación cruzada para aislar el enlace A → B."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Fit to view"
+      },
+      "tooltip": "Solo queda el enlace A → B: la clave de B con sus dos certificados."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Certificates",
+        "exact": true
+      },
+      "tooltip": "Abra Certificates para comparar los certificados implicados."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "heading",
+        "name": "Issued Certificates"
+      }
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "Demo-Hybrid-Identity-g6h1"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "heading",
+        "name": "Issued Certificates"
+      },
+      "tooltip": "Los dos certificados de B se distinguen por emisor (B y A) y por caducidad."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Demo-Hybrid-Identity-g6h1"
+      },
+      "tooltip": "Abra la identidad de prueba emitida por la emisora de B."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "tab",
+        "name": "Certificate PEM"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "tab",
+        "name": "Information"
+      },
+      "tooltip": "Su emisor es la emisora de B; la ruta hasta A se valida fuera de la interfaz."
+    }
+  ]
+}

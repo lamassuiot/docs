@@ -1,0 +1,50 @@
+{
+  "steps": [
+    {
+      "title": "Dominios independientes",
+      "body": "Las tres raíces sintéticas tienen claves distintas en el KMS. Una identidad fue emitida por cada dominio."
+    },
+    {
+      "title": "Operación disponible",
+      "body": "Cross Sign permite seleccionar una CA firmante y una CA destinataria. La pantalla indica que ambas necesitan su clave privada en KMS.",
+      "note": "Los certificados se prepararon por API antes de grabar; esta demo no ejecuta la operación en pantalla."
+    },
+    {
+      "title": "Inventario preparado",
+      "body": "Se conservaron las tres raíces autocertificadas y se crearon cuatro certificados adicionales: A → B, B → A, A → C y B → C."
+    },
+    {
+      "title": "Vista de jerarquía",
+      "body": "La jerarquía representa cada certificado de CA como entrada separada bajo el certificado emisor. Las versiones autocertificadas siguen apareciendo como raíces."
+    },
+    {
+      "title": "Certificados y emisores",
+      "body": "Las entradas con el mismo nombre de sujeto representan certificados distintos. El padre visible indica qué raíz firmó cada certificado cruzado."
+    },
+    {
+      "title": "Grafo de claves",
+      "body": "El grafo agrupa los certificados por clave: A y B aparecen unidos por una flecha doble y ambos apuntan hacia C. C no tiene enlaces salientes."
+    },
+    {
+      "title": "Malla parcial",
+      "body": "La reciprocidad existe solo entre A y B. Como faltan C → A y C → B, no se trata de una malla completa."
+    },
+    {
+      "title": "Tabla de certificados",
+      "body": "La tabla distingue los certificados por Common Name, CA Issuer y número de serie, e incluye también las identidades emitidas."
+    },
+    {
+      "title": "Identidad de B",
+      "body": "La identidad de B fue emitida por Demo-B. Su detalle muestra la validez y la cadena de dos certificados seleccionada por la interfaz."
+    },
+    {
+      "title": "Certificado público",
+      "body": "Certificate PEM muestra el certificado público; no se presenta la clave privada de la identidad."
+    },
+    {
+      "title": "Validación externa",
+      "body": "OpenSSL validó la identidad B desde A usando A → B como intermedia y la identidad A desde B usando B → A. Antes de crear B → A, la identidad A no validó desde B al no proporcionar intermedias.",
+      "note": "El perfil observado permite configurar validez, usos, sujeto, algoritmo y tipo de CA; no se observaron controles para las extensiones de política o restricciones de nombre examinadas. La exigencia de política explícita falló en la prueba."
+    }
+  ]
+}

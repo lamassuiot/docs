@@ -17,7 +17,7 @@ Fastlane closes some of the gaps intentionally left by the application chart:
 |---|---|
 | PostgreSQL, RabbitMQ and Keycloak instances for evaluation | The Kubernetes cluster, nodes and persistent storage |
 | Envoy Gateway 1.8 and the `eg` `GatewayClass` | cert-manager, external network reachability, DNS and firewall/NAT rules |
-| A self-signed Lamassu certificate flow, generated dependency credentials and an initial user | Client trust for the self-signed CA, or a trusted certificate passed to the script |
+| A self-signed Lamassu certificate flow, dependency credentials stored in Kubernetes Secrets (through the External Secrets Operator) and an initial user | Client trust for the self-signed CA, or a trusted certificate passed to the script |
 | Optional observability and lab HSM components | Production monitoring retention, backups, HA and a production HSM/key service |
 
 Fastlane does not turn the resulting stack into a production service: it does not create the cluster, public DNS, firewall rules, backups, high availability or a trusted public certificate.
@@ -119,12 +119,13 @@ Fastlane:
 1. validates local tools and the selected cluster
 2. installs or upgrades Envoy Gateway 1.8 and creates the `eg` `GatewayClass`
 3. creates the namespace
-4. installs PostgreSQL and creates the required databases
-5. installs Keycloak and creates the `lamassu` realm, frontend client, admin role and initial user
-6. installs RabbitMQ
-7. optionally installs observability and lab HSM components
-8. generates `lamassu.yaml` and installs the Lamassu chart
-9. optionally loads sample data
+4. installs the External Secrets Operator and creates the PostgreSQL, RabbitMQ and Keycloak administrator credentials as Secrets through a Fake `ClusterSecretStore`
+5. installs PostgreSQL and creates the required databases
+6. installs Keycloak and creates the `lamassu` realm, frontend client, admin role and initial user
+7. installs RabbitMQ
+8. optionally installs observability and lab HSM components
+9. generates `lamassu.yaml`, which references the Secrets instead of inline credentials, and installs the Lamassu chart
+10. optionally loads sample data
 
 The generated configuration exposes Keycloak at `/auth` through the same Gateway and bootstraps the initial `lamassu` user as a Lamassu super administrator.
 
@@ -136,12 +137,19 @@ Without them, it configures cert-manager with a self-signed issuer. This is suit
 
 ## Credentials and generated files
 
-Non-interactive mode generates random PostgreSQL, RabbitMQ and Keycloak administrator passwords. The initial Lamassu login is `lamassu` / `lamassu` and requires a password change on first use, unless `--development` was used: in that case the password stays fixed and permanent.
+Non-interactive mode generates random PostgreSQL, RabbitMQ and Keycloak administrator passwords and stores them in Kubernetes Secrets through the External Secrets Operator's Fake `ClusterSecretStore`. Fastlane writes `lamassu.yaml` in the current directory referencing those Secrets — the values file no longer contains the credentials.
 
-Fastlane writes `lamassu.yaml` in the current directory and injects credentials into it.
+The Keycloak administrator password is not printed by the script. Retrieve it from the Secret when needed:
+
+```bash
+kubectl -n lamassu-dev get secret lamassu-keycloak-admin \
+  -o jsonpath='{.data.admin-password}' | base64 --decode
+```
+
+The initial Lamassu login is `lamassu` / `lamassu` and requires a password change on first use, unless `--development` was used: in that case the password stays fixed and permanent.
 
 <Callout type="warn" title="Fastlane is a bootstrap tool">
-  Protect the generated values file, record the generated credentials in an appropriate secret store and do not reuse the evaluation identity setup in production.
+  The Fake `ClusterSecretStore` stores the credentials in plain text and is for lab use only: replace it with a real ESO provider for anything beyond a throwaway environment. Protect the generated values file, record the generated credentials in an appropriate secret store and do not reuse the evaluation identity setup in production.
 </Callout>
 
 ## Verify the installation

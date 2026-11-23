@@ -60,6 +60,7 @@ Dos cosas nunca migran solas: los datos del KMS y de la VA en volúmenes locales
 |---|---|---|---|
 | [Nombres de recursos con ámbito de release](#nombres-de-recursos-con-ámbito-de-release) | Releases de Helm con motor de KMS en sistema de archivos o CRLs de la VA en almacenamiento local | Alta: KMS y VA arrancan con volúmenes vacíos | Copiar los datos a los volúmenes nuevos |
 | [Validación estricta de values](#validación-estricta-de-values) | Todas las releases de Helm | Alta: `helm upgrade` falla | Eliminar o renombrar las claves heredadas |
+| [Credenciales en Secrets de Kubernetes](#credenciales-en-secrets-de-kubernetes) | Todas las releases de Helm | Alta: `helm upgrade` falla con credenciales inline | Crear primero los Secrets; consulta el [paso 2](#paso-2-actualiza-el-archivo-de-values) |
 | [Configuración de autorización obligatoria](#configuración-de-autorización-obligatoria) | Todos los despliegues | Alta: sin principal de bootstrap no hay administrador | Configurar `services.authz` |
 | [Retirada de la validación de tokens en el gateway](#retirada-de-la-validación-de-tokens-en-el-gateway) | Todas las releases de Helm | Alta: `helm upgrade` falla con las claves antiguas | Mover JWKS y roles a `services.authz` |
 | [Consolidación en PostgreSQL](#consolidación-en-postgresql) | Despliegues 3.8.0 con bases de datos por servicio | Alta: los servicios no encuentran datos, o una migración aborta | Limpiar antes IDs de CA duplicados y `engine_id` vacíos; fuera de Helm, mover los datos a mano |
@@ -93,6 +94,12 @@ El [paso 4 de la guía de migración](#paso-4-migra-los-datos-del-kms-y-la-va) c
 
 `values.schema.json` rechaza las claves desconocidas, así que cualquier bloque que 4.0.0 haya eliminado o renombrado —`toolbox`, `auth.oidc.apiGateway`, `auth.authorization` y otros— hace fallar directamente `helm lint` y `helm upgrade`. El [paso 2](#paso-2-actualiza-el-archivo-de-values) recoge todos los cambios.
 
+#### Credenciales en Secrets de Kubernetes
+
+En 4.0.0 el chart lee las credenciales de PostgreSQL, AMQP y SMTP de Secrets de Kubernetes en el namespace del release en lugar de valores inline: `postgres.existingSecret`, `amqp.existingSecret` y — cuando hay autenticación SMTP configurada — `services.alerts.smtp_server.existingSecret`, cada uno con `usernameKey` y `passwordKey` nombrando las claves de datos del Secret. Los valores inline `postgres.username`/`postgres.password` y `amqp.username`/`amqp.password` se eliminan y `values.schema.json` los rechaza, así que un archivo de values de 3.8.0 hace fallar `helm lint` y `helm upgrade` hasta que las credenciales pasen a Secrets.
+
+Los Secrets deben existir antes de ejecutar `helm upgrade`: el job de base de datos de pre-upgrade se conecta a PostgreSQL con ellos. El [paso 2](#paso-2-actualiza-el-archivo-de-values) los crea mediante el External Secrets Operator.
+
 #### Configuración de autorización obligatoria
 
 3.8.0 no tenía servicio de autorización, así que un archivo de values de 3.8.0 no tiene nada desde lo que migrar: hay que añadir la configuración de `services.authz` a mano. Necesita el endpoint JWKS del proveedor de identidad, las bases de datos que usa el motor de autorización y un principal de bootstrap que coincida con la forma en que el proveedor asigna el rol de administrador. Sin un principal coincidente nadie puede administrar la PKI.
@@ -106,6 +113,8 @@ El [paso 4 de la guía de migración](#paso-4-migra-los-datos-del-kms-y-la-va) c
 Las imágenes de servicio se basan en distroless y se ejecutan con el usuario numérico `65532`; la imagen de `authz` es Ubuntu con un usuario sin root que tiene el mismo UID. Se eliminan las sobrescrituras por servicio `services.kms.securityContext.runAsGroup: 0` y `services.authz.securityContext.runAsUser`/`runAsGroup: 999`; el acceso de grupo al volumen del KMS y al socket PKCS#11 lo gestiona ahora el `fsGroup: 65532` del pod.
 
 3.8.0 no fijaba la identidad del contenedor, por lo que los archivos existentes pueden tener cualquier UID. Todo volumen con claves o CRLs debe pertenecer a `65532:65532`, o al menos ser legible (y, si hace falta, escribible) por esa identidad.
+
+Los pods llevan ahora un `fsGroup: 65532` a nivel de pod con `fsGroupChangePolicy: OnRootMismatch`, que se salta los cambios recursivos de propiedad cuando la raíz del volumen ya tiene el grupo esperado. Si tus herramientas de backup o jobs usan otro GID, verifica que sigan pudiendo acceder a los volúmenes que necesitan.
 
 #### AMQP sobre TLS
 
@@ -299,6 +308,23 @@ Las migraciones de base de datos de 4.0.0 se niegan a ejecutarse con datos que n
 
 ### Paso 2: Actualiza el archivo de values
 
+**Crea los Secrets de credenciales.** El chart de 4.0.0 lee las credenciales de PostgreSQL, AMQP y SMTP de Secrets de Kubernetes, y el job de base de datos de pre-upgrade las necesita antes de que se ejecute la actualización. Copia las credenciales de 3.8.0 a tu proveedor de gestión de secretos y crea los Secrets con el External Secrets Operator (ESO), que el chart no instala:
+
+1. Configura ESO y su proveedor (`SecretStore` o `ClusterSecretStore`).
+2. Crea un `ExternalSecret` por cada conjunto de credenciales que uses. Su Secret de destino debe vivir en el namespace de la release, llamarse como el valor `existingSecret` correspondiente y contener estas claves:
+
+   | Secret (`existingSecret`) | Claves de datos obligatorias | Cuándo |
+   |---|---|---|
+   | `lamassu-postgres` (por defecto de `postgres.existingSecret`) | `username`, `password` | Siempre |
+   | `lamassu-amqp` (por defecto de `amqp.existingSecret`) | `username`, `password` | Siempre |
+   | `services.alerts.smtp_server.existingSecret` | `username`, `password` | Solo cuando hay autenticación SMTP |
+
+3. Espera a que cada `ExternalSecret` esté Ready y verifica los Secrets generados antes de ejecutar la actualización.
+
+No cambies las contraseñas de la base de datos ni del broker como parte de esta migración: ESO sincroniza credenciales en Secrets, pero no actualiza los usuarios configurados en el servidor PostgreSQL ni en el broker. Quitar credenciales del archivo de values no deshace la exposición previa — si se llegaron a subir a Git, rotarlas cuando la migración se haya completado.
+
+El `charts/lamassu/README.md` del repositorio Helm documenta en su sección *Secret management* un ejemplo completo y funcional: instalar external-secrets 0.20.2, un `ClusterSecretStore` Fake de prueba, los recursos `ExternalSecret` y la espera de la sincronización. Su proveedor Fake es solo para pruebas; para producción, sustitúyelo por la configuración de tu proveedor.
+
 **Añade `services.authz`.** Configura el endpoint JWKS, las bases de datos y el principal de bootstrap:
 
 ```yaml
@@ -323,7 +349,7 @@ services:
 ```
 
 - `jwkUrl` se consulta desde el pod de `authz`, no desde el gateway, así que un Service del namespace de la release puede referenciarse por su nombre corto. El valor por defecto apunta a un Service de Keycloak llamado `auth-keycloak`; defínelo explícitamente si tu proveedor de identidad está en otro sitio.
-- `authz` es el almacenamiento propio del servicio de autorización para principales, permisos y políticas. `pki` es la base de datos que consulta el motor de autorización al evaluar las políticas sobre las entidades. Solo se lee el campo `database` de cada entrada; la conexión usa siempre los values globales `postgres.hostname`, `postgres.port`, `postgres.username` y `postgres.password`.
+- `authz` es el almacenamiento propio del servicio de autorización para principales, permisos y políticas. `pki` es la base de datos que consulta el motor de autorización al evaluar las políticas sobre las entidades. Solo se exige el campo `database` de cada entrada; los `hostname` y `port` por esquema se siguen aceptando pero se ignoran — la conexión usa siempre los `postgres.hostname` y `postgres.port` globales con el Secret de credenciales de PostgreSQL global, `postgres.existingSecret` con sus nombres de clave configurados, salvo que la entrada defina su propio `existingSecret` (con `usernameKey` y `passwordKey` opcionales).
 - Si mantuviste los roles por defecto de 3.8.0 (`realm_access.roles` y `pki-admin`), el `services.authz.bootstrap` por defecto ya coincide con ellos.
 
 **Elimina los bloques de validación de tokens del gateway.** Quita `auth.oidc.apiGateway` y `auth.authorization` una vez que su configuración esté en `services.authz`:
@@ -378,7 +404,7 @@ migrations:
 
 **Revisa el resto de values:** sobrescrituras que fijaban `services.ui.port` a `80`, el antiguo bloque `probes:`, el issuer de TLS, y `affinity` y `topologySpreadConstraints` explícitos donde tu clúster los necesite. [Values renombrados y reestructurados](#values-renombrados-y-reestructurados) describe cada uno.
 
-Ejecuta `helm lint` con los values nuevos antes de actualizar; el schema estricto informa de cualquier clave que siga siendo desconocida.
+Ejecuta `helm lint` con los values nuevos antes de actualizar; el schema estricto informa de cualquier clave que siga siendo desconocida. Antes de ejecutar el [paso 3](#paso-3-ejecuta-la-actualización), confirma que cada `ExternalSecret` de credenciales esté Ready y que los Secrets generados contengan las claves esperadas.
 
 ### Paso 3: Ejecuta la actualización
 

@@ -17,7 +17,7 @@ Fastlane cubre algunas de las dependencias que el chart de aplicación deja deli
 |---|---|
 | Instancias de PostgreSQL, RabbitMQ y Keycloak para evaluación | El clúster Kubernetes, sus nodos y el almacenamiento persistente |
 | Envoy Gateway 1.8 y la `GatewayClass` `eg` | cert-manager, accesibilidad desde la red externa, DNS y reglas de firewall/NAT |
-| Un flujo de certificado self-signed para Lamassu, credenciales generadas para las dependencias y un usuario inicial | Confianza de los clientes en la CA self-signed, o un certificado de confianza pasado al script |
+| Un flujo de certificado self-signed para Lamassu, credenciales de las dependencias almacenadas en Secrets de Kubernetes (mediante el External Secrets Operator) y un usuario inicial | Confianza de los clientes en la CA self-signed, o un certificado de confianza pasado al script |
 | Componentes opcionales de observabilidad y HSM de laboratorio | Retención de monitorización, backups, HA y un HSM/servicio de claves de producción |
 
 Fastlane no convierte el stack en un servicio de producción: no crea el clúster, DNS público, reglas de firewall, backups, alta disponibilidad ni un certificado público de confianza.
@@ -119,12 +119,13 @@ Fastlane:
 1. valida las herramientas locales y el clúster seleccionado
 2. instala o actualiza Envoy Gateway 1.8 y crea la `GatewayClass` `eg`
 3. crea el namespace
-4. instala PostgreSQL y crea las bases de datos necesarias
-5. instala Keycloak y crea el realm `lamassu`, el cliente frontend, el rol administrador y el usuario inicial
-6. instala RabbitMQ
-7. instala opcionalmente observabilidad y componentes HSM de laboratorio
-8. genera `lamassu.yaml` e instala el chart de Lamassu
-9. carga datos de ejemplo opcionalmente
+4. instala el External Secrets Operator y crea las credenciales de PostgreSQL, RabbitMQ y del administrador de Keycloak como Secrets a través de un `ClusterSecretStore` Fake
+5. instala PostgreSQL y crea las bases de datos necesarias
+6. instala Keycloak y crea el realm `lamassu`, el cliente frontend, el rol administrador y el usuario inicial
+7. instala RabbitMQ
+8. instala opcionalmente observabilidad y componentes HSM de laboratorio
+9. genera `lamassu.yaml`, que referencia los Secrets en lugar de credenciales inline, e instala el chart de Lamassu
+10. carga datos de ejemplo opcionalmente
 
 La configuración generada expone Keycloak en `/auth` a través del mismo Gateway y provisiona al usuario inicial `lamassu` como superadministrador de Lamassu.
 
@@ -136,12 +137,19 @@ Sin ellos, configura cert-manager con un emisor self-signed. Es adecuado para la
 
 ## Credenciales y archivos generados
 
-El modo no interactivo genera contraseñas aleatorias para los administradores de PostgreSQL, RabbitMQ y Keycloak. El acceso inicial a Lamassu es `lamassu` / `lamassu` y obliga a cambiar la contraseña en el primer uso, salvo que se haya usado `--development`: en ese caso la contraseña permanece fija y permanente.
+El modo no interactivo genera contraseñas aleatorias para los administradores de PostgreSQL, RabbitMQ y Keycloak y las almacena en Secrets de Kubernetes a través del `ClusterSecretStore` Fake del External Secrets Operator. Fastlane escribe `lamassu.yaml` en el directorio actual referenciando esos Secrets — el archivo de valores ya no contiene las credenciales.
 
-Fastlane escribe `lamassu.yaml` en el directorio actual e incluye credenciales en él.
+La contraseña del administrador de Keycloak ya no se imprime por pantalla. Recupérala del Secret cuando la necesites:
+
+```bash
+kubectl -n lamassu-dev get secret lamassu-keycloak-admin \
+  -o jsonpath='{.data.admin-password}' | base64 --decode
+```
+
+El acceso inicial a Lamassu es `lamassu` / `lamassu` y obliga a cambiar la contraseña en el primer uso, salvo que se haya usado `--development`: en ese caso la contraseña permanece fija y permanente.
 
 <Callout type="warn" title="Fastlane es una herramienta de bootstrap">
-  Protege el archivo de valores generado, guarda las credenciales en un almacén de secretos apropiado y no reutilices la configuración de identidad de evaluación en producción.
+  El `ClusterSecretStore` Fake almacena las credenciales en texto plano y es solo para laboratorio: sustitúyelo por un proveedor ESO real para cualquier uso que vaya más allá de un entorno desechable. Protege el archivo de valores generado, guarda las credenciales en un almacén de secretos apropiado y no reutilices la configuración de identidad de evaluación en producción.
 </Callout>
 
 ## Verifica la instalación

@@ -60,6 +60,7 @@ Two things never migrate on their own: the KMS and VA data on local volumes, whi
 |---|---|---|---|
 | [Release-scoped resource names](#release-scoped-resource-names) | Helm releases with a filesystem KMS engine or local VA CRL storage | High: KMS and VA start on empty volumes | Copy the data into the new volumes |
 | [Strict values validation](#strict-values-validation) | Every Helm release | High: `helm upgrade` fails | Remove or rename legacy keys |
+| [Credentials in Kubernetes Secrets](#credentials-in-kubernetes-secrets) | Every Helm release | High: `helm upgrade` fails on inline credentials | Create the Secrets first; see [Step 2](#step-2-update-the-values-file) |
 | [Required authorization configuration](#required-authorization-configuration) | Every deployment | High: without a bootstrap principal there is no administrator | Configure `services.authz` |
 | [Gateway token validation removed](#gateway-token-validation-removed) | Every Helm release | High: `helm upgrade` fails on the old keys | Move JWKS and roles into `services.authz` |
 | [PostgreSQL consolidation](#postgresql-consolidation) | 3.8.0 deployments with per-service databases | High: services find no data, or a migration aborts | Clean duplicate CA IDs and empty `engine_id` values first; move data manually outside Helm |
@@ -93,6 +94,12 @@ Kubernetes derives a StatefulSet's PVC name from its pod name (`<volumeClaimTemp
 
 `values.schema.json` rejects unknown keys, so every block that 4.0.0 removed or renamed — `toolbox`, `auth.oidc.apiGateway`, `auth.authorization` and others — fails `helm lint` and `helm upgrade` outright. [Step 2](#step-2-update-the-values-file) lists every change.
 
+#### Credentials in Kubernetes Secrets
+
+In 4.0.0 the chart reads PostgreSQL, AMQP and SMTP credentials from Kubernetes Secrets in the release namespace instead of inline values: `postgres.existingSecret`, `amqp.existingSecret` and — when SMTP authentication is configured — `services.alerts.smtp_server.existingSecret`, each with `usernameKey` and `passwordKey` naming the Secret data keys. The inline `postgres.username`/`postgres.password` and `amqp.username`/`amqp.password` values are removed and rejected by `values.schema.json`, so a 3.8.0 values file fails `helm lint` and `helm upgrade` until the credentials move into Secrets.
+
+The Secrets must exist before `helm upgrade` runs: the pre-upgrade database job connects to PostgreSQL with them. [Step 2](#step-2-update-the-values-file) creates them through the External Secrets Operator.
+
 #### Required authorization configuration
 
 3.8.0 had no authorization service, so a 3.8.0 values file has nothing to migrate from: you must add the `services.authz` configuration yourself. It needs the JWKS endpoint of your identity provider, the database mappings the authorization engine uses, and a bootstrap principal that matches how your provider assigns the administrator role. Without a matching principal nobody can administer the PKI.
@@ -106,6 +113,8 @@ Kubernetes derives a StatefulSet's PVC name from its pod name (`<volumeClaimTemp
 Service images run on a distroless base as the numeric user `65532`; the `authz` image is Ubuntu with a non-root user that has the same UID. The per-service overrides `services.kms.securityContext.runAsGroup: 0` and `services.authz.securityContext.runAsUser`/`runAsGroup: 999` are removed; group access to the KMS volume and PKCS#11 socket is now handled by the pod-level `fsGroup: 65532`.
 
 3.8.0 did not pin a container identity, so existing files can carry any UID. Any volume that holds keys or CRLs must be owned by `65532:65532`, or at least readable (and, where needed, writable) by that identity.
+
+Pods now carry a pod-level `fsGroup: 65532` with `fsGroupChangePolicy: OnRootMismatch`, which skips recursive ownership changes when the volume root already has the expected group. If your backup helpers or jobs run with a different GID, verify they can still access the volumes they need.
 
 #### AMQP over TLS
 
@@ -299,6 +308,23 @@ The 4.0.0 database migrations refuse data they cannot migrate safely: they abort
 
 ### Step 2: Update the values file
 
+**Create the credential Secrets.** The 4.0.0 chart reads PostgreSQL, AMQP and SMTP credentials from Kubernetes Secrets, and the pre-upgrade database job needs them before the upgrade runs. Copy the 3.8.0 credentials into your secret-management provider and create the Secrets with the External Secrets Operator (ESO), which the chart does not install:
+
+1. Configure ESO and its provider (`SecretStore` or `ClusterSecretStore`).
+2. Create an `ExternalSecret` for each credential set you use. Its target Secret must live in the release namespace, be named after the corresponding `existingSecret` value, and contain these keys:
+
+   | Secret (`existingSecret`) | Required data keys | When |
+   |---|---|---|
+   | `lamassu-postgres` (default of `postgres.existingSecret`) | `username`, `password` | Always |
+   | `lamassu-amqp` (default of `amqp.existingSecret`) | `username`, `password` | Always |
+   | `services.alerts.smtp_server.existingSecret` | `username`, `password` | Only when SMTP authentication is enabled |
+
+3. Wait for every `ExternalSecret` to be Ready and verify the generated Secrets before running the upgrade.
+
+Do not change the database or broker passwords as part of this migration: ESO synchronizes credentials into Secrets, but it does not update the users configured on the PostgreSQL server or the broker. Removing credentials from the values file does not undo past exposure — if they were ever committed to Git, rotate them after the migration is complete.
+
+The `charts/lamassu/README.md` in the Helm repository documents a full worked example in its *Secret management* section: installing external-secrets 0.20.2, a test Fake `ClusterSecretStore`, the `ExternalSecret` resources and the wait for synchronization. Its Fake provider is for testing only; for production, replace it with your provider's configuration.
+
 **Add `services.authz`.** Configure the JWKS endpoint, the database mappings and the bootstrap principal:
 
 ```yaml
@@ -323,7 +349,7 @@ services:
 ```
 
 - `jwkUrl` is fetched from the `authz` pod, not from the gateway, so a Service in the release namespace can be referenced by its short name. The default points at a Keycloak Service named `auth-keycloak`; set it explicitly if your identity provider lives anywhere else.
-- `authz` is the authorization service's own storage for principals, grants and policies. `pki` is the database the authorization engine queries when it evaluates policies against entities. Only the `database` field of each entry is read; the connection always uses the global `postgres.hostname`, `postgres.port`, `postgres.username` and `postgres.password` values.
+- `authz` is the authorization service's own storage for principals, grants and policies. `pki` is the database the authorization engine queries when it evaluates policies against entities. Only the `database` field of each entry is required; per-schema `hostname` and `port` values remain accepted but are ignored — the connection always uses the global `postgres.hostname` and `postgres.port` with the global PostgreSQL credential Secret, `postgres.existingSecret` with its configured key names, unless the entry sets its own `existingSecret` (with optional `usernameKey` and `passwordKey`).
 - If you kept the 3.8.0 role defaults (`realm_access.roles` and `pki-admin`), the default `services.authz.bootstrap` already matches them.
 
 **Delete the gateway token validation blocks.** Remove `auth.oidc.apiGateway` and `auth.authorization` once their settings are in `services.authz`:
@@ -378,7 +404,7 @@ migrations:
 
 **Review the remaining values:** overrides that pinned `services.ui.port` to `80`, the old `probes:` block, the TLS issuer, and explicit `affinity` and `topologySpreadConstraints` where your cluster needs them. [Renamed and reshaped values](#renamed-and-reshaped-values) describes each one.
 
-Run `helm lint` with the new values before upgrading; the strict schema reports any key that is still unknown.
+Run `helm lint` with the new values before upgrading; the strict schema reports any key that is still unknown. Before running [Step 3](#step-3-run-the-upgrade), confirm every credential `ExternalSecret` is Ready and the generated Secrets contain the expected keys.
 
 ### Step 3: Run the upgrade
 

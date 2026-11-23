@@ -13,6 +13,7 @@ Prepare the platform services that are deliberately outside the Lamassu chart:
 * a Kubernetes 1.24+ cluster and Helm 3.2+
 * a reachable PostgreSQL server and a role allowed to create databases and schemas
 * a reachable RabbitMQ broker and credentials
+* Kubernetes Secrets in the release namespace holding the PostgreSQL and RabbitMQ credentials (and SMTP credentials when SMTP authentication is required) — the chart reads credentials from Secrets and rejects inline values (see [Credentials in Kubernetes Secrets](#credentials-in-kubernetes-secrets))
 * an OIDC provider, normally Keycloak, with a realm/tenant and client for Lamassu
 * Envoy Gateway 1.8+ and a `GatewayClass`
 * cert-manager 1.14+ (only for the default `tls.type: certManager` mode); for trusted TLS, either a trusted issuer or a Kubernetes TLS Secret
@@ -72,14 +73,16 @@ Start with the chart defaults and override the environment-specific values. This
 postgres:
   hostname: postgresql
   port: 5432
-  username: lamassu
-  password: change-me
+  existingSecret: lamassu-postgres
+  usernameKey: username
+  passwordKey: password
 
 amqp:
   hostname: rabbitmq
   port: 5672
-  username: lamassu
-  password: change-me
+  existingSecret: lamassu-amqp
+  usernameKey: username
+  passwordKey: password
   tls: false
 
 tls:
@@ -134,6 +137,22 @@ If Keycloak is external and already has its own reachable URL, point the OIDC se
 
 If your values file still carries the legacy gateway JWT validation settings — `auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` or `auth.authorization.roles.admin` — remove them. The migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md` documents their removal with no compatibility aliases, and `values.schema.json` rejects the leftover blocks instead of silently ignoring them. The replacements are `services.authz.jwkUrl` and `services.authz.bootstrap`, already shown in the example above.
 
+Credentials in Kubernetes Secrets [#credentials-in-kubernetes-secrets]
+
+The chart reads the PostgreSQL, AMQP and SMTP credentials from Kubernetes Secrets in the release namespace. Reference them with `existingSecret` plus the `usernameKey` and `passwordKey` data keys; inline `username` and `password` values are removed and rejected by `values.schema.json`.
+
+The Secrets must exist before you install or upgrade: the pre-install and pre-upgrade migration job connects to PostgreSQL with the PostgreSQL Secret, and the service containers read the AMQP and SMTP credentials when they start.
+
+* `postgres.existingSecret` (default `lamassu-postgres`) and `amqp.existingSecret` (default `lamassu-amqp`) are always required.
+* `services.alerts.smtp_server.existingSecret` is empty by default, which means SMTP without authentication. Set it, together with its key names, only when your SMTP server requires authentication.
+* Each `services.authz.credentials` entry names its `database` and uses the global PostgreSQL Secret — `postgres.existingSecret` with its configured key names — unless the entry sets its own `existingSecret`.
+
+Changing a Secret's contents does not roll the pods that consume it: the services read the credentials when they start. Restart the affected pods after rotating a credential.
+
+For production, manage the Secrets with the External Secrets Operator (ESO), which the chart does not install. The `charts/lamassu/README.md` in the Helm repository documents a complete working example in its *Secret management* section: installing external-secrets 0.20.2, a test `ClusterSecretStore`, the `ExternalSecret` resources and the wait before installing the chart. Its Fake provider is for testing only — replace it with your provider's configuration for anything beyond a throwaway environment; AWS Secrets Manager, Vault, Azure Key Vault, GCP Secret Manager and other providers are documented at [external-secrets.io](https://external-secrets.io/latest/provider/).
+
+Only these credentials moved into Secrets: other values, such as connector and crypto-engine settings, are still configured through the values file.
+
 TLS with an existing Secret [#tls-with-an-existing-secret]
 
 Create a Secret containing `tls.crt` and `tls.key`, then reference it. The Secret must already exist before installing: in `external` mode the chart renders no cert-manager resources and never creates this Secret.
@@ -163,7 +182,7 @@ amqp:
     secretName: lamassu-amqp-client
 ```
 
-The chart mounts configured Secrets read-only into every AMQP-consuming workload: the CA certificate under `/etc/lamassu/amqp/ca` and the client certificate and key under `/etc/lamassu/amqp/client`. The mounted file names are always `ca.crt`, `tls.crt` and `tls.key` — the `certificateKey` and `privateKeyKey` values rename only the Secret data keys, never the on-disk paths. The client private key is mounted with restrictive permissions (`defaultMode: 0440`; the CA volume uses `0444`), which works because the chart adds `fsGroup` to the pod security context when `amqp.client.secretName` is set — it uses the container `runAsGroup` (default `65532`) when `fsGroup` is not already set.
+The chart mounts configured Secrets read-only into every AMQP-consuming workload: the CA certificate under `/etc/lamassu/amqp/ca` and the client certificate and key under `/etc/lamassu/amqp/client`. The mounted file names are always `ca.crt`, `tls.crt` and `tls.key` — the `certificateKey` and `privateKeyKey` values rename only the Secret data keys, never the on-disk paths. The client private key is mounted with restrictive permissions (`defaultMode: 0440`; the CA volume uses `0444`), which works because the chart adds `fsGroup` to the pod security context when `amqp.client.secretName` is set — the chart's default pod security context already sets `fsGroup: 65532` for every service pod, so this top-up applies only when an explicit `podSecurityContext` without `fsGroup` was overridden and an AMQP client Secret is configured — and it uses the container `runAsGroup` (default `65532`) when `fsGroup` is not already set.
 
 Both Secret options require `amqp.tls: true`: `values.schema.json` rejects a non-empty `secretName` when `tls` is false, rejects unknown keys and rejects data-key names outside `^[A-Za-z0-9._-]+$`. The referenced Secret must exist in the release namespace or the consuming pods fail to start.
 

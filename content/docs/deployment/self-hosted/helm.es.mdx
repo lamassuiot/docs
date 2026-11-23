@@ -14,6 +14,7 @@ Prepara los servicios de plataforma que quedan deliberadamente fuera del chart d
 - un clúster Kubernetes 1.24+ y Helm 3.2+
 - un servidor PostgreSQL accesible y un rol autorizado para crear bases de datos y schemas
 - un broker RabbitMQ accesible y sus credenciales
+- Secrets de Kubernetes en el namespace del release con las credenciales de PostgreSQL y RabbitMQ (y las credenciales SMTP cuando el SMTP exija autenticación) — el chart lee las credenciales de Secrets y rechaza los valores inline (consulta [Credenciales en Secrets de Kubernetes](#credenciales-en-secrets-de-kubernetes))
 - un proveedor OIDC, normalmente Keycloak, con un realm/tenant y un cliente para Lamassu
 - Envoy Gateway 1.8+ y una `GatewayClass`
 - cert-manager 1.14+ (solo para el modo predeterminado `tls.type: certManager`); para TLS de confianza, un emisor de confianza o un Secret TLS de Kubernetes
@@ -73,14 +74,16 @@ Parte de los valores predeterminados del chart y sobrescribe los específicos de
 postgres:
   hostname: postgresql
   port: 5432
-  username: lamassu
-  password: change-me
+  existingSecret: lamassu-postgres
+  usernameKey: username
+  passwordKey: password
 
 amqp:
   hostname: rabbitmq
   port: 5672
-  username: lamassu
-  password: change-me
+  existingSecret: lamassu-amqp
+  usernameKey: username
+  passwordKey: password
   tls: false
 
 tls:
@@ -135,6 +138,22 @@ Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OI
 
 Si tu archivo de valores aún contiene los ajustes heredados de validación JWT del Gateway — `auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` o `auth.authorization.roles.admin` — elimínalos. La guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md` documenta su eliminación sin alias de compatibilidad, y `values.schema.json` rechaza los bloques residuales en lugar de ignorarlos silenciosamente. Los reemplazos son `services.authz.jwkUrl` y `services.authz.bootstrap`, que ya aparecen en el ejemplo anterior.
 
+### Credenciales en Secrets de Kubernetes
+
+El chart lee las credenciales de PostgreSQL, AMQP y SMTP de Secrets de Kubernetes en el namespace del release. Referéncialas con `existingSecret` más las claves de datos `usernameKey` y `passwordKey`; los valores inline `username` y `password` se han eliminado y `values.schema.json` los rechaza.
+
+Los Secrets deben existir antes de instalar o actualizar: el job de migración de pre-install y pre-upgrade se conecta a PostgreSQL con el Secret de PostgreSQL, y los contenedores de los servicios leen las credenciales de AMQP y SMTP cuando arrancan.
+
+- `postgres.existingSecret` (por defecto `lamassu-postgres`) y `amqp.existingSecret` (por defecto `lamassu-amqp`) son obligatorios siempre.
+- `services.alerts.smtp_server.existingSecret` está vacío por defecto, lo que significa SMTP sin autenticación. Defínelo, junto con sus nombres de clave, solo cuando tu servidor SMTP exija autenticación.
+- Cada entrada de `services.authz.credentials` nombra su `database` y usa el Secret global de PostgreSQL — `postgres.existingSecret` con sus nombres de clave configurados — salvo que la entrada defina su propio `existingSecret`.
+
+Cambiar el contenido de un Secret no reinicia los pods que lo consumen: los servicios leen las credenciales cuando arrancan. Reinicia los pods afectados después de rotar una credencial.
+
+Para producción, gestiona los Secrets con el External Secrets Operator (ESO), que el chart no instala. El `charts/lamassu/README.md` del repositorio Helm documenta en su sección *Secret management* un ejemplo completo y funcional: instalar external-secrets 0.20.2, un `ClusterSecretStore` de prueba, los recursos `ExternalSecret` y la espera antes de instalar el chart. Su proveedor Fake es solo para pruebas — sustitúyelo por la configuración de tu proveedor para cualquier uso que vaya más allá de un entorno desechable; AWS Secrets Manager, Vault, Azure Key Vault, GCP Secret Manager y otros proveedores están documentados en [external-secrets.io](https://external-secrets.io/latest/provider/).
+
+Solo estas credenciales pasan a Secrets: el resto de values, como la configuración de conectores o de motores criptográficos, sigue configurándose en el archivo de values.
+
 ### TLS con un Secret existente
 
 Crea un Secret con `tls.crt` y `tls.key` y referéncialo. El Secret debe existir antes de instalar: en modo `external` el chart no renderiza recursos de cert-manager ni crea nunca este Secret.
@@ -164,7 +183,7 @@ amqp:
     secretName: lamassu-amqp-client
 ```
 
-El chart monta los Secrets configurados en modo de solo lectura en todas las cargas de trabajo que consumen AMQP: el certificado de la CA en `/etc/lamassu/amqp/ca` y el certificado y la clave de cliente en `/etc/lamassu/amqp/client`. Los nombres de los archivos montados son siempre `ca.crt`, `tls.crt` y `tls.key` — los valores `certificateKey` y `privateKeyKey` renombran solo las claves de datos del Secret, nunca las rutas en disco. La clave privada del cliente se monta con permisos restrictivos (`defaultMode: 0440`; el volumen de la CA usa `0444`), que funcionan porque el chart añade `fsGroup` al security context del pod cuando `amqp.client.secretName` está definido — usa el `runAsGroup` del contenedor (por defecto `65532`) cuando `fsGroup` no está ya definido.
+El chart monta los Secrets configurados en modo de solo lectura en todas las cargas de trabajo que consumen AMQP: el certificado de la CA en `/etc/lamassu/amqp/ca` y el certificado y la clave de cliente en `/etc/lamassu/amqp/client`. Los nombres de los archivos montados son siempre `ca.crt`, `tls.crt` y `tls.key` — los valores `certificateKey` y `privateKeyKey` renombran solo las claves de datos del Secret, nunca las rutas en disco. La clave privada del cliente se monta con permisos restrictivos (`defaultMode: 0440`; el volumen de la CA usa `0444`), que funcionan porque el chart añade `fsGroup` al security context del pod cuando `amqp.client.secretName` está definido — el security context del pod por defecto del chart ya define `fsGroup: 65532` para todos los pods de servicio, por lo que este ajuste solo se aplica cuando se ha sobrescrito un `podSecurityContext` explícito sin `fsGroup` y hay un Secret de cliente AMQP configurado — y usa el `runAsGroup` del contenedor (por defecto `65532`) cuando `fsGroup` no está ya definido.
 
 Ambas opciones de Secret exigen `amqp.tls: true`: `values.schema.json` rechaza un `secretName` no vacío cuando `tls` es false, rechaza claves desconocidas y rechaza nombres de clave de datos fuera de `^[A-Za-z0-9._-]+$`. El Secret referenciado debe existir en el namespace del release o los pods consumidores no llegan a arrancar.
 

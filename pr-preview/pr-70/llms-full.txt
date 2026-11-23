@@ -226,10 +226,10 @@ Fastlane:
 1. validates local tools and the selected cluster
 2. installs or upgrades Envoy Gateway 1.8 and creates the `eg` `GatewayClass`
 3. creates the namespace
-4. installs PostgreSQL and creates the required databases
-5. installs Keycloak and creates the `lamassu` realm, frontend client, admin role and initial user
-6. installs RabbitMQ
-7. installs the External Secrets Operator and creates the PostgreSQL, RabbitMQ and Keycloak administrator credentials as Secrets through a Fake `ClusterSecretStore`
+4. installs the External Secrets Operator and creates the PostgreSQL, RabbitMQ and Keycloak administrator credentials as Secrets through a Fake `ClusterSecretStore`
+5. installs PostgreSQL and creates the required databases
+6. installs Keycloak and creates the `lamassu` realm, frontend client, admin role and initial user
+7. installs RabbitMQ
 8. optionally installs observability and lab HSM components
 9. generates `lamassu.yaml`<ins className="lm-diff-ins">, which references the Secrets instead of inline credentials,</ins> and installs the Lamassu chart
 10. optionally loads sample data
@@ -549,7 +549,7 @@ amqp:
     secretName: lamassu-amqp-client
 ```
 
-The chart mounts configured Secrets read-only into every AMQP-consuming workload: the CA certificate under `/etc/lamassu/amqp/ca` and the client certificate and key under `/etc/lamassu/amqp/client`. The mounted file names are always `ca.crt`, `tls.crt` and `tls.key` — the `certificateKey` and `privateKeyKey` values rename only the Secret data keys, never the on-disk paths. The client private key is mounted with restrictive permissions (`defaultMode: 0440`; the CA volume uses `0444`), which works because the chart adds `fsGroup` to the pod security context when `amqp.client.secretName` is set — it uses the container `runAsGroup` (default `65532`) when `fsGroup` is not already set.
+The chart mounts configured Secrets read-only into every AMQP-consuming workload: the CA certificate under `/etc/lamassu/amqp/ca` and the client certificate and key under `/etc/lamassu/amqp/client`. The mounted file names are always `ca.crt`, `tls.crt` and `tls.key` — the `certificateKey` and `privateKeyKey` values rename only the Secret data keys, never the on-disk paths. The client private key is mounted with restrictive permissions (`defaultMode: 0440`; the CA volume uses `0444`), which works because the chart adds `fsGroup` to the pod security context when `amqp.client.secretName` is set — <ins className="lm-diff-ins">the chart's default pod security context already sets `fsGroup: 65532` for every service pod, so this top-up applies only when an explicit `podSecurityContext` without `fsGroup` was overridden and an AMQP client Secret is configured — and </ins>it uses the container `runAsGroup` (default `65532`) when `fsGroup` is not already set.
 
 Both Secret options require `amqp.tls: true`: `values.schema.json` rejects a non-empty `secretName` when `tls` is false, rejects unknown keys and rejects data-key names outside `^[A-Za-z0-9._-]+$`. The referenced Secret must exist in the release namespace or the consuming pods fail to start.
 
@@ -5243,6 +5243,10 @@ Service images run on a distroless base as the numeric user `65532`; the `authz`
 
 3.8.0 did not pin a container identity, so existing files can carry any UID. Any volume that holds keys or CRLs must be owned by `65532:65532`, or at least readable (and, where needed, writable) by that identity.
 
+<div className="lm-diff-ins lm-diff-block">
+  Pods now carry a pod-level `fsGroup: 65532` with `fsGroupChangePolicy: OnRootMismatch`, which skips recursive ownership changes when the volume root already has the expected group. If your backup helpers or jobs run with a different GID, verify they can still access the volumes they need.
+</div>
+
 AMQP over TLS [#amqp-over-tls]
 
 In 3.8.0 `amqp.tls` was not applied and event-bus clients always connected over plaintext. In 4.0.0 `amqp.tls: true` switches them to AMQPS. The default `amqp.port` stays `5672` and does not change when TLS is enabled, so a values file that already set `amqp.tls: true` must point `amqp.port` at the broker's TLS listener (`amqps`, commonly `5671`), or set `amqp.tls: false` to keep plaintext. Clients must also trust the broker's certificate.
@@ -5485,7 +5489,7 @@ services:
 ```
 
 * `jwkUrl` is fetched from the `authz` pod, not from the gateway, so a Service in the release namespace can be referenced by its short name. The default points at a Keycloak Service named `auth-keycloak`; set it explicitly if your identity provider lives anywhere else.
-* `authz` is the authorization service's own storage for principals, grants and policies. `pki` is the database the authorization engine queries when it evaluates policies against entities. Only the `database` field of each entry is <del className="lm-diff-del">read</del><ins className="lm-diff-ins">required</ins>; the connection <del className="lm-diff-del">always </del>uses the global <del className="lm-diff-del">`postgres.hostname`, `postgres.port`, `postgres.username` and `postgres.password` values</del><ins className="lm-diff-ins">PostgreSQL credential Secret — `postgres.existingSecret` with its configured key names — unless the entry sets its own `existingSecret` (with optional `usernameKey` and `passwordKey`)</ins>.
+* `authz` is the authorization service's own storage for principals, grants and policies. `pki` is the database the authorization engine queries when it evaluates policies against entities. Only the `database` field of each entry is <del className="lm-diff-del">read; the connection always uses the global `postgres.hostname`, `postgres.port`, `postgres.username` and `postgres.password` values</del><ins className="lm-diff-ins">required; per-schema `hostname` and `port` values remain accepted but are ignored — the connection always uses the global `postgres.hostname` and `postgres.port` with the global PostgreSQL credential Secret, `postgres.existingSecret` with its configured key names, unless the entry sets its own `existingSecret` (with optional `usernameKey` and `passwordKey`)</ins>.
 * If you kept the 3.8.0 role defaults (`realm_access.roles` and `pki-admin`), the default `services.authz.bootstrap` already matches them.
 
 **Delete the gateway token validation blocks.** Remove `auth.oidc.apiGateway` and `auth.authorization` once their settings are in `services.authz`:

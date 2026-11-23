@@ -118,10 +118,10 @@ Fastlane:
 1. validates local tools and the selected cluster
 2. installs or upgrades Envoy Gateway 1.8 and creates the `eg` `GatewayClass`
 3. creates the namespace
-4. installs PostgreSQL and creates the required databases
-5. installs Keycloak and creates the `lamassu` realm, frontend client, admin role and initial user
-6. installs RabbitMQ
-7. installs the External Secrets Operator and creates the PostgreSQL, RabbitMQ and Keycloak administrator credentials as Secrets through a Fake `ClusterSecretStore`
+4. installs the External Secrets Operator and creates the PostgreSQL, RabbitMQ and Keycloak administrator credentials as Secrets through a Fake `ClusterSecretStore`
+5. installs PostgreSQL and creates the required databases
+6. installs Keycloak and creates the `lamassu` realm, frontend client, admin role and initial user
+7. installs RabbitMQ
 8. optionally installs observability and lab HSM components
 9. generates `lamassu.yaml`<ins className="lm-diff-ins">, which references the Secrets instead of inline credentials,</ins> and installs the Lamassu chart
 10. optionally loads sample data

@@ -119,6 +119,10 @@ Las imágenes de servicio se basan en distroless y se ejecutan con el usuario nu
 
 3.8.0 no fijaba la identidad del contenedor, por lo que los archivos existentes pueden tener cualquier UID. Todo volumen con claves o CRLs debe pertenecer a `65532:65532`, o al menos ser legible (y, si hace falta, escribible) por esa identidad.
 
+<div className="lm-diff-ins lm-diff-block">
+  Los pods llevan ahora un `fsGroup: 65532` a nivel de pod con `fsGroupChangePolicy: OnRootMismatch`, que se salta los cambios recursivos de propiedad cuando la raíz del volumen ya tiene el grupo esperado. Si tus herramientas de backup o jobs usan otro GID, verifica que sigan pudiendo acceder a los volúmenes que necesitan.
+</div>
+
 AMQP sobre TLS [#amqp-sobre-tls]
 
 En 3.8.0 `amqp.tls` no se aplicaba y los clientes del bus de eventos se conectaban siempre en texto plano. En 4.0.0, `amqp.tls: true` los pasa a AMQPS. El valor por defecto de `amqp.port` sigue siendo `5672` y no cambia al activar TLS, así que un archivo de values que ya tuviera `amqp.tls: true` debe apuntar `amqp.port` al listener TLS del broker (`amqps`, habitualmente `5671`), o poner `amqp.tls: false` para seguir en texto plano. Los clientes deben además confiar en el certificado del broker.
@@ -361,7 +365,7 @@ services:
 ```
 
 * `jwkUrl` se consulta desde el pod de `authz`, no desde el gateway, así que un Service del namespace de la release puede referenciarse por su nombre corto. El valor por defecto apunta a un Service de Keycloak llamado `auth-keycloak`; defínelo explícitamente si tu proveedor de identidad está en otro sitio.
-* `authz` es el almacenamiento propio del servicio de autorización para principales, permisos y políticas. `pki` es la base de datos que consulta el motor de autorización al evaluar las políticas sobre las entidades. Solo se <del className="lm-diff-del">lee</del><ins className="lm-diff-ins">exige</ins> el campo `database` de cada entrada; la conexión usa <del className="lm-diff-del">siempre los values globales `postgres.hostname`, `postgres.port`, `postgres.username` y `postgres.password`</del><ins className="lm-diff-ins">el Secret de credenciales de PostgreSQL global — `postgres.existingSecret` con sus nombres de clave configurados — salvo que la entrada defina su propio `existingSecret` (con `usernameKey` y `passwordKey` opcionales)</ins>.
+* `authz` es el almacenamiento propio del servicio de autorización para principales, permisos y políticas. `pki` es la base de datos que consulta el motor de autorización al evaluar las políticas sobre las entidades. Solo se <del className="lm-diff-del">lee</del><ins className="lm-diff-ins">exige</ins> el campo `database` de cada entrada; <del className="lm-diff-del">la conexión usa siempre los values globales `postgres.hostname`, `postgres.port`, `postgres.username` y `postgres.password`</del><ins className="lm-diff-ins">los `hostname` y `port` por esquema se siguen aceptando pero se ignoran — la conexión usa siempre los `postgres.hostname` y `postgres.port` globales con el Secret de credenciales de PostgreSQL global, `postgres.existingSecret` con sus nombres de clave configurados, salvo que la entrada defina su propio `existingSecret` (con `usernameKey` y `passwordKey` opcionales)</ins>.
 * Si mantuviste los roles por defecto de 3.8.0 (`realm_access.roles` y `pki-admin`), el `services.authz.bootstrap` por defecto ya coincide con ellos.
 
 **Elimina los bloques de validación de tokens del gateway.** Quita `auth.oidc.apiGateway` y `auth.authorization` una vez que su configuración esté en `services.authz`:

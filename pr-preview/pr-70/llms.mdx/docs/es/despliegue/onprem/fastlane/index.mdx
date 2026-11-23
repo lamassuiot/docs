@@ -118,10 +118,10 @@ Fastlane:
 1. valida las herramientas locales y el clúster seleccionado
 2. instala o actualiza Envoy Gateway 1.8 y crea la `GatewayClass` `eg`
 3. crea el namespace
-4. instala PostgreSQL y crea las bases de datos necesarias
-5. instala Keycloak y crea el realm `lamassu`, el cliente frontend, el rol administrador y el usuario inicial
-6. instala RabbitMQ
-7. instala el External Secrets Operator y crea las credenciales de PostgreSQL, RabbitMQ y del administrador de Keycloak como Secrets a través de un `ClusterSecretStore` Fake
+4. instala el External Secrets Operator y crea las credenciales de PostgreSQL, RabbitMQ y del administrador de Keycloak como Secrets a través de un `ClusterSecretStore` Fake
+5. instala PostgreSQL y crea las bases de datos necesarias
+6. instala Keycloak y crea el realm `lamassu`, el cliente frontend, el rol administrador y el usuario inicial
+7. instala RabbitMQ
 8. instala opcionalmente observabilidad y componentes HSM de laboratorio
 9. genera `lamassu.yaml`<ins className="lm-diff-ins">, que referencia los Secrets en lugar de credenciales inline,</ins> e instala el chart de Lamassu
 10. carga datos de ejemplo opcionalmente

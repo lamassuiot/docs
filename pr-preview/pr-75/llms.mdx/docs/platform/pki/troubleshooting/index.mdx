@@ -32,7 +32,7 @@ Check each boundary independently:
 4. **CRL:** compare `latest_crl`, number and timestamps with the downloaded list. Check the serial in its contents. If unchanged, review `regenerate_on_revoke`, event delivery, jobs, signing and storage with the deployment operator.
 5. **Client:** check cache, policy for expired or unavailable evidence, critical IDP extension and rejection of a new connection.
 
-Reactivation from `CertificateHold` needs a new CRL for the client to stop seeing the hold. Reactivating a CA does not restore its descendant cascade; inspect every status and individual operation failure.
+Reactivation from `CertificateHold` needs a new CRL for the client to stop seeing the hold. A hold cascaded from a CA is lifted by releasing that CA; a cascade from a CA revoked for good is not. Inspect every status and individual operation failure.
 
 The chain validates but the connection fails [#the-chain-validates-but-the-connection-fails]
 

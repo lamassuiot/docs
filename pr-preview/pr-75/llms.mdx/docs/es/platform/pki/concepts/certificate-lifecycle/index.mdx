@@ -61,7 +61,7 @@ Solo `CertificateHold` permite reactivar un certificado revocado que no esté en
 
 Efecto de revocar una CA [#efecto-de-revocar-una-ca]
 
-Revocar una CA inicia una cascada que intenta revocar sus descendientes con `CessationOfOperation`. Puede terminar con fallos parciales y no se deshace al reactivar el padre. Consulta [Jerarquía y rotación](/docs/platform/pki/ca-hierarchy-and-rotation) para sus condiciones y comprobaciones.
+Revocar una CA inicia una cascada que intenta revocar sus descendientes. Una cascada con `CertificateHold` los suspende de forma reversible: al reactivar la CA se restauran los que sigan suspendidos. Cualquier otra razón de revocación revoca los descendientes definitivamente con `CessationOfOperation`. Consulta [Jerarquía y rotación](/docs/platform/pki/ca-hierarchy-and-rotation) para sus condiciones y comprobaciones.
 
 Antes de confirmar:
 

@@ -1750,15 +1750,15 @@ Each device has a `Device ID`, one owning DMS (`dms_owner`) and, once provisione
 
 Device states [#device-states]
 
-| Operational view    | Meaning                                                              |
-| ------------------- | -------------------------------------------------------------------- |
-| **No Identity**     | A record exists without an associated identity.                      |
-| **Active**          | The slot is active; also check certificate dates, status and usages. |
-| **Renewal Pending** | The identity is in the operational renewal window.                   |
-| **Expiring Soon**   | Expiration is approaching according to configured thresholds.        |
-| **Expired**         | The identity has expired.                                            |
-| **Revoked**         | The identity is marked revoked.                                      |
-| **Decommissioned**  | The record is retired and ordinary updates do not restore operation. |
+| Operational view    | Meaning                                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **No Identity**     | A record exists without an associated identity.                                                                |
+| **Active**          | The slot is active; also check certificate dates, status and usages.                                           |
+| **Renewal Pending** | The identity is in the operational renewal window.                                                             |
+| **Expiring Soon**   | Expiration is approaching according to configured thresholds.                                                  |
+| **Expired**         | The identity has expired.                                                                                      |
+| **Revoked**         | The identity is marked revoked. A hold cascaded from its CA shows here and is lifted when that CA is released. |
+| **Decommissioned**  | The record is retired and ordinary updates do not restore operation.                                           |
 
 Device, slot and [certificate](/docs/platform/pki/concepts/certificate-lifecycle) states are distinct. Events and jobs can update the view after saving a certificate; an **Active** label does not establish consumer acceptance.
 
@@ -1819,6 +1819,8 @@ Revoke the current identity [#revoke-the-current-identity]
 Locate the active serial in history and revoke it with an appropriate reason. Verify the record, OCSP/CRL publication and rejection of a new consumer connection using the [certificate guide](/docs/platform/pki/certificates).
 
 Revocation does not remove the device. It does not automatically enable another enrollment either: recovery depends on its credential, status and DMS policy. `CertificateHold` can be reactivated under PKI conditions; other reasons block subsequent certificate changes.
+
+A certificate suspended by a CA hold cascade shows as **Revoked** and returns to active when the holding CA is released. If its certificate expired during the hold, the monitoring job marks it as expired again after the release. If you revoke a held identity yourself, that revocation is permanent.
 
 Decommission a device [#decommission-a-device]
 
@@ -3452,7 +3454,7 @@ Reissuance and rotation are not the same [#reissuance-and-rotation-are-not-the-s
 
 **Reissuing a CA** creates a new certificate over the existing key. Lamassu generates a CSR with that key, self-signs it if it is a root or asks the parent CA to sign it if it is subordinate. The new certificate becomes active and the CA points to its serial number; the old and new certificates are linked through metadata.
 
-If the CRL settings of the CA are signed by the superseded CA certificate, reissuing moves the signer to the new certificate — provided it carries `cRLSign` — and republishes the CRL. Otherwise, and for settings signed by a different certificate, the signer is kept, so check the new certificate’s key usage after reissuing; see the [CRL guide](/docs/platform/pki/crl).
+If the CRL settings of the CA are signed by the superseded CA certificate, reissuing moves the signer to the new certificate — provided it carries `cRLSign` — and republishes the CRL. Otherwise, and for settings signed by a different certificate, the signer is kept, so check the new certificate’s key usage after reissuing. A CA with no CRL settings — for example, one imported without its key or without `cRLSign` — has them initialized by the reissue when the new certificate carries `cRLSign`; otherwise it keeps none. See the [CRL guide](/docs/platform/pki/crl).
 
 **Rotating a CA** creates a successor key and authority. It is the right choice in the face of compromise, a cryptographic change, an engine migration or non-exportable key policies.
 
@@ -3507,11 +3509,11 @@ Key rotation procedure [#key-rotation-procedure]
 
 Cascading revocation [#cascading-revocation]
 
-Lamassu saves the CA’s revocation, then attempts to revoke child CAs and issued certificates with `CessationOfOperation`. Propagation continues recursively through child CAs. This is not a transaction over the whole hierarchy: some resources may have changed while other updates failed.
+Lamassu saves the CA’s revocation, then applies the same revocation to child CAs and issued certificates. Propagation continues recursively through child CAs. This is not a transaction over the whole hierarchy: some resources may have changed while other updates failed.
 
 Resources in `EXPIRED` state and resources already revoked for a final reason reject further status transitions. Per-descendant failures are logged; review the inventory and logs even when the parent operation completes.
 
-`CertificateHold` allows reactivating the parent while it is not expired, but does not restore child CAs or certificates permanently revoked during the cascade. Holding a CA therefore does not provide a reversible pause for its entire branch.
+`CertificateHold` is the reversible exception. Holding a CA suspends its active sub-CAs and issued certificates with `CertificateHold` and marks them as suspended by that CA. Releasing the CA — to `ACTIVE` or to any other non-revoked status such as `EXPIRED` — reactivates exactly the descendants still on hold that carry that mark. Holds placed manually before or after the cascade are left untouched, and any later status change of a descendant clears the mark. Revoking a held CA with any other reason remains permanent: descendants are revoked with `CessationOfOperation` and cannot be restored.
 
 Before closing the change, compare the original dependency inventory with final states and verify revocation publication for each issuer. Do not use revocation as the ordinary mechanism to stop issuance: complete migration and remove the CA from operational flows.
 
@@ -3621,6 +3623,10 @@ You need the CA certificate in PEM, its chain to a known root and, when importin
 
 The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number matches a stored certificate with different contents, or whose identical certificate already belongs to an existing CA. A deleted CA's certificate record is kept and can be reused when re-importing the same certificate, including its previous status. Re-importing a different certificate with that serial number is rejected; check the certificate and status after re-importing.
 
+<div className="lm-diff-ins lm-diff-block">
+  A certificate whose validity period has already ended, such as that of a retired external authority, is accepted and the CA is stored as `EXPIRED` from the start, as happens when importing a plain certificate. An `EXPIRED` CA rejects status changes; see [certificate lifecycle](/docs/platform/pki/concepts/certificate-lifecycle).
+</div>
+
 Deleting a CA releases the key references of its own current certificate and linked reissued certificates, while keeping those records for its issuer's CRL and OCSP. It then attempts to delete the key; the KMS keeps it if other certificates still reference it, such as another CA sharing the key. Revoking certificates issued by the deleted CA does not release their own key references.
 
 <Steps>
@@ -3648,6 +3654,8 @@ Deleting a CA releases the key references of its own current certificate and lin
     Verify the import [#verify-the-import]
 
     Review the registered type, associated key and engine, and issuer relationship. Certificate-only import may associate an existing KMS key using the certificate’s key identifier. Without a usable key, the CA is public material and cannot sign.
+
+    An imported CA whose key is in the KMS and whose certificate carries `cRLSign` receives its CRL settings and first CRL automatically; without a key in the KMS or without `cRLSign` it receives none, and this is not an import error (see [CRL](/docs/platform/pki/crl)).
 
     For an issuing CA, complete a test issuance and check OCSP and CRL. Creating the record alone does not establish key availability, complete chain consistency or status publication.
   </Step>
@@ -3683,7 +3691,7 @@ A CA signs only while its status is `ACTIVE` and the current time falls inside t
 Revoke a CA [#revoke-a-ca]
 
 <Callout type="warn" title="Revocation affects the entire dependent chain">
-  Revoking a CA prevents issuance and may interrupt its entire branch. Only `CertificateHold` allows reactivating the CA itself if it is not expired. Descendant revocation is attempted with `CessationOfOperation`; reactivating the parent does not restore those descendants. Follow the [cascading revocation](/docs/platform/pki/ca-hierarchy-and-rotation) conditions.
+  Revoking a CA prevents issuance and may interrupt its entire branch. With `CertificateHold` the cascade is reversible: descendants are suspended on hold and are restored when you release the CA. Any other revocation reason revokes descendants permanently with `CessationOfOperation`. Follow the [cascading revocation](/docs/platform/pki/ca-hierarchy-and-rotation) conditions.
 </Callout>
 
 <Steps>
@@ -3977,7 +3985,7 @@ Check that the saved reason is `CertificateHold` and the identity still satisfie
 
 Read the record and query OCSP again. With `regenerate_on_revoke` enabled, the reactivation event requests CRL regeneration: check that the new list omits the serial. An earlier list can still mark it revoked until the client refreshes its copy.
 
-This does not undo permanent revocation or a cascade started by revoking a CA.
+This does not undo permanent revocation or the cascade of a CA revoked for good; the hold cascaded by a CA is lifted by releasing that CA.
 
 Continue [#continue]
 
@@ -4051,7 +4059,7 @@ Only `CertificateHold` allows reactivating a revoked certificate that is not in 
 
 Effect of revoking a CA [#effect-of-revoking-a-ca]
 
-Revoking a CA starts a cascade that attempts to revoke descendants with `CessationOfOperation`. It may end with partial failures and is not undone by reactivating the parent. Read [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for conditions and checks.
+Revoking a CA starts a cascade that attempts to revoke descendants. A `CertificateHold` cascade suspends them reversibly: releasing the CA restores those still on hold. Any other revocation reason revokes descendants permanently with `CessationOfOperation`. Read [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for conditions and checks.
 
 Before confirming:
 
@@ -4159,7 +4167,7 @@ A CRL is an issuer-signed list of revoked certificates. This guide is for an ope
 
 CRL settings [#crl-settings]
 
-The CRL settings of a CA store the configuration and metadata of its latest published list. Each CA has its own settings, keyed by its CA ID — even when two CAs share a key: they share the SKI, not the CRL. Generation requires a usable issuer key; do not assume an imported CA without a key has an available CRL.
+The CRL settings of a CA store the configuration and metadata of its latest published list. Each CA has its own settings, keyed by its CA ID — even when two CAs share a key: they share the SKI, not the CRL. The VA creates them when a CA is created; when a CA is imported whose key is in the KMS — either imported with the private key or already held by the KMS — and whose certificate carries `cRLSign`: such a CA publishes its first CRL immediately, like a created one; and when a CA without settings is reissued with a certificate that can sign CRLs. An imported CA whose key is not in the KMS, or whose certificate lacks `cRLSign`, receives no settings: the import succeeds without error, and the CA's CRL endpoints report the settings as missing. Settings are never created retroactively: a CA that has none keeps none until it is reissued. Generation requires a usable issuer key; do not assume an imported CA without a key has an available CRL.
 
 | Field        | Purpose                                                                                                                                                                                                                                                                                                                                               |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -4183,7 +4191,7 @@ When a CA is reissued and the signer is the superseded CA certificate, the VA mo
   The CRL lifecycle decisions — when publication stops and when the final CRL expires — use only the CA's current certificate. If a reissued certificate expires earlier than an older certificate that is still valid, CRL publication can stop, or the final CRL can expire, while the older certificate is still valid. This is an accepted limitation of the current behavior.
 </Callout>
 
-A CA whose signer lacks `cRLSign` cannot generate its CRL, and an update that selects a signer without `cRLSign` is rejected (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and update the settings to use it as the signer. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages, and without `cRLSign` the settings keep their previous signer.
+A CA whose signer lacks `cRLSign` cannot generate its CRL, and an update that selects a signer without `cRLSign` is rejected (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and update the settings to use it as the signer. A CA that has no settings at all — for example, one imported without `cRLSign` — has nothing to update: the only way to obtain them is to reissue the CA with a certificate that carries `cRLSign`. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages, and without `cRLSign` the settings keep their previous signer.
 
 <span id="cases-in-which-the-settings-can-no-longer-be-edited" />
 
@@ -4300,7 +4308,7 @@ Common CRL settings errors [#common-crl-settings-errors]
 | `PUT /v1/crl-settings/{ca-id}` returns 409.           | The settings are not `ACTIVE`: revoking the CA permanently or letting it expire finalized them, or the migration archived them because their CA was deleted before the upgrade. | There is no API way back to `ACTIVE`. The last CRL keeps being served.                                                                                                                |
 | `DELETE /v1/crl-settings/{ca-id}` returns 409.        | The settings are not yet `ARCHIVED`: the CA has not been deleted.                                                                                                               | Delete the CA first; deleting it archives its settings.                                                                                                                               |
 | `PUT` returns 400.                                    | The new signer lacks `cRLSign`, or its subject and public key do not match the CA.                                                                                              | Set the serial number of a valid certificate of that CA.                                                                                                                              |
-| `PUT` returns 404.                                    | The CA or the new signer certificate does not exist, or the CA has no CRL settings (for example, an imported CA).                                                               | Check the CA ID and the signer serial number.                                                                                                                                         |
+| `PUT` returns 404.                                    | The CA or the new signer certificate does not exist, or the CA has no CRL settings, for example because it was imported without its key or its certificate lacks `cRLSign`.     | Check the CA ID and the signer serial number.                                                                                                                                         |
 | `PUT` returns 400 from a 3.x client.                  | `crl_options.subject_key_id_signer` was replaced by `crl_options.signer_serial_number`, which is required.                                                                      | Update the client to send the new field.                                                                                                                                              |
 | The CRL does not change after revoking a certificate. | `regenerate_on_revoke` is `false`, the issuing CA has no CRL settings, or generation failed because of an invalid signer.                                                       | Check the VA logs. Missing settings only produce a warning (no retry, no failed-events entry); an invalid signer also leaves the event in the failed-events queue, so fix the signer. |
 | A verifier rejects the CRL because of the issuer.     | The list was fetched through a legacy `/crl/<ski>` URL and belongs to the CA that owned that SKI when the upgrade ran.                                                          | Use the CDP of the certificate being validated: certificates issued in 4.0.0 carry `/crl/<ca-id>` URLs.                                                                               |
@@ -4991,7 +4999,7 @@ Check each boundary independently:
 4. **CRL:** compare `latest_crl`, number and timestamps with the downloaded list. Check the serial in its contents. If unchanged, review `regenerate_on_revoke`, event delivery, jobs, signing and storage with the deployment operator.
 5. **Client:** check cache, policy for expired or unavailable evidence, critical IDP extension and rejection of a new connection.
 
-Reactivation from `CertificateHold` needs a new CRL for the client to stop seeing the hold. Reactivating a CA does not restore its descendant cascade; inspect every status and individual operation failure.
+Reactivation from `CertificateHold` needs a new CRL for the client to stop seeing the hold. A hold cascaded from a CA is lifted by releasing that CA; a cascade from a CA revoked for good is not. Inspect every status and individual operation failure.
 
 The chain validates but the connection fails [#the-chain-validates-but-the-connection-fails]
 

@@ -92,6 +92,10 @@ Necesitas el certificado de CA en PEM, su cadena hasta una raíz conocida y, si 
 
 El backend rechaza una importación cuyo certificado carece de la restricción básica de CA (`basicConstraints cA flag is not set`), cuyo número de serie coincide con el de un certificado almacenado con contenido distinto, o cuyo certificado idéntico ya pertenece a una CA existente. El registro de certificado de una CA eliminada se conserva y puede reutilizarse al reimportar el mismo certificado, incluido su estado anterior. Reimportar otro certificado con ese número de serie se rechaza; comprueba el certificado y su estado tras reimportarlo.
 
+<div className="lm-diff-ins lm-diff-block">
+  Un certificado cuyo periodo de validez ya ha terminado, como el de una autoridad externa retirada, se acepta y la CA se almacena como `EXPIRED` desde el principio, igual que al importar un certificado simple. Una CA `EXPIRED` rechaza los cambios de estado; consulta el [ciclo de vida del certificado](/docs/platform/pki/concepts/certificate-lifecycle).
+</div>
+
 Eliminar una CA libera las referencias a la clave de su propio certificado actual y de sus certificados reemitidos vinculados, pero conserva esos registros para la CRL y el OCSP de su emisor. Después intenta eliminar la clave; el KMS la conserva si otros certificados todavía la referencian, como los de otra CA que comparte la clave. Revocar los certificados emitidos por la CA eliminada no libera sus propias referencias a claves.
 
 <Steps>
@@ -119,6 +123,8 @@ Eliminar una CA libera las referencias a la clave de su propio certificado actua
     Verifica la importación [#verifica-la-importación]
 
     Revisa el tipo registrado, la clave y el motor asociados y la relación con el emisor. Una importación sin clave puede asociarse a una clave ya existente en KMS mediante el identificador de clave del certificado. Si no existe una clave utilizable, la CA sirve como material público pero no puede firmar.
+
+    Una CA importada cuya clave está en el KMS y cuyo certificado incluye `cRLSign` recibe automáticamente sus ajustes de CRL y su primera CRL; sin una clave en el KMS o sin `cRLSign` no los recibe, y esto no es un error de importación (consulta [CRL](/docs/platform/pki/crl)).
 
     Para una CA emisora, completa una emisión de prueba y comprueba OCSP y CRL. El alta del registro por sí sola no demuestra disponibilidad de la clave, coherencia completa de la cadena ni publicación del estado.
   </Step>
@@ -154,7 +160,7 @@ Una CA solo firma mientras su estado es `ACTIVE` y la hora actual está dentro d
 Revoca una CA [#revoca-una-ca]
 
 <Callout type="warn" title="La revocación afecta a toda la cadena dependiente">
-  Revocar una CA impide que emita y puede interrumpir toda su rama. Solo `CertificateHold` permite reactivar la propia CA si no está expirada. Sus descendientes se intentan revocar con `CessationOfOperation`; reactivar el padre no restaura esos descendientes. Sigue las condiciones de [revocación en cascada](/docs/platform/pki/ca-hierarchy-and-rotation).
+  Revocar una CA impide que emita y puede interrumpir toda su rama. Con `CertificateHold` la cascada es reversible: los descendientes quedan suspendidos y se restauran al reactivar la CA. Cualquier otra razón de revocación revoca los descendientes definitivamente con `CessationOfOperation`. Sigue las condiciones de [revocación en cascada](/docs/platform/pki/ca-hierarchy-and-rotation).
 </Callout>
 
 <Steps>

@@ -77,7 +77,7 @@ Check that the saved reason is `CertificateHold` and the identity still satisfie
 
 Read the record and query OCSP again. With `regenerate_on_revoke` enabled, the reactivation event requests CRL regeneration: check that the new list omits the serial. An earlier list can still mark it revoked until the client refreshes its copy.
 
-This does not undo permanent revocation or a cascade started by revoking a CA.
+This does not undo permanent revocation or the cascade of a CA revoked for good; the hold cascaded by a CA is lifted by releasing that CA.
 
 Continue [#continue]
 

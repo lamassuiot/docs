@@ -32,7 +32,7 @@ Revisa cada frontera por separado:
 4. **CRL:** compara `latest_crl`, número y tiempos de la lista descargada. Confirma la serie en el contenido. Si no cambia, revisa `regenerate_on_revoke`, entrega del evento, trabajos, firma y almacenamiento con el operador de Despliegue.
 5. **Cliente:** comprueba caché, política ante evidencia vencida o no disponible, extensión IDP crítica y rechazo de una conexión nueva.
 
-Una reactivación desde `CertificateHold` requiere una CRL nueva para que el cliente deje de ver la suspensión. Reactivar una CA no restaura su cascada de descendientes; revisa todos los estados y los errores individuales de la operación.
+Una reactivación desde `CertificateHold` requiere una CRL nueva para que el cliente deje de ver la suspensión. Una suspensión en cascada desde una CA se levanta reactivando esa CA; la cascada de una CA revocada definitivamente no. Revisa todos los estados y los errores individuales de la operación.
 
 La cadena se valida pero la conexión falla [#la-cadena-se-valida-pero-la-conexión-falla]
 

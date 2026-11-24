@@ -8,15 +8,15 @@ Cada dispositivo tiene un `Device ID`, un DMS propietario (`dms_owner`) y, cuand
 
 Estados del dispositivo [#estados-del-dispositivo]
 
-| Vista operativa     | Interpretación                                                                               |
-| ------------------- | -------------------------------------------------------------------------------------------- |
-| **No Identity**     | Hay registro, pero todavía no hay identidad asociada.                                        |
-| **Active**          | El slot está activo; comprueba además las fechas, estado y usos del certificado.             |
-| **Renewal Pending** | La identidad está en la ventana operativa de renovación.                                     |
-| **Expiring Soon**   | Se aproxima al vencimiento según los umbrales configurados.                                  |
-| **Expired**         | La identidad ha vencido.                                                                     |
-| **Revoked**         | La identidad está marcada como revocada.                                                     |
-| **Decommissioned**  | El registro está retirado y no vuelve al estado operativo mediante una actualización normal. |
+| Vista operativa     | Interpretación                                                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **No Identity**     | Hay registro, pero todavía no hay identidad asociada.                                                                            |
+| **Active**          | El slot está activo; comprueba además las fechas, estado y usos del certificado.                                                 |
+| **Renewal Pending** | La identidad está en la ventana operativa de renovación.                                                                         |
+| **Expiring Soon**   | Se aproxima al vencimiento según los umbrales configurados.                                                                      |
+| **Expired**         | La identidad ha vencido.                                                                                                         |
+| **Revoked**         | La identidad está marcada como revocada. Una suspensión en cascada desde su CA se muestra aquí y se levanta al reactivar esa CA. |
+| **Decommissioned**  | El registro está retirado y no vuelve al estado operativo mediante una actualización normal.                                     |
 
 Los estados de dispositivo, slot y [certificado](/docs/platform/pki/concepts/certificate-lifecycle) son distintos. Los eventos y trabajos pueden actualizar la vista después de guardar el certificado; una etiqueta **Active** no prueba aceptación por un consumidor.
 
@@ -77,6 +77,8 @@ Revoca la identidad actual [#revoca-la-identidad-actual]
 Localiza la serie activa en el historial y revócala con una razón apropiada. Comprueba registro, publicación OCSP/CRL y rechazo de una conexión nueva en el consumidor con la [guía de certificados](/docs/platform/pki/certificates).
 
 La revocación no elimina el dispositivo. Tampoco habilita automáticamente una nueva inscripción: la recuperación depende de su credencial, estado y política DMS. `CertificateHold` puede reactivarse bajo las condiciones de PKI; otras razones bloquean cambios posteriores del certificado.
+
+Un certificado suspendido por una cascada de suspensión de una CA se muestra como **Revoked** y vuelve a estar activo cuando se reactiva esa CA. Si su certificado caducó durante la suspensión, el trabajo de monitorización lo marca de nuevo como caducado tras la reactivación. Si tú revocas una identidad suspendida, esa revocación es permanente.
 
 Retira un dispositivo [#retira-un-dispositivo]
 

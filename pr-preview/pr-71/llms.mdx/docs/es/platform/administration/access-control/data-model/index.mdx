@@ -1,0 +1,60 @@
+# Modelo de datos (/docs/pr-preview/pr-71/es/platform/administration/access-control/data-model)
+
+
+
+El esquema `connectors/authz/pki.json` define las entidades del dominio `pki` para el control de acceso. Una política identifica el tipo de recurso mediante `namespace: pki`, `schema_name` y `entity_type`. Por ejemplo, `ca.certificate` corresponde al esquema `ca` y al tipo de entidad `certificate`.
+
+Relaciones del esquema [#relaciones-del-esquema]
+
+Cada flecha sale de la entidad que declara la relación y apunta a su `target_entity`. Debajo de la etiqueta aparece el valor de `foreign_key`, la columna de origen. En `pki.json`, el `name` de cada relación coincide con esa columna. El diagrama se puede pulsar para ampliarlo y recorrerlo.
+
+```mermaid
+flowchart TB
+    accTitle: Relaciones del esquema pki.json
+    accDescr: Nueve relaciones declaradas en pki.json, con la columna de origen debajo de la etiqueta de cada flecha.
+
+    CA["ca.ca_certificate"]
+    CERT["ca.certificate"]
+    PROFILE["ca.issuance_profile"]
+    DEVICE["devicemanager.device"]
+    DMS["dmsmanager.dms"]
+    KEY["kms.kms_key"]
+    CRL["va.crl_settings"]
+
+    CA -->|"Perfil de emisión<br/><code>profile_id</code>"| PROFILE
+    CA -->|"Certificado actual<br/><code>serial_number</code>"| CERT
+    CERT -->|"CA emisora por ID<br/><code>issuer_meta_id</code>"| CA
+    CERT -->|"Referencia de serie del emisor<br/><code>issuer_meta_serial_number</code>"| CA
+    CERT -->|"Dispositivo por Common Name<br/><code>subject_common_name</code>"| DEVICE
+    CERT -->|"Clave del certificado<br/><code>key_id</code>"| KEY
+    DEVICE -->|"DMS propietario<br/><code>dms_owner</code>"| DMS
+    CRL -->|"Certificado firmante<br/><code>signer_serial_number</code>"| CERT
+    CRL -->|"Clave firmante<br/><code>signer_key_id</code>"| KEY
+```
+
+Una política puede propagar acciones desde la entidad referenciada hacia la que declara la relación. Por ejemplo, para conceder lectura de los dispositivos de un DMS, la regla parte de `dmsmanager.dms`, apunta a `devicemanager.device` y especifica `via: dms_owner`.
+
+En los filtros de acceso heredado, `authz` compara la columna `foreign_key` con la primera columna de `primary_key` de la entidad referenciada. Así, `subject_common_name` se compara con `device.id`, `issuer_meta_serial_number` con `ca_certificate.id` y los enlaces hacia `kms_key` con `kms_key.key_id`.
+
+Entidades del esquema [#entidades-del-esquema]
+
+| Entidad (`schema_name.entity_type`) | Tabla (`table_name`) | Clave (`primary_key`) |
+| ----------------------------------- | -------------------- | --------------------- |
+| `alerts.event`                      | `events`             | `event_type`          |
+| `alerts.subscription`               | `subscriptions`      | `id`                  |
+| `ca.ca_certificate`                 | `ca_certificates`    | `id`                  |
+| `ca.certificate`                    | `certificates`       | `serial_number`       |
+| `ca.issuance_profile`               | `issuance_profiles`  | `id`                  |
+| `devicemanager.device_group`        | `device_groups`      | `id`                  |
+| `devicemanager.device`              | `devices`            | `id`                  |
+| `dmsmanager.dms`                    | `dms`                | `id`                  |
+| `kms.kms_key`                       | `kms_keys`           | `key_id`, `engine_id` |
+| `va.crl_settings`                   | `crl_settings`       | `ca_id`               |
+
+Los eventos, las suscripciones y los grupos de dispositivos tienen acciones y filtros propios. Sus listas `relations` están vacías y tienen cero referencias entrantes en el esquema. Para `ca.certificate`, `view_tables` también registra `certificates_view`.
+
+Cada entidad declara sus acciones sobre instancias en `atomic_actions`, sus acciones sin identificador de recurso en `global_actions` y las columnas y tipos que admite en `column_filters` mediante `filterable`.
+
+<Cards>
+  <Card title="Acceso heredado por relaciones" href="/docs/platform/administration/access-control#acceso-heredado-por-relaciones" />
+</Cards>

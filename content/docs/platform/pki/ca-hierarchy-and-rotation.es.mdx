@@ -34,7 +34,7 @@ Si los ajustes de CRL de la CA están firmados por el certificado de la CA susti
 
 **Rotar una CA** crea una clave y una autoridad sucesoras. Es la opción adecuada ante compromiso, cambio criptográfico, migración de motor o política de claves no exportables.
 
-Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiración haya pasado. Anticípate a ambas condiciones.
+Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiración haya pasado. Una CA subordinada la firma su CA padre, de modo que esta también debe estar `ACTIVE` y dentro de su periodo de validez; en caso contrario la reemisión falla con `400`. Anticípate a estas condiciones.
 
 ## Cuándo elegir cada operación
 

@@ -19,7 +19,9 @@ For Gateway, sign-in, pods, dependencies and messaging, see [Deployment troubles
 
 For unexpected certificate fields, review `Honor Subject`, `Honor Key Usage`, `Honor Extended Key Usages` and `Honor Extensions`. The latter preserves SAN only, without validating entitlement to those names. Validity is not automatically clamped to CA expiration.
 
-For CA reissuance failures, check revocation and date: reissuance is not supported for a revoked or already expired CA. To change its key, use [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation).
+If issuance fails with `400` and `CA Status inconsistent`, the issuing CA is not `ACTIVE` or is outside the validity period of its certificate. The stored status can lag behind the dates until the expiration monitor runs, so check the dates too. Reissue the CA while it is still valid, or issue from another CA.
+
+For CA reissuance failures, check revocation and date: reissuance is not supported for a revoked or already expired CA. For a subordinate CA, also check the status and dates of its parent. To change its key, use [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation).
 
 ## OCSP or CRL do not reflect a change
 

@@ -147,6 +147,10 @@ You can start an issuance from **Issued Certificates**, from a CA's action menu 
 
 Follow [Issue your first certificate](/docs/platform/pki/quickstarts/issue-certificate) for the guided flow. [Certificate management](/docs/platform/pki/certificates) explains the inventory, inspection and revocation.
 
+A CA key signs certificates only. The CA API has no endpoint to sign or verify arbitrary data. To sign and verify a message with a key, use the KMS operations described in [Key management](/docs/platform/pki/key-management#sign-and-verify), subject to their own permissions.
+
+A CA signs only while its status is `ACTIVE` and the current time falls inside the validity period of its certificate. Lamassu checks both, because the stored status can lag behind the dates until the expiration monitor runs. Otherwise the request fails with `400` and the message `CA Status inconsistent`, before the KMS is called. The same check applies when the CA signs the certificate of a subordinate CA, including when you create or reissue it.
+
 ## Revoke a CA
 
 <Callout type="warn" title="Revocation affects the entire dependent chain">

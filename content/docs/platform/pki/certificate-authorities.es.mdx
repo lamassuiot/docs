@@ -147,6 +147,10 @@ Puedes iniciar una emisión desde **Issued Certificates**, desde la acción de u
 
 Sigue [Emite tu primer certificado](/docs/platform/pki/quickstarts/issue-certificate) para el flujo guiado. La [gestión de certificados](/docs/platform/pki/certificates) explica el inventario, la inspección y la revocación.
 
+La clave de una CA solo firma certificados. La API de CA no tiene ningún endpoint para firmar o verificar datos arbitrarios. Para firmar y verificar un mensaje con una clave, utiliza las operaciones del KMS descritas en [Gestión de claves](/docs/platform/pki/key-management#firmar-y-verificar), sujetas a sus propios permisos.
+
+Una CA solo firma mientras su estado es `ACTIVE` y la hora actual está dentro del periodo de validez de su certificado. Lamassu comprueba ambas condiciones porque el estado almacenado puede ir por detrás de las fechas hasta que se ejecuta el monitor de expiración. En caso contrario, la petición falla con `400` y el mensaje `CA Status inconsistent`, antes de llamar al KMS. La misma comprobación se aplica cuando la CA firma el certificado de una CA subordinada, también al crearla o reemitirla.
+
 ## Revoca una CA
 
 <Callout type="warn" title="La revocación afecta a toda la cadena dependiente">

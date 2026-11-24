@@ -16,7 +16,7 @@ Each device has a `Device ID`, one owning DMS (`dms_owner`) and, once provisione
 | **Renewal Pending** | The identity is in the operational renewal window. |
 | **Expiring Soon** | Expiration is approaching according to configured thresholds. |
 | **Expired** | The identity has expired. |
-| **Revoked** | The identity is marked revoked. |
+| **Revoked** | The identity is marked revoked. A hold cascaded from its CA shows here and is lifted when that CA is released. |
 | **Decommissioned** | The record is retired and ordinary updates do not restore operation. |
 
 Device, slot and [certificate](/docs/platform/pki/concepts/certificate-lifecycle) states are distinct. Events and jobs can update the view after saving a certificate; an **Active** label does not establish consumer acceptance.
@@ -75,6 +75,8 @@ Issuing, binding and installing are separate steps. If an operation fails, check
 Locate the active serial in history and revoke it with an appropriate reason. Verify the record, OCSP/CRL publication and rejection of a new consumer connection using the [certificate guide](/docs/platform/pki/certificates).
 
 Revocation does not remove the device. It does not automatically enable another enrollment either: recovery depends on its credential, status and DMS policy. `CertificateHold` can be reactivated under PKI conditions; other reasons block subsequent certificate changes.
+
+A certificate suspended by a CA hold cascade shows as **Revoked** and returns to active when the holding CA is released. If its certificate expired during the hold, the monitoring job marks it as expired again after the release. If you revoke a held identity yourself, that revocation is permanent.
 
 ## Decommission a device
 

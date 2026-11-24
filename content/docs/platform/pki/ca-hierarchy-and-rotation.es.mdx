@@ -85,11 +85,11 @@ Lamassu no permite reemitir una CA ya revocada ni una CA cuya fecha de expiraci�
 
 ## Revocación en cascada
 
-Lamassu guarda la revocación de la CA y después intenta revocar sus CAs hijas y certificados emitidos con `CessationOfOperation`. La propagación continúa recursivamente por las hijas. No es una transacción sobre toda la jerarquía: puede haber recursos ya modificados y otros cuya actualización haya fallado.
+Lamassu guarda la revocación de la CA y después aplica la misma revocación a sus CAs hijas y certificados emitidos. La propagación continúa recursivamente por las hijas. No es una transacción sobre toda la jerarquía: puede haber recursos ya modificados y otros cuya actualización haya fallado.
 
 Los recursos en estado `EXPIRED` y los ya revocados por una razón definitiva no admiten otra transición de estado. Los errores por descendiente se registran; revisa el inventario y los registros aunque la operación sobre el padre haya terminado.
 
-`CertificateHold` permite reactivar el padre mientras no esté expirado, pero no restaura las hijas ni los certificados revocados definitivamente durante la cascada. Por eso suspender una CA tampoco sirve como pausa reversible de toda la rama.
+`CertificateHold` es la excepción reversible. Suspender una CA suspende sus CAs hijas activas y sus certificados emitidos con `CertificateHold` y los marca como suspendidos por esa CA. Al reactivar la CA — a `ACTIVE` o a cualquier otro estado no revocado, como `EXPIRED` — se reactivan exactamente los descendientes que siguen suspendidos y conservan esa marca. Las suspensiones colocadas manualmente antes o después de la cascada no se tocan, y cualquier cambio de estado posterior de un descendiente elimina la marca. Revocar definitivamente una CA suspendida con cualquier otra razón sigue siendo permanente: los descendientes se revocan con `CessationOfOperation` y no pueden restaurarse.
 
 Antes de cerrar el cambio, contrasta el listado de dependencias inicial con los estados finales y verifica la publicación de revocación en cada emisor. No utilices la revocación como mecanismo ordinario para dejar de emitir: completa la migración y retira la CA de los flujos operativos.
 

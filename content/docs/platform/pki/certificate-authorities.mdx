@@ -156,7 +156,7 @@ A CA signs only while its status is `ACTIVE` and the current time falls inside t
 ## Revoke a CA
 
 <Callout type="warn" title="Revocation affects the entire dependent chain">
-  Revoking a CA prevents issuance and may interrupt its entire branch. Only `CertificateHold` allows reactivating the CA itself if it is not expired. Descendant revocation is attempted with `CessationOfOperation`; reactivating the parent does not restore those descendants. Follow the [cascading revocation](/docs/platform/pki/ca-hierarchy-and-rotation) conditions.
+  Revoking a CA prevents issuance and may interrupt its entire branch. With `CertificateHold` the cascade is reversible: descendants are suspended on hold and are restored when you release the CA. Any other revocation reason revokes descendants permanently with `CessationOfOperation`. Follow the [cascading revocation](/docs/platform/pki/ca-hierarchy-and-rotation) conditions.
 </Callout>
 
 <Steps>

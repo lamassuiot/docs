@@ -77,6 +77,12 @@ Son decisiones del esquema, no de una política: `skip_authz` elimina la comprob
   Una ruta con `skip_authz` y un prefijo con `default_action: "allow"` conceden acceso sin consultar ninguna política. Cualquier identidad que coincida con un principal activo puede alcanzar lo que abran, incluidas las identidades sin políticas concedidas. Una ruta con `skip_authz` en un esquema también abre una petición que otro esquema asigna a una acción protegida por un grant. Revisa estos ajustes cada vez que integres o actualices un servicio.
 </Callout>
 
+Un esquema también puede hacer que una ruta individual acepte la credencial por la URL. **`query_token: true` en una ruta** hace que acepte el token de acceso OIDC del parámetro de consulta `access_token`, pero solo cuando la petición no lleva ni una cabecera `Authorization: Bearer` ni una cabecera de certificado de cliente: la credencial en una cabecera siempre prevalece. El token se valida y autoriza exactamente igual que un token Bearer, así que la acción de la ruta sigue exigiendo un grant, y las rutas que no activan esta opción nunca leen el parámetro de consulta. La terminal experimental del dashboard usa este mecanismo, porque la conexión WebSocket que abre su cliente de navegador no puede establecer cabeceras de petición.
+
+<Callout type="warn" title="El token en la URL acaba en los logs">
+  Las cadenas de consulta suelen quedar registradas. `authz` sustituye el valor de `access_token` por `REDACTED` en sus propios logs de decisión, pero otros logs que capturan la URL —el access log del Gateway, los logs de petición de los servicios, el tracing— no la redactan. Reserva `query_token` para rutas WebSocket y tokens de corta duración.
+</Callout>
+
 Servicios desarrollados por Lamassu [#servicios-desarrollados-por-lamassu]
 
 Los servicios nativos de Lamassu integran autorización en su middleware y conocen las entidades sobre las que operan: certificados, CAs, perfiles de emisión, claves, dispositivos, DMS o suscripciones, entre otras.
@@ -289,9 +295,12 @@ La precarga de `authz` instala políticas reutilizables para los dominios princi
 * una política `Auditor` de lectura de PKI y visibilidad de autorización;
 * acceso a la interfaz;
 * políticas de administración y observación para las APIs NBI y SBI del Job Manager;
+* acceso a la terminal experimental del dashboard (Terminal Network);
 * `SUPER ADMIN`, que concede todas las acciones sobre los dominios `authz` y `pki`.
 
 Empieza por estas políticas antes de crear otras. Si ninguna refleja el límite que necesitas, crea una política específica y pequeña en lugar de copiar `SUPER ADMIN` y retirar permisos de forma informal.
+
+La política de Terminal Network la crea la precarga de `authz` la próxima vez que `authz` arranque tras la actualización. Las políticas precargadas son políticas del sistema —sus identificadores empiezan por `lamassu.`— y no se pueden editar a través de la API.
 
 Provisiona el primer administrador [#provisiona-el-primer-administrador]
 

@@ -1080,6 +1080,12 @@ These are decisions of the schema, not of a policy: `skip_authz` removes the gra
   A `skip_authz` route and a `default_action: "allow"` prefix grant access without consulting any policy. Every identity that matches an active principal can reach what they open, including identities with no granted policies. A `skip_authz` route in one schema also opens a request that another schema maps to a grant-protected action. Review these settings whenever you add or upgrade an integrated service.
 </Callout>
 
+A schema can also make an individual route accept the credential from the URL. **`query_token: true` on a route** makes it accept the OIDC access token from the `access_token` query parameter, but only when the request carries neither an `Authorization: Bearer` header nor a client-certificate header: a credential in a header always wins. The token is validated and authorized exactly like a Bearer token, so the route's action still requires a policy grant, and routes that do not opt in never read the query parameter. The dashboard's experimental browser terminal uses this mechanism, because the WebSocket connection its browser client opens cannot set request headers.
+
+<Callout type="warn" title="The token in the URL ends up in logs">
+  Query strings are often recorded. `authz` replaces the `access_token` value with `REDACTED` in its own decision logs, but other logs that capture the URL — the Gateway access log, service request logs, tracing — are not redacted. Keep `query_token` for WebSocket routes and short-lived tokens.
+</Callout>
+
 Services developed by Lamassu [#services-developed-by-lamassu]
 
 Lamassu's native services embed authorization in their middleware and know the entities they operate on: certificates, CAs, issuance profiles, keys, devices, DMSs or subscriptions, among others.
@@ -1292,9 +1298,12 @@ The `authz` preload installs reusable policies for the main domains. Among them 
 * an `Auditor` policy with PKI read access and authorization visibility;
 * console access;
 * administration and observation policies for the Job Manager NBI and SBI APIs;
+* access to the dashboard's experimental terminal (Terminal Network);
 * `SUPER ADMIN`, which grants all actions over the `authz` and `pki` domains.
 
 Start with these policies before creating others. If none reflects the boundary you need, create a specific, small policy instead of copying `SUPER ADMIN` and informally removing permissions.
+
+The Terminal Network policy is created by the `authz` preload the next time `authz` starts after the upgrade. Preloaded policies are system policies — their ids begin with `lamassu.` — and cannot be edited through the API.
 
 Provision the first administrator [#provision-the-first-administrator]
 

@@ -18,7 +18,9 @@ La emisión falla [#la-emisión-falla]
 
 Si el certificado emitido tiene campos inesperados, revisa `Honor Subject`, `Honor Key Usage`, `Honor Extended Key Usages` y `Honor Extensions`. Esta última solo conserva SAN, sin validar el derecho a esos nombres. La validez no se recorta automáticamente al vencimiento de la CA.
 
-Si falla la reemisión de una CA, comprueba revocación y fecha: no se admite para una CA revocada o ya vencida. Para cambiar la clave, utiliza [Jerarquía y rotación](/docs/platform/pki/ca-hierarchy-and-rotation).
+Si la emisión falla con `400` y `CA Status inconsistent`, la CA emisora no está `ACTIVE` o está fuera del periodo de validez de su certificado. El estado almacenado puede ir por detrás de las fechas hasta que se ejecuta el monitor de expiración, así que comprueba también las fechas. Reemite la CA mientras siga vigente o emite desde otra CA.
+
+Si falla la reemisión de una CA, comprueba revocación y fecha: no se admite para una CA revocada o ya vencida. Si es subordinada, comprueba también el estado y las fechas de su CA padre. Para cambiar la clave, utiliza [Jerarquía y rotación](/docs/platform/pki/ca-hierarchy-and-rotation).
 
 OCSP o CRL no reflejan un cambio [#ocsp-o-crl-no-reflejan-un-cambio]
 

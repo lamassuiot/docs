@@ -11,7 +11,7 @@ A CRL is an issuer-signed list of revoked certificates. This guide is for an ope
 
 ## CRL settings
 
-The CRL settings of a CA store the configuration and metadata of its latest published list. Each CA has its own settings, keyed by its CA ID — even when two CAs share a key: they share the SKI, not the CRL. Generation requires a usable issuer key; do not assume an imported CA without a key has an available CRL.
+The CRL settings of a CA store the configuration and metadata of its latest published list. Each CA has its own settings, keyed by its CA ID — even when two CAs share a key: they share the SKI, not the CRL. The VA creates them when a CA is created; when a CA is imported whose key is in the KMS — either imported with the private key or already held by the KMS — and whose certificate carries `cRLSign`: such a CA publishes its first CRL immediately, like a created one; and when a CA without settings is reissued with a certificate that can sign CRLs. An imported CA whose key is not in the KMS, or whose certificate lacks `cRLSign`, receives no settings: the import succeeds without error, and the CA's CRL endpoints report the settings as missing. Settings are never created retroactively: a CA that has none keeps none until it is reissued. Generation requires a usable issuer key; do not assume an imported CA without a key has an available CRL.
 
 | Field | Purpose |
 |---|---|
@@ -35,7 +35,7 @@ When a CA is reissued and the signer is the superseded CA certificate, the VA mo
   The CRL lifecycle decisions — when publication stops and when the final CRL expires — use only the CA's current certificate. If a reissued certificate expires earlier than an older certificate that is still valid, CRL publication can stop, or the final CRL can expire, while the older certificate is still valid. This is an accepted limitation of the current behavior.
 </Callout>
 
-A CA whose signer lacks `cRLSign` cannot generate its CRL, and an update that selects a signer without `cRLSign` is rejected (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and update the settings to use it as the signer. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages, and without `cRLSign` the settings keep their previous signer.
+A CA whose signer lacks `cRLSign` cannot generate its CRL, and an update that selects a signer without `cRLSign` is rejected (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and update the settings to use it as the signer. A CA that has no settings at all — for example, one imported without `cRLSign` — has nothing to update: the only way to obtain them is to reissue the CA with a certificate that carries `cRLSign`. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages, and without `cRLSign` the settings keep their previous signer.
 
 <span id="cases-in-which-the-settings-can-no-longer-be-edited" />
 
@@ -152,7 +152,7 @@ After a change, check saved configuration and the next list actually published. 
 | `PUT /v1/crl-settings/{ca-id}` returns 409. | The settings are not `ACTIVE`: revoking the CA permanently or letting it expire finalized them, or the migration archived them because their CA was deleted before the upgrade. | There is no API way back to `ACTIVE`. The last CRL keeps being served. |
 | `DELETE /v1/crl-settings/{ca-id}` returns 409. | The settings are not yet `ARCHIVED`: the CA has not been deleted. | Delete the CA first; deleting it archives its settings. |
 | `PUT` returns 400. | The new signer lacks `cRLSign`, or its subject and public key do not match the CA. | Set the serial number of a valid certificate of that CA. |
-| `PUT` returns 404. | The CA or the new signer certificate does not exist, or the CA has no CRL settings (for example, an imported CA). | Check the CA ID and the signer serial number. |
+| `PUT` returns 404. | The CA or the new signer certificate does not exist, or the CA has no CRL settings, for example because it was imported without its key or its certificate lacks `cRLSign`. | Check the CA ID and the signer serial number. |
 | `PUT` returns 400 from a 3.x client. | `crl_options.subject_key_id_signer` was replaced by `crl_options.signer_serial_number`, which is required. | Update the client to send the new field. |
 | The CRL does not change after revoking a certificate. | `regenerate_on_revoke` is `false`, the issuing CA has no CRL settings, or generation failed because of an invalid signer. | Check the VA logs. Missing settings only produce a warning (no retry, no failed-events entry); an invalid signer also leaves the event in the failed-events queue, so fix the signer. |
 | A verifier rejects the CRL because of the issuer. | The list was fetched through a legacy `/crl/<ski>` URL and belongs to the CA that owned that SKI when the upgrade ran. | Use the CDP of the certificate being validated: certificates issued in 4.0.0 carry `/crl/<ca-id>` URLs. |

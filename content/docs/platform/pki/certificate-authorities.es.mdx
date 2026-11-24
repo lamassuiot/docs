@@ -120,6 +120,8 @@ Eliminar una CA libera las referencias a la clave de su propio certificado actua
 
     Revisa el tipo registrado, la clave y el motor asociados y la relación con el emisor. Una importación sin clave puede asociarse a una clave ya existente en KMS mediante el identificador de clave del certificado. Si no existe una clave utilizable, la CA sirve como material público pero no puede firmar.
 
+    Una CA importada cuya clave está en el KMS y cuyo certificado incluye `cRLSign` recibe automáticamente sus ajustes de CRL y su primera CRL; sin una clave utilizable o sin `cRLSign` no los recibe, y esto no es un error de importación (consulta [CRL](/docs/platform/pki/crl)).
+
     Para una CA emisora, completa una emisión de prueba y comprueba OCSP y CRL. El alta del registro por sí sola no demuestra disponibilidad de la clave, coherencia completa de la cadena ni publicación del estado.
   </Step>
 </Steps>

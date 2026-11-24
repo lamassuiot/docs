@@ -1,0 +1,128 @@
+{
+  "steps": [
+    {
+      "title": "Dashboard del administrador",
+      "body": "El dashboard de Lamassu es el lado del administrador: aquí se revisa cómo está configurado el DMS y, al final, el dispositivo y el certificado que resultan del enrolamiento."
+    },
+    {
+      "title": "Menú lateral contraído",
+      "body": "Contraer el menú lateral deja más ancho a la página y a la terminal. Cada entrada sigue disponible como icono.",
+      "note": "Solo cambia la disposición del dashboard; no se modifica ninguna configuración."
+    },
+    {
+      "title": "Terminal del dispositivo",
+      "body": "La terminal hace de dispositivo, el cliente EST. Es una shell real en un contenedor desechable con Bash, OpenSSL y curl, mostrada mediante una terminal SSH web; no hay nada simulado.",
+      "note": "La cuenta y la contraseña de ese contenedor son públicas y solo valen para este entorno de demostración desechable."
+    },
+    {
+      "title": "Registration Authorities",
+      "body": "Una Registration Authority es el DMS: define el protocolo de enrolamiento, cómo se admiten los dispositivos y qué CA firma sus certificados."
+    },
+    {
+      "title": "El DMS EST Showcase",
+      "body": "La página muestra el ID est-showcase, el protocolo EST · RFC 7030, el modo de registro JITP, el modo de autenticación y la CA de enrolamiento, Acme Device CA.",
+      "note": "El ID, no el nombre visible, es lo que aparece en la URL EST."
+    },
+    {
+      "title": "Modo de registro",
+      "body": "Just-in-time provisioning crea automáticamente un dispositivo desconocido la primera vez que se enrola. Pre-registration solo admitiría dispositivos registrados de antemano.",
+      "note": "Allow replaceable enrollment está desactivado, así que enrolar otra vez con un ID existente se rechaza: la demo usa un ID nuevo."
+    },
+    {
+      "title": "CA de enrolamiento y perfil",
+      "body": "Acme Device CA, la CA de enrolamiento, firma todos los certificados que emite este DMS. El perfil Device Certificates fija 365 días de validez, Digital Signature y Key Encipherment como uso de clave, y Client Auth y Server Auth como uso extendido.",
+      "note": "El perfil impone las extensiones; el sujeto se copia de la CSR."
+    },
+    {
+      "title": "Autenticación inicial",
+      "body": "Sin Require client certificate ni Call external webhook activados, cualquier dispositivo puede pedir un certificado: la CSR es suficiente. Eso permite que esta demo funcione por HTTP sin cifrar.",
+      "note": "Un DMS real debe exigir un certificado de cliente (bootstrap) o un webhook. El quickstart Enroll and connect your first device usa CLIENT_CERTIFICATE sobre HTTPS."
+    },
+    {
+      "title": "Directorio privado",
+      "body": "umask 077 hace que cada archivo nuevo sea legible solo por su propietario, de modo que la clave privada que se crea después no queda expuesta. mkdir crea un directorio con el nombre del dispositivo y cd entra en él."
+    },
+    {
+      "title": "Endpoint EST",
+      "body": "La terminal es un contenedor, así que llega a Lamassu mediante host.docker.internal:8080, el equipo donde corre el gateway. La ruta EST termina con el ID del DMS, est-showcase, seguido del nombre de la operación.",
+      "note": "Esta demo usa HTTP en un entorno local desechable; en cualquier despliegue real usa HTTPS y verifica el certificado del servidor."
+    },
+    {
+      "title": "Comprobar cacerts",
+      "body": "La operación cacerts devuelve un PKCS#7 en Base64 con las CA que distribuye el DMS. Al decodificarlo aparecen Acme Device CA y un segundo certificado del gateway, porque la distribución de CA incluye la CA del sistema.",
+      "note": "Una respuesta correcta indica que el endpoint está activo; no prueba que la emisión funcione, y el paquete no debe tomarse como confianza sin más."
+    },
+    {
+      "title": "Par de claves del dispositivo",
+      "body": "openssl genpkey crea un par de claves EC P-256 y lo escribe en device.key. La clave privada nunca se envía a Lamassu: solo viaja la CSR derivada de ella.",
+      "note": "La generación de clave en el servidor está desactivada en este DMS, así que el dispositivo debe crear su propia clave."
+    },
+    {
+      "title": "Crear la CSR",
+      "body": "La CSR lleva la clave pública y el sujeto CN=sensor-0421, firmados con la clave privada. Con JITP, ese CN pasa a ser el ID del dispositivo.",
+      "note": "El perfil copia el sujeto de la petición, así que revisa el CN antes de enviarla."
+    },
+    {
+      "title": "Verificar la CSR",
+      "body": "openssl req -verify comprueba que la autofirma coincide con la clave pública (imprime verify OK) y -subject muestra el sujeto solicitado. El DMS repite esta comprobación porque Verify CSR signature está activado."
+    },
+    {
+      "title": "Codificar para EST",
+      "body": "EST espera el cuerpo de la petición como PKCS#10 DER codificado en Base64. openssl convierte la CSR PEM a DER y base64 -A la escribe en una sola línea en device.csr.b64."
+    },
+    {
+      "title": "Solicitar el certificado",
+      "body": "Un POST a simpleenroll con Content-Type application/pkcs10 envía la CSR. --fail-with-body hace que curl falle ante errores HTTP guardando el cuerpo, y la respuesta se escribe en enroll.b64. No se envía certificado de cliente porque la autenticación inicial está desactivada.",
+      "note": "Tras un timeout no repitas la petición a ciegas: el certificado puede estar ya emitido, así que consulta antes el inventario de dispositivos."
+    },
+    {
+      "title": "Extraer el certificado",
+      "body": "La respuesta es un PKCS#7 DER en Base64 que contiene el certificado. openssl base64 -d la decodifica y openssl pkcs7 -print_certs escribe el certificado PEM en device.crt.",
+      "note": "Solo se escribe el certificado público; device.key no se toca."
+    },
+    {
+      "title": "Ampliar la terminal",
+      "body": "Expand hace que el panel de la terminal use todo el ancho sin recargar ninguna aplicación, de modo que las líneas largas del certificado caben en una sola. Restore recupera la vista conjunta.",
+      "note": "Las dos sesiones siguen activas; solo cambia la disposición."
+    },
+    {
+      "title": "Inspeccionar el certificado",
+      "body": "openssl x509 imprime el sujeto, el emisor, el número de serie, las fechas de validez y las extensiones Key Usage y Extended Key Usage. Deben coincidir con el perfil Device Certificates visto en el dashboard.",
+      "note": "-noout evita imprimir el PEM, y la clave privada no interviene."
+    },
+    {
+      "title": "Resultado del enrolamiento",
+      "body": "El certificado tiene sujeto CN=sensor-0421, emisor Acme Device CA, Digital Signature y Key Encipherment, autenticación de cliente y de servidor, y un año de validez. La serie es el valor que se compara en el dashboard.",
+      "note": "La terminal imprime la serie en hexadecimal en mayúsculas sin separadores; el dashboard la muestra en minúsculas con pares separados por dos puntos."
+    },
+    {
+      "title": "Restaurar la vista conjunta",
+      "body": "Restore devuelve el dashboard y la terminal lado a lado, de modo que la serie impresa por la terminal sigue visible mientras compruebas el dashboard."
+    },
+    {
+      "title": "Inventario de dispositivos",
+      "body": "Devices lista todos los dispositivos que gestiona Lamassu. El que acaba de enrolarse aparece aquí sin que nadie lo haya creado en la consola."
+    },
+    {
+      "title": "Filtrar por ID",
+      "body": "El ID del dispositivo es el CN de la CSR, sensor-0421. Escribirlo en el filtro reduce el inventario a ese dispositivo."
+    },
+    {
+      "title": "Abrir el dispositivo",
+      "body": "El registro se creó automáticamente cuando el DMS aceptó la CSR; su Device ID es el CN que pusiste en ella. La página muestra su estado, su Registration Authority y su identidad."
+    },
+    {
+      "title": "Propietario e identidad",
+      "body": "El dispositivo pertenece a la autoridad de registro EST Showcase y su identidad está ACTIVE en la versión v0, el primer certificado emitido para él. La página muestra también cuándo caduca esa identidad."
+    },
+    {
+      "title": "Certificado asociado",
+      "body": "View certificate abre el certificado vinculado ahora a la identidad del dispositivo, con su emisor, su periodo de validez y su cadena."
+    },
+    {
+      "title": "Comparar la serie",
+      "body": "La serie del dashboard es la que imprimió openssl en la terminal, y el sujeto y el emisor también coinciden: el certificado que obtuvo el dispositivo es el que Lamassu le asoció.",
+      "note": "Esto demuestra la asociación en Lamassu. No prueba que el dispositivo haya instalado o use la clave; la clave nunca salió de la terminal."
+    }
+  ]
+}

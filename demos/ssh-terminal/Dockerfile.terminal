@@ -1,0 +1,22 @@
+FROM alpine:3.21 AS blesh
+RUN apk add --no-cache git make gawk bash
+ARG BLESH_REV=v0.4.0-devel3
+RUN git clone --depth 1 --branch "$BLESH_REV" --recursive --shallow-submodules https://github.com/akinomyoga/ble.sh.git /src \
+    && make -C /src install PREFIX=/usr/local
+
+FROM alpine:3.21
+RUN apk add --no-cache openssh-server openssl curl bash ca-certificates git gawk sed grep coreutils \
+    && adduser -D -s /bin/bash demo \
+    && echo 'demo:lamassu-demo-only' | chpasswd \
+    && ssh-keygen -A \
+    && : > /etc/motd \
+    && printf '\nPasswordAuthentication yes\nPermitRootLogin no\nPrintLastLog no\n' >> /etc/ssh/sshd_config
+COPY --from=blesh /usr/local/share/blesh /usr/local/share/blesh
+COPY files-image/lamassu-demo.bashrc /etc/lamassu-demo.bashrc
+COPY files-image/lamassu-demo.blerc /etc/lamassu-demo.blerc
+# sshd arranca bash como shell de login: solo lee ~/.bash_profile, no ~/.bashrc.
+RUN printf '. /etc/lamassu-demo.bashrc\n' > /home/demo/.bashrc \
+    && printf '[ -r ~/.bashrc ] && . ~/.bashrc\n' > /home/demo/.bash_profile \
+    && chown demo:demo /home/demo/.bashrc /home/demo/.bash_profile
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D", "-e"]

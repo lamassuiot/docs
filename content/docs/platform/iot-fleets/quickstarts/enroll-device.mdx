@@ -66,6 +66,13 @@ The download must succeed and contain the expected enrollment root. Compare its 
 
 ## Enroll the device
 
+The walkthrough shows the whole enrollment from both sides: the Lamassu dashboard on the left, where the DMS is reviewed and the new device is located, and the device terminal on the right, where the key and the CSR are created and the EST request is sent. It runs against a disposable environment with synthetic data, a DMS named `est-showcase` and a device named `sensor-0421`.
+
+<EstEnrollmentDemo locale="en" />
+
+The demo DMS has initial authentication disabled and is reached over HTTP, so its `curl` commands carry neither `--cert` nor `--key`. Do not copy that configuration: the commands below use the bootstrap credential and HTTPS, as this quickstart prepared them.
+
+
 Generate a new key and CSR with the selected identifier:
 
 ```bash

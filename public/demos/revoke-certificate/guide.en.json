@@ -1,0 +1,45 @@
+{
+  "steps": [
+    {
+      "title": "The CA inventory",
+      "body": "Open Certification Authorities. Every certificate lives under the CA that issued it, so start from the issuer."
+    },
+    {
+      "title": "Open the issuing CA",
+      "body": "Select the CA that issued the certificate to revoke. Revocation is recorded by the issuer: choosing the wrong CA means you will not find the certificate or its serial."
+    },
+    {
+      "title": "Issued Certificates",
+      "body": "The Issued Certificates tab lists what the CA has signed. Here it holds 100 certificates, so scrolling is not practical.",
+      "note": "The CA's own certificate is also listed in this tab; do not confuse the two."
+    },
+    {
+      "title": "Search by Common Name",
+      "body": "Filter by Common Name to find device-042 among the 100. Always confirm the serial number before acting on a match."
+    },
+    {
+      "title": "Row actions",
+      "body": "The More actions menu of the matching row groups what you can do with that certificate, such as downloading its PEM or revoking it."
+    },
+    {
+      "title": "Revoke Certificate",
+      "body": "Revoke when the key is compromised, the subject is no longer authorized or the identity must stop being accepted before it expires.",
+      "note": "Identify who uses this identity and prepare a replacement before revoking in production."
+    },
+    {
+      "title": "Revocation reason",
+      "body": "Choose the reason that describes the incident. KeyCompromise fits because the device key is considered exposed.",
+      "note": "Only CertificateHold is reversible. Every other reason is final, and CertificateHold must not be used for a compromised key."
+    },
+    {
+      "title": "Confirm the revocation",
+      "body": "Confirming changes the certificate status immediately in Lamassu.",
+      "note": "Status and publication are separate: validators see the change through OCSP or an updated CRL, which depends on its regeneration settings. Established sessions are not closed."
+    },
+    {
+      "title": "Read the new status",
+      "body": "The row now shows REVOKED with the reason and the revocation time. Read the record again instead of trusting the dialog.",
+      "note": "Revocation does not delete the certificate or its key."
+    }
+  ]
+}

@@ -76,7 +76,7 @@ Localiza la serie activa en el historial y revócala con una razón apropiada. C
 
 La revocación no elimina el dispositivo. Tampoco habilita automáticamente una nueva inscripción: la recuperación depende de su credencial, estado y política DMS. `CertificateHold` puede reactivarse bajo las condiciones de PKI; otras razones bloquean cambios posteriores del certificado.
 
-Un certificado suspendido por una cascada de suspensión de una CA se muestra como **Revoked** y vuelve a estar activo cuando se reactiva esa CA. Si tú revocas una identidad suspendida, esa revocación es permanente.
+Un certificado suspendido por una cascada de suspensión de una CA se muestra como **Revoked** y vuelve a estar activo cuando se reactiva esa CA. Si su certificado caducó durante la suspensión, el trabajo de monitorización lo marca de nuevo como caducado tras la reactivación. Si tú revocas una identidad suspendida, esa revocación es permanente.
 
 ## Retira un dispositivo
 

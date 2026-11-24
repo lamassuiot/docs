@@ -154,7 +154,7 @@ Una CA solo firma mientras su estado es `ACTIVE` y la hora actual está dentro d
 ## Revoca una CA
 
 <Callout type="warn" title="La revocación afecta a toda la cadena dependiente">
-  Revocar una CA impide que emita y puede interrumpir toda su rama. Solo `CertificateHold` permite reactivar la propia CA si no está expirada. Sus descendientes se intentan revocar con `CessationOfOperation`; reactivar el padre no restaura esos descendientes. Sigue las condiciones de [revocación en cascada](/docs/platform/pki/ca-hierarchy-and-rotation).
+  Revocar una CA impide que emita y puede interrumpir toda su rama. Con `CertificateHold` la cascada es reversible: los descendientes quedan suspendidos y se restauran al reactivar la CA, si no está expirada. Cualquier otra razón de revocación revoca los descendientes definitivamente con `CessationOfOperation`. Sigue las condiciones de [revocación en cascada](/docs/platform/pki/ca-hierarchy-and-rotation).
 </Callout>
 
 <Steps>

@@ -76,7 +76,7 @@ Comprueba que la razón guardada es `CertificateHold` y que la identidad todaví
 
 Vuelve a consultar el registro y OCSP. Con `regenerate_on_revoke` habilitado, el evento de reactivación solicita regeneración de la CRL: verifica que la nueva lista omite la serie. Una lista anterior puede seguir marcándola como revocada hasta que el cliente renueve su copia.
 
-Esto no revierte una revocación definitiva ni la cascada iniciada al revocar una CA.
+Esto no revierte una revocación definitiva ni la cascada de una CA revocada para siempre; la suspensión en cascada desde una CA se levanta reactivando esa CA.
 
 ## Continúa
 

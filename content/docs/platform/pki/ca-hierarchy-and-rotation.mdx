@@ -85,11 +85,11 @@ Lamassu does not allow reissuing an already-revoked CA or a CA whose expiration 
 
 ## Cascading revocation
 
-Lamassu saves the CA’s revocation, then attempts to revoke child CAs and issued certificates with `CessationOfOperation`. Propagation continues recursively through child CAs. This is not a transaction over the whole hierarchy: some resources may have changed while other updates failed.
+Lamassu saves the CA’s revocation, then applies the same revocation to child CAs and issued certificates. Propagation continues recursively through child CAs. This is not a transaction over the whole hierarchy: some resources may have changed while other updates failed.
 
 Resources in `EXPIRED` state and resources already revoked for a final reason reject further status transitions. Per-descendant failures are logged; review the inventory and logs even when the parent operation completes.
 
-`CertificateHold` allows reactivating the parent while it is not expired, but does not restore child CAs or certificates permanently revoked during the cascade. Holding a CA therefore does not provide a reversible pause for its entire branch.
+`CertificateHold` is the reversible exception. Holding a CA suspends its active sub-CAs and issued certificates with `CertificateHold` and marks them as suspended by that CA. Releasing the CA — to `ACTIVE` or to any other non-revoked status such as `EXPIRED` — reactivates exactly the descendants still on hold that carry that mark. Holds placed manually before or after the cascade are left untouched, and any later status change of a descendant clears the mark. Revoking a held CA with any other reason remains permanent: descendants are revoked with `CessationOfOperation` and cannot be restored.
 
 Before closing the change, compare the original dependency inventory with final states and verify revocation publication for each issuer. Do not use revocation as the ordinary mechanism to stop issuance: complete migration and remove the CA from operational flows.
 

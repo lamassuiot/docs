@@ -61,7 +61,7 @@ Only `CertificateHold` allows reactivating a revoked certificate that is not in 
 
 Effect of revoking a CA [#effect-of-revoking-a-ca]
 
-Revoking a CA starts a cascade that attempts to revoke descendants with `CessationOfOperation`. It may end with partial failures and is not undone by reactivating the parent. Read [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for conditions and checks.
+Revoking a CA starts a cascade that attempts to revoke descendants. A `CertificateHold` cascade suspends them reversibly: releasing the CA restores those still on hold. Any other revocation reason revokes descendants permanently with `CessationOfOperation`. Read [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for conditions and checks.
 
 Before confirming:
 

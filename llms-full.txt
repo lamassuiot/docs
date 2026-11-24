@@ -1750,15 +1750,15 @@ Each device has a `Device ID`, one owning DMS (`dms_owner`) and, once provisione
 
 Device states [#device-states]
 
-| Operational view    | Meaning                                                              |
-| ------------------- | -------------------------------------------------------------------- |
-| **No Identity**     | A record exists without an associated identity.                      |
-| **Active**          | The slot is active; also check certificate dates, status and usages. |
-| **Renewal Pending** | The identity is in the operational renewal window.                   |
-| **Expiring Soon**   | Expiration is approaching according to configured thresholds.        |
-| **Expired**         | The identity has expired.                                            |
-| **Revoked**         | The identity is marked revoked.                                      |
-| **Decommissioned**  | The record is retired and ordinary updates do not restore operation. |
+| Operational view    | Meaning                                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **No Identity**     | A record exists without an associated identity.                                                                |
+| **Active**          | The slot is active; also check certificate dates, status and usages.                                           |
+| **Renewal Pending** | The identity is in the operational renewal window.                                                             |
+| **Expiring Soon**   | Expiration is approaching according to configured thresholds.                                                  |
+| **Expired**         | The identity has expired.                                                                                      |
+| **Revoked**         | The identity is marked revoked. A hold cascaded from its CA shows here and is lifted when that CA is released. |
+| **Decommissioned**  | The record is retired and ordinary updates do not restore operation.                                           |
 
 Device, slot and [certificate](/docs/platform/pki/concepts/certificate-lifecycle) states are distinct. Events and jobs can update the view after saving a certificate; an **Active** label does not establish consumer acceptance.
 
@@ -1819,6 +1819,8 @@ Revoke the current identity [#revoke-the-current-identity]
 Locate the active serial in history and revoke it with an appropriate reason. Verify the record, OCSP/CRL publication and rejection of a new consumer connection using the [certificate guide](/docs/platform/pki/certificates).
 
 Revocation does not remove the device. It does not automatically enable another enrollment either: recovery depends on its credential, status and DMS policy. `CertificateHold` can be reactivated under PKI conditions; other reasons block subsequent certificate changes.
+
+A certificate suspended by a CA hold cascade shows as **Revoked** and returns to active when the holding CA is released. If its certificate expired during the hold, the monitoring job marks it as expired again after the release. If you revoke a held identity yourself, that revocation is permanent.
 
 Decommission a device [#decommission-a-device]
 
@@ -3507,11 +3509,11 @@ Key rotation procedure [#key-rotation-procedure]
 
 Cascading revocation [#cascading-revocation]
 
-Lamassu saves the CA’s revocation, then attempts to revoke child CAs and issued certificates with `CessationOfOperation`. Propagation continues recursively through child CAs. This is not a transaction over the whole hierarchy: some resources may have changed while other updates failed.
+Lamassu saves the CA’s revocation, then applies the same revocation to child CAs and issued certificates. Propagation continues recursively through child CAs. This is not a transaction over the whole hierarchy: some resources may have changed while other updates failed.
 
 Resources in `EXPIRED` state and resources already revoked for a final reason reject further status transitions. Per-descendant failures are logged; review the inventory and logs even when the parent operation completes.
 
-`CertificateHold` allows reactivating the parent while it is not expired, but does not restore child CAs or certificates permanently revoked during the cascade. Holding a CA therefore does not provide a reversible pause for its entire branch.
+`CertificateHold` is the reversible exception. Holding a CA suspends its active sub-CAs and issued certificates with `CertificateHold` and marks them as suspended by that CA. Releasing the CA — to `ACTIVE` or to any other non-revoked status such as `EXPIRED` — reactivates exactly the descendants still on hold that carry that mark. Holds placed manually before or after the cascade are left untouched, and any later status change of a descendant clears the mark. Revoking a held CA with any other reason remains permanent: descendants are revoked with `CessationOfOperation` and cannot be restored.
 
 Before closing the change, compare the original dependency inventory with final states and verify revocation publication for each issuer. Do not use revocation as the ordinary mechanism to stop issuance: complete migration and remove the CA from operational flows.
 
@@ -3685,7 +3687,7 @@ A CA signs only while its status is `ACTIVE` and the current time falls inside t
 Revoke a CA [#revoke-a-ca]
 
 <Callout type="warn" title="Revocation affects the entire dependent chain">
-  Revoking a CA prevents issuance and may interrupt its entire branch. Only `CertificateHold` allows reactivating the CA itself if it is not expired. Descendant revocation is attempted with `CessationOfOperation`; reactivating the parent does not restore those descendants. Follow the [cascading revocation](/docs/platform/pki/ca-hierarchy-and-rotation) conditions.
+  Revoking a CA prevents issuance and may interrupt its entire branch. With `CertificateHold` the cascade is reversible: descendants are suspended on hold and are restored when you release the CA. Any other revocation reason revokes descendants permanently with `CessationOfOperation`. Follow the [cascading revocation](/docs/platform/pki/ca-hierarchy-and-rotation) conditions.
 </Callout>
 
 <Steps>
@@ -3975,7 +3977,7 @@ Check that the saved reason is `CertificateHold` and the identity still satisfie
 
 Read the record and query OCSP again. With `regenerate_on_revoke` enabled, the reactivation event requests CRL regeneration: check that the new list omits the serial. An earlier list can still mark it revoked until the client refreshes its copy.
 
-This does not undo permanent revocation or a cascade started by revoking a CA.
+This does not undo permanent revocation or the cascade of a CA revoked for good; the hold cascaded by a CA is lifted by releasing that CA.
 
 Continue [#continue]
 
@@ -4049,7 +4051,7 @@ Only `CertificateHold` allows reactivating a revoked certificate that is not in 
 
 Effect of revoking a CA [#effect-of-revoking-a-ca]
 
-Revoking a CA starts a cascade that attempts to revoke descendants with `CessationOfOperation`. It may end with partial failures and is not undone by reactivating the parent. Read [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for conditions and checks.
+Revoking a CA starts a cascade that attempts to revoke descendants. A `CertificateHold` cascade suspends them reversibly: releasing the CA restores those still on hold. Any other revocation reason revokes descendants permanently with `CessationOfOperation`. Read [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for conditions and checks.
 
 Before confirming:
 
@@ -4989,7 +4991,7 @@ Check each boundary independently:
 4. **CRL:** compare `latest_crl`, number and timestamps with the downloaded list. Check the serial in its contents. If unchanged, review `regenerate_on_revoke`, event delivery, jobs, signing and storage with the deployment operator.
 5. **Client:** check cache, policy for expired or unavailable evidence, critical IDP extension and rejection of a new connection.
 
-Reactivation from `CertificateHold` needs a new CRL for the client to stop seeing the hold. Reactivating a CA does not restore its descendant cascade; inspect every status and individual operation failure.
+Reactivation from `CertificateHold` needs a new CRL for the client to stop seeing the hold. A hold cascaded from a CA is lifted by releasing that CA; a cascade from a CA revoked for good is not. Inspect every status and individual operation failure.
 
 The chain validates but the connection fails [#the-chain-validates-but-the-connection-fails]
 

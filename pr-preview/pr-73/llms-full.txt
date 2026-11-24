@@ -3650,7 +3650,7 @@ Deleting a CA releases the key references of its own current certificate and lin
     Review the registered type, associated key and engine, and issuer relationship. Certificate-only import may associate an existing KMS key using the certificate’s key identifier. Without a usable key, the CA is public material and cannot sign.
 
     <div className="lm-diff-ins lm-diff-block">
-      An imported CA whose key is in the KMS and whose certificate carries `cRLSign` receives its CRL settings and first CRL automatically; without a usable key or without `cRLSign` it receives none, and this is not an import error (see [CRL](/docs/platform/pki/crl)).
+      An imported CA whose key is in the KMS and whose certificate carries `cRLSign` receives its CRL settings and first CRL automatically; without a key in the KMS or without `cRLSign` it receives none, and this is not an import error (see [CRL](/docs/platform/pki/crl)).
     </div>
 
     For an issuing CA, complete a test issuance and check OCSP and CRL. Creating the record alone does not establish key availability, complete chain consistency or status publication.

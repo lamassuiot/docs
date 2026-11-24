@@ -79,6 +79,7 @@ Two things never migrate on their own: the KMS and VA data on local volumes, whi
 | [Renamed and reshaped values](#renamed-and-reshaped-values) | Releases that override `toolbox`, `services.connectors`, ports, probes or scheduling | Low to medium: validation errors or changed defaults | Update the values file |
 | [DMS update API](#dms-update-api) | Clients that send the DMS ID in the update body | Low: the ID in the URL wins | Send the ID in the URL |
 | [CA IDs are always assigned by the backend](#ca-ids-are-always-assigned-by-the-backend) | Clients that send an `id` when creating or importing CAs | Low: the ID in the body is ignored, and the field is removed | Let the backend assign the ID and use the returned one |
+| [CA signature endpoints removed](#ca-signature-endpoints-removed) | API and SDK clients that call `/v1/cas/{id}/signature/sign` or `/verify`, and alert subscriptions on `ca.sign.signature` | Medium: the calls return `404` and the subscriptions never fire | Use the KMS `sign` and `verify` operations |
 | [Certificate type values](#certificate-type-values) | Consumers that match on certificate `type` | Low: two values are renamed | Adapt consumers |
 | [Independent re-enrollment authentication](#independent-re-enrollment-authentication) | Any DMS | Low: informational | Read both blocks before editing |
 
@@ -269,6 +270,12 @@ The settings of a CA deleted before the upgrade are migrated as `ARCHIVED`, with
 #### CA IDs are always assigned by the backend
 
 Creating or importing a CA registers it under a backend-generated UUID. Any `id` sent in the request body is ignored, and the field is removed from the create and import bodies. Scripts that supplied their own IDs and addressed CAs by them must read the ID the backend returns instead.
+
+#### CA signature endpoints removed
+
+A CA key now signs only certificates. 3.8.0 let a client sign arbitrary data with a CA key through `POST /v1/cas/{id}/signature/sign` and check the result with `POST /v1/cas/{id}/signature/verify`. 4.0.0 removes both endpoints, the matching `SignatureSign` and `SignatureVerify` methods of the Go SDK `CAService`, and the `ca.sign.signature` event. An alert subscription on that event no longer fires: delete it or move it to another event.
+
+To sign and verify data, use the KMS operations `POST /v1/keys/{id}/sign` and `POST /v1/keys/{id}/verify`, which have their own authorization. Signing a certificate with a CA that is not `ACTIVE` or whose validity period does not include the current time now fails with `400`, even if the stored status has not yet changed to `EXPIRED`: see [Certificate authorities](/docs/platform/pki/certificate-authorities#issue-certificates).
 
 #### VA CRL signer
 

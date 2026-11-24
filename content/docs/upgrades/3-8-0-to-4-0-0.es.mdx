@@ -79,6 +79,7 @@ Dos cosas nunca migran solas: los datos del KMS y de la VA en volúmenes locales
 | [Values renombrados y reestructurados](#values-renombrados-y-reestructurados) | Releases que sobrescriben `toolbox`, `services.connectors`, puertos, sondas o planificación | Baja a media: errores de validación o cambios de valores por defecto | Actualizar el archivo de values |
 | [API de actualización del DMS](#api-de-actualización-del-dms) | Clientes que envían el ID del DMS en el cuerpo de la actualización | Baja: prevalece el ID de la URL | Enviar el ID en la URL |
 | [Los IDs de CA los asigna siempre el backend](#los-ids-de-ca-los-asigna-siempre-el-backend) | Clientes que envían un `id` al crear o importar CAs | Baja: el ID del cuerpo se ignora y el campo desaparece | Dejar que el backend asigne el ID y usar el que devuelve |
+| [Endpoints de firma de CA eliminados](#endpoints-de-firma-de-ca-eliminados) | Clientes de API y SDK que llaman a `/v1/cas/{id}/signature/sign` o `/verify`, y suscripciones de alertas sobre `ca.sign.signature` | Media: las llamadas devuelven `404` y las suscripciones no se disparan nunca | Utilizar las operaciones `sign` y `verify` del KMS |
 | [Valores de tipo de certificado](#valores-de-tipo-de-certificado) | Consumidores que comparan el `type` del certificado | Baja: dos valores cambian de nombre | Adaptar los consumidores |
 | [Autenticación de reenrolamiento independiente](#autenticación-de-reenrolamiento-independiente) | Cualquier DMS | Baja: solo informativo | Revisar ambos bloques antes de editar |
 
@@ -269,6 +270,12 @@ Los ajustes de una CA eliminada antes de la actualización se migran como `ARCHI
 #### Los IDs de CA los asigna siempre el backend
 
 Crear o importar una CA la registra con un UUID generado por el backend. Cualquier `id` enviado en el cuerpo de la petición se ignora, y el campo desaparece de los cuerpos de creación e importación. Los scripts que enviaban su propio ID y se dirigían a la CA con él deben leer el ID que devuelve el backend.
+
+#### Endpoints de firma de CA eliminados
+
+La clave de una CA ahora solo firma certificados. 3.8.0 permitía firmar datos arbitrarios con la clave de una CA mediante `POST /v1/cas/{id}/signature/sign` y comprobar el resultado con `POST /v1/cas/{id}/signature/verify`. 4.0.0 elimina ambos endpoints, los métodos `SignatureSign` y `SignatureVerify` de `CAService` en el SDK de Go y el evento `ca.sign.signature`. Una suscripción de alertas a ese evento deja de dispararse: elimínala o muévela a otro evento.
+
+Para firmar y verificar datos, utiliza las operaciones del KMS `POST /v1/keys/{id}/sign` y `POST /v1/keys/{id}/verify`, que tienen su propia autorización. Firmar un certificado con una CA que no está `ACTIVE`, o cuyo periodo de validez no incluye la hora actual, falla ahora con `400`, aunque el estado almacenado aún no haya pasado a `EXPIRED`: consulta [Autoridades de certificación](/docs/platform/pki/certificate-authorities#emite-certificados).
 
 #### Firmante de CRL de la VA
 

@@ -34,7 +34,7 @@ If the CRL settings of the CA are signed by the superseded CA certificate, reiss
 
 **Rotating a CA** creates a successor key and authority. It is the right choice in the face of compromise, a cryptographic change, an engine migration or non-exportable key policies.
 
-Lamassu does not allow reissuing an already-revoked CA or a CA whose expiration date has passed. Plan ahead for both conditions.
+Lamassu does not allow reissuing an already-revoked CA or a CA whose expiration date has passed. A subordinate CA is signed by its parent, so the parent must also be `ACTIVE` and inside its validity period; otherwise the reissue fails with `400`. Plan ahead for these conditions.
 
 ## When to choose each operation
 

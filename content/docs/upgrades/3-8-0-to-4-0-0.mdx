@@ -74,6 +74,7 @@ Two things never migrate on their own: the KMS and VA data on local volumes, whi
 | [Re-enrollment trust set](#re-enrollment-trust-set) | Scripts and consoles that edit DMSs through the API | Medium: an old-layout edit silently empties `validation_cas` | Read the DMS before editing and use the new field |
 | [CRL signer field](#crl-signer-field) | Clients that create or update CRL settings through the API | Medium: requests with the old field return an error | Replace `crl_options.subject_key_id_signer` with the required `crl_options.signer_serial_number` |
 | [Renamed VA events](#renamed-va-events) | Alert subscriptions and consumers of the VA events | Medium: subscription types are renamed automatically, their conditions are not | Review conditions filtering on the old event payload or subject |
+| [CA signature endpoints removed](#ca-signature-endpoints-removed) | Clients that sign or verify arbitrary data through the CA API or the Go SDK, and alert subscriptions on the `ca.sign.signature` event | Medium: the endpoints, the SDK methods and the event no longer exist | Sign and verify with KMS keys instead; remove subscriptions on the event |
 | [Device events](#device-events) | Consumers that read the device `events` field | Medium: the field disappears | Use the new event endpoints |
 | [VA CRL signer](#va-crl-signer) | Deployments with VA roles whose signer cannot be resolved uniquely | Medium: the VA migration aborts | Fix the affected roles before upgrading |
 | [Renamed and reshaped values](#renamed-and-reshaped-values) | Releases that override `toolbox`, `services.connectors`, ports, probes or scheduling | Low to medium: validation errors or changed defaults | Update the values file |
@@ -265,6 +266,10 @@ The settings of a CA deleted before the upgrade are migrated as `ARCHIVED`, with
 #### Renamed VA events
 
 `va.role.update` becomes `va.crl-settings.update` and `va.role.crl.init` becomes `va.crl-settings.init`; `va.role.crl.create` keeps its name and its payload. Every subject changes from `crl/<ski>` to `crl/<ca-id>`, and the payload of the renamed events changes from the old VA role to the CRL settings of the CA, with `ca_id` instead of `ca_ski`. The alerts migration renames the event types of existing subscriptions automatically, but it does not rewrite their conditions — JSON Path, JSON Schema or JavaScript: review conditions that filter on the old payload or on the old `crl/<ski>` subject, including those for `va.role.crl.create`. Direct event-bus consumers and audit searches must adopt the new names and payload themselves.
+
+#### CA signature endpoints removed
+
+`POST /v1/cas/{id}/signature/sign` and `POST /v1/cas/{id}/signature/verify` no longer exist: the CA service no longer signs or verifies arbitrary data, so a CA's private key only signs certificates. The Go SDK's `CAService.SignatureSign` and `CAService.SignatureVerify` methods are removed too, and the `ca.sign.signature` event is no longer published, so alert subscriptions and event-bus consumers that rely on it never fire again — remove those subscriptions and point consumers elsewhere. Sign and verify arbitrary data with a KMS key instead; see [Sign and verify](/docs/platform/pki/key-management#sign-and-verify). A CA is also only accepted for signing when its validity window includes the current time, even if its stored status still reads `ACTIVE`.
 
 #### CA IDs are always assigned by the backend
 

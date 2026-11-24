@@ -1821,7 +1821,7 @@ Locate the active serial in history and revoke it with an appropriate reason. Ve
 Revocation does not remove the device. It does not automatically enable another enrollment either: recovery depends on its credential, status and DMS policy. `CertificateHold` can be reactivated under PKI conditions; other reasons block subsequent certificate changes.
 
 <div className="lm-diff-ins lm-diff-block">
-  A certificate suspended by a CA hold cascade shows as **Revoked** and returns to active when the holding CA is released. If you revoke a held identity yourself, that revocation is permanent.
+  A certificate suspended by a CA hold cascade shows as **Revoked** and returns to active when the holding CA is released. If its certificate expired during the hold, the monitoring job marks it as expired again after the release. If you revoke a held identity yourself, that revocation is permanent.
 </div>
 
 Decommission a device [#decommission-a-device]
@@ -3693,7 +3693,7 @@ A CA signs only while its status is `ACTIVE` and the current time falls inside t
 Revoke a CA [#revoke-a-ca]
 
 <Callout type="warn" title="Revocation affects the entire dependent chain">
-  Revoking a CA prevents issuance and may interrupt its entire branch. <del className="lm-diff-del">Only</del><ins className="lm-diff-ins">With</ins> `CertificateHold` <del className="lm-diff-del">allows reactivating the CA itself if it is not expired. Descendant revocation is attempted with `CessationOfOperation`; reactivating the parent does not restore those descendants</del><ins className="lm-diff-ins">the cascade is reversible: descendants are suspended on hold and are restored when you release the CA, if it is not expired. Any other revocation reason revokes descendants permanently with `CessationOfOperation`</ins>. Follow the [cascading revocation](/docs/platform/pki/ca-hierarchy-and-rotation) conditions.
+  Revoking a CA prevents issuance and may interrupt its entire branch. <del className="lm-diff-del">Only</del><ins className="lm-diff-ins">With</ins> `CertificateHold` <del className="lm-diff-del">allows reactivating the CA itself if it is not expired. Descendant revocation is attempted with `CessationOfOperation`; reactivating the parent does not restore those descendants</del><ins className="lm-diff-ins">the cascade is reversible: descendants are suspended on hold and are restored when you release the CA. Any other revocation reason revokes descendants permanently with `CessationOfOperation`</ins>. Follow the [cascading revocation](/docs/platform/pki/ca-hierarchy-and-rotation) conditions.
 </Callout>
 
 <Steps>

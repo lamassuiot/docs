@@ -79,7 +79,7 @@ Locate the active serial in history and revoke it with an appropriate reason. Ve
 Revocation does not remove the device. It does not automatically enable another enrollment either: recovery depends on its credential, status and DMS policy. `CertificateHold` can be reactivated under PKI conditions; other reasons block subsequent certificate changes.
 
 <div className="lm-diff-ins lm-diff-block">
-  A certificate suspended by a CA hold cascade shows as **Revoked** and returns to active when the holding CA is released. If you revoke a held identity yourself, that revocation is permanent.
+  A certificate suspended by a CA hold cascade shows as **Revoked** and returns to active when the holding CA is released. If its certificate expired during the hold, the monitoring job marks it as expired again after the release. If you revoke a held identity yourself, that revocation is permanent.
 </div>
 
 Decommission a device [#decommission-a-device]

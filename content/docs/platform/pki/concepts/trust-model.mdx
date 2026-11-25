@@ -56,7 +56,7 @@ A valid chain does not by itself guarantee that a certificate should be accepted
 
 An OCSP `Good` status does not replace chain, date, usage and identity checks either; [Validation](/docs/platform/pki/certificate-validation) brings those criteria together.
 
-During the mTLS authentication of a DMS, Lamassu attempts to check revocation. If the certificate does not contain enough information to perform that check, the backend logs a warning and continues treating it as not revoked. Design your profiles and distribution points to avoid that situation in production.
+During the mTLS authentication of a DMS, Lamassu checks revocation and fails closed: a certificate whose revocation cannot be verified is rejected by default. The `allow_unverifiable_revocation` option of the DMS (see [DMS](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation)) is the opt-out, and it only relaxes certificates that carry no OCSP/CRL endpoint at all. Design your profiles and distribution points so that the check succeeds.
 
 ## Custody limits
 

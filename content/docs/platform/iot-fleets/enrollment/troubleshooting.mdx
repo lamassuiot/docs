@@ -17,6 +17,7 @@ The EST controller normally returns 400 when rejecting input and 500 when the se
 | 404 or missing APS | Public route `/.well-known/est/{DMS_ID}/{operation}` and existing DMS. APS is not the service name. |
 | 400, CSR or format error | `Content-Type: application/pkcs10`, Base64 of DER, valid signature and a body preserved without double encoding. |
 | Missing credential or invalid certificate | Operation mode, validating CA, dates, revocation and credential delivery by Gateway. Do not confuse server TLS trust with the bootstrap CA. |
+| Enroll or re-enroll rejects a certificate for unverifiable revocation | Whether the certificate is managed by Lamassu, whether its OCSP/CRL endpoints are configured and reachable from the service, and whether `allow_unverifiable_revocation` is set for that operation's block. See [DMS](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation) and [Revocation and checks](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks). |
 | Webhook denies, times out or responds without authorization | Configuration, connectivity and JSON response with `authorized: true`. There is no automatic fallback to `NO_AUTH`. |
 | `unexpected status code: <n>: redirects are not followed` | The webhook answered with a redirect. Configure the final absolute `http` or `https` URL in the webhook config; redirects are never followed. |
 | `webhook response exceeds 1048576 bytes` | The receiver returned more than 1 MiB of JSON. Reduce the response of the authorization webhook. |
@@ -49,6 +50,6 @@ The default response is Base64-encoded DER PKCS#7; PEM through `Accept: applicat
 4. Make one request, save headers/body and query the device and certificates.
 5. If you receive an identity, check the key, subject, use and connection with the consumer.
 
-External bootstrap revocation checks have limitations: absence of evidence can be accepted, and OCSP Unknown does not cause the same rejection as Revoked. Do not assume a policy that rejects every uncertainty. An intermediate CA in the TLS chain does not prove that the entire chain reached the DMS validator either.
+External bootstrap revocation checks fail closed: a certificate whose revocation cannot be verified — including an OCSP Unknown status — is rejected by default. Only `allow_unverifiable_revocation` in that operation's block (see [DMS](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation)) relaxes it, and only for certificates that carry no OCSP/CRL endpoint at all; unreachable, stale or inconclusive endpoints are rejected whatever the option says. See [Revocation and checks](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks). An intermediate CA in the TLS chain does not prove that the entire chain reached the DMS validator either.
 
 For logs, networking, pods or Gateway headers, continue in [Deployment troubleshooting](/docs/deployment/troubleshooting). For identities issued, revoked or bound partially, use [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) and [Devices and identities](/docs/platform/iot-fleets/device-management).

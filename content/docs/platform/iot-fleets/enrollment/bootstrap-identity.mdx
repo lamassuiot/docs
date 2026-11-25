@@ -57,6 +57,10 @@ A bodyless `204` does not satisfy the contract. Denial, transport error, uninter
 
 ## Revocation and checks
 
-The DMS first looks up the certificate in Lamassu; for external certificates it attempts OCSP and CRL. If revocation cannot be checked, validators can continue treating it as not revoked. The code also does not establish rejection of every external status other than Good. Test required behavior with your actual credential and endpoint; do not present this as guaranteed strict enforcement across every source.
+The DMS first looks up the presented certificate in Lamassu; certificates it issued and manages are checked against their stored status. External certificates are checked through their OCSP servers and then their CRL distribution points. By default, unverifiable revocation is a rejection, not an acceptance: a certificate that is not managed by Lamassu and lists no OCSP or CRL endpoint is rejected unless `allow_unverifiable_revocation` is set in that operation's block (see [Authentication per operation](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation)).
+
+A certificate that does list endpoints is held to a stricter standard, with or without the option: unreachable endpoints, stale or invalid evidence, or an inconclusive (unknown) status reject the certificate. The evidence must be fresh — `thisUpdate` not in the future, `nextUpdate` not passed, and an answer without `nextUpdate` accepted only while it is less than about 24 hours old — and OCSP responses must be signed by the certificate's issuer itself or by a delegated responder that carries the `id-kp-OCSPSigning` EKU and is within its validity. A revoked verdict is honored regardless of its age. Each OCSP or CRL request has a 10-second timeout.
+
+One caveat remains: a signed Good OCSP response or CRL captured before a revocation keeps validating until its `nextUpdate` (up to about 24 hours without `nextUpdate`). Revocation propagates to devices at the pace the responders publish evidence, not at the moment of revocation.
 
 Test an allowed certificate, an incorrect one, another CN, webhook denial, timeout and re-enrollment under its own policy. Keep results and schedule bootstrap credential retirement where appropriate. Continue with [EST client](/docs/platform/iot-fleets/enrollment/est-client).

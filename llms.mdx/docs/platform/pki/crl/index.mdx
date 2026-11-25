@@ -86,7 +86,7 @@ CRL contents [#crl-contents]
 
 Each entry contains serial number, revocation time and reason. The generator queries certificates in `REVOKED` state for the selected CA. A reactivated certificate disappears when the list is recalculated; an earlier downloaded copy retains its contents.
 
-The list contains a critical *Issuing Distribution Point* (OID `2.5.29.28`) with configured distribution URLs. Check that your client interprets this extension and that it matches the list’s scope. If rejected, investigate format and scope; ignoring a critical extension is not successful validation.
+When the VA has configured domains, the list contains a critical *Issuing Distribution Point* (OID `2.5.29.28`) with those distribution URLs; a VA with no configured domains publishes the list without an IDP, and a CRL without an IDP covers every certificate of its CA. When the extension is present, check that your client interprets it and that it matches the list’s scope. If rejected, investigate format and scope; ignoring a critical extension is not successful validation.
 
 Public download endpoint [#public-download-endpoint]
 

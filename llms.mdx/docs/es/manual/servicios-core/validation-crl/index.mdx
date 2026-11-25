@@ -86,7 +86,7 @@ Contenido de la CRL [#contenido-de-la-crl]
 
 Cada entrada incluye serie, fecha de revocación y razón. El generador consulta certificados en estado `REVOKED` para la CA seleccionada. Un certificado reactivado deja de aparecer al recalcular la lista; una copia descargada anteriormente conserva su contenido.
 
-La lista incluye un *Issuing Distribution Point* crítico (OID `2.5.29.28`) con las URLs de distribución configuradas. Comprueba que tu cliente interpreta esa extensión y que corresponde al ámbito de la lista. Si la rechaza, investiga el formato y el alcance; ignorar una extensión crítica no es una validación satisfactoria.
+Cuando la VA tiene dominios configurados, la lista incluye un *Issuing Distribution Point* crítico (OID `2.5.29.28`) con esas URLs de distribución; una VA sin dominios configurados publica la lista sin IDP, y una CRL sin IDP cubre todos los certificados de su CA. Cuando la extensión está presente, comprueba que tu cliente la interpreta y que corresponde al ámbito de la lista. Si la rechaza, investiga el formato y el alcance; ignorar una extensión crítica no es una validación satisfactoria.
 
 Endpoint público de descarga [#endpoint-público-de-descarga]
 

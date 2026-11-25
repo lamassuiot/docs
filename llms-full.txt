@@ -3626,6 +3626,8 @@ You need the CA certificate in PEM, its chain to a known root and, when importin
 
 The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number matches a stored certificate with different contents, or whose identical certificate already belongs to an existing CA. A deleted CA's certificate record is kept and can be reused when re-importing the same certificate, including its previous status. Re-importing a different certificate with that serial number is rejected; check the certificate and status after re-importing.
 
+A certificate whose validity period has already ended, such as that of a retired external authority, is accepted and, when Lamassu has no stored record of that certificate yet, the CA is stored as `EXPIRED` from the start, as happens when importing a plain certificate. If the import reuses the record of a deleted CA (see above and [Delete a CA](#delete-a-ca)), the previous status is kept instead, even if the certificate has expired in the meantime. An `EXPIRED` CA rejects status changes; see [certificate lifecycle](/docs/platform/pki/concepts/certificate-lifecycle).
+
 Deleting a CA releases the key references of its own current certificate and linked reissued certificates, while keeping those records for its issuer's CRL and OCSP. It then attempts to delete the key; the KMS keeps it if other certificates still reference it, such as another CA sharing the key. Revoking certificates issued by the deleted CA does not release their own key references.
 
 <Steps>
@@ -3659,6 +3661,16 @@ Deleting a CA releases the key references of its own current certificate and lin
     For an issuing CA, complete a test issuance and check OCSP and CRL. Creating the record alone does not establish key availability, complete chain consistency or status publication.
   </Step>
 </Steps>
+
+CA states [#ca-states]
+
+A CA only signs in `ACTIVE`. From there it can move to `EXPIRED` or to `REVOKED`, and it leaves those states only by deletion, with one exception: a revocation with `CertificateHold` can be undone.
+
+<DiagramEmbed name="ca-lifecycle" lang="en" title="CA lifecycle: ACTIVE, EXPIRED, REVOKED with CertificateHold, permanently REVOKED and deletion" />
+
+* **Expiry.** The expiry monitor marks as `EXPIRED` the `ACTIVE` CAs whose validity period has ended. Until it runs, the CA already does not sign, because Lamassu checks the dates ([Issue certificates](#issue-certificates)).
+* **Revocation.** Revoking with the `CertificateHold` reason is reversible. A revocation with any other reason, like `EXPIRED`, rejects every later status change. Revoking, also with `CertificateHold`, additionally acts on the subordinate CAs and the certificates it issued: [Revoke a CA](#revoke-a-ca).
+* **Deletion.** Only a CA revoked with another reason, or an expired one, can be deleted; an imported CA without a key can be deleted from any state. Conditions and effects in [Delete a CA](#delete-a-ca).
 
 Inspect an authority [#inspect-an-authority]
 
@@ -3722,6 +3734,8 @@ Revoke a CA [#revoke-a-ca]
 Delete a CA [#delete-a-ca]
 
 Permanent deletion is only available with the CA revoked or expired; a CA imported without a key can be deleted in any state. Delete the record only when your retention and audit policy allows it.
+
+What the deletion does to what the CA issued depends on its status. Deleting an active CA imported without a key whose validity period has not ended only removes the record from Lamassu: the CA, its descendants and the certificates it issued keep their status, since the CA keeps operating outside Lamassu — its key was never in Lamassu. But if the validity period has already ended while the stored status still says `ACTIVE` — the stored status can lag behind the dates until the expiration monitor runs — the CA counts as expired for deletion. Deleting a revoked or expired CA revokes what it issued with `CessationOfOperation`, the same cascade as when revoking a CA. To retire an active keyless CA together with everything it issued, revoke it first with `POST /v1/cas/:id/status` and then delete it.
 
 The CA’s CRL settings are kept. A deletion is refused with a `409` error while they are still `ACTIVE`: the VA must first publish the CA’s final CRL, which can take up to about an hour after revocation with the default job schedule, so retry after the final CRL is published. An expired CA is finalized without a final CRL, and a CA on hold (`CertificateHold`) is refused with a message asking you to revoke it permanently first. The deletion is also refused with a `409` when the CA’s key signs the CRLs of another CA: the error names that CA, so change its CRL signer, or delete or revoke it, before deleting this one. The CA and all its descendants are checked before anything is deleted; nothing changes if any of them cannot be deleted.
 

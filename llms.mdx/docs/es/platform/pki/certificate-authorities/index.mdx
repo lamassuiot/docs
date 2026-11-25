@@ -92,6 +92,8 @@ Necesitas el certificado de CA en PEM, su cadena hasta una raíz conocida y, si 
 
 El backend rechaza una importación cuyo certificado carece de la restricción básica de CA (`basicConstraints cA flag is not set`), cuyo número de serie coincide con el de un certificado almacenado con contenido distinto, o cuyo certificado idéntico ya pertenece a una CA existente. El registro de certificado de una CA eliminada se conserva y puede reutilizarse al reimportar el mismo certificado, incluido su estado anterior. Reimportar otro certificado con ese número de serie se rechaza; comprueba el certificado y su estado tras reimportarlo.
 
+Un certificado cuyo periodo de validez ya ha terminado, como el de una autoridad externa retirada, se acepta y, cuando Lamassu aún no tiene un registro de ese certificado, la CA se almacena como `EXPIRED` desde el principio, igual que al importar un certificado simple. Si la importación reutiliza el registro de una CA eliminada (véase arriba y [Elimina una CA](#elimina-una-ca)), se conserva el estado anterior aunque el certificado haya caducado entretanto. Una CA `EXPIRED` rechaza los cambios de estado; consulta el [ciclo de vida del certificado](/docs/platform/pki/concepts/certificate-lifecycle).
+
 Eliminar una CA libera las referencias a la clave de su propio certificado actual y de sus certificados reemitidos vinculados, pero conserva esos registros para la CRL y el OCSP de su emisor. Después intenta eliminar la clave; el KMS la conserva si otros certificados todavía la referencian, como los de otra CA que comparte la clave. Revocar los certificados emitidos por la CA eliminada no libera sus propias referencias a claves.
 
 <Steps>
@@ -125,6 +127,16 @@ Eliminar una CA libera las referencias a la clave de su propio certificado actua
     Para una CA emisora, completa una emisión de prueba y comprueba OCSP y CRL. El alta del registro por sí sola no demuestra disponibilidad de la clave, coherencia completa de la cadena ni publicación del estado.
   </Step>
 </Steps>
+
+Estados de una CA [#estados-de-una-ca]
+
+Una CA solo firma en `ACTIVE`. Desde ahí puede pasar a `EXPIRED` o a `REVOKED`, y de esos estados solo sale por la eliminación, salvo en un caso: la revocación con `CertificateHold` se puede deshacer.
+
+<DiagramEmbed name="ca-lifecycle" title="Ciclo de vida de una CA: ACTIVE, EXPIRED, REVOKED con CertificateHold, REVOKED definitivo y eliminación" />
+
+* **Caducidad.** El monitor de expiración marca como `EXPIRED` las CAs `ACTIVE` cuyo periodo de validez ha terminado. Hasta que se ejecuta, la CA ya no firma, porque Lamassu comprueba las fechas ([Emite certificados](#emite-certificados)).
+* **Revocación.** Revocar con la razón `CertificateHold` es reversible. Una revocación con cualquier otra razón, igual que `EXPIRED`, rechaza todo cambio de estado posterior. Revocar, también con `CertificateHold`, actúa además sobre las CAs subordinadas y los certificados que emitió: [Revoca una CA](#revoca-una-ca).
+* **Eliminación.** Solo una CA revocada con otra razón o caducada puede eliminarse; una importada sin clave, desde cualquier estado. Condiciones y efectos en [Elimina una CA](#elimina-una-ca).
 
 Inspecciona una autoridad [#inspecciona-una-autoridad]
 
@@ -188,6 +200,8 @@ Revoca una CA [#revoca-una-ca]
 Elimina una CA [#elimina-una-ca]
 
 La eliminación permanente solo está disponible con la CA revocada o caducada; una CA importada sin clave puede eliminarse en cualquier estado. Elimina el registro únicamente cuando la política de retención y auditoría lo permita.
+
+Lo que la eliminación hace con lo emitido por la CA depende de su estado. Eliminar una CA activa importada sin clave cuyo periodo de validez no ha terminado solo elimina el registro de Lamassu: la CA, sus descendientes y los certificados que emitió conservan su estado, ya que la CA sigue operando fuera de Lamassu — su clave nunca estuvo en Lamassu. Pero si el periodo de validez ya terminó y el estado almacenado sigue siendo `ACTIVE` — el estado almacenado puede ir por detrás de las fechas hasta que se ejecute el monitor de expiración —, para la eliminación la CA cuenta como caducada. Eliminar una CA revocada o caducada revoca lo que emitió con `CessationOfOperation`, la misma cascada que al revocar una CA. Para retirar una CA activa sin clave junto con todo lo que emitió, revócala primero con `POST /v1/cas/:id/status` y después elimínala.
 
 Los ajustes de CRL de la CA se conservan. La eliminación se rechaza con un error `409` mientras sigan `ACTIVE`: la VA debe publicar primero la CRL final de la CA, lo que puede tardar hasta aproximadamente una hora después de la revocación con la programación predeterminada del trabajo, así que reintenta cuando se haya publicado la CRL final. Una CA caducada se finaliza sin CRL final, y una CA en retención (`CertificateHold`) se rechaza con un mensaje que te pide revocarla de forma permanente primero. La eliminación también se rechaza con un `409` cuando la clave de la CA firma las CRLs de otra CA: el error nombra a esa CA, así que cambia su firmante de CRL, o elimínala o revócala, antes de eliminar esta. La CA y todos sus descendientes se comprueban antes de eliminar nada; si alguno no puede eliminarse, no cambia nada.
 

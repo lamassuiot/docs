@@ -13,7 +13,7 @@ No puedes obtener tu única prueba de confianza del mismo servidor todavía no a
 
 ## Credencial bootstrap
 
-Con `CLIENT_CERTIFICATE`, el dispositivo presenta su certificado inicial y demuestra posesión de su clave en TLS. El DMS lo valida frente a sus CAs de admisión. En el flujo examinado, el validador recibe una credencial de hoja: configura y prueba el emisor directo para el caso sencillo; enviar más intermedias desde el cliente no demuestra que lleguen al servicio.
+Con `CLIENT_CERTIFICATE`, el dispositivo presenta su certificado inicial y demuestra posesión de su clave en TLS. El DMS lo valida frente a sus CAs de admisión. El validador recibe una credencial de hoja: configura y prueba el emisor directo para el caso sencillo; enviar más intermedias desde el cliente no demuestra que lleguen al servicio.
 
 Comprueba fechas, certificado y clave correspondientes y estado de revocación antes de provisionarlos. Una credencial compartida entre equipos identifica esa credencial compartida, no a un equipo concreto.
 
@@ -57,6 +57,10 @@ Un `204` sin cuerpo no cumple el contrato. Rechazo, error de transporte, respues
 
 ## Revocación y comprobaciones
 
-El DMS busca primero el certificado en Lamassu; para uno externo intenta OCSP y CRL. Si no logra comprobar revocación, los validadores pueden continuar tratándolo como no revocado. El código tampoco permite asumir que todo estado externo distinto de Good se rechace. Verifica el comportamiento requerido con tu credencial y endpoint reales; no presentes esta comprobación como una política estricta garantizada para todas las fuentes.
+El DMS busca primero el certificado presentado en Lamassu; los certificados que emitió y gestiona se comprueban con su estado almacenado. Los certificados externos se comprueban mediante sus servidores OCSP y, después, sus puntos de distribución CRL. Por defecto, una revocación no verificable es un rechazo, no una aceptación: un certificado que no gestiona Lamassu y no lista ningún endpoint OCSP o CRL se rechaza, salvo que se active `allow_unverifiable_revocation` en el bloque de esa operación (consulta [Autenticación por operación](/docs/platform/iot-fleets/enrollment/dms#autenticación-por-operación)).
+
+Un certificado que sí lista endpoints se exige con un estándar más estricto, con o sin la opción: los endpoints que no responden, la evidencia caducada o inválida o un estado no concluyente (desconocido) rechazan el certificado. La evidencia debe estar fresca — `thisUpdate` no en el futuro, `nextUpdate` no superado, y una respuesta sin `nextUpdate` solo se acepta mientras tenga menos de unas 24 horas — y las respuestas OCSP deben estar firmadas por el propio emisor del certificado o por un responder delegado que lleve el EKU `id-kp-OCSPSigning` y esté dentro de su validez. Un veredicto de revocado se respeta con independencia de su antigüedad. Cada solicitud OCSP o CRL tiene un timeout de 10 segundos.
+
+Queda un matiz: una respuesta OCSP Good o una CRL firmadas y capturadas antes de una revocación siguen validando hasta su `nextUpdate` (hasta unas 24 horas sin `nextUpdate`). La revocación se propaga a los dispositivos al ritmo con que los responders publican evidencia, no en el momento de la revocación.
 
 Prueba certificado permitido, certificado incorrecto, CN ajeno, webhook denegado, timeout y reenrolamiento bajo su propia política. Conserva el resultado y programa la retirada de las credenciales bootstrap cuando corresponda. Continúa con [Cliente EST](/docs/platform/iot-fleets/enrollment/est-client).

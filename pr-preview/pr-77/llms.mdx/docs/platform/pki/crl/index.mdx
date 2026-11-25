@@ -1,0 +1,167 @@
+# Revocation lists (CRL) (/docs/pr-preview/pr-77/platform/pki/crl)
+
+
+
+<span id="crl-service" />
+
+A CRL is an issuer-signed list of revoked certificates. This guide is for an operator publishing lists and an integrator using them locally. You need the issuing CA certificate, its CA ID and access to the published endpoint. The client must maintain a current copy: offline operation still requires refreshing evidence.
+
+CRL settings [#crl-settings]
+
+The CRL settings of a CA store the configuration and metadata of its latest published list. Each CA has its own settings, keyed by its CA ID — even when two CAs share a key: they share the SKI, not the CRL. The VA creates them when a CA is created; when a CA is imported whose key is in the KMS — either imported with the private key or already held by the KMS — and whose certificate carries `cRLSign`: such a CA publishes its first CRL immediately, like a created one; and when a CA without settings is reissued with a certificate that can sign CRLs. An imported CA whose key is not in the KMS, or whose certificate lacks `cRLSign`, receives no settings: the import succeeds without error, and the CA's CRL endpoints report the settings as missing. Settings are never created retroactively: a CA that has none keeps none until it is reissued. Generation requires a usable issuer key; do not assume an imported CA without a key has an available CRL.
+
+| Field        | Purpose                                                                                                                                                                                                                                                                                                                                               |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ca_id`      | ID of the CA the settings belong to.                                                                                                                                                                                                                                                                                                                  |
+| `status`     | Lifecycle of the settings. `ACTIVE` ones generate CRLs. `FINAL` ones belong to a CA revoked permanently or expired: the first publishes one final CRL, valid until the CA's current certificate expires, and the second is turned `FINAL` without one. `ARCHIVED` ones belong to a deleted CA: their last CRL is still served, but never regenerated. |
+| `legacy_ski` | Read-only. SKI the settings were keyed by before the 4.0.0 migration; only migrated settings have it, and `/crl/<ski>` keeps resolving to them.                                                                                                                                                                                                       |
+| `latest_crl` | Version, validity start and end of the last published list. Read-only.                                                                                                                                                                                                                                                                                |
+
+| `crl_options` field    | Purpose                                                                                                                                                                                                                                                           | Initial value                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `validity`             | Time from `thisUpdate` to `nextUpdate`.                                                                                                                                                                                                                           | 7 days.                                        |
+| `refresh_interval`     | Time since the issuance of the latest published CRL that triggers scheduled renewal; `0` disables only this trigger. The effective granularity is bounded by the job frequency (see [Periodic and automatic regeneration](#periodic-and-automatic-regeneration)). | 6 days and 23 hours.                           |
+| `regenerate_on_revoke` | Request regeneration on revocation or reactivation from `CertificateHold` events.                                                                                                                                                                                 | `true`.                                        |
+| `signer_serial_number` | Serial number of the existing certificate that signs the CRL.                                                                                                                                                                                                     | Serial number of the CA’s current certificate. |
+
+The signer must be an existing certificate with the `cRLSign` key usage and the same subject and public key as the CA. Certificates from before a reissue qualify. A delegated signer is not supported: a certificate with the CA’s subject but a different key is rejected.
+
+When a CA is reissued and the signer is the superseded CA certificate, the VA moves the signer to the new certificate — provided it carries `cRLSign` — and republishes the CRL. If the new certificate lacks `cRLSign`, the VA keeps the previous signer and logs a warning. If the signer is any other certificate with the CA’s subject and key, it is deliberately left unchanged; the previous certificate then cannot be deleted while the settings use it (the API returns `409` `certificate is in use`), and to retire it you update the signer with `PUT`.
+
+<Callout type="info" title="Lifecycle decisions use the CA's current certificate">
+  The CRL lifecycle decisions — when publication stops and when the final CRL expires — use only the CA's current certificate. If a reissued certificate expires earlier than an older certificate that is still valid, CRL publication can stop, or the final CRL can expire, while the older certificate is still valid. This is an accepted limitation of the current behavior.
+</Callout>
+
+A CA whose signer lacks `cRLSign` cannot generate its CRL, and an update that selects a signer without `cRLSign` is rejected (400 error). Since 4.0 the VA requires this usage. Check before importing with `openssl x509 -noout -ext keyUsage` and, if it is missing, obtain a certificate for the same CA and key that includes it and update the settings to use it as the signer. A CA that has no settings at all — for example, one imported without `cRLSign` — has nothing to update: the only way to obtain them is to reissue the CA with a certificate that carries `cRLSign`. After reissuing a CA, also check the key usage of the new certificate: it may not keep the original’s usages, and without `cRLSign` the settings keep their previous signer.
+
+<span id="cases-in-which-the-settings-can-no-longer-be-edited" />
+
+<Callout type="warn" title="Cases in which the settings can no longer be edited">
+  Deleting a CA keeps its CRL settings; they remain until you delete the archived ones through the API or from the console's Verification Authorities page (see [CRL settings API](#crl-settings-api)). What happens to them depends on how the CA ended:
+
+  * The 4.0.0 upgrade migration archives the settings of the CAs that had been deleted before the upgrade. Their `status` is `ARCHIVED` and their `ca_id` is `legacy-<ski>`: the last CRL keeps being served, but it is never regenerated, any `PUT` returns 409, and there is no API way back to `ACTIVE`.
+  * Revoking a CA permanently or letting it expire finalizes its settings: their `status` becomes `FINAL`, any `PUT` returns 409, and no new CRL is generated. A permanently revoked CA publishes one final CRL, valid until the CA's current certificate expires; an expired CA gets none. Deleting the CA afterwards archives its settings, which then behave like the archived ones of the migration.
+
+  The settings can no longer be edited while their `status` is not `ACTIVE`. Adjust validity and signer before revoking or deleting a CA.
+
+  `PUT` validates the signer only when the request changes it. If the stored signer is no longer valid, the other options can still be edited, but the CRL cannot be regenerated until a valid signer is set.
+</Callout>
+
+<Callout type="warn" title="Do not share keys between CAs">
+  Sharing a key between CAs is a migration blocker: the 4.0.0 upgrade aborts while an SKI belongs to more than one CA. See [CAs that share a key](#cas-that-share-a-key).
+</Callout>
+
+CRL versions are kept as PEM in object storage at `pki/va/crl/<ca-id>/<version>.crl`; the public endpoint returns DER. CRLs published before the 4.0.0 upgrade remain at `pki/va/crl/<ski>/<version>.crl` and keep being served.
+
+CAs that share a key [#cas-that-share-a-key]
+
+Since 4.0.0, each CA publishes its own CRL even when its key is shared: two CAs with the same key have the same SKI, but each has its own CRL settings and its own list, signed by a certificate with that CA’s identity.
+
+Certificates issued from now on carry `/crl/<ca-id>` distribution points, so each CA’s certificates resolve to its own list. Certificates issued before the upgrade keep their `/crl/<ski>` distribution points: that URL keeps resolving to the settings the upgrade migrated, and always serves the list of the CA that owned that SKI when the upgrade ran. It is never rebound to a CA created later with the same key. After regeneration, the migrated list includes both URLs in its *Issuing Distribution Point* (OID `2.5.29.28`), so a verifier that compares the IDP with the CDP of the certificate accepts either form. Until the VA scheduled CRL job successfully regenerates it, the pre-upgrade list contains only the legacy `/crl/<ski>` IDP; IDP-checking verifiers cannot validate newly issued certificates with `/crl/<ca-id>` CDPs. The first run can take up to about an hour with the default schedule, and failures can extend the window.
+
+Sharing an SKI between CAs blocks the upgrade: the migration aborts and names the SKIs. To detect the problem before upgrading, compare the SKI of the CAs in the inventory: two with the same SKI are affected. To fix it, create a CA with its own key and reissue its certificates; those already issued keep the old URL and are not corrected until reissued.
+
+Lamassu takes the SKI of an imported certificate as-is and does not check that it corresponds to its public key. Until Lamassu rejects imports whose SKI collides with an existing CA — proposed in [lamassuiot#834](https://github.com/lamassuiot/lamassuiot/issues/834), together with the per-CA CRL that 4.0.0 implements — restrict the permission to import CAs as an interim control; it covers only the import path. Creating a CA with **Create New CA (Existing Key)** on a KMS key another CA already uses produces the same SKI collision, so avoid reusing keys across CAs.
+
+Periodic and automatic regeneration [#periodic-and-automatic-regeneration]
+
+The VA scheduled job checks the CRL settings of every CA on each run and requests a new list when either of these conditions is met:
+
+* **The list is about to expire:** the remaining validity of `latest_crl` is less than the interval between job runs. This condition always applies and cannot be disabled.
+* **The refresh interval has elapsed:** the time since the issuance of the latest published CRL reaches `refresh_interval`. Setting `refresh_interval` to `0` disables only this condition; the list is still regenerated when it is about to expire.
+
+Setting `refresh_interval` to `0` therefore does not freeze regeneration. With the default 7-day validity and an hourly job, a CRL is renewed up to an hour before it expires even if `refresh_interval` is `0`. Because the job runs on its own schedule, `refresh_interval` is honored only as precisely as the job frequency allows.
+
+The job frequency is set in Helm with `services.va.job.crl.frequency` (default `0 * * * *`) and accepts a duration (`1h`) or a cron expression. A cron expression is converted into a constant interval equal to the time left until its next firing when the service starts, so it is not aligned with the clock. Keep `validity` well above that interval: with a shorter validity, the list is regenerated on every cycle.
+
+If generation fails (for example, because the CA cannot be resolved or the signer is invalid), the job logs the warning `something went wrong while calculating CRL for CA <ca-id>` and retries on the next cycle. There is no other renewal path until the cause is fixed, and the last published list keeps being served until it expires. All of this depends on working jobs, storage and signing.
+
+Settings whose `status` is not `ACTIVE` — `FINAL` or `ARCHIVED` — are skipped: nothing regenerates their CRL.
+
+With `regenerate_on_revoke`, the event handler requests a new CRL upon revocation or reactivation from `CertificateHold` to `ACTIVE`. This happens after the status change and has its own failure paths: if generation fails (for example, because of an invalid signer), the event is retried and, once retries are exhausted, moves to the failed-events queue. If the issuing CA has no CRL settings, there is no CRL to regenerate: the event is acknowledged without retry, the VA logs a warning, and nothing appears in the failed-events queue. Confirming revocation does not establish that the new CRL is already published or that all clients have downloaded it.
+
+Compare CRL numbers and timestamps before and after a change. Monitor expired lists and generation failures; clients must apply policy when current evidence is unavailable.
+
+CRL contents [#crl-contents]
+
+Each entry contains serial number, revocation time and reason. The generator queries certificates in `REVOKED` state for the selected CA. A reactivated certificate disappears when the list is recalculated; an earlier downloaded copy retains its contents.
+
+The list contains a critical *Issuing Distribution Point* (OID `2.5.29.28`) with configured distribution URLs. Check that your client interprets this extension and that it matches the list’s scope. If rejected, investigate format and scope; ignoring a critical extension is not successful validation.
+
+Public download endpoint [#public-download-endpoint]
+
+The VA service exposes `GET /crl/{id}` without management authorization. Use the **issuing CA’s** ID, not the end-entity certificate’s ID or serial. Certificates issued before the 4.0.0 upgrade carry `/crl/<ski>` URLs with the SKI of the CA key; that form keeps resolving. First inspect the certificate’s CDP:
+
+```bash
+openssl x509 -in device.crt -noout -text
+```
+
+Replace the following URL with the CDP URL and review exposure in [Deployment](/docs/deployment/self-hosted/networking):
+
+```bash
+CRL_URL='http://pki.example.com/crl/REPLACE_WITH_CDP_ID'
+
+curl --fail --show-error --silent --max-time 15 \
+  "$CRL_URL" -o ca.crl.der
+
+openssl crl -inform DER -in ca.crl.der \
+  -outform PEM -out ca.crl.pem
+
+openssl crl -in ca.crl.pem -noout \
+  -issuer -lastupdate -nextupdate -crlnumber
+
+openssl crl -in ca.crl.pem -noout -text
+openssl crl -in ca.crl.pem -noout -verify -CAfile issuer.pem
+```
+
+You need OpenSSL 3.x and `issuer.pem` containing the direct issuer’s certificate. An accepted signer certificate has the same subject and public key as the CA, so this signature check also works when the settings point to an earlier certificate for that CA and key. Require a valid signature, current timestamps and the expected issuer. For a root that issues directly:
+
+```bash
+openssl verify -CAfile roots.pem -CRLfile ca.crl.pem \
+  -crl_check -purpose sslclient device.crt
+```
+
+`roots.pem` contains deliberately trusted roots. For intermediates, add `-untrusted intermediates.pem` before the `device.crt` argument. `-crl_check` checks the end-entity certificate’s revocation against the local list; it does not download other lists or establish the status of the whole chain. A complete chain check needs the corresponding CRLs and a policy requiring them.
+
+The test should accept an allowed certificate absent from the list and reject it with `certificate revoked` after publishing and using the list containing its serial.
+
+CRL settings API [#crl-settings-api]
+
+The following paths are relative to the VA service; confirm the public prefix in the Gateway. They are not the URLs of the public OCSP and CRL endpoints.
+
+| Method   | Relative path              | Operation                                                                         |
+| -------- | -------------------------- | --------------------------------------------------------------------------------- |
+| `GET`    | `/v1/crl-settings`         | List the CRL settings; filterable at least by `ca_id`, `status` and `legacy_ski`. |
+| `GET`    | `/v1/crl-settings/{ca-id}` | Read the `crl_options` and `latest_crl` of a CA.                                  |
+| `PUT`    | `/v1/crl-settings/{ca-id}` | Replace the CRL configuration of a CA.                                            |
+| `DELETE` | `/v1/crl-settings/{ca-id}` | Remove the archived CRL settings of a CA.                                         |
+
+You need authentication and CRL settings read, update or delete permissions. Consult your installation’s [API reference](/docs/api-reference) and [Access control](/docs/platform/administration/access-control). Read current configuration before updating and send the full object expected by the contract — `refresh_interval`, `validity`, `signer_serial_number` and `regenerate_on_revoke`: the backend replaces all four; it does not merge omitted fields. `status`, `legacy_ski` and `latest_crl` are read-only. A `PUT` returns 409 when the settings are not `ACTIVE`, validates the signer only when it changes, and does not regenerate the CRL.
+
+Archived settings, whose CA no longer exists, can be removed with `DELETE`: the call returns 204 on success, 404 when the CA has no settings and 409 while the settings are not yet archived. After the deletion, the public `/crl/{id}` endpoint and any legacy `/crl/<ski>` endpoint stop serving the CA’s list, although the published CRL files remain in the bucket. Keep the archived settings while any certificate issued by the CA may still need revocation evidence: `DELETE` stops serving the list immediately, regardless of `latest_crl` validity. The action cannot be undone.
+
+After a change, check saved configuration and the next list actually published. Updating the settings alone does not establish regeneration or client acceptance.
+
+Common CRL settings errors [#common-crl-settings-errors]
+
+| Symptom                                               | Cause                                                                                                                                                                           | Action                                                                                                                                                                                |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUT /v1/crl-settings/{ca-id}` returns 409.           | The settings are not `ACTIVE`: revoking the CA permanently or letting it expire finalized them, or the migration archived them because their CA was deleted before the upgrade. | There is no API way back to `ACTIVE`. The last CRL keeps being served.                                                                                                                |
+| `DELETE /v1/crl-settings/{ca-id}` returns 409.        | The settings are not yet `ARCHIVED`: the CA has not been deleted.                                                                                                               | Delete the CA first; deleting it archives its settings.                                                                                                                               |
+| `PUT` returns 400.                                    | The new signer lacks `cRLSign`, or its subject and public key do not match the CA.                                                                                              | Set the serial number of a valid certificate of that CA.                                                                                                                              |
+| `PUT` returns 404.                                    | The CA or the new signer certificate does not exist, or the CA has no CRL settings, for example because it was imported without its key or its certificate lacks `cRLSign`.     | Check the CA ID and the signer serial number.                                                                                                                                         |
+| `PUT` returns 400 from a 3.x client.                  | `crl_options.subject_key_id_signer` was replaced by `crl_options.signer_serial_number`, which is required.                                                                      | Update the client to send the new field.                                                                                                                                              |
+| The CRL does not change after revoking a certificate. | `regenerate_on_revoke` is `false`, the issuing CA has no CRL settings, or generation failed because of an invalid signer.                                                       | Check the VA logs. Missing settings only produce a warning (no retry, no failed-events entry); an invalid signer also leaves the event in the failed-events queue, so fix the signer. |
+| A verifier rejects the CRL because of the issuer.     | The list was fetched through a legacy `/crl/<ski>` URL and belongs to the CA that owned that SKI when the upgrade ran.                                                          | Use the CDP of the certificate being validated: certificates issued in 4.0.0 carry `/crl/<ca-id>` URLs.                                                                               |
+
+References [#references]
+
+* [RFC 5280: X.509 and CRL profile](https://www.rfc-editor.org/rfc/rfc5280).
+* [OpenSSL: openssl-crl](https://docs.openssl.org/3.6/man1/openssl-crl/).
+* [OpenSSL: openssl-verify](https://docs.openssl.org/3.6/man1/openssl-verify/).
+
+<Cards>
+  <Card title="OCSP service" href="/docs/platform/pki/ocsp" />
+
+  <Card title="Certificate validation" href="/docs/platform/pki/certificate-validation" />
+</Cards>

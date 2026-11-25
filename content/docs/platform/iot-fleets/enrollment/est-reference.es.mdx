@@ -3,7 +3,7 @@ title: Referencia EST
 description: Consulta las rutas, formatos, autenticación y respuesta multipart de Lamassu.
 ---
 
-Referencia del contrato del [backend examinado](/docs/platform/iot-fleets/enrollment/overview#versión-del-contrato), basada en [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html). Utiliza [Cliente EST](/docs/platform/iot-fleets/enrollment/est-client) para el procedimiento y [DMS](/docs/platform/iot-fleets/enrollment/dms) para configurar la política.
+Referencia del servicio EST de Lamassu, basada en [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html). Utiliza [Cliente EST](/docs/platform/iot-fleets/enrollment/est-client) para el procedimiento y [DMS](/docs/platform/iot-fleets/enrollment/dms) para configurar la política.
 
 ## Referencia de endpoints
 
@@ -26,7 +26,7 @@ La respuesta predeterminada tiene `Content-Type: application/pkcs7-mime; smime-t
 
 ## simpleenroll
 
-Envía una CSR PKCS#10 DER codificada en Base64, con `Content-Type: application/pkcs10`. El controlador examinado compara ese media type literalmente; evita añadir parámetros como charset. El CN identifica el dispositivo y la firma de la CSR debe verificarse mediante la política DMS.
+Envía una CSR PKCS#10 DER codificada en Base64, con `Content-Type: application/pkcs10`. El controlador compara ese media type literalmente; evita añadir parámetros como charset. El CN identifica el dispositivo y la firma de la CSR debe verificarse mediante la política DMS.
 
 La respuesta predeterminada usa el formato PKCS#7/Base64 descrito para cacerts, pero contiene el certificado emitido; no presupongas que incluye toda su cadena. `Accept: application/x-pem-file` devuelve ese certificado en PEM. El cliente conserva la clave que firmó la CSR.
 

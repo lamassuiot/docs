@@ -38,7 +38,7 @@ El controlador EST devuelve normalmente 400 al rechazar entrada y 500 cuando el 
 
 ### Notas de compatibilidad
 
-Los ejemplos usan el contrato del [backend examinado](/docs/platform/iot-fleets/enrollment/overview#versión-del-contrato). No atribuyas automáticamente ese comportamiento a otra release. Verifica el modo de renovación guardado y el comportamiento del Gateway con certificados vencidos y con la CA inicial.
+Verifica el modo de renovación guardado y el comportamiento del Gateway con certificados vencidos y con la CA inicial.
 
 La respuesta predeterminada es PKCS#7 DER en Base64; el PEM por `Accept: application/x-pem-file` es una extensión de Lamassu. ServerKeyGen devuelve multipart y requiere tratar cada parte por separado. Consulta la [referencia EST](/docs/platform/iot-fleets/enrollment/est-reference).
 

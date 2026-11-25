@@ -47,7 +47,7 @@ Prepare EST server trust and device connectivity through [Deployment](/docs/depl
 
 `settings.enrollment_settings.registration_mode` accepts `JITP` or `PRE_REGISTRATION`. JITP creates an unknown device with the CSR CN as ID and the DMS as owner. `device_provisioning_profile` supplies tags, metadata and icon for that registration.
 
-PRE_REGISTRATION requires an existing ID. In the inspected code, an existing device encounters replacement checks first, even without an identity. Review [preregistration conditions](/docs/platform/iot-fleets/enrollment/provisioning-strategies#preregistration-and-replacement) before using this mode.
+PRE_REGISTRATION requires an existing ID. An existing device encounters replacement checks first, even without an identity. Review [preregistration conditions](/docs/platform/iot-fleets/enrollment/provisioning-strategies#preregistration-and-replacement) before using this mode.
 
 ### Enrollment Settings
 
@@ -77,7 +77,7 @@ The blocks are independent:
 
 Webhook and combined modes also execute during re-enrollment when configured in its block. They do not implicitly degrade to NO_AUTH. An absent or unrecognized mode fails.
 
-For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired`, `chain_level_validation` and `allow_unverifiable_revocation`. The inspected flow receives one certificate credential; it does not guarantee forwarding every handshake intermediate to the validator. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
+For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired`, `chain_level_validation` and `allow_unverifiable_revocation`. The validator receives one certificate credential; it does not guarantee forwarding every handshake intermediate to the validator. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
 
 Revocation is checked for every presented certificate. In initial enrollment the client certificate **and** every intermediate CA between it and the validation CA are checked, each against its issuer; extra certificates the device sends in the handshake are ignored. A validation CA that is revoked in Lamassu rejects the operation: the first validation CA that validates the certificate is used, and a revoked one is not replaced by the remaining validation CAs. Certificates issued and managed by Lamassu are checked against their stored status. External certificates are checked through their OCSP and CRL endpoints, and the operation fails closed when revocation cannot be verified: only `allow_unverifiable_revocation` — `false` by default in both blocks — relaxes the case of an external certificate that lists no endpoint at all. Endpoints that exist but are unreachable, return stale or invalid evidence, or report an inconclusive status are always rejected, whatever the option says. The details and the evidence the endpoints must present are in [Revocation and checks](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks).
 

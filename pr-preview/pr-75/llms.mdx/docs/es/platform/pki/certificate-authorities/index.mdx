@@ -130,6 +130,24 @@ Eliminar una CA libera las referencias a la clave de su propio certificado actua
   </Step>
 </Steps>
 
+<div className="lm-diff-ins lm-diff-block">
+  Estados de una CA [#estados-de-una-ca]
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  Una CA solo firma en `ACTIVE`. Desde ahí puede pasar a `EXPIRED` o a `REVOKED`, y de esos estados solo sale por la eliminación, salvo en un caso: la revocación con `CertificateHold` se puede deshacer.
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  <DiagramEmbed name="ca-lifecycle" title="Ciclo de vida de una CA: ACTIVE, EXPIRED, REVOKED con CertificateHold, REVOKED definitivo y eliminación" />
+</div>
+
+<div className="lm-diff-ins lm-diff-block">
+  * **Caducidad.** El monitor de expiración marca como `EXPIRED` las CAs `ACTIVE` cuyo periodo de validez ha terminado. Hasta que se ejecuta, la CA ya no firma, porque Lamassu comprueba las fechas ([Emite certificados](#emite-certificados)).
+  * **Revocación.** Revocar con la razón `CertificateHold` es reversible. Una revocación con cualquier otra razón, igual que `EXPIRED`, rechaza todo cambio de estado posterior. Revocar, también con `CertificateHold`, actúa además sobre las CAs subordinadas y los certificados que emitió: [Revoca una CA](#revoca-una-ca).
+  * **Eliminación.** Solo una CA revocada con otra razón o caducada puede eliminarse; una importada sin clave, desde cualquier estado. Condiciones y efectos en [Elimina una CA](#elimina-una-ca).
+</div>
+
 Inspecciona una autoridad [#inspecciona-una-autoridad]
 
 Abre una CA desde el inventario para consultar:

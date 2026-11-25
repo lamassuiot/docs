@@ -25,7 +25,7 @@ The default response has `Content-Type: application/pkcs7-mime; smime-type=certs
 
 simpleenroll [#simpleenroll]
 
-Send a Base64-encoded DER PKCS#10 CSR with `Content-Type: application/pkcs10`. The examined controller compares that media type literally; avoid adding parameters such as charset. The CN identifies the device and the CSR signature must be verified through DMS policy.
+Send a Base64-encoded DER PKCS#10 CSR with `Content-Type: application/pkcs10`. The <del className="lm-diff-del">examined </del>controller compares that media type literally; avoid adding parameters such as charset. The CN identifies the device and the CSR signature must be verified through DMS policy.
 
 The default response uses the PKCS#7/Base64 format described for cacerts, but contains the issued certificate; do not assume it includes its entire chain. `Accept: application/x-pem-file` returns that certificate in PEM. The client retains the key that signed the CSR.
 

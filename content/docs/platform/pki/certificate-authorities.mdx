@@ -126,6 +126,16 @@ Deleting a CA releases the key references of its own current certificate and lin
   </Step>
 </Steps>
 
+## CA states
+
+A CA only signs in `ACTIVE`. From there it can move to `EXPIRED` or to `REVOKED`, and it leaves those states only by deletion, with one exception: a revocation with `CertificateHold` can be undone.
+
+<DiagramEmbed name="ca-lifecycle" lang="en" title="CA lifecycle: ACTIVE, EXPIRED, REVOKED with CertificateHold, permanently REVOKED and deletion" />
+
+- **Expiry.** The expiry monitor marks as `EXPIRED` the `ACTIVE` CAs whose validity period has ended. Until it runs, the CA already does not sign, because Lamassu checks the dates ([Issue certificates](#issue-certificates)).
+- **Revocation.** Revoking with the `CertificateHold` reason is reversible. A revocation with any other reason, like `EXPIRED`, rejects every later status change. Revoking, also with `CertificateHold`, additionally acts on the subordinate CAs and the certificates it issued: [Revoke a CA](#revoke-a-ca).
+- **Deletion.** Only a CA revoked with another reason, or an expired one, can be deleted; an imported CA without a key can be deleted from any state. Conditions and effects in [Delete a CA](#delete-a-ca).
+
 ## Inspect an authority
 
 Open a CA from the inventory to review:

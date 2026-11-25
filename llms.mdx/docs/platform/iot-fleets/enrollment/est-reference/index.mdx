@@ -2,7 +2,7 @@
 
 
 
-Reference for the [examined backend](/docs/platform/iot-fleets/enrollment/overview#contract-version), based on [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html). Use [EST client](/docs/platform/iot-fleets/enrollment/est-client) for the procedure and [DMS](/docs/platform/iot-fleets/enrollment/dms) to configure policy.
+Reference for the Lamassu EST service, based on [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html). Use [EST client](/docs/platform/iot-fleets/enrollment/est-client) for the procedure and [DMS](/docs/platform/iot-fleets/enrollment/dms) to configure policy.
 
 Endpoint reference [#endpoint-reference]
 
@@ -25,7 +25,7 @@ The default response has `Content-Type: application/pkcs7-mime; smime-type=certs
 
 simpleenroll [#simpleenroll]
 
-Send a Base64-encoded DER PKCS#10 CSR with `Content-Type: application/pkcs10`. The examined controller compares that media type literally; avoid adding parameters such as charset. The CN identifies the device and the CSR signature must be verified through DMS policy.
+Send a Base64-encoded DER PKCS#10 CSR with `Content-Type: application/pkcs10`. The controller compares that media type literally; avoid adding parameters such as charset. The CN identifies the device and the CSR signature must be verified through DMS policy.
 
 The default response uses the PKCS#7/Base64 format described for cacerts, but contains the issued certificate; do not assume it includes its entire chain. `Accept: application/x-pem-file` returns that certificate in PEM. The client retains the key that signed the CSR.
 
@@ -33,7 +33,7 @@ simplereenroll [#simplereenroll]
 
 Use the same request and certificate response formats. Authentication comes from the independent `reenrollment_settings.est_rfc7030_settings` block. With a client certificate, its CN must match the CSR CN; the subject is also checked against the current certificate.
 
-In mTLS mode, the enrollment CA always validates the re-enrollment credential; certificates from other issuers are accepted only if they are listed as validation CAs in the re-enrollment block. The expiry check through `enable_expired_renewal` belongs to that validator. A revoked current certificate and a request before the window are rejected. See [Renewal](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for installation and recovery.
+In mTLS mode, the enrollment CA always validates the re-enrollment credential; certificates from other issuers are accepted only if they are listed as validation CAs in the re-enrollment block. The expiry check through `enable_expired_renewal` belongs to that validator. A revoked current certificate and a request before the window are rejected. With default settings, a client certificate whose revocation cannot be verified is also rejected; the [DMS guide](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation) describes `allow_unverifiable_revocation`. See [Renewal](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for installation and recovery.
 
 serverkeygen [#serverkeygen]
 

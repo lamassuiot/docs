@@ -18,7 +18,7 @@ For an initial client test, use [Enroll and connect a device](/docs/platform/iot
 
 Preregistration and replacement [#preregistration-and-replacement]
 
-In the inspected code, finding any device owned by the same DMS triggers the `enable_replaceable_enrollment` check before PRE\_REGISTRATION. With the flag disabled, a preregistered device can receive `forbiddenNewEnrollment` even in **No Identity**. Selecting PRE\_REGISTRATION alone therefore does not establish a working path.
+Finding any device owned by the same DMS triggers the `enable_replaceable_enrollment` check before PRE\_REGISTRATION. With the flag disabled, a preregistered device can receive `forbiddenNewEnrollment` even in **No Identity**. Selecting PRE\_REGISTRATION alone therefore does not establish a working path.
 
 Enabling the flag permits repeated `/simpleenroll` for an existing ID. The backend schedules a deferred attempt to revoke the previous certificate with `Superseded`; it can also run if later issuance or binding fails. Without an identity, that attempt can fail because no serial exists. The flag does not provide a replacement transaction or guarantee restoration of previous state.
 

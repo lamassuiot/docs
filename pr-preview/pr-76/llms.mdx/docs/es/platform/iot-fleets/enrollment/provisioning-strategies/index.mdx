@@ -18,7 +18,7 @@ Para una primera prueba desde el cliente, utiliza [Enrola y conecta un dispositi
 
 Prerregistro y sustitución [#prerregistro-y-sustitución]
 
-En el código examinado, encontrar cualquier dispositivo del mismo DMS activa el control `enable_replaceable_enrollment` antes de comprobar PRE\_REGISTRATION. Con el flag desactivado, un dispositivo prerregistrado puede recibir `forbiddenNewEnrollment` incluso estando en **No Identity**. No se presenta ese recorrido como garantizado por seleccionar únicamente PRE\_REGISTRATION.
+<del className="lm-diff-del">En el código examinado, encontrar</del><ins className="lm-diff-ins">Encontrar</ins> cualquier dispositivo del mismo DMS activa el control `enable_replaceable_enrollment` antes de comprobar PRE\_REGISTRATION. Con el flag desactivado, un dispositivo prerregistrado puede recibir `forbiddenNewEnrollment` incluso estando en **No Identity**. No se presenta ese recorrido como garantizado por seleccionar únicamente PRE\_REGISTRATION.
 
 Activar el flag permite repetir `/simpleenroll` para un ID existente. El backend programa un intento diferido de revocación del certificado anterior con `Superseded`; también puede ejecutarlo si después falla la emisión o vinculación. Si no había identidad, el intento puede fallar por falta de serie. El flag no es una transacción de sustitución ni garantiza restaurar el estado anterior.
 

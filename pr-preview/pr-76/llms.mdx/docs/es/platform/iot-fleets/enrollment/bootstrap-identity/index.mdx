@@ -12,7 +12,7 @@ No puedes obtener tu única prueba de confianza del mismo servidor todavía no a
 
 Credencial bootstrap [#credencial-bootstrap]
 
-Con `CLIENT_CERTIFICATE`, el dispositivo presenta su certificado inicial y demuestra posesión de su clave en TLS. El DMS lo valida frente a sus CAs de admisión. En el flujo examinado, el validador recibe una credencial de hoja: configura y prueba el emisor directo para el caso sencillo; enviar más intermedias desde el cliente no demuestra que lleguen al servicio.
+Con `CLIENT_CERTIFICATE`, el dispositivo presenta su certificado inicial y demuestra posesión de su clave en TLS. El DMS lo valida frente a sus CAs de admisión. <del className="lm-diff-del">En el flujo examinado, el</del><ins className="lm-diff-ins">El</ins> validador recibe una credencial de hoja: configura y prueba el emisor directo para el caso sencillo; enviar más intermedias desde el cliente no demuestra que lleguen al servicio.
 
 Comprueba fechas, certificado y clave correspondientes y estado de revocación antes de provisionarlos. Una credencial compartida entre equipos identifica esa credencial compartida, no a un equipo concreto.
 

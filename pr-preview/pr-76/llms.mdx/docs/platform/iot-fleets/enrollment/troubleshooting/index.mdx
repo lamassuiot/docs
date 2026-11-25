@@ -37,7 +37,7 @@ The EST controller normally returns 400 when rejecting input and 500 when the se
 
 Compatibility notes [#compatibility-notes]
 
-The examples use the contract of the [examined backend](/docs/platform/iot-fleets/enrollment/overview#contract-version). Do not automatically attribute that behavior to another release. Check the saved renewal mode and Gateway behavior with expired certificates and the bootstrap CA.
+<del className="lm-diff-del">The examples use the contract of the </del>[<del className="lm-diff-del">examined backend</del>](/docs/platform/iot-fleets/enrollment/overview#contract-version)<del className="lm-diff-del">. Do not automatically attribute that behavior to another release. </del>Check the saved renewal mode and Gateway behavior with expired certificates and the bootstrap CA.
 
 The default response is Base64-encoded DER PKCS#7; PEM through `Accept: application/x-pem-file` is a Lamassu extension. ServerKeyGen returns multipart and requires handling each part separately. See the [EST reference](/docs/platform/iot-fleets/enrollment/est-reference).
 

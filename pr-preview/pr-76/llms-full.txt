@@ -1857,7 +1857,7 @@ Your only trust proof cannot come from the same unauthenticated server. The EST 
 
 Bootstrap credential [#bootstrap-credential]
 
-With `CLIENT_CERTIFICATE`, the device presents its initial certificate and proves key possession through TLS. The DMS validates it against admission CAs. In the inspected flow, the validator receives one leaf credential: configure and test the direct issuer for the simple case; sending more intermediates does not establish delivery to the service.
+With `CLIENT_CERTIFICATE`, the device presents its initial certificate and proves key possession through TLS. The DMS validates it against admission CAs. <del className="lm-diff-del">In the inspected flow, the</del><ins className="lm-diff-ins">The</ins> validator receives one leaf credential: configure and test the direct issuer for the simple case; sending more intermediates does not establish delivery to the service.
 
 Check dates, matching certificate/key and revocation before provisioning. A credential shared across equipment identifies that shared credential, not an individual device.
 
@@ -1966,7 +1966,7 @@ Enrollment Device Registration [#enrollment-device-registration]
 
 `settings.enrollment_settings.registration_mode` accepts `JITP` or `PRE_REGISTRATION`. JITP creates an unknown device with the CSR CN as ID and the DMS as owner. `device_provisioning_profile` supplies tags, metadata and icon for that registration.
 
-PRE\_REGISTRATION requires an existing ID. In the inspected code, an existing device encounters replacement checks first, even without an identity. Review [preregistration conditions](/docs/platform/iot-fleets/enrollment/provisioning-strategies#preregistration-and-replacement) before using this mode.
+PRE\_REGISTRATION requires an existing ID. <del className="lm-diff-del">In the inspected code, an</del><ins className="lm-diff-ins">An</ins> existing device encounters replacement checks first, even without an identity. Review [preregistration conditions](/docs/platform/iot-fleets/enrollment/provisioning-strategies#preregistration-and-replacement) before using this mode.
 
 Enrollment Settings [#enrollment-settings]
 
@@ -1996,7 +1996,7 @@ The blocks are independent:
 
 Webhook and combined modes also execute during re-enrollment when configured in its block. They do not implicitly degrade to NO\_AUTH. An absent or unrecognized mode fails.
 
-For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired`<del className="lm-diff-del"> and `chain_level_validation`</del><ins className="lm-diff-ins">, `chain_level_validation` and `allow_unverifiable_revocation`</ins>. The inspected flow receives one certificate credential; it does not guarantee forwarding every handshake intermediate to the validator. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
+For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired`<del className="lm-diff-del"> and `chain_level_validation`. The inspected flow</del><ins className="lm-diff-ins">, `chain_level_validation` and `allow_unverifiable_revocation`. The validator</ins> receives one certificate credential; it does not guarantee forwarding every handshake intermediate to the validator. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
 
 <div className="lm-diff-ins lm-diff-block">
   Revocation is checked for every presented certificate. In initial enrollment the client certificate **and** every intermediate CA between it and the validation CA are checked, each against its issuer; extra certificates the device sends in the handshake are ignored. A validation CA that is revoked in Lamassu rejects the operation: the first validation CA that validates the certificate is used, and a revoked one is not replaced by the remaining validation CAs. Certificates issued and managed by Lamassu are checked against their stored status. External certificates are checked through their OCSP and CRL endpoints, and the operation fails closed when revocation cannot be verified: only `allow_unverifiable_revocation` — `false` by default in both blocks — relaxes the case of an external certificate that lists no endpoint at all. Endpoints that exist but are unreachable, return stale or invalid evidence, or report an inconclusive status are always rejected, whatever the option says. The details and the evidence the endpoints must present are in [Revocation and checks](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks).
@@ -2179,7 +2179,7 @@ Implement [renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-an
 
 
 
-Reference for the [examined backend](/docs/platform/iot-fleets/enrollment/overview#contract-version), based on [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html). Use [EST client](/docs/platform/iot-fleets/enrollment/est-client) for the procedure and [DMS](/docs/platform/iot-fleets/enrollment/dms) to configure policy.
+Reference for the [<del className="lm-diff-del">examined backend</del>](/docs/platform/iot-fleets/enrollment/overview#contract-version)<ins className="lm-diff-ins">Lamassu EST service</ins>, based on [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html). Use [EST client](/docs/platform/iot-fleets/enrollment/est-client) for the procedure and [DMS](/docs/platform/iot-fleets/enrollment/dms) to configure policy.
 
 Endpoint reference [#endpoint-reference]
 
@@ -2367,9 +2367,13 @@ For the integrator [#for-the-integrator]
   <Card title="Troubleshooting" description="Distinguish transport, policy, issuance and installation failures." href="/docs/platform/iot-fleets/enrollment/troubleshooting" />
 </Cards>
 
-Contract version [#contract-version]
+<div className="lm-diff-del lm-diff-block">
+  Contract version
+</div>
 
-This block describes `main` code inspected at commit <del className="lm-diff-del">`8f42c47157f9a36bac3ed5caa3692aebebe19c4b`</del><ins className="lm-diff-ins">`03aa2f1be273a05cb06d85d8dfb2560d6d677ca4`</ins>. The site catalog publishes `main (unstable)`; this behavior is not attributed to a stable release. Before using another version, check its contract, particularly independent re-enrollment authentication. Client checks and live-instance tests are distinguished in the revision plan.
+<div className="lm-diff-del lm-diff-block">
+  This block describes `main` code inspected at commit `8f42c47157f9a36bac3ed5caa3692aebebe19c4b`. The site catalog publishes `main (unstable)`; this behavior is not attributed to a stable release. Before using another version, check its contract, particularly independent re-enrollment authentication. Client checks and live-instance tests are distinguished in the revision plan.
+</div>
 
 Gateway, TLS, provider and service configuration belongs to [Deployment](/docs/deployment/overview). Identity use in AWS or other destinations belongs to [Integrations](/docs/platform/iot-fleets/overview#integrations).
 
@@ -2394,7 +2398,7 @@ For an initial client test, use [Enroll and connect a device](/docs/platform/iot
 
 Preregistration and replacement [#preregistration-and-replacement]
 
-In the inspected code, finding any device owned by the same DMS triggers the `enable_replaceable_enrollment` check before PRE\_REGISTRATION. With the flag disabled, a preregistered device can receive `forbiddenNewEnrollment` even in **No Identity**. Selecting PRE\_REGISTRATION alone therefore does not establish a working path.
+<del className="lm-diff-del">In the inspected code, finding</del><ins className="lm-diff-ins">Finding</ins> any device owned by the same DMS triggers the `enable_replaceable_enrollment` check before PRE\_REGISTRATION. With the flag disabled, a preregistered device can receive `forbiddenNewEnrollment` even in **No Identity**. Selecting PRE\_REGISTRATION alone therefore does not establish a working path.
 
 Enabling the flag permits repeated `/simpleenroll` for an existing ID. The backend schedules a deferred attempt to revoke the previous certificate with `Superseded`; it can also run if later issuance or binding fails. Without an identity, that attempt can fail because no serial exists. The flag does not provide a replacement transaction or guarantee restoration of previous state.
 
@@ -2537,7 +2541,7 @@ The EST controller normally returns 400 when rejecting input and 500 when the se
 
 Compatibility notes [#compatibility-notes]
 
-The examples use the contract of the [examined backend](/docs/platform/iot-fleets/enrollment/overview#contract-version). Do not automatically attribute that behavior to another release. Check the saved renewal mode and Gateway behavior with expired certificates and the bootstrap CA.
+<del className="lm-diff-del">The examples use the contract of the </del>[<del className="lm-diff-del">examined backend</del>](/docs/platform/iot-fleets/enrollment/overview#contract-version)<del className="lm-diff-del">. Do not automatically attribute that behavior to another release. </del>Check the saved renewal mode and Gateway behavior with expired certificates and the bootstrap CA.
 
 The default response is Base64-encoded DER PKCS#7; PEM through `Accept: application/x-pem-file` is a Lamassu extension. ServerKeyGen returns multipart and requires handling each part separately. See the [EST reference](/docs/platform/iot-fleets/enrollment/est-reference).
 
@@ -2590,7 +2594,7 @@ Migrate trust [#migrate-trust]
 
 Before changing Enrollment CA, inventory disconnected equipment, bootstrap and operational certificates, and consumers. Distribute the new root and required intermediates; check that a cohort accepts both old and new chains.
 
-In the DMS, separate distributed CAs from the re-enrollment validation CAs at `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`, used for re-enrollment credentials. That list is optional because the enrollment CA always validates re-enrollment credentials, but when switching the enrollment CA, add the previous issuance CA to it so old-CA identities keep re-enrolling during overlap. The inspected validator tries the enrollment CA followed by those CAs against the received leaf; accepting a multilevel chain requires checking what reaches the service and which issuer is configured.
+In the DMS, separate distributed CAs from the re-enrollment validation CAs at `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`, used for re-enrollment credentials. That list is optional because the enrollment CA always validates re-enrollment credentials, but when switching the enrollment CA, add the previous issuance CA to it so old-CA identities keep re-enrolling during overlap. The <del className="lm-diff-del">inspected </del>validator tries the enrollment CA followed by those CAs against the received leaf; accepting a multilevel chain requires checking what reaches the service and which issuer is configured.
 
 Switch issuance, renew in cohorts and compare the installed serial with the active slot. Remove previous trust once no legitimate equipment needs it and policy permits ending overlap. Follow [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for the PKI operation.
 

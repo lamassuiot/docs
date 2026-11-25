@@ -12,7 +12,7 @@ Your only trust proof cannot come from the same unauthenticated server. The EST 
 
 Bootstrap credential [#bootstrap-credential]
 
-With `CLIENT_CERTIFICATE`, the device presents its initial certificate and proves key possession through TLS. The DMS validates it against admission CAs. In the inspected flow, the validator receives one leaf credential: configure and test the direct issuer for the simple case; sending more intermediates does not establish delivery to the service.
+With `CLIENT_CERTIFICATE`, the device presents its initial certificate and proves key possession through TLS. The DMS validates it against admission CAs. <del className="lm-diff-del">In the inspected flow, the</del><ins className="lm-diff-ins">The</ins> validator receives one leaf credential: configure and test the direct issuer for the simple case; sending more intermediates does not establish delivery to the service.
 
 Check dates, matching certificate/key and revocation before provisioning. A credential shared across equipment identifies that shared credential, not an individual device.
 

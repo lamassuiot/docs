@@ -2,7 +2,7 @@
 
 
 
-Enrollment with PKI reúne el recorrido desde la admisión del dispositivo hasta la instalación y renovación de su identidad. El DMS actúa como autoridad de registro: autentica la solicitud, aplica la política de registro y pide a la CA que firme. El cliente conserva o recibe la clave, instala el resultado y lo presenta al consumidor.
+El enrolamiento con PKI reúne el recorrido desde la admisión del dispositivo hasta la instalación y renovación de su identidad. El DMS actúa como autoridad de registro: autentica la solicitud, aplica la política de registro y pide a la CA que firme. El cliente conserva o recibe la clave, instala el resultado y lo presenta al consumidor.
 
 El recorrido [#el-recorrido]
 
@@ -20,22 +20,10 @@ Para el administrador [#para-el-administrador]
   <Card title="Estrategias de aprovisionamiento" description="Elige registro automático, prerregistro o asignación manual." href="/docs/platform/iot-fleets/enrollment/provisioning-strategies" />
 
   <Card title="Configura el DMS" description="Separa admisión, autenticación por operación, perfil y distribución." href="/docs/platform/iot-fleets/enrollment/dms" />
-
-  <Card title="Identidad inicial y autenticación" description="Decide qué prueba permite solicitar la primera identidad." href="/docs/platform/iot-fleets/enrollment/bootstrap-identity" />
-
-  <Card title="Distribución de confianza" description="Actualiza raíces y cadenas con un solapamiento comprobado." href="/docs/platform/iot-fleets/enrollment/trust-distribution" />
 </Cards>
 
 Para el integrador [#para-el-integrador]
 
-<Cards>
-  <Card title="Cliente EST" description="Prepara la solicitud, verifica la respuesta e instala la identidad." href="/docs/platform/iot-fleets/enrollment/est-client" />
-
-  <Card title="Renovación y recuperación" description="Genera el sucesor y trata credenciales vencidas o perdidas." href="/docs/platform/iot-fleets/enrollment/renewal-and-recovery" />
-
-  <Card title="Referencia EST" description="Consulta rutas, formatos, autenticación y ServerKeyGen." href="/docs/platform/iot-fleets/enrollment/est-reference" />
-
-  <Card title="Diagnóstico" description="Distingue fallos de transporte, política, emisión e instalación." href="/docs/platform/iot-fleets/enrollment/troubleshooting" />
-</Cards>
+Consulta [EST (RFC 7030)](/docs/platform/iot-fleets/est) para preparar la autenticación y la confianza inicial, integrar el cliente y mantener la identidad.
 
 La configuración del Gateway, TLS, proveedores y servicios pertenece a [Despliegue](/docs/deployment/overview). El uso de la identidad en AWS u otros destinos corresponde a [Integraciones](/docs/platform/iot-fleets/overview#integraciones).

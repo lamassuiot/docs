@@ -816,7 +816,7 @@ Choose the next page [#choose-the-next-page]
 
 
 
-Start by locating the failing layer. A Gateway response and an unready pod require different evidence. For rejected issuance or validation results, see [PKI troubleshooting](/docs/platform/pki/troubleshooting); for enrollment, see [EST diagnostics](/docs/platform/iot-fleets/enrollment/troubleshooting#diagnostics-and-compatibility).
+Start by locating the failing layer. A Gateway response and an unready pod require different evidence. For rejected issuance or validation results, see [PKI troubleshooting](/docs/platform/pki/troubleshooting); for enrollment, see [EST diagnostics](/docs/platform/iot-fleets/est/troubleshooting#diagnostics-and-compatibility).
 
 Diagnostic sequence [#diagnostic-sequence]
 
@@ -1862,75 +1862,8 @@ Automate enrollment [#automate-enrollment]
 <Cards>
   <Card title="Enroll and connect a device" description="Obtain an identity from the client and test mTLS." href="/docs/platform/iot-fleets/quickstarts/enroll-device" />
 
-  <Card title="Renewal and recovery" description="Install the successor and handle failures without losing known state." href="/docs/platform/iot-fleets/enrollment/renewal-and-recovery" />
+  <Card title="Renewal and recovery" description="Install the successor and handle failures without losing known state." href="/docs/platform/iot-fleets/est/configuration" />
 </Cards>
-
-
-# Bootstrap identity and authentication (/docs/platform/iot-fleets/enrollment/bootstrap-identity)
-
-
-
-This guide connects the DMS administrator with device manufacturing and integration. Before requesting an operational identity, the client must authenticate the EST server and establish entitlement to request the intended ID.
-
-Initial server trust [#initial-server-trust]
-
-Install a previously verified root, chain or pin through a trusted channel: manufacturing, approved configuration or authenticated distribution. It enables TLS and server-name verification before downloading `/cacerts`.
-
-Your only trust proof cannot come from the same unauthenticated server. The EST server TLS certificate, bootstrap certificate and operational identity issuer may belong to different hierarchies.
-
-Bootstrap credential [#bootstrap-credential]
-
-With `CLIENT_CERTIFICATE`, the device presents its initial certificate and proves key possession through TLS. The DMS validates it against admission CAs. The validator receives one leaf credential: configure and test the direct issuer for the simple case; sending more intermediates does not establish delivery to the service.
-
-Check dates, matching certificate/key and revocation before provisioning. A credential shared across equipment identifies that shared credential, not an individual device.
-
-Initial mTLS validation does not by itself compare bootstrap CN with the requested CSR CN. If a requester should only request its own `Device ID`, add a control binding credential to ID, such as the combined webhook, and test a request with another CN. Certificate re-enrollment does compare its CN to the CSR; subsequent checks use the registered active identity.
-
-Modes per operation [#modes-per-operation]
-
-Select the four modes independently for enrollment and re-enrollment in [DMS](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation). Renewal credentials depend on that block; do not assume the bootstrap is always used or the webhook disappears.
-
-An administrative OIDC token is not a native EST mode. A webhook may interpret an agreed credential header; that service then performs authorization. In NO\_AUTH, sending a token does not add DMS authentication.
-
-Webhook contract [#webhook-contract]
-
-The DMS sends operation context to the configured service. Method comes from configuration; agree the contract before selecting POST or PUT. Authorization wait defaults to 10 seconds, replaced by a configured positive timeout. The DMS verifies the receiver certificate unless `insecure_skip_verify` is enabled in the webhook config — verification is on by default — and does not follow redirects, so the configured URL must be the final one. The authorization response must be JSON of at most 1 MiB. With Lamassu-to-webhook authentication configured over `http://`, the API key or bearer token travels in cleartext, and mTLS has no effect because no TLS handshake takes place, so the client certificate is never presented; prefer `https://`. Configure those options in the [webhook settings](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings) of the DMS guide.
-
-Example body:
-
-```json
-{
-  "csr": "BASE64_OF_PEM_CSR",
-  "aps": "DMS_ID",
-  "device_cn": "est-device-001",
-  "http_request": {
-    "headers": { "X-Enrollment-Credential": "REDACTED" },
-    "url": "/.well-known/est/DMS_ID/simpleenroll"
-  }
-}
-```
-
-`csr` is **base64 of PEM**, unlike the EST body, which is base64 of DER. `http_request` contains URL and first header entries from available HTTP context. This body does not include an `operation` field; distinguish enroll and reenroll through the path and configured policy.
-
-The webhook should verify credential, its relationship to `device_cn`, DMS, operation and admission policy. Forwarded headers are not themselves trusted evidence. **Lamassu-to-webhook authentication** is a separate relationship configured in the server’s HTTP client.
-
-Continuation requires a successful HTTP response and JSON:
-
-```json
-{ "authorized": true }
-```
-
-A bodyless `204` does not satisfy the contract. Denial, transport error, uninterpretable response or timeout abort authorization. Combined mode validates the certificate first, then queries the webhook. See the [webhook specification](/docs/api-reference/enroll-reenroll-webhook).
-
-Revocation and checks [#revocation-and-checks]
-
-The DMS first looks up the presented certificate in Lamassu; certificates it issued and manages are checked against their stored status. External certificates are checked through their OCSP servers and then their CRL distribution points. By default, unverifiable revocation is a rejection, not an acceptance: a certificate that is not managed by Lamassu and lists no OCSP or CRL endpoint is rejected unless `allow_unverifiable_revocation` is set in that operation's block (see [Authentication per operation](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation)).
-
-A certificate that does list endpoints is held to a stricter standard, with or without the option: unreachable endpoints, stale or invalid evidence, or an inconclusive (unknown) status reject the certificate. The evidence must be fresh — `thisUpdate` not in the future, `nextUpdate` not passed, and an answer without `nextUpdate` accepted only while it is less than about 24 hours old — and OCSP responses must be signed by the certificate's issuer itself or by a delegated responder that carries the `id-kp-OCSPSigning` EKU and is within its validity. A revoked verdict is honored regardless of its age. Each OCSP or CRL request has a 10-second timeout.
-
-One caveat remains: a signed Good OCSP response or CRL captured before a revocation keeps validating until its `nextUpdate` (up to about 24 hours without `nextUpdate`). Revocation propagates to devices at the pace the responders publish evidence, not at the moment of revocation.
-
-Test an allowed certificate, an incorrect one, another CN, webhook denial, timeout and re-enrollment under its own policy. Keep results and schedule bootstrap credential retirement where appropriate. Continue with [EST client](/docs/platform/iot-fleets/enrollment/est-client).
 
 
 # Configure and operate the DMS (/docs/platform/iot-fleets/enrollment/dms)
@@ -1979,123 +1912,13 @@ Configure a DMS [#configure-a-dms]
   </Step>
 </Steps>
 
-Enrollment configuration [#enrollment-configuration]
+Protocol configuration [#protocol-configuration]
 
-Enrollment Device Registration [#enrollment-device-registration]
-
-`settings.enrollment_settings.registration_mode` accepts `JITP` or `PRE_REGISTRATION`. JITP creates an unknown device with the CSR CN as ID and the DMS as owner. `device_provisioning_profile` supplies tags, metadata and icon for that registration.
-
-PRE\_REGISTRATION requires an existing ID. An existing device encounters replacement checks first, even without an identity. Review [preregistration conditions](/docs/platform/iot-fleets/enrollment/provisioning-strategies#preregistration-and-replacement) before using this mode.
-
-Enrollment Settings [#enrollment-settings]
-
-| `settings.enrollment_settings` field | Decision                                                                                                                                                   |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `protocol`                           | `EST_RFC7030` for these operations.                                                                                                                        |
-| `enrollment_ca`                      | ID of the signing CA.                                                                                                                                      |
-| `verify_csr_signature`               | Keep `true` to verify CSR key possession.                                                                                                                  |
-| `enable_replaceable_enrollment`      | Allows `/simpleenroll` for an existing ID in the same DMS. It can attempt previous certificate revocation even if a later phase fails; this is not atomic. |
-| `est_rfc7030_settings.auth_mode`     | One of the four authentication modes.                                                                                                                      |
-
-Initial enrollment rejects an ID owned by another DMS. Do not automatically enable replacement in response to an error; [Troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting) distinguishes repeated IDs, ownership and partial changes.
-
-Authentication per operation [#authentication-per-operation]
-
-The blocks are independent:
-
-* `settings.enrollment_settings.est_rfc7030_settings` for `/simpleenroll` and `/serverkeygen`.
-* `settings.reenrollment_settings.est_rfc7030_settings` for `/simplereenroll`.
-
-| `auth_mode`                               | Control applied in the configured operation          |
-| ----------------------------------------- | ---------------------------------------------------- |
-| `CLIENT_CERTIFICATE`                      | Presented certificate validation.                    |
-| `EXTERNAL_WEBHOOK`                        | Configured webhook authorization.                    |
-| `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | Certificate validation followed by webhook approval. |
-| `NO_AUTH`                                 | No DMS requester authentication.                     |
-
-Webhook and combined modes also execute during re-enrollment when configured in its block. They do not implicitly degrade to NO\_AUTH. An absent or unrecognized mode fails.
-
-For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired`, `chain_level_validation` and `allow_unverifiable_revocation`. The validator receives one certificate credential; the flow does not guarantee forwarding every handshake intermediate to it. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
-
-The authentication editor offers an **Allow certificates without revocation information** switch (`allow_unverifiable_revocation`, off by default). When it is on, certificates — and intermediate CAs of the chain — that Lamassu does not manage and that list no OCSP or CRL endpoint are accepted; unreachable, stale or inconclusive revocation answers are always rejected. While the switch is on, the console shows an amber warning: **Revocation will not be verified** — a revoked certificate with no OCSP or CRL endpoint, and not managed by Lamassu, will be accepted, and this also applies to the intermediate CAs of the chain.
-
-The same switch is offered in both the enrollment and re-enrollment authentication editors and is stored per block inside `est_rfc7030_settings.client_certificate_settings`; a DMS stored before this field existed loads with the switch off. The console also shows an amber warning alert whenever an authentication option is in its insecure state — **Allow expired certificates** on, **Allow expired renewal** on or **Verify CSR signature** off — and the No authentication note is presented as a warning alert too.
-
-Revocation is checked for every presented certificate. In initial enrollment the client certificate **and** every intermediate CA between it and the validation CA are checked, each against its issuer; extra certificates the device sends in the handshake are ignored. A validation CA that is revoked in Lamassu rejects the operation: the first validation CA that validates the certificate is used, and a revoked one is not replaced by the remaining validation CAs. Certificates issued and managed by Lamassu are checked against their stored status. External certificates are checked through their OCSP and CRL endpoints, and the operation fails closed when revocation cannot be verified: only `allow_unverifiable_revocation` — `false` by default in both blocks — relaxes the case of an external certificate that lists no endpoint at all. Endpoints that exist but are unreachable, return stale or invalid evidence, or report an inconclusive status are always rejected, whatever the option says. The details and the evidence the endpoints must present are in [Revocation and checks](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks).
-
-For certificate re-enrollment, the validator tries the enrollment CA first and then the CAs listed in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; those are the re-enrollment validation CAs. That list is optional because the enrollment CA is always trusted for re-enrollment, and each settings block consults only its own `validation_cas`. CAs listed only in the initial block's `validation_cas` do not extend re-enrollment acceptance; during a CA rotation, add the old issuance CA to the re-enrollment block's list. The re-enrollment validator compares the presented TLS leaf against those CAs; the re-enrollment block's `chain_level_validation` and `allow_expired` values are stored but not consulted, and expiry is governed by `enable_expired_renewal`. Re-enrollment checks revocation of the client certificate only; that check is governed by the re-enrollment block's own `allow_unverifiable_revocation`.
-
-For a webhook, configure destination, Lamassu-to-service authentication, method and timeout. The [authentication contract](/docs/platform/iot-fleets/enrollment/bootstrap-identity) explains the device credential and request body. `NO_AUTH` does not establish ownership of the requested ID.
-
-External webhook settings [#external-webhook-settings]
-
-The webhook authentication modes read `external_webhook_settings` in the same `est_rfc7030_settings` block:
-
-| `external_webhook_settings` field | Decision                                                                                                                                         |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `url`                             | Absolute `http` or `https` URL of the receiver. It must be the final URL; redirects are not followed.                                            |
-| `method`                          | `POST` or `PUT`; `POST` by default.                                                                                                              |
-| `name`                            | Label used in service logs.                                                                                                                      |
-| `config.auth_mode`                | `noauth`, `apikey`, `jwt` or `mtls`. An absent or unknown value behaves as `noauth`.                                                             |
-| `config.log_level`                | Log level of the webhook call: `debug`, `info`, `warn` or `error`; `info` by default.                                                            |
-| `config.apikey_options`           | Required for `apikey`: `header` and `key`. Reserved header names are rejected.                                                                   |
-| `config.jwt_options`              | Required for `jwt`: `oidc_client_id`, `oidc_client_secret` and an absolute `http` or `https` `oidc_well_known`.                                  |
-| `config.mtls_options`             | Required for `mtls`: `cert_content` and `key_content` as Base64-encoded PEM, like certificates elsewhere in the API; plain PEM is also accepted. |
-| `config.insecure_skip_verify`     | Skips verification of the receiver certificate when `true`. Verification is on by default. Unlike alert channels, this flag is honored here.     |
-| `config.call_timeout`             | Maximum duration of the authorization call (for example `10s`); 10 seconds by default.                                                           |
-
-Rules for that configuration:
-
-* Creating or updating a DMS whose enrollment or reenrollment `auth_mode` uses the webhook validates the block and returns HTTP 400 — the body starts with `struct validation error:` and continues with `invalid enrollment external webhook config` or `invalid reenrollment external webhook config` — when the URL, method or options are invalid. That includes an `mtls_options.cert_content`/`key_content` pair that does not decode to a matching certificate and private key. File references (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`) are always invalid: the service does not read files, so enter the certificate and key as Base64-encoded PEM in `mtls_options.cert_content` and `key_content`, or as plain PEM.
-* A custom `apikey_options.header` may not use names that the platform or the receiving service trusts — for example `X-Principal-Id`, `X-Request-Id`, `Host`, `Content-Type` or `Forwarded` — and no name may start with `X-Forwarded-`, `X-Envoy-` or `X-Lms-` (case-insensitive). The [DMS API reference](/docs/api-reference/dms-manager) documents the `WebhookCall` and `WebhookCallHttpClient` schemas and that reserved API-key headers are rejected.
-* The nested `http_client` key exists only in alert channel configurations; in a DMS body it is ignored. The DMS key is `external_webhook_settings.config`.
-* A body with `config.auth_mode` set to `apikey`, `jwt` or `mtls` must carry its corresponding option block (`apikey_options`, `jwt_options` or `mtls_options`) — and nothing else. Bodies with those auth modes carrying only `apikey`, `oidc` or `mtls` fail validation with 400, and `validate_server_cert` is always ignored: use `insecure_skip_verify`. Only bodies without option blocks are accepted as `noauth`, and their credentials are dropped.
-* The authorization response must be JSON of at most 1 MiB; a larger body fails the call.
-
-<Callout type="warn" title="Credentials over http://">
-  With credentials configured, they are sent regardless of the URL scheme: an `http://` webhook receives the API key or bearer token in cleartext, and mTLS has no effect because no TLS handshake takes place, so the client certificate is never presented. Prefer `https://` for `url`, `oidc_well_known` and the token endpoint it advertises.
-</Callout>
-
-Initial authentication and renewal settings are stored independently. If a DMS only has the initial authentication block, renewal reuses it: read both blocks before editing. The console exposes independent editors for the enrollment and re-enrollment authentication, with the same Log Level, Call Timeout, HTTP Authentication and credential fields as the webhook channels, plus a **Skip TLS Verification** switch (off by default, so verification stays on; the console warns when you enable it).
-
-Webhook credentials must be stored as PEM content. File references (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`) are never valid in a stored webhook config: delivery rejects any webhook config that references files, whatever its auth mode, so every enroll and reenroll that calls that webhook fails until the certificate and key are entered as Base64-encoded or plain PEM in `mtls_options.cert_content` and `key_content`, or the file fields are removed if the webhook does not use mTLS. If a stored config holds file paths in `mtls_options.cert_content` or `key_content`, every full settings update (`POST /v1/dms`, `PUT /v1/dms/:id`) fails validation — settings are replaced wholesale, so the stored config must be resent — until the values are replaced by PEM content or the webhook stops being used. Meanwhile, delivery of that webhook fails on every call; a metadata-only update through `PUT` or `PATCH` on `/v1/dms/:id/metadata` still succeeds. To fix it in the console, open the DMS, replace any file-path value with PEM content — the editor rejects file paths with an inline field error — and save. Saving rewrites `external_webhook_settings.config` with the current keys, and the console reads both plain and Base64-encoded PEM from migrated configurations and stores the material Base64-encoded. If your stored config previously relied on `validate_server_cert: false`, it now carries `insecure_skip_verify: true`: receiver-certificate verification stays skipped until you set that flag to `false`. See [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0) for the upgrade notes and the operator checklist.
-
-The re-enrollment trust set lives in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`. The flat field `reenrollment_settings.additional_validation_cas` is not part of the API: bodies that carry it are accepted but the value is silently ignored — unknown JSON fields are dropped — and GET responses do not include it. Read the DMS before sending API edits: an update body built with that flat field silently empties `validation_cas`.
-
-Issuance profile [#issuance-profile]
-
-`settings.issuance_profile_id` takes precedence over `settings.issuance_profile`; without either, the CA default profile is used. The resolved profile — including the CA default used as fallback when the DMS defines none — must define an end-entity certificate: a `Sign as CA` profile is rejected at enrollment and re-enrollment time. Rules are documented once in [Profiles](/docs/platform/pki/certificate-profiles). DMS changes affect future requests; they do not modify signed certificates or install client trust.
-
-Re-enrollment configuration [#re-enrollment-configuration]
-
-| `settings.reenrollment_settings` field                            | Purpose                                                                                                                                                                                                                |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reenrollment_delta`                                              | Opens the window at the active certificate’s `NotAfter` minus this delta.                                                                                                                                              |
-| `preventive_delta`                                                | Preventive operational monitoring threshold.                                                                                                                                                                           |
-| `critical_delta`                                                  | Critical operational monitoring threshold.                                                                                                                                                                             |
-| `enable_expired_renewal`                                          | Accepts an expired presented certificate in the renewal mTLS validator. Does not authorize another mode or remove Gateway constraints by itself.                                                                       |
-| `est_rfc7030_settings.client_certificate_settings.validation_cas` | Re-enrollment validation CAs for the renewal mTLS credential, tried after the enrollment CA; optional, because the enrollment CA is always trusted. Typically populated during CA rotation while old-CA cohorts renew. |
-| `revoke_on_reenrollment`                                          | If the previous certificate is ACTIVE, attempts Superseded revocation before binding its successor.                                                                                                                    |
-
-Monitoring does not renew: the client must schedule the request and installation. Webhook and NO\_AUTH modes do not use the same mTLS expired-credential validator; the webhook must explicitly authorize permitted recovery. Review [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for operation order and partial failures.
-
-ServerKeyGen [#serverkeygen]
-
-`settings.server_keygen_settings.enabled` enables software key generation on the server. The console exposes it through an **Enable server-side key generation** switch and a **Key type** selection: `ECDSA` P-256, P-384 or P-521, or `RSA` with 2048, 3072 or 4096 bits; the defaults are P-256 for `ECDSA` and 4096 bit for `RSA`. Algorithm and size come from its `key` field, stored as `{type,bits}` where P-256, P-384 and P-521 map to `bits` 256, 384 and 521; `key` is omitted when disabled. The profile must permit them. The response contains an unencrypted PKCS#8 key inside TLS alongside the certificate. See format and extraction in [EST reference](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen).
-
-Trust distribution [#trust-distribution]
-
-| Option                        | Published material                                                         |
-| ----------------------------- | -------------------------------------------------------------------------- |
-| **Include Lamassu System CA** | Available downstream TLS certificate; it can be a leaf, not an issuing CA. |
-| **Include Enrollment CA**     | Selected issuing CA certificate.                                           |
-| **Managed CAs**               | Explicitly selected CA certificates.                                       |
-
-All ancestors are not added automatically. [Trust distribution](/docs/platform/iot-fleets/enrollment/trust-distribution) distinguishes trusted roots, intermediates and initial server trust.
+See [Configure EST in the DMS](/docs/platform/iot-fleets/est/configuration) for registration, authentication, issuance, renewal, key generation and trust distribution.
 
 Operate the DMS inventory [#operate-the-dms-inventory]
 
-**Edit** changes name, settings and metadata. Updates go through the [DMS API](/docs/api-reference/dms-manager). `PUT /v1/dms/{id}` always targets the DMS identified by the URL path: the body carries no `id` field, and any `id` or `creation_ts` in it is silently ignored — authorization is evaluated against the same URL identifier. The body must include a non-empty `name` and a `settings` object; missing either returns HTTP 400 and leaves the stored DMS unchanged. `name` and `settings` are always full replacements, so read the DMS before sending API edits to avoid losing fields. `metadata` is optional: omitting it or sending `null` keeps the stored metadata, a supplied object replaces it entirely, and `{}` clears it (a later GET returns an empty object, not `null`). Old-style bodies that carry the full DMS object keep working while they include `name` and `settings`; unknown fields are ignored. Updates reject an empty `name` with HTTP 400: a DMS whose stored name was zeroed by an earlier update must be renamed before any client round-trips it — the AWS IoT connector’s JITP writeback included. If the object does not include the AWS IoT connector key (`lamassu.io/iot/{connector_id}`), the connector ignores the DMS's later events.
+**Edit** changes name, settings and metadata. Updates go through the [DMS API](/docs/api-reference/dms-manager). `PUT /v1/dms/{id}` always targets the DMS identified by the URL path: the body carries no `id` field, and any `id` or `creation_ts` in it is silently ignored. Authorization is evaluated against the same URL identifier. The body must include a non-empty `name` and a `settings` object; missing either returns HTTP 400 and leaves the stored DMS unchanged. `name` and `settings` are always full replacements, so read the DMS before sending API edits to avoid losing fields. `metadata` is optional: omitting it or sending `null` keeps the stored metadata, a supplied object replaces it entirely, and `{}` clears it (a later GET returns an empty object, not `null`). Old-style bodies that carry the full DMS object keep working while they include `name` and `settings`; unknown fields are ignored. Updates reject an empty `name` with HTTP 400: a DMS whose stored name was zeroed by an earlier update must be renamed before any client round-trips it, including the AWS IoT connector’s JITP writeback. If the object does not include the AWS IoT connector key (`lamassu.io/iot/{connector_id}`), the connector ignores the DMS's later events.
 
 **Go to DMS owned devices** restricts inventory by owner. **Show/Edit Metadata** contains operational and integration data; consult the integration guide before changing it. **EST (RFC-7030)** helps locate URLs.
 
@@ -2103,249 +1926,7 @@ Operate the DMS inventory [#operate-the-dms-inventory]
 
 Integrate the devices [#integrate-the-devices]
 
-Continue with [EST client](/docs/platform/iot-fleets/enrollment/est-client) or the [enrollment and mTLS tutorial](/docs/platform/iot-fleets/quickstarts/enroll-device). [EST reference](/docs/platform/iot-fleets/enrollment/est-reference) covers formats; [Troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting) covers failures.
-
-
-# Integrate the EST client (/docs/platform/iot-fleets/enrollment/est-client)
-
-
-
-This guide is for those implementing the device client. The administrator must have prepared the [DMS policy](/docs/platform/iot-fleets/enrollment/dms). For a complete first run, follow [Enroll and connect your first device](/docs/platform/iot-fleets/quickstarts/enroll-device).
-
-Before you begin [#before-you-begin]
-
-You need the public HTTPS DMS URL, server trust obtained through an approved channel, the operation's authentication mode and an admitted identifier. The examples use Bash, OpenSSL 3.x and curl with `--fail-with-body`; use a private working directory and compatible versions of these tools.
-
-Prepare `est-trust.pem` to verify the EST server, `bootstrap.crt` and `bootstrap.key` for initial certificate authentication, and `device-root.pem` as the approved root of the device issuer. The two trust files can contain different roots. For another authentication mode, adapt the credentials according to [Bootstrap identity](/docs/platform/iot-fleets/enrollment/bootstrap-identity).
-
-Replace the host and `REPLACE_DMS_ID` with those of your installation. The URL's APS is the DMS identifier, not its display name.
-
-```bash
-set -euo pipefail
-umask 077
-EST_BASE='https://lamassu.example.com/.well-known/est/REPLACE_DMS_ID'
-```
-
-Download and inspect cacerts [#download-and-inspect-cacerts]
-
-The default content is Base64-encoded DER PKCS#7. It is not a direct PEM file.
-
-```bash
-curl --fail-with-body --show-error --silent --max-time 30 \
-  --cacert est-trust.pem \
-  --dump-header cacerts.headers --output cacerts.b64 \
-  "$EST_BASE/cacerts"
-openssl base64 -d -in cacerts.b64 -out cacerts.p7b
-openssl pkcs7 -inform DER -in cacerts.p7b -print_certs -quiet -out cacerts.pem
-openssl crl2pkcs7 -nocrl -certfile cacerts.pem | openssl pkcs7 -print_certs -noout
-```
-
-Check fingerprints, issuers and dates against the [trust distribution](/docs/platform/iot-fleets/enrollment/trust-distribution) policy. The response can contain a selection of CAs and Lamassu's TLS certificate. Do not turn the entire bundle into trusted roots or use it to authenticate its own initial download. HTTP 200 here does not prove that authentication or issuance works.
-
-Prepare the CSR [#prepare-the-csr]
-
-The example generates a new EC P-256 key and uses `est-device-001`, which must be available if the DMS registers automatically. The `Common Name` becomes the device identifier. Check that the profile permits the selected key and subject.
-
-```bash
-test ! -e device.key
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out device.key
-openssl req -new -sha256 -key device.key -subj '/CN=est-device-001' -out device.csr
-openssl req -in device.csr -verify -noout
-openssl req -in device.csr -outform DER -out device.csr.der
-openssl base64 -A -in device.csr.der -out device.csr.b64
-```
-
-An implementation using hardware or its own store must produce the CSR through its resident key. `simpleenroll` sends the request and retains the key in the client. Honor Extensions does not authorize every requested attribute: see [Profiles](/docs/platform/pki/certificate-profiles).
-
-Request the identity [#request-the-identity]
-
-With initial `CLIENT_CERTIFICATE` authentication, send the Base64-encoded DER CSR using `Content-Type: application/pkcs10`:
-
-```bash
-curl --fail-with-body --show-error --silent --max-time 30 \
-  --cacert est-trust.pem --cert bootstrap.crt --key bootstrap.key \
-  --header 'Content-Type: application/pkcs10' \
-  --data-binary @device.csr.b64 \
-  --dump-header enroll.headers --output enroll.b64 \
-  "$EST_BASE/simpleenroll"
-openssl base64 -d -in enroll.b64 -out enroll.p7b
-openssl pkcs7 -inform DER -in enroll.p7b -print_certs -quiet -out device.crt
-```
-
-Stop if curl fails. Retain the HTTP code, headers and body for diagnosis; an error response is not decoded as a certificate. The Bash example stops before that conversion. A timeout leaves the operation's result to be checked in Lamassu: do not automatically repeat issuance.
-
-Check and install the result [#check-and-install-the-result]
-
-For a root that issues directly:
-
-```bash
-openssl verify -CAfile device-root.pem -purpose sslclient device.crt
-openssl x509 -in device.crt -noout -subject -issuer -serial -dates -text
-openssl x509 -in device.crt -pubkey -noout > certificate-public.pem
-openssl pkey -pubin -in certificate-public.pem -outform DER -out certificate-public.der
-openssl pkey -in device.key -pubout -outform DER -out key-public.der
-cmp certificate-public.der key-public.der
-```
-
-Also verify that the CN is correct, the certificate is a leaf, its uses permit your application and its dates satisfy the profile. `cmp` must exit with code 0. With intermediates, provide the chain through `-untrusted` as described in [PKI validation](/docs/platform/pki/certificate-validation).
-
-Query the device: the owning DMS, current serial number and history must match the result. Protect the key/certificate pair and install both using the device's mechanism. Association in Lamassu does not install files in the client. Check a real connection before considering the process complete.
-
-Next steps [#next-steps]
-
-Implement [renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) and trust updates. The [EST reference](/docs/platform/iot-fleets/enrollment/est-reference) covers endpoints, formats and ServerKeyGen; [troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting) helps distinguish transport, admission and persistence failures.
-
-
-# EST reference (/docs/platform/iot-fleets/enrollment/est-reference)
-
-
-
-Reference for the Lamassu EST service, based on [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html). Use [EST client](/docs/platform/iot-fleets/enrollment/est-client) for the procedure and [DMS](/docs/platform/iot-fleets/enrollment/dms) to configure policy.
-
-Endpoint reference [#endpoint-reference]
-
-Public route in the examples: `/.well-known/est/{APS}/{operation}`. `APS` is the DMS ID. The router admits routes without that segment, but the controller requires it; do not use them as a default service. Gateway configuration determines the public host and route.
-
-| Operation         | Method | Authentication and condition                                                                   |
-| ----------------- | ------ | ---------------------------------------------------------------------------------------------- |
-| `/cacerts`        | GET    | DMS reading does not require an EST credential; HTTPS and infrastructure controls still apply. |
-| `/simpleenroll`   | POST   | Initial authentication and DMS registration/replacement policy.                                |
-| `/simplereenroll` | POST   | Renewal authentication, existing identity, subject, revocation and window.                     |
-| `/serverkeygen`   | POST   | Initial authentication and admission; server generation enabled.                               |
-
-These routes do not implement `/csrattrs` or `/fullcmc`. There is no native JWT EST authentication mode; a webhook can interpret a request credential according to its own contract.
-
-cacerts [#cacerts]
-
-The default response has `Content-Type: application/pkcs7-mime; smime-type=certs-only` and `Content-Transfer-Encoding: base64`. The body is Base64-encoded DER PKCS#7 with lines of up to 76 characters. It includes the certificates selected by the DMS, not necessarily every ancestor.
-
-`Accept: application/x-pem-file` requests the bundle in PEM through a Lamassu extension. Inspect and approve its contents before modifying trusted roots.
-
-simpleenroll [#simpleenroll]
-
-Send a Base64-encoded DER PKCS#10 CSR with `Content-Type: application/pkcs10`. The controller compares that media type literally; avoid adding parameters such as charset. The CN identifies the device and the CSR signature must be verified through DMS policy.
-
-The default response uses the PKCS#7/Base64 format described for cacerts, but contains the issued certificate; do not assume it includes its entire chain. `Accept: application/x-pem-file` returns that certificate in PEM. The client retains the key that signed the CSR.
-
-simplereenroll [#simplereenroll]
-
-Use the same request and certificate response formats. Authentication comes from the independent `reenrollment_settings.est_rfc7030_settings` block. With a client certificate, its CN must match the CSR CN; the subject is also checked against the current certificate.
-
-In mTLS mode, the enrollment CA always validates the re-enrollment credential; certificates from other issuers are accepted only if they are listed as validation CAs in the re-enrollment block. The expiry check through `enable_expired_renewal` belongs to that validator. A revoked current certificate and a request before the window are rejected. With default settings, a client certificate whose revocation cannot be verified is also rejected; the [DMS guide](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation) describes `allow_unverifiable_revocation`. See [Renewal](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) for installation and recovery.
-
-serverkeygen [#serverkeygen]
-
-The server generates a software key, rebuilds the CSR with that key and performs initial enrollment. The flag must be enabled and the algorithm permitted by the profile. This operation's key does not become a hardware key because the CA is hosted in an HSM.
-
-The code supports RSA and ECDSA, and the `bits` value of the DMS key setting means something different for each. For ECDSA it selects the curve: 224, 256, 384 or 521 map to P-224, P-256, P-384 and P-521, and an unrecognized size falls back to P-256, so explicitly select a compatible size and check the resulting key. For RSA it is used directly as the modulus size; the console offers 2048, 3072 and 4096 bits. Do not reuse an enrolled ID to test this operation without reviewing replacement.
-
-Response format [#response-format]
-
-The body is **MIME multipart/mixed**, with the boundary specified in `Content-Type`. It contains two parts:
-
-| Part                                            | Content after decoding its Base64             |
-| ----------------------------------------------- | --------------------------------------------- |
-| `application/pkcs8`                             | Unencrypted DER PKCS#8 private key.           |
-| `application/pkcs7-mime; smime-type=certs-only` | DER PKCS#7 containing the issued certificate. |
-
-The controller also adds `Content-Transfer-Encoding: base64` to the outer header, although the outer body is MIME text. **Do not Base64-decode the entire body.** Read the actual boundary and decode each part according to its headers.
-
-Request and extraction [#request-and-extraction]
-
-In a Bash session with `set -euo pipefail` and `umask 077`, use `EST_BASE` and the trust/bootstrap files from [EST client](/docs/platform/iot-fleets/enrollment/est-client). Select an available and admitted `est-serverkeygen-001`. The `server-request.key` only signs the input CSR; the received identity uses the server-generated key.
-
-```bash
-test ! -e server-request.key
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out server-request.key
-openssl req -new -sha256 -key server-request.key \
-  -subj '/CN=est-serverkeygen-001' -out serverkeygen.csr
-openssl req -in serverkeygen.csr -outform DER -out serverkeygen.csr.der
-openssl base64 -A -in serverkeygen.csr.der -out serverkeygen.csr.b64
-curl --fail-with-body --show-error --silent --max-time 30 \
-  --cacert est-trust.pem --cert bootstrap.crt --key bootstrap.key \
-  --header 'Content-Type: application/pkcs10' \
-  --data-binary @serverkeygen.csr.b64 \
-  --dump-header serverkeygen.headers --output serverkeygen.mime \
-  "$EST_BASE/serverkeygen"
-```
-
-Save this Python 3 extractor. It validates both parts before writing and rejects existing output files:
-
-```python
-# Save as extract-serverkeygen.py and run: python3 extract-serverkeygen.py
-import base64
-import os
-from email import policy
-from email.parser import BytesParser
-from pathlib import Path
-
-os.umask(0o077)
-headers = Path("serverkeygen.headers").read_bytes().splitlines()
-content_types = [
-    line.split(b":", 1)[1].strip()
-    for line in headers
-    if line.lower().startswith(b"content-type:")
-]
-if not content_types:
-    raise SystemExit("Missing response Content-Type")
-message = BytesParser(policy=policy.default).parsebytes(
-    b"Content-Type: " + content_types[-1]
-    + b"\r\nMIME-Version: 1.0\r\n\r\n"
-    + Path("serverkeygen.mime").read_bytes()
-)
-if message.get_content_type() != "multipart/mixed" or not message.is_multipart():
-    raise SystemExit("Expected multipart/mixed")
-if message.defects:
-    raise SystemExit("Malformed multipart response")
-expected = {
-    "application/pkcs8": "device.server.key.der",
-    "application/pkcs7-mime": "device.server.p7b",
-}
-outputs = {}
-for part in message.iter_parts():
-    media_type = part.get_content_type()
-    if media_type not in expected or media_type in outputs or part.defects:
-        raise SystemExit("Unexpected, duplicate or malformed part")
-    encoding = str(part.get("Content-Transfer-Encoding", "")).strip().lower()
-    payload = part.get_payload()
-    if encoding != "base64" or not isinstance(payload, str):
-        raise SystemExit("Expected Base64 part")
-    try:
-        decoded = base64.b64decode("".join(payload.split()), validate=True)
-    except (ValueError, UnicodeError) as error:
-        raise SystemExit("Invalid Base64 part") from error
-    if not decoded:
-        raise SystemExit("Empty part")
-    outputs[media_type] = decoded
-if set(outputs) != set(expected):
-    raise SystemExit("Missing key or certificate part")
-if any(Path(name).exists() for name in expected.values()):
-    raise SystemExit("Output already exists; use a fresh directory")
-for media_type, name in expected.items():
-    with open(name, "xb") as output:
-        output.write(outputs[media_type])
-```
-
-Convert and check the result:
-
-```bash
-python3 extract-serverkeygen.py
-openssl pkcs8 -inform DER -in device.server.key.der -nocrypt -out device.server.key
-openssl pkcs7 -inform DER -in device.server.p7b -print_certs -quiet -out device.server.crt
-openssl verify -CAfile device-root.pem -purpose sslclient device.server.crt
-openssl x509 -in device.server.crt -pubkey -noout > server-certificate-public.pem
-openssl pkey -pubin -in server-certificate-public.pem -outform DER -out server-certificate-public.der
-openssl pkey -in device.server.key -pubout -outform DER -out server-key-public.der
-cmp server-certificate-public.der server-key-public.der
-```
-
-Inspect the CN, serial, dates and uses; check association in Lamassu before installing. Protect the DER and PEM files containing the key and remove temporary copies according to the device's storage mechanism. See [openssl-pkcs8](https://docs.openssl.org/3.6/man1/openssl-pkcs8/) and the [Python MIME parser](https://docs.python.org/3/library/email.parser.html).
-
-Compatibility notes [#compatibility-notes]
-
-Do not interpret every 500 as a transient failure. Invalid input typically produces 400; service denials and errors typically produce 500 with a JSON `err` body. Gateway errors and some controller paths can have another format. Retain headers and body before decoding and see [troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting).
-
-The examples use [openssl-pkcs7](https://docs.openssl.org/3.6/man1/openssl-pkcs7/) to extract certificates and [openssl-x509](https://docs.openssl.org/3.6/man1/openssl-x509/) to prepare renewal. Check your version's capabilities and responses before integrating a generic EST client.
+Continue with [EST client](/docs/platform/iot-fleets/est/configuration) or the [enrollment and mTLS tutorial](/docs/platform/iot-fleets/quickstarts/enroll-device). [EST reference](/docs/platform/iot-fleets/est/configuration) covers formats; [Troubleshooting](/docs/platform/iot-fleets/est/troubleshooting) covers failures.
 
 
 # Enrollment with PKI (/docs/platform/iot-fleets/enrollment/overview)
@@ -2370,23 +1951,11 @@ For the administrator [#for-the-administrator]
   <Card title="Provisioning strategies" description="Choose automatic registration, preregistration or manual assignment." href="/docs/platform/iot-fleets/enrollment/provisioning-strategies" />
 
   <Card title="Configure the DMS" description="Separate admission, authentication per operation, profiles and distribution." href="/docs/platform/iot-fleets/enrollment/dms" />
-
-  <Card title="Bootstrap identity and authentication" description="Decide which proof allows requesting the first identity." href="/docs/platform/iot-fleets/enrollment/bootstrap-identity" />
-
-  <Card title="Trust distribution" description="Update roots and chains with verified overlap." href="/docs/platform/iot-fleets/enrollment/trust-distribution" />
 </Cards>
 
 For the integrator [#for-the-integrator]
 
-<Cards>
-  <Card title="EST client" description="Prepare the request, verify the response and install the identity." href="/docs/platform/iot-fleets/enrollment/est-client" />
-
-  <Card title="Renewal and recovery" description="Generate the successor and handle expired or lost credentials." href="/docs/platform/iot-fleets/enrollment/renewal-and-recovery" />
-
-  <Card title="EST reference" description="Look up paths, formats, authentication and ServerKeyGen." href="/docs/platform/iot-fleets/enrollment/est-reference" />
-
-  <Card title="Troubleshooting" description="Distinguish transport, policy, issuance and installation failures." href="/docs/platform/iot-fleets/enrollment/troubleshooting" />
-</Cards>
+See [EST (RFC 7030)](/docs/platform/iot-fleets/est) to prepare authentication and initial trust, integrate the client and maintain the device identity.
 
 Gateway, TLS, provider and service configuration belongs to [Deployment](/docs/deployment/overview). Identity use in AWS or other destinations belongs to [Integrations](/docs/platform/iot-fleets/overview#integrations).
 
@@ -2415,7 +1984,7 @@ Finding any device owned by the same DMS triggers the `enable_replaceable_enroll
 
 Enabling the flag permits repeated `/simpleenroll` for an existing ID. The backend schedules a deferred attempt to revoke the previous certificate with `Superseded`; it can also run if later issuance or binding fails. Without an identity, that attempt can fail because no serial exists. The flag does not provide a replacement transaction or guarantee restoration of previous state.
 
-Test the exact case on your version before enabling it for a population. For an operational identity with authorized renewal, use `/simplereenroll`; for recovery, follow [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) and check persisted state before retrying.
+Test the exact case on your version before enabling it for a population. For an operational identity with authorized renewal, use `/simplereenroll`; for recovery, follow [Renewal and recovery](/docs/platform/iot-fleets/est/configuration) and check persisted state before retrying.
 
 Choose authentication [#choose-authentication]
 
@@ -2426,7 +1995,7 @@ Decide initial enrollment and re-enrollment separately:
 * **Certificate and webhook:** requires both controls in the configured operation.
 * **NO\_AUTH:** does not establish requester identity; appropriate only when admission is deliberately controlled outside that DMS.
 
-Authenticating an initial certificate does not itself establish entitlement to choose any CSR CN. Define that authorization in [Bootstrap identity and authentication](/docs/platform/iot-fleets/enrollment/bootstrap-identity).
+Authenticating an initial certificate does not itself establish entitlement to choose any CSR CN. Define that authorization in [Bootstrap identity and authentication](/docs/platform/iot-fleets/est/bootstrap-identity).
 
 Choose custody [#choose-custody]
 
@@ -2436,27 +2005,445 @@ Choose custody [#choose-custody]
 | Existing device key  | CSR signed with that key and a new certificate.                           |
 | ServerKeyGen         | Private PKCS#8 key and certificate in a TLS-protected multipart response. |
 
-ServerKeyGen does not automatically use the CA’s HSM or KMS for the device key. Review its [contract and extraction](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen) and the device’s ability to install the material.
+ServerKeyGen does not automatically use the CA’s HSM or KMS for the device key. Review its [contract and extraction](/docs/platform/iot-fleets/est/configuration#serverkeygen) and the device’s ability to install the material.
 
 Check the decision [#check-the-decision]
 
 Before expanding the flow, test allowed registration, incorrect credentials, an ID owned by another DMS, repeated requests and recovery after failure. Keep ID, serial, active version and error. Also test consumer acceptance and rejection; issuance does not imply destination registration or permission to operate.
 
 
-# Renewal and recovery (/docs/platform/iot-fleets/enrollment/renewal-and-recovery)
+# Authentication and trust (/docs/platform/iot-fleets/est/bootstrap-identity)
 
 
 
-Renewal retains the device identifier and requests a successor certificate. The client must complete the process: check the response, install the matching pair and demonstrate that the consumer accepts it. Lamassu alerts notify you; they do not perform those steps.
+This guide connects the DMS administrator with device manufacturing and integration. Before requesting an operational identity, the client must authenticate the EST server and establish entitlement to request the intended ID.
 
-Prepare renewal [#prepare-renewal]
+Initial server trust [#initial-server-trust]
+
+Install a previously verified root, chain or pin through a trusted channel: manufacturing, approved configuration or authenticated distribution. It enables TLS and server-name verification before downloading `/cacerts`.
+
+Your only trust proof cannot come from the same unauthenticated server. The EST server TLS certificate, bootstrap certificate and operational identity issuer may belong to different hierarchies.
+
+Bootstrap credential [#bootstrap-credential]
+
+With `CLIENT_CERTIFICATE`, the device presents its initial certificate and proves key possession through TLS. The DMS validates it against admission CAs. The validator receives one leaf credential: configure and test the direct issuer for the simple case; sending more intermediates does not establish delivery to the service.
+
+Check dates, matching certificate/key and revocation before provisioning. A credential shared across equipment identifies that shared credential, not an individual device.
+
+Initial mTLS validation does not by itself compare bootstrap CN with the requested CSR CN. If a requester should only request its own `Device ID`, add a control binding credential to ID, such as the combined webhook, and test a request with another CN. Certificate re-enrollment does compare its CN to the CSR; subsequent checks use the registered active identity.
+
+Modes per operation [#modes-per-operation]
+
+Select the four modes independently for enrollment and re-enrollment in [DMS](/docs/platform/iot-fleets/est/configuration#authentication-per-operation). Renewal credentials depend on that block; do not assume the bootstrap is always used or the webhook disappears.
+
+An administrative OIDC token is not a native EST mode. A webhook may interpret an agreed credential header; that service then performs authorization. In NO\_AUTH, sending a token does not add DMS authentication.
+
+Webhook contract [#webhook-contract]
+
+The DMS sends operation context to the configured service. Method comes from configuration; agree the contract before selecting POST or PUT. Authorization wait defaults to 10 seconds, replaced by a configured positive timeout. The DMS verifies the receiver certificate unless `insecure_skip_verify` is enabled in the webhook config (verification is on by default) and does not follow redirects, so the configured URL must be the final one. The authorization response must be JSON of at most 1 MiB. With Lamassu-to-webhook authentication configured over `http://`, the API key or bearer token travels in cleartext, and mTLS has no effect because no TLS handshake takes place, so the client certificate is never presented; prefer `https://`. Configure those options in the [webhook settings](/docs/platform/iot-fleets/est/configuration#external-webhook-settings) of the DMS guide.
+
+Example body:
+
+```json
+{
+  "csr": "BASE64_OF_PEM_CSR",
+  "aps": "DMS_ID",
+  "device_cn": "est-device-001",
+  "http_request": {
+    "headers": { "X-Enrollment-Credential": "REDACTED" },
+    "url": "/.well-known/est/DMS_ID/simpleenroll"
+  }
+}
+```
+
+`csr` is **base64 of PEM**, unlike the EST body, which is base64 of DER. `http_request` contains URL and first header entries from available HTTP context. This body does not include an `operation` field; distinguish enroll and reenroll through the path and configured policy.
+
+The webhook should verify credential, its relationship to `device_cn`, DMS, operation and admission policy. Forwarded headers are not themselves trusted evidence. **Lamassu-to-webhook authentication** is a separate relationship configured in the server’s HTTP client.
+
+Continuation requires a successful HTTP response and JSON:
+
+```json
+{ "authorized": true }
+```
+
+A bodyless `204` does not satisfy the contract. Denial, transport error, uninterpretable response or timeout abort authorization. Combined mode validates the certificate first, then queries the webhook. See the [webhook specification](/docs/api-reference/enroll-reenroll-webhook).
+
+Revocation and checks [#revocation-and-checks]
+
+The DMS first looks up the presented certificate in Lamassu; certificates it issued and manages are checked against their stored status. External certificates are checked through their OCSP servers and then their CRL distribution points. By default, unverifiable revocation is a rejection, not an acceptance: a certificate that is not managed by Lamassu and lists no OCSP or CRL endpoint is rejected unless `allow_unverifiable_revocation` is set in that operation's block (see [Authentication per operation](/docs/platform/iot-fleets/est/configuration#authentication-per-operation)).
+
+A certificate that does list endpoints is held to a stricter standard, with or without the option: unreachable endpoints, stale or invalid evidence, or an inconclusive (unknown) status reject the certificate. The evidence must be fresh (`thisUpdate` not in the future, `nextUpdate` not passed, and an answer without `nextUpdate` accepted only while it is less than about 24 hours old) and OCSP responses must be signed by the certificate's issuer itself or by a delegated responder that carries the `id-kp-OCSPSigning` EKU and is within its validity. A revoked verdict is honored regardless of its age. Each OCSP or CRL request has a 10-second timeout.
+
+One caveat remains: a signed Good OCSP response or CRL captured before a revocation keeps validating until its `nextUpdate` (up to about 24 hours without `nextUpdate`). Revocation propagates to devices at the pace the responders publish evidence, not at the moment of revocation.
+
+Test an allowed certificate, an incorrect one, another CN, webhook denial, timeout and re-enrollment under its own policy. Keep results and schedule bootstrap credential retirement where appropriate. Continue with [EST client](/docs/platform/iot-fleets/est/configuration).
+
+
+# EST in Lamassu (/docs/platform/iot-fleets/est/configuration)
+
+
+
+The DMS applies the configured authentication mode to enrollment requests before enforcing registration and issuance rules. Initial enrollment and re-enrollment have independent authentication settings. Lamassu supports a client certificate, a webhook, both, or no DMS authentication. [Authentication and trust](/docs/platform/iot-fleets/est/bootstrap-identity) explains credentials, initial trust and validation.
+
+The DMS also controls the CA, profile, renewal window, server-generated keys and distributed certificates. See the [DMS guide](/docs/platform/iot-fleets/enrollment/dms) for administration.
+
+Endpoint reference [#endpoint-reference]
+
+Public route in the examples: `/.well-known/est/{APS}/{operation}`. `APS` is the DMS ID. The router admits routes without that segment, but the controller requires it; do not use them as a default service. Gateway configuration determines the public host and route.
+
+| Operation                            | Method | Authentication and condition                                                                   |
+| ------------------------------------ | ------ | ---------------------------------------------------------------------------------------------- |
+| [`/cacerts`](#cacerts)               | GET    | DMS reading does not require an EST credential; HTTPS and infrastructure controls still apply. |
+| [`/simpleenroll`](#simpleenroll)     | POST   | Initial authentication and DMS registration/replacement policy.                                |
+| [`/simplereenroll`](#simplereenroll) | POST   | Renewal authentication, existing identity, subject, revocation and window.                     |
+| [`/serverkeygen`](#serverkeygen)     | POST   | Initial authentication and server-side key generation enabled.                                 |
+
+These routes do not implement `/csrattrs` or `/fullcmc`. There is no native JWT EST authentication mode; a webhook can interpret a request credential according to its own contract.
+
+Authentication per operation [#authentication-per-operation]
+
+The blocks are independent:
+
+* `settings.enrollment_settings.est_rfc7030_settings` for `/simpleenroll` and `/serverkeygen`.
+* `settings.reenrollment_settings.est_rfc7030_settings` for `/simplereenroll`.
+
+| `auth_mode`                               | Control applied in the configured operation          |
+| ----------------------------------------- | ---------------------------------------------------- |
+| `CLIENT_CERTIFICATE`                      | Presented certificate validation.                    |
+| `EXTERNAL_WEBHOOK`                        | Configured webhook authorization.                    |
+| `CLIENT_CERTIFICATE_AND_EXTERNAL_WEBHOOK` | Certificate validation followed by webhook approval. |
+| `NO_AUTH`                                 | No DMS requester authentication.                     |
+
+Webhook and combined modes also execute during re-enrollment when configured in its block. They do not implicitly degrade to NO\_AUTH. An absent or unrecognized mode fails.
+
+For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired`, `chain_level_validation` and `allow_unverifiable_revocation`. The validator receives one certificate credential; the flow does not guarantee forwarding every handshake intermediate to it. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
+
+The authentication editor offers an **Allow certificates without revocation information** switch (`allow_unverifiable_revocation`, off by default). When it is on, certificates (and intermediate CAs of the chain) that Lamassu does not manage and that list no OCSP or CRL endpoint are accepted; unreachable, stale or inconclusive revocation answers are always rejected. While the switch is on, the console shows an amber warning: **Revocation will not be verified**. A revoked certificate with no OCSP or CRL endpoint, and not managed by Lamassu, will be accepted, and this also applies to the intermediate CAs of the chain.
+
+The same switch is offered in both the enrollment and re-enrollment authentication editors and is stored per block inside `est_rfc7030_settings.client_certificate_settings`; a DMS stored before this field existed loads with the switch off. The console also shows an amber warning alert whenever an authentication option is in its insecure state (**Allow expired certificates** on, **Allow expired renewal** on or **Verify CSR signature** off) and the No authentication note is presented as a warning alert too.
+
+Revocation is checked for every presented certificate. In initial enrollment the client certificate **and** every intermediate CA between it and the validation CA are checked, each against its issuer; extra certificates the device sends in the handshake are ignored. A validation CA that is revoked in Lamassu rejects the operation: the first validation CA that validates the certificate is used, and a revoked one is not replaced by the remaining validation CAs. Certificates issued and managed by Lamassu are checked against their stored status. External certificates are checked through their OCSP and CRL endpoints, and the operation fails closed when revocation cannot be verified: only `allow_unverifiable_revocation` (`false` by default in both blocks) relaxes the case of an external certificate that lists no endpoint at all. Endpoints that exist but are unreachable, return stale or invalid evidence, or report an inconclusive status are always rejected, whatever the option says. The details and the evidence the endpoints must present are in [Revocation and checks](/docs/platform/iot-fleets/est/bootstrap-identity#revocation-and-checks).
+
+For certificate re-enrollment, the validator tries the enrollment CA first and then the CAs listed in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`; those are the re-enrollment validation CAs. That list is optional because the enrollment CA is always trusted for re-enrollment, and each settings block consults only its own `validation_cas`. CAs listed only in the initial block's `validation_cas` do not extend re-enrollment acceptance; during a CA rotation, add the old issuance CA to the re-enrollment block's list. The re-enrollment validator compares the presented TLS leaf against those CAs; the re-enrollment block's `chain_level_validation` and `allow_expired` values are stored but not consulted, and expiry is governed by `enable_expired_renewal`. Re-enrollment checks revocation of the client certificate only; that check is governed by the re-enrollment block's own `allow_unverifiable_revocation`.
+
+For a webhook, configure destination, Lamassu-to-service authentication, method and timeout. The [authentication contract](/docs/platform/iot-fleets/est/bootstrap-identity) explains the device credential and request body. `NO_AUTH` does not establish ownership of the requested ID.
+
+External webhook settings [#external-webhook-settings]
+
+The webhook authentication modes read `external_webhook_settings` in the same `est_rfc7030_settings` block:
+
+| `external_webhook_settings` field | Decision                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `url`                             | Absolute `http` or `https` URL of the receiver. It must be the final URL; redirects are not followed.                                            |
+| `method`                          | `POST` or `PUT`; `POST` by default.                                                                                                              |
+| `name`                            | Label used in service logs.                                                                                                                      |
+| `config.auth_mode`                | `noauth`, `apikey`, `jwt` or `mtls`. An absent or unknown value behaves as `noauth`.                                                             |
+| `config.log_level`                | Log level of the webhook call: `debug`, `info`, `warn` or `error`; `info` by default.                                                            |
+| `config.apikey_options`           | Required for `apikey`: `header` and `key`. Reserved header names are rejected.                                                                   |
+| `config.jwt_options`              | Required for `jwt`: `oidc_client_id`, `oidc_client_secret` and an absolute `http` or `https` `oidc_well_known`.                                  |
+| `config.mtls_options`             | Required for `mtls`: `cert_content` and `key_content` as Base64-encoded PEM, like certificates elsewhere in the API; plain PEM is also accepted. |
+| `config.insecure_skip_verify`     | Skips verification of the receiver certificate when `true`. Verification is on by default. Unlike alert channels, this flag is honored here.     |
+| `config.call_timeout`             | Maximum duration of the authorization call (for example `10s`); 10 seconds by default.                                                           |
+
+Rules for that configuration:
+
+* Creating or updating a DMS whose enrollment or reenrollment `auth_mode` uses the webhook validates the block and returns HTTP 400 (the body starts with `struct validation error:` and continues with `invalid enrollment external webhook config` or `invalid reenrollment external webhook config`) when the URL, method or options are invalid. That includes an `mtls_options.cert_content`/`key_content` pair that does not decode to a matching certificate and private key. File references (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`) are always invalid: the service does not read files, so enter the certificate and key as Base64-encoded PEM in `mtls_options.cert_content` and `key_content`, or as plain PEM.
+* A custom `apikey_options.header` may not use names that the platform or the receiving service trusts (for example `X-Principal-Id`, `X-Request-Id`, `Host`, `Content-Type` or `Forwarded`) and no name may start with `X-Forwarded-`, `X-Envoy-` or `X-Lms-` (case-insensitive). The [DMS API reference](/docs/api-reference/dms-manager) documents the `WebhookCall` and `WebhookCallHttpClient` schemas and that reserved API-key headers are rejected.
+* The nested `http_client` key exists only in alert channel configurations; in a DMS body it is ignored. The DMS key is `external_webhook_settings.config`.
+* A body with `config.auth_mode` set to `apikey`, `jwt` or `mtls` must carry its corresponding option block (`apikey_options`, `jwt_options` or `mtls_options`) and nothing else. Bodies with those auth modes carrying only `apikey`, `oidc` or `mtls` fail validation with 400, and `validate_server_cert` is always ignored: use `insecure_skip_verify`. Only bodies without option blocks are accepted as `noauth`, and their credentials are dropped.
+* The authorization response must be JSON of at most 1 MiB; a larger body fails the call.
+
+<Callout type="warn" title="Credentials over http://">
+  With credentials configured, they are sent regardless of the URL scheme: an `http://` webhook receives the API key or bearer token in cleartext, and mTLS has no effect because no TLS handshake takes place, so the client certificate is never presented. Prefer `https://` for `url`, `oidc_well_known` and the token endpoint it advertises.
+</Callout>
+
+Initial authentication and renewal settings are stored independently. Re-enrollment reads its own block and an absent or unknown mode fails. Read both blocks before editing. The console exposes independent editors for the enrollment and re-enrollment authentication, with the same Log Level, Call Timeout, HTTP Authentication and credential fields as the webhook channels, plus a **Skip TLS Verification** switch (off by default, so verification stays on; the console warns when you enable it).
+
+Webhook credentials must be stored as PEM content. File references (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`) are never valid in a stored webhook config: delivery rejects any webhook config that references files, whatever its auth mode, so every enroll and reenroll that calls that webhook fails until the certificate and key are entered as Base64-encoded or plain PEM in `mtls_options.cert_content` and `key_content`, or the file fields are removed if the webhook does not use mTLS. If a stored config holds file paths in `mtls_options.cert_content` or `key_content`, every full settings update (`POST /v1/dms`, `PUT /v1/dms/:id`) fails validation (settings are replaced wholesale, so the stored config must be resent) until the values are replaced by PEM content or the webhook stops being used. Meanwhile, delivery of that webhook fails on every call; a metadata-only update through `PUT` or `PATCH` on `/v1/dms/:id/metadata` still succeeds. To fix it in the console, open the DMS, replace any file-path value with PEM content (the editor rejects file paths with an inline field error) and save. Saving rewrites `external_webhook_settings.config` with the current keys, and the console reads both plain and Base64-encoded PEM from migrated configurations and stores the material Base64-encoded. If your stored config previously relied on `validate_server_cert: false`, it now carries `insecure_skip_verify: true`: receiver-certificate verification stays skipped until you set that flag to `false`. See [3.8.0 to 4.0.0](/docs/upgrades/3-8-0-to-4-0-0) for the upgrade notes and the operator checklist.
+
+The re-enrollment trust set lives in `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`. The flat field `reenrollment_settings.additional_validation_cas` is not part of the API: bodies that carry it are accepted but the value is silently ignored (unknown JSON fields are dropped) and GET responses do not include it. Read the DMS before sending API edits: an update body built with that flat field silently empties `validation_cas`.
+
+Compatibility notes [#compatibility-notes]
+
+Do not interpret every 500 as a transient failure. Invalid input typically produces 400; service denials and errors typically produce 500 with a JSON `err` body. Gateway errors and some controller paths can have another format. Retain headers and body before decoding and see [troubleshooting](/docs/platform/iot-fleets/est/troubleshooting).
+
+The examples use [openssl-pkcs7](https://docs.openssl.org/3.6/man1/openssl-pkcs7/) to extract certificates and [openssl-x509](https://docs.openssl.org/3.6/man1/openssl-x509/) to prepare renewal. Check your version's capabilities and responses before integrating a generic EST client.
+
+Before you begin [#before-you-begin]
+
+For an end-to-end first enrollment, follow [Enroll and connect your first device](/docs/platform/iot-fleets/quickstarts/enroll-device).
+
+You need the public HTTPS DMS URL, server trust obtained through an approved channel, the operation's authentication mode and an admitted identifier. The examples use Bash, OpenSSL 3.x and curl with `--fail-with-body`; use a private working directory and compatible versions of these tools.
+
+Prepare `est-trust.pem` to verify the EST server, `bootstrap.crt` and `bootstrap.key` for initial certificate authentication, and `device-root.pem` as the approved root of the device issuer. The two trust files can contain different roots. For another authentication mode, adapt the credentials according to [Bootstrap identity](/docs/platform/iot-fleets/est/bootstrap-identity).
+
+Replace the host and `REPLACE_DMS_ID` with those of your installation. The URL's APS is the DMS identifier, not its display name.
+
+```bash
+set -euo pipefail
+umask 077
+EST_BASE='https://lamassu.example.com/.well-known/est/REPLACE_DMS_ID'
+```
+
+/cacerts [#cacerts]
+
+`GET /cacerts` retrieves the certificates published by the DMS. The client can inspect the bundle and use approved certificates to build trust chains.
+
+Configuration [#trust-distribution]
+
+The options are stored in `settings.ca_distribution_settings` and determine the contents of `/cacerts`.
+
+<span id="lamassu-tls-certificate" />
+
+**Lamassu TLS certificate**
+
+`include_system_ca` (**Include Lamassu System CA**). Available downstream TLS certificate; it can be a leaf, not an issuing CA.
+
+<span id="enrollment-ca" />
+
+**Enrollment CA**
+
+`include_enrollment_ca` (**Include Enrollment CA**). Selected issuing CA certificate.
+
+<span id="managed-cas" />
+
+**Managed CAs**
+
+`managed_cas` (**Managed CAs**). Explicitly selected CA certificates.
+
+All ancestors are not added automatically.
+
+Request and Response [#cacerts-request-and-response]
+
+Send an HTTPS GET with an empty body. The DMS lets clients retrieve certificates without an EST credential. Gateway controls still apply.
+
+* **Default response.** `Content-Type: application/pkcs7-mime; smime-type=certs-only` and `Content-Transfer-Encoding: base64`. The body is Base64-encoded DER PKCS#7 with lines of up to 76 characters.
+* **PEM response.** Lamassu selects this format when `Accept` is exactly `application/x-pem-file` and returns the same value in `Content-Type`. The body contains the certificates in PEM.
+
+<span id="what-cacerts-returns" />
+
+**What cacerts returns**
+
+The DMS may include the available downstream TLS certificate, selected Managed CAs and enrollment CA. Selecting the issuer does not include every ancestor. The set may contain leaves, roots and intermediates, including multiple hierarchies during migration.
+
+Position does not define the chain. Identify certificates by subject, issuer, AKI/SKI, signature and constraints. Download and inspect using [EST client](/docs/platform/iot-fleets/est/configuration#download-and-inspect-cacerts).
+
+<span id="download-and-inspect-cacerts" />
+
+**Download and inspect cacerts**
+
+This example downloads and converts the default response. Follow the [shared client setup](#before-you-begin) to set `EST_BASE` and prepare the credentials.
+
+```bash
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem \
+  --dump-header cacerts.headers --output cacerts.b64 \
+  "$EST_BASE/cacerts"
+openssl base64 -d -in cacerts.b64 -out cacerts.p7b
+openssl pkcs7 -inform DER -in cacerts.p7b -print_certs -quiet -out cacerts.pem
+openssl crl2pkcs7 -nocrl -certfile cacerts.pem | openssl pkcs7 -print_certs -noout
+```
+
+Check fingerprints, issuers and dates against the [trust distribution](/docs/platform/iot-fleets/est/configuration#trust-distribution) policy. The response can contain a selection of CAs and Lamassu's TLS certificate. Do not turn the entire bundle into trusted roots or use it to authenticate its own initial download. HTTP 200 here does not prove that authentication or issuance works.
+
+/simpleenroll [#simpleenroll]
+
+`POST /simpleenroll` issues a device’s initial certificate from a CSR. Lamassu takes the device identifier from the CN and binds the issued certificate to the device identity. The private key stays on the client.
+
+Configuration [#enrollment-configuration]
+
+The following options are stored in `settings.enrollment_settings`.
+
+<span id="enrollment-device-registration" />
+
+**Registration mode**
+
+`settings.enrollment_settings.registration_mode` accepts `JITP` or `PRE_REGISTRATION`. JITP creates an unknown device with the CSR CN as ID and the DMS as owner.
+
+PRE\_REGISTRATION requires an existing ID. An existing device encounters replacement checks first, even without an identity. Review [preregistration conditions](/docs/platform/iot-fleets/enrollment/provisioning-strategies#preregistration-and-replacement) before using this mode.
+
+<span id="device-provisioning-profile" />
+
+**Device provisioning profile**
+
+`settings.enrollment_settings.device_provisioning_profile` supplies tags, metadata and an icon for JITP registration.
+
+<span id="enrollment-settings" />
+
+**Protocol**
+
+`protocol`. `EST_RFC7030` for these operations.
+
+<span id="issuing-ca" />
+
+**Issuing CA**
+
+`enrollment_ca`. ID of the signing CA.
+
+<span id="csr-signature-verification" />
+
+**CSR signature verification**
+
+`verify_csr_signature`. Keep `true` to verify CSR key possession.
+
+<span id="certificate-replacement" />
+
+**Certificate replacement**
+
+`enable_replaceable_enrollment`. Allows `/simpleenroll` for an existing ID in the same DMS. It can attempt previous certificate revocation even if a later phase fails; this is not atomic.
+
+<span id="authentication-mode" />
+
+**Authentication mode**
+
+`est_rfc7030_settings.auth_mode`. Select an [authentication mode](#authentication-per-operation) for initial enrollment.
+
+Initial enrollment rejects an ID owned by another DMS. Do not automatically enable replacement in response to an error; [Troubleshooting](/docs/platform/iot-fleets/est/troubleshooting) distinguishes repeated IDs, ownership and partial changes.
+
+<span id="issuance-profile" />
+
+**Issuance profile**
+
+`settings.issuance_profile_id` takes precedence over `settings.issuance_profile`; without either, the CA default profile is used. The resolved profile (including the CA default used as fallback when the DMS defines none) must define an end-entity certificate: a `Sign as CA` profile is rejected at enrollment and re-enrollment time. Rules are documented once in [Profiles](/docs/platform/pki/certificate-profiles). DMS changes affect future requests; they do not modify signed certificates or install client trust.
+
+Request and Response [#simpleenroll-request-and-response]
+
+Send `Content-Type: application/pkcs10` with a Base64-encoded DER PKCS#10 CSR in the body. Lamassu decodes the body directly as Base64. Send the encoded CSR as the entire body.
+
+* **Default response.** `Content-Type: application/pkcs7-mime; smime-type=certs-only` and `Content-Transfer-Encoding: base64`. The PKCS#7 contains the issued certificate. Retrieve the CA certificates you need to validate its chain separately.
+* **PEM response.** Send exactly `Accept: application/x-pem-file` to receive the certificate in PEM with `Content-Type: application/x-pem-file`.
+
+<span id="initial-enrollment-example" />
+
+Follow the [shared client setup](#before-you-begin) to set `EST_BASE` and prepare the credentials.
+
+<span id="prepare-the-csr" />
+
+**Prepare the CSR**
+
+The example generates a new EC P-256 key and uses `est-device-001`, which must be available if the DMS registers automatically. The `Common Name` becomes the device identifier. Check that the profile permits the selected key and subject.
+
+```bash
+test ! -e device.key
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out device.key
+openssl req -new -sha256 -key device.key -subj '/CN=est-device-001' -out device.csr
+openssl req -in device.csr -verify -noout
+openssl req -in device.csr -outform DER -out device.csr.der
+openssl base64 -A -in device.csr.der -out device.csr.b64
+```
+
+An implementation using hardware or its own store must produce the CSR through its resident key. `simpleenroll` sends the request and retains the key in the client. Honor Extensions does not authorize every requested attribute: see [Profiles](/docs/platform/pki/certificate-profiles).
+
+<span id="request-the-identity" />
+
+**Request the identity**
+
+With initial `CLIENT_CERTIFICATE` authentication, send the Base64-encoded DER CSR using `Content-Type: application/pkcs10`:
+
+```bash
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem --cert bootstrap.crt --key bootstrap.key \
+  --header 'Content-Type: application/pkcs10' \
+  --data-binary @device.csr.b64 \
+  --dump-header enroll.headers --output enroll.b64 \
+  "$EST_BASE/simpleenroll"
+openssl base64 -d -in enroll.b64 -out enroll.p7b
+openssl pkcs7 -inform DER -in enroll.p7b -print_certs -quiet -out device.crt
+```
+
+Stop if curl fails. Retain the HTTP code, headers and body for diagnosis; an error response is not decoded as a certificate. The Bash example stops before that conversion. A timeout leaves the operation's result to be checked in Lamassu: do not automatically repeat issuance.
+
+<span id="check-and-install-the-result" />
+
+For a root that issues directly:
+
+```bash
+openssl verify -CAfile device-root.pem -purpose sslclient device.crt
+openssl x509 -in device.crt -noout -subject -issuer -serial -dates -text
+openssl x509 -in device.crt -pubkey -noout > certificate-public.pem
+openssl pkey -pubin -in certificate-public.pem -outform DER -out certificate-public.der
+openssl pkey -in device.key -pubout -outform DER -out key-public.der
+cmp certificate-public.der key-public.der
+```
+
+Also verify that the CN is correct, the certificate is a leaf, its uses permit your application and its dates satisfy the profile. `cmp` must exit with code 0. With intermediates, provide the chain through `-untrusted` as described in [PKI validation](/docs/platform/pki/certificate-validation).
+
+Query the device: the owning DMS, current serial number and history must match the result. Protect the key/certificate pair and install both using the device's mechanism. Association in Lamassu does not install files in the client. Check a real connection before considering the process complete.
+
+<span id="next-steps" />
+
+/simplereenroll [#simplereenroll]
+
+`POST /simplereenroll` issues a successor certificate for an active identity. The client keeps the device identifier and can request the certificate with a new key.
+
+Configuration [#re-enrollment-configuration]
+
+The following options are stored in `settings.reenrollment_settings`.
+
+<span id="renewal-authentication" />
+
+**Renewal authentication**
+
+`est_rfc7030_settings.auth_mode` controls how the client authenticates for renewal. See [Authentication per operation](#authentication-per-operation).
+
+<span id="renewal-window" />
+
+**Renewal window**
+
+`reenrollment_delta`. Opens the window at the active certificate’s `NotAfter` minus this delta.
+
+<span id="preventive-threshold" />
+
+**Preventive threshold**
+
+`preventive_delta`. Preventive operational monitoring threshold.
+
+<span id="critical-threshold" />
+
+**Critical threshold**
+
+`critical_delta`. Critical operational monitoring threshold.
+
+<span id="renewal-with-an-expired-certificate" />
+
+**Renewal with an expired certificate**
+
+`enable_expired_renewal`. Accepts an expired presented certificate in the renewal mTLS validator. Does not authorize another mode or remove Gateway constraints by itself.
+
+<span id="renewal-validation-cas" />
+
+**Renewal validation CAs**
+
+`est_rfc7030_settings.client_certificate_settings.validation_cas`. Re-enrollment validation CAs for the renewal mTLS credential, tried after the enrollment CA; optional, because the enrollment CA is always trusted. Typically populated during CA rotation while old-CA cohorts renew.
+
+<span id="previous-certificate-revocation" />
+
+**Previous certificate revocation**
+
+`revoke_on_reenrollment`. If the previous certificate is ACTIVE, attempts Superseded revocation before binding its successor.
+
+Monitoring does not renew: the client must schedule the request and installation. Webhook and NO\_AUTH modes do not use the same mTLS expired-credential validator; the webhook must explicitly authorize permitted recovery. Review [renewal and recovery](#recover-according-to-state) for operation order and partial failures.
+
+Request and Response [#simplereenroll-request-and-response]
+
+Use the same [CSR format and headers](#simpleenroll-request-and-response) as `simpleenroll`. The response contains the successor certificate in Base64-encoded DER PKCS#7, or in PEM if you send exactly `Accept: application/x-pem-file`.
+
+With certificate authentication, Lamassu requires the credential’s CN to match the CSR’s CN and compares the requested subject with the current certificate. The DMS rejects a revoked current certificate or a request made before the renewal window. See [authentication per operation](#authentication-per-operation) for accepted CAs, expiry and revocation checks.
+
+<span id="renewal-example" />
+
+<span id="prepare-renewal" />
+
+**Prepare renewal**
 
 * Query the current certificate in Lamassu and compare it with the installed certificate. You need its subject, serial and dates, as well as the client key.
 * Check the **re-enrollment** authentication mode: it is independent of initial authentication. With `CLIENT_CERTIFICATE`, use the current identity; do not assume the bootstrap credential is admitted.
 * Calculate the window's start: the current certificate's `NotAfter` minus `reenrollment_delta`. Preventive and critical thresholds produce states/notifications; they do not extend that window.
 * Review **Revoke on Re-enrollment** and recovery if installation fails. When enabled, Lamassu can revoke the previous identity before the client installs the new one.
 
-Request the successor certificate [#request-the-successor-certificate]
+<span id="request-the-successor-certificate" />
+
+**Request the successor certificate**
 
 The example continues the [EST tutorial](/docs/platform/iot-fleets/quickstarts/enroll-device), in the same Bash session with `set -euo pipefail`, `umask 077` and `EST_BASE`. Use a new key compatible with the profile. Conversion from the certificate preserves the subject and copies only SAN when present; check the subject and requested names before sending it. The backend checks the subject against the current identity: it attempts RawSubject equality and then compares CN, OU, O, L, ST and C. Rebuilding only the CN can lose required attributes.
 
@@ -2487,7 +2474,7 @@ cmp next-certificate-public.der next-key-public.der
 
 The request authenticates with `device.crt` and `device.key`; the CSR contains the new public key. Also check extensions, dates and correspondence of the serial with the current slot in Lamassu. Do not resubmit a failed request without querying that state: issuance, previous revocation and successor binding can have partial results.
 
-Install and check the new pair [#install-and-check-the-new-pair]
+<span id="install-and-check-the-new-pair" />
 
 Keep the result as `device.next.crt` and `device.next.key` until verified. Switch the pair through a coordinated operation in the device store or configuration; avoid temporarily exposing a certificate with another version's key.
 
@@ -2512,10 +2499,108 @@ Continuous operation [#continuous-operation]
 
 Schedule renewal with time for disconnections, trust distribution and consumer checks. Stagger requests across the population and bound retries within the window; authentication, subject and policy errors require correcting their cause. Maintain an admitted and tested recovery mechanism for lost keys and pairs that could not be installed.
 
-Continue with [Trust distribution](/docs/platform/iot-fleets/enrollment/trust-distribution), [Devices and identities](/docs/platform/iot-fleets/device-management) and [Troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting).
+Continue with [Trust distribution](/docs/platform/iot-fleets/est/configuration#trust-distribution), [Devices and identities](/docs/platform/iot-fleets/device-management) and [Troubleshooting](/docs/platform/iot-fleets/est/troubleshooting).
+
+/serverkeygen [#serverkeygen]
+
+`POST /serverkeygen` generates a software key in Lamassu, rebuilds the CSR with that key and performs initial enrollment. The client receives the private key and certificate.
+
+Configuration [#serverkeygen-configuration]
+
+`settings.server_keygen_settings` controls key generation. The operation applies the [initial enrollment policy](#enrollment-configuration). Before testing with a registered ID, check whether the policy allows certificate replacement.
+
+<span id="enable-key-generation" />
+
+**Enable key generation**
+
+`enabled` turns on the operation. The console shows an **Enable server-side key generation** switch. When disabled, the console omits the `key` field.
+
+<span id="key-type" />
+
+**Key type**
+
+`key.type` selects RSA or ECDSA in **Key type**. The issuance profile must allow the selected algorithm and size.
+
+<span id="key-size" />
+
+**Key size**
+
+`key.bits` is the modulus size for RSA or the curve for ECDSA. The console offers 2048, 3072 or 4096 bits for RSA, defaulting to 4096, and P-256, P-384 or P-521 for ECDSA, defaulting to P-256.
+
+For ECDSA, the service also recognizes 224, 256, 384 and 521 as P-224, P-256, P-384 and P-521. An unrecognized value selects P-256. Choose a compatible size and check the resulting key.
+
+Request and Response [#serverkeygen-request-and-response]
+
+Send a Base64-encoded DER PKCS#10 CSR with `Content-Type: application/pkcs10`. The response uses this operation’s multipart format even if `Accept` asks for PEM. Lamassu generates the key in software even when the CA signs with an HSM-backed key.
+
+<span id="response-format" />
+
+**Response format**
+
+The body is **MIME multipart/mixed**, with the boundary specified in `Content-Type`. It contains two parts:
+
+| Part                                            | Content after decoding its Base64             |
+| ----------------------------------------------- | --------------------------------------------- |
+| `application/pkcs8`                             | Unencrypted DER PKCS#8 private key.           |
+| `application/pkcs7-mime; smime-type=certs-only` | DER PKCS#7 containing the issued certificate. |
+
+The controller also adds `Content-Transfer-Encoding: base64` to the outer header, although the outer body is MIME text. **Do not Base64-decode the entire body.** Read the actual boundary and decode each part according to its headers.
+
+<span id="request-and-extraction" />
+
+**Example request**
+
+In a Bash session with `set -euo pipefail` and `umask 077`, use `EST_BASE` and the trust/bootstrap files from [client setup](#before-you-begin). Select an available and admitted `est-serverkeygen-001`. The `server-request.key` only signs the input CSR; the received identity uses the server-generated key.
+
+```bash
+test ! -e server-request.key
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out server-request.key
+openssl req -new -sha256 -key server-request.key \
+  -subj '/CN=est-serverkeygen-001' -out serverkeygen.csr
+openssl req -in serverkeygen.csr -outform DER -out serverkeygen.csr.der
+openssl base64 -A -in serverkeygen.csr.der -out serverkeygen.csr.b64
+curl --fail-with-body --show-error --silent --max-time 30 \
+  --cacert est-trust.pem --cert bootstrap.crt --key bootstrap.key \
+  --header 'Content-Type: application/pkcs10' \
+  --data-binary @serverkeygen.csr.b64 \
+  --dump-header serverkeygen.headers --output serverkeygen.mime \
+  "$EST_BASE/serverkeygen"
+```
+
+<span id="extraction-and-verification" />
+
+Process the MIME parts according to their headers and verify that the received key matches the certificate. Inspect the CN, serial, dates and uses, and check the association in Lamassu before installing. Protect files containing the key and remove temporary copies according to the device storage mechanism.
 
 
-# Enrollment troubleshooting (/docs/platform/iot-fleets/enrollment/troubleshooting)
+# EST Reference (/docs/platform/iot-fleets/est)
+
+
+
+Enrollment over Secure Transport (EST) is a protocol for obtaining and renewing X.509 certificates over HTTPS. An EST client communicates with an EST server, which handles certificate requests and provides certification authority certificates. The standard defines messages, operations and authentication mechanisms. [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html)
+
+Operations [#operations]
+
+Operation paths are appended to the `/.well-known/est` prefix, which may include a label identifying the CA or service.
+
+| Operation         | Method | Purpose                                             | Server support |
+| ----------------- | ------ | --------------------------------------------------- | -------------- |
+| `/cacerts`        | GET    | Retrieve CA certificates.                           | Mandatory      |
+| `/simpleenroll`   | POST   | Request an initial certificate using a CSR.         | Mandatory      |
+| `/simplereenroll` | POST   | Request certificate renewal or rekeying.            | Mandatory      |
+| `/serverkeygen`   | POST   | Request a server-generated key and its certificate. | Optional       |
+| `/csrattrs`       | GET    | Retrieve suggested CSR attributes.                  | Optional       |
+| `/fullcmc`        | POST   | Submit a Full CMC request.                          | Optional       |
+
+Authentication and messages [#authentication-and-messages]
+
+EST uses TLS to protect the exchange. The client authenticates the server, and the server authenticates and authorizes the client using the mechanisms defined by the standard. Initial CA certificate distribution has specific conditions for establishing trust. [RFC 7030, sections 3.3 and 4.1](https://www.rfc-editor.org/rfc/rfc7030.html)
+
+The `/simpleenroll` and `/simplereenroll` requests use a PKCS#10 CSR. The certificate response uses PKCS#7. The `/serverkeygen` response is `multipart/mixed` and contains the key and certificate. The standard also defines Full CMC requests and responses and the CSR attributes format. [RFC 7030, section 3.2.4](https://www.rfc-editor.org/rfc/rfc7030.html#section-3.2.4)
+
+See [EST in Lamassu](/docs/platform/iot-fleets/est/configuration) for the available operations and their configuration.
+
+
+# Enrollment troubleshooting (/docs/platform/iot-fleets/est/troubleshooting)
 
 
 
@@ -2527,36 +2612,36 @@ Error codes and diagnostics [#error-codes-and-diagnostics]
 
 The EST controller normally returns 400 when rejecting input and 500 when the service rejects or fails the operation. A 500 can also represent a policy denial; it does not mean retrying is safe. Gateway can produce its own codes and bodies. Examine the actual body and persisted result.
 
-| Symptom or message                                                    | What to check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| curl rejects TLS, name or issuer                                      | URL, clock, server SAN and approved root in `est-trust.pem`. Resolve trust in [Deployment](/docs/deployment/troubleshooting); do not skip verification.                                                                                                                                                                                                                                                                                                                                               |
-| 404 or missing APS                                                    | Public route `/.well-known/est/{DMS_ID}/{operation}` and existing DMS. APS is not the service name.                                                                                                                                                                                                                                                                                                                                                                                                   |
-| 400, CSR or format error                                              | `Content-Type: application/pkcs10`, Base64 of DER, valid signature and a body preserved without double encoding.                                                                                                                                                                                                                                                                                                                                                                                      |
-| Missing credential or invalid certificate                             | Operation mode, validating CA, dates, revocation and credential delivery by Gateway. Do not confuse server TLS trust with the bootstrap CA.                                                                                                                                                                                                                                                                                                                                                           |
-| Enroll or re-enroll rejects a certificate for unverifiable revocation | Whether the certificate is managed by Lamassu, whether its OCSP/CRL endpoints are configured and reachable from the service, and whether `allow_unverifiable_revocation` is set for that operation's block. See [DMS](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation) and [Revocation and checks](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks).                                                                                              |
-| Webhook denies, times out or responds without authorization           | Configuration, connectivity and JSON response with `authorized: true`. There is no automatic fallback to `NO_AUTH`.                                                                                                                                                                                                                                                                                                                                                                                   |
-| `unexpected status code: <n>: redirects are not followed`             | The webhook answered with a redirect. Configure the final absolute `http` or `https` URL in the webhook config; redirects are never followed.                                                                                                                                                                                                                                                                                                                                                         |
-| `webhook response exceeds 1048576 bytes`                              | The receiver returned more than 1 MiB of JSON. Reduce the response of the authorization webhook.                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `webhook config must not reference files`                             | The webhook config points to files (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`). For mTLS, enter the certificate and key as Base64-encoded PEM in `cert_content` and `key_content`, or as plain PEM; remove any other file field, including `ca_cert_file`, which has no inline equivalent (the receiver certificate must chain to the system trust store). See the webhook credentials guidance in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings). |
-| `mtls_options.cert_content must be base64-encoded PEM`                | The value is neither Base64-encoded PEM nor plain PEM: it is a file path or Base64 of non-PEM data. Enter the certificate and key as Base64-encoded PEM, like certificates elsewhere in the API, or as plain PEM (see the webhook settings in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings)). The same message names `mtls_options.key_content` when the key is the offending value.                                                                                      |
-| `webhook mTLS certificate and key are invalid: …`                     | The certificate and key do not form a matching pair. Enter both values from the same pair; the check runs when the DMS is saved and again on every webhook call.                                                                                                                                                                                                                                                                                                                                      |
-| 400 `struct validation error` creating or updating a DMS              | The webhook config of the operation that uses it is invalid. Review `external_webhook_settings` in [DMS](/docs/platform/iot-fleets/enrollment/dms#external-webhook-settings).                                                                                                                                                                                                                                                                                                                         |
-| HTTP 500 with an `err` body on enroll or reenroll                     | Service failures reach the EST client as 500 with a body of `err` plus the message; webhook authorization errors are named there.                                                                                                                                                                                                                                                                                                                                                                     |
-| `device not preregistered`                                            | PRE\_REGISTRATION requires an existing inventory entry.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `forbiddenNewEnrollment`                                              | An existing device requires replacement to be enabled, even in No Identity. Investigate before enabling the flag.                                                                                                                                                                                                                                                                                                                                                                                     |
-| Different owning DMS                                                  | CN/ID, global inventory and owning DMS; do not reuse an ID from another context.                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `invalid RawSubject bytes`                                            | CSR subject versus the current certificate. Preserve its attributes as well as its CN.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `invalid reenroll window`                                             | Current identity's NotAfter and reenrollment\_delta. Alert thresholds do not change that window.                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Current certificate revoked                                           | Renewal rejected; prepare authorized recovery according to the cause.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| CA, profile or signing error                                          | Active CA, available key, selected profile and restrictions. Successful cacerts does not prove issuance.                                                                                                                                                                                                                                                                                                                                                                                              |
-| HTTP 200 without a device connection                                  | Installed pair, chain, uses, consumer trust and permissions. Also check the slot and history.                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Timeout or error after issuance                                       | New certificates, current slot and previous identity's state before retrying.                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Symptom or message                                                    | What to check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| curl rejects TLS, name or issuer                                      | URL, clock, server SAN and approved root in `est-trust.pem`. Resolve trust in [Deployment](/docs/deployment/troubleshooting); do not skip verification.                                                                                                                                                                                                                                                                                                                                                  |
+| 404 or missing APS                                                    | Public route `/.well-known/est/{DMS_ID}/{operation}` and existing DMS. APS is not the service name.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 400, CSR or format error                                              | `Content-Type: application/pkcs10`, Base64 of DER, valid signature and a body preserved without double encoding.                                                                                                                                                                                                                                                                                                                                                                                         |
+| Missing credential or invalid certificate                             | Operation mode, validating CA, dates, revocation and credential delivery by Gateway. Do not confuse server TLS trust with the bootstrap CA.                                                                                                                                                                                                                                                                                                                                                              |
+| Enroll or re-enroll rejects a certificate for unverifiable revocation | Whether the certificate is managed by Lamassu, whether its OCSP/CRL endpoints are configured and reachable from the service, and whether `allow_unverifiable_revocation` is set for that operation's block. See [DMS](/docs/platform/iot-fleets/est/configuration#authentication-per-operation) and [Revocation and checks](/docs/platform/iot-fleets/est/bootstrap-identity#revocation-and-checks).                                                                                                     |
+| Webhook denies, times out or responds without authorization           | Configuration, connectivity and JSON response with `authorized: true`. There is no automatic fallback to `NO_AUTH`.                                                                                                                                                                                                                                                                                                                                                                                      |
+| `unexpected status code: <n>: redirects are not followed`             | The webhook answered with a redirect. Configure the final absolute `http` or `https` URL in the webhook config; redirects are never followed.                                                                                                                                                                                                                                                                                                                                                            |
+| `webhook response exceeds 1048576 bytes`                              | The receiver returned more than 1 MiB of JSON. Reduce the response of the authorization webhook.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `webhook config must not reference files`                             | The webhook config points to files (`ca_cert_file`, `mtls_options.cert_file`, `mtls_options.key_file`). For mTLS, enter the certificate and key as Base64-encoded PEM in `cert_content` and `key_content`, or as plain PEM; remove any other file field, including `ca_cert_file`, which has no inline equivalent (the receiver certificate must chain to the system trust store). See the webhook credentials guidance in [DMS](/docs/platform/iot-fleets/est/configuration#external-webhook-settings). |
+| `mtls_options.cert_content must be base64-encoded PEM`                | The value is neither Base64-encoded PEM nor plain PEM: it is a file path or Base64 of non-PEM data. Enter the certificate and key as Base64-encoded PEM, like certificates elsewhere in the API, or as plain PEM (see the webhook settings in [DMS](/docs/platform/iot-fleets/est/configuration#external-webhook-settings)). The same message names `mtls_options.key_content` when the key is the offending value.                                                                                      |
+| `webhook mTLS certificate and key are invalid: …`                     | The certificate and key do not form a matching pair. Enter both values from the same pair; the check runs when the DMS is saved and again on every webhook call.                                                                                                                                                                                                                                                                                                                                         |
+| 400 `struct validation error` creating or updating a DMS              | The webhook config of the operation that uses it is invalid. Review `external_webhook_settings` in [DMS](/docs/platform/iot-fleets/est/configuration#external-webhook-settings).                                                                                                                                                                                                                                                                                                                         |
+| HTTP 500 with an `err` body on enroll or reenroll                     | Service failures reach the EST client as 500 with a body of `err` plus the message; webhook authorization errors are named there.                                                                                                                                                                                                                                                                                                                                                                        |
+| `device not preregistered`                                            | PRE\_REGISTRATION requires an existing inventory entry.                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `forbiddenNewEnrollment`                                              | An existing device requires replacement to be enabled, even in No Identity. Investigate before enabling the flag.                                                                                                                                                                                                                                                                                                                                                                                        |
+| Different owning DMS                                                  | CN/ID, global inventory and owning DMS; do not reuse an ID from another context.                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `invalid RawSubject bytes`                                            | CSR subject versus the current certificate. Preserve its attributes as well as its CN.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `invalid reenroll window`                                             | Current identity's NotAfter and reenrollment\_delta. Alert thresholds do not change that window.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Current certificate revoked                                           | Renewal rejected; prepare authorized recovery according to the cause.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| CA, profile or signing error                                          | Active CA, available key, selected profile and restrictions. Successful cacerts does not prove issuance.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| HTTP 200 without a device connection                                  | Installed pair, chain, uses, consumer trust and permissions. Also check the slot and history.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Timeout or error after issuance                                       | New certificates, current slot and previous identity's state before retrying.                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 Compatibility notes [#compatibility-notes]
 
 Check the saved renewal mode and Gateway behavior with expired certificates and the bootstrap CA.
 
-The default response is Base64-encoded DER PKCS#7; PEM through `Accept: application/x-pem-file` is a Lamassu extension. ServerKeyGen returns multipart and requires handling each part separately. See the [EST reference](/docs/platform/iot-fleets/enrollment/est-reference).
+The default response is Base64-encoded DER PKCS#7; PEM through `Accept: application/x-pem-file` is a Lamassu extension. ServerKeyGen returns multipart and requires handling each part separately. See the [EST in Lamassu](/docs/platform/iot-fleets/est/configuration).
 
 EST enrollment fails [#est-enrollment-fails]
 
@@ -2566,54 +2651,9 @@ EST enrollment fails [#est-enrollment-fails]
 4. Make one request, save headers/body and query the device and certificates.
 5. If you receive an identity, check the key, subject, use and connection with the consumer.
 
-External bootstrap revocation checks fail closed: a certificate whose revocation cannot be verified — including an OCSP Unknown status — is rejected by default. Only `allow_unverifiable_revocation` in that operation's block (see [DMS](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation)) relaxes it, and only for certificates that carry no OCSP/CRL endpoint at all; unreachable, stale or inconclusive endpoints are rejected whatever the option says. See [Revocation and checks](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks). An intermediate CA in the TLS chain does not prove that the entire chain reached the DMS validator either.
+External bootstrap revocation checks fail closed: a certificate whose revocation cannot be verified (including an OCSP Unknown status) is rejected by default. Only `allow_unverifiable_revocation` in that operation's block (see [DMS](/docs/platform/iot-fleets/est/configuration#authentication-per-operation)) relaxes it, and only for certificates that carry no OCSP/CRL endpoint at all; unreachable, stale or inconclusive endpoints are rejected whatever the option says. See [Revocation and checks](/docs/platform/iot-fleets/est/bootstrap-identity#revocation-and-checks). An intermediate CA in the TLS chain does not prove that the entire chain reached the DMS validator either.
 
-For logs, networking, pods or Gateway headers, continue in [Deployment troubleshooting](/docs/deployment/troubleshooting). For identities issued, revoked or bound partially, use [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) and [Devices and identities](/docs/platform/iot-fleets/device-management).
-
-
-# Trust distribution and updates (/docs/platform/iot-fleets/enrollment/trust-distribution)
-
-
-
-This guide is for device and consumer trust administrators. You need issuer inventory, trust-store access and an authenticated update channel. Distributing certificates is separate from choosing trusted anchors.
-
-Three trust relationships [#three-trust-relationships]
-
-| Relationship        | Material prepared by its owner                                         |
-| ------------------- | ---------------------------------------------------------------------- |
-| Device → EST server | Previously verified server root, chain or pin and TLS name.            |
-| DMS → requester     | CAs and rules authorizing initial or renewal credentials.              |
-| Consumer → device   | Operational identity roots, intermediates, validation and permissions. |
-
-Obtaining a certificate does not automatically configure these relationships in third parties. Review the [Trust model](/docs/platform/pki/concepts/trust-model).
-
-What cacerts returns [#what-cacerts-returns]
-
-The DMS may include the available downstream TLS certificate, selected Managed CAs and enrollment CA. Selecting the issuer does not include every ancestor. The set may contain leaves, roots and intermediates, including multiple hierarchies during migration.
-
-Position does not define the chain. Identify certificates by subject, issuer, AKI/SKI, signature and constraints. Download and inspect using [EST client](/docs/platform/iot-fleets/enrollment/est-client#download-and-inspect-cacerts).
-
-Install the required material [#install-the-required-material]
-
-1. Keep initial EST server trust separate from identity consumer trust.
-2. Select policy-approved roots as anchors.
-3. Retain intermediates for chain building or presentation; do not automatically turn them into roots.
-4. Present the leaf and required intermediates in mTLS. Normally the peer already trusts its root and does not need it sent.
-5. Verify chain, dates, names, usages and revocation from the consumer.
-
-Do not indiscriminately use all of `cacerts.pem` as `-CAfile`: this can expand trusted authorities, hide missing intermediates or trust a TLS leaf intended for another purpose.
-
-Migrate trust [#migrate-trust]
-
-Before changing Enrollment CA, inventory disconnected equipment, bootstrap and operational certificates, and consumers. Distribute the new root and required intermediates; check that a cohort accepts both old and new chains.
-
-In the DMS, separate distributed CAs from the re-enrollment validation CAs at `reenrollment_settings.est_rfc7030_settings.client_certificate_settings.validation_cas`, used for re-enrollment credentials. That list is optional because the enrollment CA always validates re-enrollment credentials, but when switching the enrollment CA, add the previous issuance CA to it so old-CA identities keep re-enrolling during overlap. The validator tries the enrollment CA followed by those CAs against the received leaf; accepting a multilevel chain requires checking what reaches the service and which issuer is configured.
-
-Switch issuance, renew in cohorts and compare the installed serial with the active slot. Remove previous trust once no legitimate equipment needs it and policy permits ending overlap. Follow [Hierarchy and rotation](/docs/platform/pki/ca-hierarchy-and-rotation) for the PKI operation.
-
-Check the update [#check-the-update]
-
-Test an old identity allowed during overlap, a new one, an unknown chain and the result after removing old trust. Keep trust-store version, approved set, date and result. Reachable `/cacerts` establishes distribution only; it does not establish installation or acceptance across every device.
+For logs, networking, pods or Gateway headers, continue in [Deployment troubleshooting](/docs/deployment/troubleshooting). For identities issued, revoked or bound partially, use [Renewal and recovery](/docs/platform/iot-fleets/est/configuration) and [Devices and identities](/docs/platform/iot-fleets/device-management).
 
 
 # AWS IoT Core (/docs/platform/iot-fleets/integrations/aws-iot-core)
@@ -3058,7 +3098,7 @@ Troubleshooting [#troubleshooting]
 <Cards>
   <Card title="Configure a DMS" href="/docs/platform/iot-fleets/enrollment/dms" />
 
-  <Card title="Device enrollment (EST)" href="/docs/platform/iot-fleets/enrollment/overview" />
+  <Card title="Device enrollment (EST)" href="/docs/platform/iot-fleets/est" />
 
   <Card title="Certificate management" href="/docs/platform/pki/certificates" />
 </Cards>
@@ -3102,7 +3142,7 @@ This section connects PKI rules to the device client. Preparation follows this o
 <Cards>
   <Card title="Configure the DMS" description="Prepare the CA, admission, authentication and renewal rules." href="/docs/platform/iot-fleets/enrollment/dms" />
 
-  <Card title="Integrate the EST client" description="Review the device endpoints, formats and checks." href="/docs/platform/iot-fleets/enrollment/est-client" />
+  <Card title="EST (RFC 7030)" description="Find the guides for authentication, client integration and renewal." href="/docs/platform/iot-fleets/est" />
 </Cards>
 
 Integrations [#integrations]
@@ -3141,7 +3181,7 @@ Prepare the bootstrap credential [#prepare-the-bootstrap-credential]
 
 Issue a bootstrap leaf certificate with `CN=est-device-001`, its own key and Client Authentication use. Follow [Issue and verify a certificate](/docs/platform/pki/quickstarts/issue-certificate), changing its CN and saving the result as `bootstrap.crt` and `bootstrap.key`. Choose validity that covers this test and check the pair and chain.
 
-The same root CA can issue it for this isolated evaluation. The operational identity will have a different key and certificate. The matching CN makes the example easier to read; initial certificate authentication does not itself bind the bootstrap CN to the requested ID. Review [admission](/docs/platform/iot-fleets/enrollment/bootstrap-identity) before applying the policy to a population.
+The same root CA can issue it for this isolated evaluation. The operational identity will have a different key and certificate. The matching CN makes the example easier to read; initial certificate authentication does not itself bind the bootstrap CN to the requested ID. Review [admission](/docs/platform/iot-fleets/est/bootstrap-identity) before applying the policy to a population.
 
 Configure the evaluation DMS [#configure-the-evaluation-dms]
 
@@ -3215,7 +3255,7 @@ openssl base64 -d -in enroll.b64 -out enroll.p7b
 openssl pkcs7 -inform DER -in enroll.p7b -print_certs -quiet -out device.crt
 ```
 
-If curl fails, use [Troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting) with the saved body. Do not convert it or repeat the request without querying inventory: a timeout or error can follow persisted issuance.
+If curl fails, use [Troubleshooting](/docs/platform/iot-fleets/est/troubleshooting) with the saved body. Do not convert it or repeat the request without querying inventory: a timeout or error can follow persisted issuance.
 
 Verify the obtained identity [#verify-the-obtained-identity]
 
@@ -3281,7 +3321,7 @@ Result and continuity [#result-and-continuity]
 | Inventory    | Received serial visible as the current identity and in history.        |
 | Consumer     | mTLS responds 200 with the identity and rejects a missing certificate. |
 
-Continue with [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) to request a successor pair within the window, install it and repeat the mTLS check. The consumer must use the new files in that test. After checking the successor, retire the previous certificate according to PKI policy; the example does not revoke it automatically.
+Continue with [Renewal and recovery](/docs/platform/iot-fleets/est/configuration) to request a successor pair within the window, install it and repeat the mTLS check. The consumer must use the new files in that test. After checking the successor, retire the previous certificate according to PKI policy; the example does not revoke it automatically.
 
 [Devices and identities](/docs/platform/iot-fleets/device-management) explains retirement and the limits of historical revocation. For a real destination, prepare consumer trust, validation and permissions; [AWS IoT Core](/docs/platform/iot-fleets/integrations/aws-iot-core) is an available integration.
 
@@ -3370,7 +3410,7 @@ If the result fails [#if-the-result-fails]
 
 Automate the next device [#automate-the-next-device]
 
-Continue with [DMS](/docs/platform/iot-fleets/enrollment/dms) and [EST](/docs/platform/iot-fleets/enrollment/overview) for the device to request and renew certificates. Prepare server trust, the initial credential and policies for each operation before implementing the client.
+Continue with [DMS](/docs/platform/iot-fleets/enrollment/dms) and [EST](/docs/platform/iot-fleets/est) for the device to request and renew certificates. Prepare server trust, the initial credential and policies for each operation before implementing the client.
 
 For a path from the client through mTLS, follow [Enroll and connect your first device](/docs/platform/iot-fleets/quickstarts/enroll-device) with a new ID.
 
@@ -3432,7 +3472,7 @@ Define [issuance profiles](/docs/platform/pki/certificate-profiles), sign reques
 
 Automate device identities [#automate-device-identities]
 
-Configure a [DMS](/docs/platform/iot-fleets/enrollment/dms) and use [EST](/docs/platform/iot-fleets/enrollment/overview) to request and renew certificates. Preparing the initial credential and installing the result belong to device integration.
+Configure a [DMS](/docs/platform/iot-fleets/enrollment/dms) and use [EST](/docs/platform/iot-fleets/est) to request and renew certificates. Preparing the initial credential and installing the result belong to device integration.
 
 Publish validation status [#publish-validation-status]
 
@@ -3452,7 +3492,7 @@ Operational reference [#operational-reference]
 | Consumer integrator     | Issuer trust, certificate validation and permissions in the destination.       |
 | Infrastructure operator | Installation, network, availability, dependencies and deployment diagnosis.    |
 
-The [API reference](/docs/api-reference/ca) contains contracts for automating operations. To investigate a failure, start in the affected section: [PKI](/docs/platform/pki/troubleshooting), [EST](/docs/platform/iot-fleets/enrollment/troubleshooting#diagnostics-and-compatibility) or [Deployment](/docs/deployment/troubleshooting).
+The [API reference](/docs/api-reference/ca) contains contracts for automating operations. To investigate a failure, start in the affected section: [PKI](/docs/platform/pki/troubleshooting), [EST](/docs/platform/iot-fleets/est/troubleshooting#diagnostics-and-compatibility) or [Deployment](/docs/deployment/troubleshooting).
 
 
 # CA hierarchy and rotation (/docs/platform/pki/ca-hierarchy-and-rotation)
@@ -4175,7 +4215,7 @@ A valid chain does not by itself guarantee that a certificate should be accepted
 
 An OCSP `Good` status does not replace chain, date, usage and identity checks either; [Validation](/docs/platform/pki/certificate-validation) brings those criteria together.
 
-During the mTLS authentication of a DMS, Lamassu checks revocation and fails closed: a certificate whose revocation cannot be verified is rejected by default. The `allow_unverifiable_revocation` option of the DMS (see [DMS](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation)) is the opt-out, and it only relaxes certificates that carry no OCSP/CRL endpoint at all. Design your profiles and distribution points so that the check succeeds.
+During the mTLS authentication of a DMS, Lamassu checks revocation and fails closed: a certificate whose revocation cannot be verified is rejected by default. The `allow_unverifiable_revocation` option of the DMS (see [DMS](/docs/platform/iot-fleets/est/configuration#authentication-per-operation)) is the opt-out, and it only relaxes certificates that carry no OCSP/CRL endpoint at all. Design your profiles and distribution points so that the check succeeds.
 
 Custody limits [#custody-limits]
 
@@ -4360,6 +4400,21 @@ References [#references]
 
   <Card title="Certificate validation" href="/docs/platform/pki/certificate-validation" />
 </Cards>
+
+
+# Enrollment protocols (/docs/platform/pki/enrollment-protocols)
+
+
+
+Lamassu supports EST (Enrollment over Secure Transport), defined in [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030.html#section-3.2.2). The DMS applies the enrollment policy and the configured CA issues the certificates.
+
+| Core endpoint          | Purpose                                            |
+| ---------------------- | -------------------------------------------------- |
+| `GET /cacerts`         | Retrieve the CA certificates published by the DMS. |
+| `POST /simpleenroll`   | Request an initial certificate using a CSR.        |
+| `POST /simplereenroll` | Request a successor to an existing certificate.    |
+
+See [EST (RFC 7030)](/docs/platform/iot-fleets/est) for client setup, authentication, request formats and optional server-side key generation.
 
 
 # Keys and cryptographic engines (/docs/platform/pki/key-management)
@@ -4700,6 +4755,8 @@ Issue and control certificates [#issue-and-control-certificates]
 
 A [profile](/docs/platform/pki/certificate-profiles) establishes subject, validity, usage and key restrictions. The CA applies issuance configuration and signs the certificate. In the [inventory](/docs/platform/pki/certificates), you can inspect the result, download it and manage its status.
 
+[Enrollment protocols](/docs/platform/pki/enrollment-protocols) let clients obtain and renew certificates from a Lamassu CA.
+
 Publish validation status [#publish-validation-status]
 
 [Validation](/docs/platform/pki/certificate-validation) covers the chain, validity, usages and revocation status. Lamassu publishes status through [OCSP](/docs/platform/pki/ocsp) and [CRL](/docs/platform/pki/crl); the consumer configures which issuers it recognizes and how it checks that status.
@@ -4998,7 +5055,7 @@ Continue according to your goal [#continue-according-to-your-goal]
 
 * To operate certificates, continue with [Certificates](/docs/platform/pki/certificates) and [Validation](/docs/platform/pki/certificate-validation).
 * To manage a device identity in Lamassu, follow [Manual registration](/docs/platform/iot-fleets/quickstarts/register-device). That path includes DMS preparation.
-* For the device to request its certificate, prepare the [DMS](/docs/platform/iot-fleets/enrollment/dms) and [EST client](/docs/platform/iot-fleets/enrollment/overview).
+* For the device to request its certificate, prepare the [DMS](/docs/platform/iot-fleets/enrollment/dms) and [EST client](/docs/platform/iot-fleets/est/configuration).
 
 
 # PKI troubleshooting (/docs/platform/pki/troubleshooting)
@@ -5007,7 +5064,7 @@ Continue according to your goal [#continue-according-to-your-goal]
 
 This guide helps a PKI operator locate issuance and status publication failures. Keep the Lamassu version, operation, CA, issuer, serial, time and returned error. Do not include private keys or tokens in diagnostics.
 
-For Gateway, sign-in, pods, dependencies and messaging, see [Deployment troubleshooting](/docs/deployment/troubleshooting). For device enrollment, see [EST diagnostics](/docs/platform/iot-fleets/enrollment/troubleshooting#diagnostics-and-compatibility).
+For Gateway, sign-in, pods, dependencies and messaging, see [Deployment troubleshooting](/docs/deployment/troubleshooting). For device enrollment, see [EST diagnostics](/docs/platform/iot-fleets/est/troubleshooting#diagnostics-and-compatibility).
 
 Issuance fails [#issuance-fails]
 
@@ -5305,7 +5362,7 @@ Fail-closed revocation checks [#fail-closed-revocation-checks]
 
 Enrollment and re-enrollment now verify the revocation of the presented certificates and fail closed when it cannot be verified. There is no migration: every pre-existing DMS has the new `allow_unverifiable_revocation` option at its default `false`, so a certificate that is not managed by Lamassu and carries no OCSP or CRL distribution points is rejected until the option is set to `true` in the affected block, independently for the enrollment and the re-enrollment block.
 
-Certificates that do carry endpoints are still strictly checked: unreachable endpoints, stale or inconclusive answers reject the certificate even when `allow_unverifiable_revocation` is enabled, and certificates managed by Lamassu are unaffected because their stored status is used. A validation CA revoked in Lamassu also rejects the operation, without falling back to the remaining validation CAs. See the [DMS guide](/docs/platform/iot-fleets/enrollment/dms#authentication-per-operation) and [Revocation and checks](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks).
+Certificates that do carry endpoints are still strictly checked: unreachable endpoints, stale or inconclusive answers reject the certificate even when `allow_unverifiable_revocation` is enabled, and certificates managed by Lamassu are unaffected because their stored status is used. A validation CA revoked in Lamassu also rejects the operation, without falling back to the remaining validation CAs. See the [DMS guide](/docs/platform/iot-fleets/est/configuration#authentication-per-operation) and [Revocation and checks](/docs/platform/iot-fleets/est/bootstrap-identity#revocation-and-checks).
 
 Independent re-enrollment authentication [#independent-re-enrollment-authentication]
 

@@ -31,7 +31,7 @@ In 3.8.0 the API Gateway validated tokens: a JWT policy on every private route c
 
 Device events get their own store [#device-events-get-their-own-store]
 
-Historical device events move from the `devices.events` column to a dedicated `device_events` store with their own endpoints. The events endpoint can also stream events over Server-Sent Events (SSE); to fan events out across service instances, each Device Manager instance binds its own durable AMQP queue.
+Historical device events move from the `devices.events` column to a dedicated `device_events` store with their own endpoints. The events endpoint can also stream events over Server-Sent Events (SSE); to fan events out across service instances, each Device Manager instance binds its own AMQP queue, which on AMQP the broker removes automatically when the instance stops (see [Device events](#device-events)).
 
 A hardened Helm chart [#a-hardened-helm-chart]
 
@@ -233,7 +233,9 @@ The `events` field no longer appears in the device representation. Point consume
 * `GET /v1/devices/:id/events` returns a device's events.
 * `POST /v1/devices/:id/events` creates an event.
 
-When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Each Device Manager instance binds a durable AMQP queue named after its service ID, `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until removed, so configure an expiration or cleanup policy on the broker.
+When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Delivery is best effort: events emitted while no client is connected are not replayed on the next connection. The server closes each stream after a maximum lifetime, 10 minutes by default and configurable with the Device Manager `sse_max_stream_duration` setting, and the client reconnects to keep receiving events. When an instance has reached its subscriber limit, set by the Device Manager `sse_max_subscribers` setting (default 1000 and shared by all streams of the instance), new streams receive a `503` response with a `Retry-After` header. Each stream also re-checks the reader's permission to read the device, and closes it when the permission is revoked or cannot be verified; reconnecting goes through the regular authorization checks again. In a Helm deployment, set `services.deviceManager.sseEnabled` to `false` to disable SSE (default `true`); see [Device event stream (SSE)](/docs/deployment/self-hosted/helm#device-event-stream-sse).
+
+On AMQP, each Device Manager instance binds a subscriber queue named after its service ID, `device-manager-sse-<uuid>`. The queue is durable and auto-delete, with a one-hour expiration (`x-expires`), so the broker removes it when the instance stops or its connection dies and no cleanup policy is needed. Only on event-bus providers without ephemeral-subscriber support can a per-process durable queue linger after its instance stops; check those providers if you observe leftover queues.
 
 CRL signer field [#crl-signer-field]
 
@@ -614,7 +616,7 @@ After the upgrade, check in this order:
 6. **Legacy CA keys.** If the CA-to-KMS migration ran, review its report and warnings and confirm the expected keys appear in the KMS. Migrated CA certificates now report `key_id` and `has_private_key`, which you can use to confirm the registration.
 7. **Connectivity.** `helm test "$RELEASE" -n $NAMESPACE --logs` passes; the hook checks the CA, DMS Manager, Device Manager and VA health endpoints and the UI response.
 8. **Authorization.** Sign in as the bootstrap principal and confirm administration works, check that an identity without permissions receives `403`, and review client and integration permissions.
-9. **AMQP.** The backend connects to the broker with the expected TLS settings, and the cleanup policy for SSE queues is in place.
+9. **AMQP.** The backend connects to the broker with the expected TLS settings. On AMQP the SSE subscriber queues are auto-delete and disappear when their instance stops; on event-bus providers without ephemeral-subscriber support, check that leftover per-process SSE queues are not accumulating.
 10. **Device events.** `GET /v1/devices/:id/events` returns the historical events of a device that had them.
 11. **Webhooks without file fields.** For each DMS that uses a webhook for enrollment or re-enrollment, the `config` block carries `insecure_skip_verify` and the expected option block (`apikey_options`, `jwt_options` or `mtls_options`), with the certificate and key as PEM and no `cert_file` or `key_file`.
 12. **Receiver verification.** `insecure_skip_verify` is `false`, unless the receiver certificate is intentionally unverified.

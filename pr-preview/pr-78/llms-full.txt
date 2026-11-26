@@ -465,6 +465,12 @@ The AMQP client loads certificates at startup, so restart the consuming pods aft
   Per the migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: in 3.8.0 `amqp.tls` was not applied and event-bus clients used plaintext AMQP; from 4.0.0, `amqp.tls: true` switches them to AMQPS. Set `amqp.port` to the broker TLS listener before upgrading, or set `amqp.tls: false` to keep plaintext AMQP. `amqp.tls: false` sends the broker credentials and all event-bus traffic in cleartext.
 </Callout>
 
+Device event stream (SSE) [#device-event-stream-sse]
+
+`services.deviceManager.sseEnabled` (default `true`) controls whether Device Manager serves its device-event stream over Server-Sent Events (SSE). With the default, the chart renders a dedicated gateway rule for the device-events endpoint with an 11-minute request timeout, because the Gateway's default request timeout is too short for these streams, which the service keeps open for up to about ten minutes. Device Manager calls that are not SSE requests keep the Gateway's default timeout.
+
+Set it to `false` to disable the stream: the chart then renders `sse_enabled: false` in the Device Manager configuration and omits the gateway rule, and SSE requests to the device-events endpoint fail. See [Device events](/docs/upgrades/3-8-0-to-4-0-0#device-events) in the 3.8.0 to 4.0.0 upgrade guide.
+
 Provision the first administrator [#provision-the-first-administrator]
 
 There is no implicit superuser. Create the role or group expected by `services.authz.bootstrap` in the OIDC provider and assign it to at least one administrator before exposing Lamassu.
@@ -476,6 +482,23 @@ The pre-install and pre-upgrade job applies the bootstrap idempotently: existing
 </Callout>
 
 See [Access control](/docs/platform/administration/access-control) for the principal and policy model.
+
+Experimental dashboard terminal (optional) [#experimental-dashboard-terminal-optional]
+
+The dashboard includes an experimental browser terminal for working with devices. It is disabled by default; enable it in the values file:
+
+```yaml
+services:
+  ui:
+    terminal:
+      enabled: true
+```
+
+Enabling the terminal requires external authorization: set `auth.externalAuthorization.enabled: true` and `auth.externalAuthorization.failOpen: false`. The chart refuses to render the release otherwise, because the terminal's WebSocket endpoint would then be exposed through the Gateway without external authorization.
+
+Only identities granted the preloaded "Terminal Network" policy can open terminal sessions. See [Access control](/docs/platform/administration/access-control) for how policies are assigned.
+
+Note that even with the terminal enabled, pods inside the cluster can still reach the UI service directly unless network policies restrict that access — the external authorization applies to traffic entering through the Gateway.
 
 3. Install Lamassu [#3-install-lamassu]
 
@@ -1767,7 +1790,7 @@ Inspect a device [#inspect-a-device]
 Filter the inventory by ID, tags and status. Open details and record the owning DMS, active version and current certificate serial.
 
 * **Certificate History** relates previous and current versions. Replacing the slot does not by itself revoke every previous version.
-* **Device Event Timeline** helps reconstruct registration, provisioning, renewal and status changes. A change may be saved even if event persistence fails; also inspect the record and certificates.
+* **Device Event Timeline** helps reconstruct registration, provisioning, renewal and status changes. In **Live** mode it follows new events and device changes (such as status or owner) automatically without reloading the page, and shows a **Connected** or **Disconnected** indicator. After an interruption it reconnects and recovers without gaps or duplicates, so **Live** shows the same content a page reload would. When live updates cannot be used — no permission, device not found, or live updates not enabled on the server — the timeline shows `Live updates unavailable: ...` with the reason, while history browsing (**Load more**) still works. A change may be saved even if event persistence fails; also inspect the record and certificates.
 
 Compare these values with the identity installed on the device. Updating a Lamassu slot does not install files on the remote equipment.
 
@@ -1997,6 +2020,10 @@ The blocks are independent:
 Webhook and combined modes also execute during re-enrollment when configured in its block. They do not implicitly degrade to NO\_AUTH. An absent or unrecognized mode fails.
 
 For initial mTLS, `client_certificate_settings` contains `validation_cas`, `allow_expired`, `chain_level_validation` and `allow_unverifiable_revocation`. The validator receives one certificate credential; the flow does not guarantee forwarding every handshake intermediate to it. For a direct case, configure the bootstrap’s direct issuer as validation CA and test the actual Gateway path.
+
+The authentication editor offers an **Allow certificates without revocation information** switch (`allow_unverifiable_revocation`, off by default). When it is on, certificates — and intermediate CAs of the chain — that Lamassu does not manage and that list no OCSP or CRL endpoint are accepted; unreachable, stale or inconclusive revocation answers are always rejected. While the switch is on, the console shows an amber warning: **Revocation will not be verified** — a revoked certificate with no OCSP or CRL endpoint, and not managed by Lamassu, will be accepted, and this also applies to the intermediate CAs of the chain.
+
+The same switch is offered in both the enrollment and re-enrollment authentication editors and is stored per block inside `est_rfc7030_settings.client_certificate_settings`; a DMS stored before this field existed loads with the switch off. The console also shows an amber warning alert whenever an authentication option is in its insecure state — **Allow expired certificates** on, **Allow expired renewal** on or **Verify CSR signature** off — and the No authentication note is presented as a warning alert too.
 
 Revocation is checked for every presented certificate. In initial enrollment the client certificate **and** every intermediate CA between it and the validation CA are checked, each against its issuer; extra certificates the device sends in the handshake are ignored. A validation CA that is revoked in Lamassu rejects the operation: the first validation CA that validates the certificate is used, and a revoked one is not replaced by the remaining validation CAs. Certificates issued and managed by Lamassu are checked against their stored status. External certificates are checked through their OCSP and CRL endpoints, and the operation fails closed when revocation cannot be verified: only `allow_unverifiable_revocation` — `false` by default in both blocks — relaxes the case of an external certificate that lists no endpoint at all. Endpoints that exist but are unreachable, return stale or invalid evidence, or report an inconclusive status are always rejected, whatever the option says. The details and the evidence the endpoints must present are in [Revocation and checks](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks).<ins className="lm-diff-ins"> CRL lists fetched for these checks are reused for a limited time before being downloaded again; see </ins>[<ins className="lm-diff-ins">Revocation and checks</ins>](/docs/platform/iot-fleets/enrollment/bootstrap-identity#revocation-and-checks)<ins className="lm-diff-ins"> for the caching window and its effect on revocation visibility.</ins>
 
@@ -3630,6 +3657,8 @@ You need the CA certificate in PEM, its chain to a known root and, when importin
 
 The backend rejects an import whose certificate lacks the CA basic constraint (`basicConstraints cA flag is not set`), whose serial number matches a stored certificate with different contents, or whose identical certificate already belongs to an existing CA. A deleted CA's certificate record is kept and can be reused when re-importing the same certificate, including its previous status. Re-importing a different certificate with that serial number is rejected; check the certificate and status after re-importing.
 
+A certificate whose validity period has already ended, such as that of a retired external authority, is accepted and, when Lamassu has no stored record of that certificate yet, the CA is stored as `EXPIRED` from the start, as happens when importing a plain certificate. If the import reuses the record of a deleted CA (see above and [Delete a CA](#delete-a-ca)), the previous status is kept instead, even if the certificate has expired in the meantime. An `EXPIRED` CA rejects status changes; see [certificate lifecycle](/docs/platform/pki/concepts/certificate-lifecycle).
+
 Deleting a CA releases the key references of its own current certificate and linked reissued certificates, while keeping those records for its issuer's CRL and OCSP. It then attempts to delete the key; the KMS keeps it if other certificates still reference it, such as another CA sharing the key. Revoking certificates issued by the deleted CA does not release their own key references.
 
 <Steps>
@@ -3663,6 +3692,16 @@ Deleting a CA releases the key references of its own current certificate and lin
     For an issuing CA, complete a test issuance and check OCSP and CRL. Creating the record alone does not establish key availability, complete chain consistency or status publication.
   </Step>
 </Steps>
+
+CA states [#ca-states]
+
+A CA only signs in `ACTIVE`. From there it can move to `EXPIRED` or to `REVOKED`, and it leaves those states only by deletion, with one exception: a revocation with `CertificateHold` can be undone.
+
+<DiagramEmbed name="ca-lifecycle" lang="en" title="CA lifecycle: ACTIVE, EXPIRED, REVOKED with CertificateHold, permanently REVOKED and deletion" />
+
+* **Expiry.** The expiry monitor marks as `EXPIRED` the `ACTIVE` CAs whose validity period has ended. Until it runs, the CA already does not sign, because Lamassu checks the dates ([Issue certificates](#issue-certificates)).
+* **Revocation.** Revoking with the `CertificateHold` reason is reversible. A revocation with any other reason, like `EXPIRED`, rejects every later status change. Revoking, also with `CertificateHold`, additionally acts on the subordinate CAs and the certificates it issued: [Revoke a CA](#revoke-a-ca).
+* **Deletion.** Only a CA revoked with another reason, or an expired one, can be deleted; an imported CA without a key can be deleted from any state. Conditions and effects in [Delete a CA](#delete-a-ca).
 
 Inspect an authority [#inspect-an-authority]
 
@@ -3726,6 +3765,8 @@ Revoke a CA [#revoke-a-ca]
 Delete a CA [#delete-a-ca]
 
 Permanent deletion is only available with the CA revoked or expired; a CA imported without a key can be deleted in any state. Delete the record only when your retention and audit policy allows it.
+
+What the deletion does to what the CA issued depends on its status. Deleting an active CA imported without a key whose validity period has not ended only removes the record from Lamassu: the CA, its descendants and the certificates it issued keep their status, since the CA keeps operating outside Lamassu — its key was never in Lamassu. But if the validity period has already ended while the stored status still says `ACTIVE` — the stored status can lag behind the dates until the expiration monitor runs — the CA counts as expired for deletion. Deleting a revoked or expired CA revokes what it issued with `CessationOfOperation`, the same cascade as when revoking a CA. To retire an active keyless CA together with everything it issued, revoke it first with `POST /v1/cas/:id/status` and then delete it.
 
 The CA’s CRL settings are kept. A deletion is refused with a `409` error while they are still `ACTIVE`: the VA must first publish the CA’s final CRL, which can take up to about an hour after revocation with the default job schedule, so retry after the final CRL is published. An expired CA is finalized without a final CRL, and a CA on hold (`CertificateHold`) is refused with a message asking you to revoke it permanently first. The deletion is also refused with a `409` when the CA’s key signs the CRLs of another CA: the error names that CA, so change its CRL signer, or delete or revoke it, before deleting this one. The CA and all its descendants are checked before anything is deleted; nothing changes if any of them cannot be deleted.
 
@@ -4244,7 +4285,7 @@ CRL contents [#crl-contents]
 
 Each entry contains serial number, revocation time and reason. The generator queries certificates in `REVOKED` state for the selected CA. A reactivated certificate disappears when the list is recalculated; an earlier downloaded copy retains its contents.
 
-The list contains a critical *Issuing Distribution Point* (OID `2.5.29.28`) with configured distribution URLs. Check that your client interprets this extension and that it matches the list’s scope. If rejected, investigate format and scope; ignoring a critical extension is not successful validation.
+When the VA has configured domains, the list contains a critical *Issuing Distribution Point* (OID `2.5.29.28`) with those distribution URLs; a VA with no configured domains publishes the list without an IDP, and a CRL without an IDP covers every certificate of its CA. When the extension is present, check that your client interprets it and that it matches the list’s scope. If rejected, investigate format and scope; ignoring a critical extension is not successful validation.
 
 Public download endpoint [#public-download-endpoint]
 
@@ -5087,7 +5128,7 @@ In 3.8.0 the API Gateway validated tokens: a JWT policy on every private route c
 
 Device events get their own store [#device-events-get-their-own-store]
 
-Historical device events move from the `devices.events` column to a dedicated `device_events` store with their own endpoints. The events endpoint can also stream events over Server-Sent Events (SSE); to fan events out across service instances, each Device Manager instance binds its own durable AMQP queue.
+Historical device events move from the `devices.events` column to a dedicated `device_events` store with their own endpoints. The events endpoint can also stream events over Server-Sent Events (SSE); to fan events out across service instances, each Device Manager instance binds its own AMQP queue, which on AMQP the broker removes automatically when the instance stops (see [Device events](#device-events)).
 
 A hardened Helm chart [#a-hardened-helm-chart]
 
@@ -5289,7 +5330,9 @@ The `events` field no longer appears in the device representation. Point consume
 * `GET /v1/devices/:id/events` returns a device's events.
 * `POST /v1/devices/:id/events` creates an event.
 
-When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Each Device Manager instance binds a durable AMQP queue named after its service ID, `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until removed, so configure an expiration or cleanup policy on the broker.
+When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Delivery is best effort: events emitted while no client is connected are not replayed on the next connection. The server closes each stream after a maximum lifetime, 10 minutes by default and configurable with the Device Manager `sse_max_stream_duration` setting, and the client reconnects to keep receiving events. When an instance has reached its subscriber limit, set by the Device Manager `sse_max_subscribers` setting (default 1000 and shared by all streams of the instance), new streams receive a `503` response with a `Retry-After` header. Each stream also re-checks the reader's permission to read the device, and closes it when the permission is revoked or cannot be verified; reconnecting goes through the regular authorization checks again. In a Helm deployment, set `services.deviceManager.sseEnabled` to `false` to disable SSE (default `true`); see [Device event stream (SSE)](/docs/deployment/self-hosted/helm#device-event-stream-sse).
+
+On AMQP, each Device Manager instance binds a subscriber queue named after its service ID, `device-manager-sse-<uuid>`. The queue is durable and auto-delete, with a one-hour expiration (`x-expires`), so the broker removes it when the instance stops or its connection dies and no cleanup policy is needed. Only on event-bus providers without ephemeral-subscriber support can a per-process durable queue linger after its instance stops; check those providers if you observe leftover queues.
 
 CRL signer field [#crl-signer-field]
 
@@ -5670,7 +5713,7 @@ After the upgrade, check in this order:
 6. **Legacy CA keys.** If the CA-to-KMS migration ran, review its report and warnings and confirm the expected keys appear in the KMS. Migrated CA certificates now report `key_id` and `has_private_key`, which you can use to confirm the registration.
 7. **Connectivity.** `helm test "$RELEASE" -n $NAMESPACE --logs` passes; the hook checks the CA, DMS Manager, Device Manager and VA health endpoints and the UI response.
 8. **Authorization.** Sign in as the bootstrap principal and confirm administration works, check that an identity without permissions receives `403`, and review client and integration permissions.
-9. **AMQP.** The backend connects to the broker with the expected TLS settings, and the cleanup policy for SSE queues is in place.
+9. **AMQP.** The backend connects to the broker with the expected TLS settings. On AMQP the SSE subscriber queues are auto-delete and disappear when their instance stops; on event-bus providers without ephemeral-subscriber support, check that leftover per-process SSE queues are not accumulating.
 10. **Device events.** `GET /v1/devices/:id/events` returns the historical events of a device that had them.
 11. **Webhooks without file fields.** For each DMS that uses a webhook for enrollment or re-enrollment, the `config` block carries `insecure_skip_verify` and the expected option block (`apikey_options`, `jwt_options` or `mtls_options`), with the certificate and key as PEM and no `cert_file` or `key_file`.
 12. **Receiver verification.** `insecure_skip_verify` is `false`, unless the receiver certificate is intentionally unverified.

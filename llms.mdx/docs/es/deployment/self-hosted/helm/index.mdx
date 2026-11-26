@@ -204,6 +204,23 @@ El job de pre-install y pre-upgrade aplica el bootstrap de forma idempotente: co
 
 Consulta [Control de acceso](/docs/platform/administration/access-control) para conocer el modelo de principales y políticas.
 
+Terminal experimental del dashboard (opcional) [#terminal-experimental-del-dashboard-opcional]
+
+El dashboard incluye un terminal experimental en el navegador para trabajar con los dispositivos. Está deshabilitado por defecto; actívalo en el archivo de valores:
+
+```yaml
+services:
+  ui:
+    terminal:
+      enabled: true
+```
+
+Para habilitar el terminal se requiere la autorización externa: define `auth.externalAuthorization.enabled: true` y `auth.externalAuthorization.failOpen: false`. Si no, el chart se niega a renderizar el release, porque el endpoint WebSocket del terminal quedaría expuesto a través del Gateway sin autorización externa.
+
+Solo las identidades que tengan concedida la política precargada "Terminal Network" pueden abrir sesiones de terminal. Consulta [Control de acceso](/docs/platform/administration/access-control) para saber cómo se asignan las políticas.
+
+Ten en cuenta que, incluso con el terminal habilitado, los pods dentro del clúster pueden seguir llegando directamente al servicio de la UI salvo que las network policies restrinjan ese acceso: la autorización externa se aplica al tráfico que entra por el Gateway.
+
 3. Instala Lamassu [#3-instala-lamassu]
 
 ```bash

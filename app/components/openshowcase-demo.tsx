@@ -15,6 +15,7 @@ import { useDemoPopups } from "@/lib/demo-popups";
 type Demo = NonNullable<InteractiveDemoProps["demo"]>;
 type Player =
   typeof import("@rustrak/openshowcase-player-react").InteractiveDemo;
+type GuideStep = { title: string; body: string; note?: string };
 
 /** How long each popup stays on screen before Auto-play advances, in ms. */
 const AUTOPLAY_POPUP_MS = 4000;
@@ -36,9 +37,11 @@ const HOTSPOT_STYLE = { bgColor: "#405fff", textColor: "#ffffff" };
 export function OpenShowcaseDemo({
   name,
   locale,
+  showGuide = false,
 }: {
   name: string;
   locale: "en" | "es";
+  showGuide?: boolean;
 }) {
   const [Player, setPlayer] = useState<Player | null>(null);
   const [demo, setDemo] = useState<Demo | null>(null);
@@ -48,6 +51,10 @@ export function OpenShowcaseDemo({
   const frame = useRef<HTMLDivElement>(null);
   const container = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [guide, setGuide] = useState<GuideStep[]>([]);
+  const [guideIndex, setGuideIndex] = useState(0);
+  const demoRef = useRef<Demo | null>(null);
+  demoRef.current = demo;
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -74,6 +81,22 @@ export function OpenShowcaseDemo({
     };
   }, [base, locale]);
 
+  useEffect(() => {
+    if (!showGuide) return;
+    let active = true;
+    setGuide([]);
+    setGuideIndex(0);
+    fetch(`${base}guide.${locale}.json`)
+      .then((r) => r.json() as Promise<{ steps: GuideStep[] }>)
+      .then((data) => {
+        if (active) setGuide(data.steps);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [base, locale, showGuide]);
+
   // With popups off, keep every step (some screens exist only as photos) and
   // its hotspot, which app.css draws as a mouse pointer, but drop the label so
   // no tooltip shows. onStepChange then clicks each hotspot on its own.
@@ -93,14 +116,24 @@ export function OpenShowcaseDemo({
     [demo, autoplay, showPopups],
   );
 
-  const latest = useRef({ autoplay, showPopups });
-  latest.current = { autoplay, showPopups };
+  const latest = useRef({ autoplay, showPopups, showGuide });
+  latest.current = { autoplay, showPopups, showGuide };
 
   const onStepChange = useCallback<
     NonNullable<InteractiveDemoProps["onStepChange"]>
-  >((_index, step) => {
+  >((index, step) => {
     clearTimeout(timer.current);
     if (step.type !== "photo") return;
+    if (latest.current.showGuide && step.hotspot && demoRef.current) {
+      setGuideIndex(
+        Math.max(
+          0,
+          demoRef.current.steps
+            .slice(0, index + 1)
+            .filter((item) => item.type === "photo" && item.hotspot).length - 1,
+        ),
+      );
+    }
     const { autoplay, showPopups } = latest.current;
     // The player waits for a click on every hotspot (or, without one, on the
     // stage). Popups off: click it after a short look at the screen. Popups
@@ -118,23 +151,49 @@ export function OpenShowcaseDemo({
   }, []);
 
   return (
-    <div ref={frame} className="demo-frame group not-prose relative my-6">
-      <FullscreenButton target={frame} locale={locale} />
-      <div
-        ref={container}
-        className={`platform-demo platform-demo--plain aspect-video w-full ${showPopups ? "" : "platform-demo--clicks"}`}
-      >
-        {Player && playerDemo && (
-          <Player
-            key={`${name}-${locale}-${autoplay}-${showPopups}`}
-            demo={playerDemo}
-            assetBaseUrl={base}
-            wrapper="none"
-            backdrop={null}
-            hotspotStyle={HOTSPOT_STYLE}
-            startWhenVisible
-            onStepChange={onStepChange}
-          />
+    <div
+      className={
+        showGuide ? "demo-guide-container not-prose my-6" : "not-prose my-6"
+      }
+    >
+      <div className={showGuide ? "demo-with-guide" : undefined}>
+        <div ref={frame} className="demo-frame group not-prose relative">
+          <FullscreenButton target={frame} locale={locale} />
+          <div
+            ref={container}
+            className={`platform-demo platform-demo--plain aspect-video w-full ${showGuide ? "platform-demo--guided" : ""} ${showPopups ? "" : "platform-demo--clicks"}`}
+          >
+            {Player && playerDemo && (
+              <Player
+                key={`${name}-${locale}-${autoplay}-${showPopups}`}
+                demo={playerDemo}
+                assetBaseUrl={base}
+                wrapper="none"
+                backdrop={null}
+                hotspotStyle={HOTSPOT_STYLE}
+                startWhenVisible
+                onStepChange={onStepChange}
+              />
+            )}
+          </div>
+        </div>
+        {showGuide && guide[guideIndex] && (
+          <aside
+            className="demo-guide"
+            aria-label={
+              locale === "es" ? "Guía del recorrido" : "Walkthrough guide"
+            }
+          >
+            <p className="demo-guide-count">
+              {locale === "es" ? "Guía" : "Guide"} · {guideIndex + 1} /{" "}
+              {guide.length}
+            </p>
+            <h3>{guide[guideIndex].title}</h3>
+            <p>{guide[guideIndex].body}</p>
+            {guide[guideIndex].note && (
+              <p className="demo-guide-note">{guide[guideIndex].note}</p>
+            )}
+          </aside>
         )}
       </div>
     </div>

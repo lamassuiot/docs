@@ -750,6 +750,39 @@ body {
   box-shadow: 0 12px 28px rgb(0 0 0 / 0.16);
 }
 
+/* Keep recorded hotspots clickable above the player's navigation bar. */
+.platform-demo--guided .openshowcase-player .hotspot {
+  z-index: 7;
+}
+
+.demo-guide-container {
+  container-type: inline-size;
+}
+
+.demo-with-guide {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+@container (min-width: 68rem) {
+  .demo-with-guide {
+    grid-template-columns: minmax(0, 3fr) minmax(14rem, 1fr);
+  }
+}
+
+.demo-guide {
+  padding: 1rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 0.75rem;
+  background: var(--color-fd-card);
+}
+
+.demo-guide h3 { margin: 0.5rem 0; font-size: 1.05rem; font-weight: 600; }
+.demo-guide p { margin: 0.5rem 0; font-size: 0.875rem; }
+.demo-guide .demo-guide-count { font-weight: 600; }
+.demo-guide .demo-guide-note { border-inline-start: 3px solid #405fff; padding-inline-start: 0.75rem; }
+
 .platform-demo--plain .openshowcase-player .frame-window {
   border-radius: 1rem;
   background: #fff;

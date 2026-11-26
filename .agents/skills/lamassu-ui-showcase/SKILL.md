@@ -19,6 +19,12 @@ Turn the user's requested workflow into an editable OpenShowcase flow JSON. Use 
 - Use an existing authorized demo instance when available. To create the local demo, **clone** `lamassuiot/lamassuiot` into a temporary directory and **check out its `v4` branch**. Monolithic launches the UI container itself: configure its image as `ghcr.io/lamassuiot/lamassu-ui:dev`; do not launch a second UI container. Follow [references/runtime.md](references/runtime.md) for exact setup, port discovery, readiness and cleanup. Do not change an existing checkout, assume an instance is disposable, or alter its authentication.
 - Create an isolated temporary working directory outside the documentation repository for OpenShowcase installation, Chromium profile, recordings, browser data, intermediate exports and logs. Keep authentication secrets out of the flow and deliverables. Use `--profile` to point OpenShowcase at a profile in that directory. Clean up only owned temporary resources after completion; retain the persistent flow and requested deliverables.
 
+## Integrated terminal
+
+- For workflows requiring shell commands, use the terminal built into the Lamassu UI. Open it from the terminal icon in the top bar; it appears as a panel below the current page and can be resized, expanded or closed using its controls. Inspect the current UI and use its actual accessible names and selectors.
+- Record the dashboard and terminal together in the same UI. Do not deploy WebSSH, SSH Easy, a separate terminal container, or an iframe wrapper for new recordings. When updating an older flow that used them, adapt its URL, selectors, terminal actions and popups to the integrated terminal before inspecting or recording.
+- Before recording, verify that the integrated terminal is available, that its environment has the required commands and can reach the target services, and that its output is visible and readable. Use synthetic data and avoid exposing secrets. If a required capability is unavailable, report the blocker rather than assuming the old terminal environment or silently substituting another one.
+
 ## OpenShowcase workflow
 
 1. Inspect the installed recorder's `--help` and version; install it in the temporary directory if needed. Use its own Playwright Chromium and extension. Refer to the installed recorder README for the current flow schema and command syntax.

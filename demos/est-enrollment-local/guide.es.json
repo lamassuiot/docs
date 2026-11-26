@@ -1,0 +1,85 @@
+{
+  "steps": [
+    {
+      "title": "Preparar la vista",
+      "body": "La barra lateral se reduce a iconos y se abre la terminal integrada bajo el dashboard. Esa sesión Debian representa al dispositivo que solicitará la identidad."
+    },
+    {
+      "title": "DMS de ejemplo",
+      "body": "EST Showcase identifica la autoridad de registro y contiene la política que se aplica a las solicitudes."
+    },
+    {
+      "title": "Registro automático",
+      "body": "Just-in-time provisioning crea un registro para un identificador desconocido al enrolarse. El CN de la CSR se usa como identificador en este ejemplo."
+    },
+    {
+      "title": "Protocolo EST",
+      "body": "EST RFC 7030 ofrece la operación simpleenroll para solicitar el certificado. La CA y el perfil mostrados determinan la emisión."
+    },
+    {
+      "title": "Autenticación inicial",
+      "body": "Los dos métodos de autenticación inicial están apagados en este entorno sintético. Cualquier cliente que lo alcance puede solicitar un certificado.",
+      "note": "NO_AUTH por HTTP es exclusivamente para esta demo aislada; el quickstart del proyecto usa certificado de bootstrap y HTTPS."
+    },
+    {
+      "title": "Comprobar la CSR",
+      "body": "El control Verify CSR signature determina si se valida la firma de la solicitud. Se cambia temporalmente para mostrar su configuración."
+    },
+    {
+      "title": "Activar verificación",
+      "body": "El interruptor vuelve a quedar activado antes de guardar. Una firma incorrecta debe provocar el rechazo de la solicitud."
+    },
+    {
+      "title": "Guardar política",
+      "body": "Save changes aplica la configuración del DMS a futuras solicitudes. En la grabación quedan JITP, EST y la verificación de la firma activados."
+    },
+    {
+      "title": "Clave y CSR",
+      "body": "Se genera una clave EC P-256 en un directorio temporal del cliente, se crea una CSR con el CN sensor-demo-930 y se codifica en DER y Base64 para EST. La clave privada no se imprime."
+    },
+    {
+      "title": "Dirección EST",
+      "body": "La ruta incorpora el ID est-showcase. La dirección 172.17.0.1 es específica del host Docker de esta ejecución."
+    },
+    {
+      "title": "Solicitud simpleenroll",
+      "body": "curl envía la CSR con Content-Type application/pkcs10 y guarda la respuesta en enroll.b64. El DMS de este laboratorio no pide credenciales iniciales."
+    },
+    {
+      "title": "Respuesta del servidor",
+      "body": "HTTP 200 muestra que la solicitud terminó correctamente. La respuesta contiene un paquete de certificados codificado en Base64."
+    },
+    {
+      "title": "Inspeccionar certificado",
+      "body": "OpenSSL extrae el certificado de la respuesta PKCS#7 y muestra sujeto, emisor y serie. La clave privada permanece en el cliente."
+    },
+    {
+      "title": "Identidad emitida",
+      "body": "El sujeto contiene el CN solicitado y el emisor es Acme Device CA. Guarda visualmente la serie para contrastarla con el dashboard."
+    },
+    {
+      "title": "Inventario de dispositivos",
+      "body": "La vista Devices permite localizar el registro que JITP creó durante la emisión."
+    },
+    {
+      "title": "Buscar por CN",
+      "body": "El filtro usa el mismo identificador que aparece en el sujeto de la CSR y del certificado."
+    },
+    {
+      "title": "Abrir dispositivo",
+      "body": "El detalle muestra el registro recién creado y su identidad asociada."
+    },
+    {
+      "title": "Autoridad de registro",
+      "body": "El detalle del dispositivo muestra el DMS propietario. Debe corresponder a EST Showcase."
+    },
+    {
+      "title": "Certificado asociado",
+      "body": "View certificate abre el certificado vinculado a la identidad del dispositivo."
+    },
+    {
+      "title": "Comparar la serie",
+      "body": "La serie del dashboard y la salida de OpenSSL representan el mismo valor; la interfaz añade separadores y cambia la presentación de mayúsculas."
+    }
+  ]
+}

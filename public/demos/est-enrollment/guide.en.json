@@ -1,128 +1,85 @@
 {
   "steps": [
     {
-      "title": "Administrator dashboard",
-      "body": "The Lamassu dashboard is the administrator's side: you review how the DMS is configured and, at the end, the device and the certificate that result from the enrollment."
+      "title": "Prepare the view",
+      "body": "The sidebar shrinks to icons and the integrated terminal opens below the dashboard. The Debian session represents the device requesting its identity."
     },
     {
-      "title": "Collapsed sidebar",
-      "body": "Collapsing the navigation sidebar leaves more width for the page and for the terminal. Each entry stays available as an icon.",
-      "note": "It only changes the layout of the dashboard; no configuration is modified."
+      "title": "Example DMS",
+      "body": "EST Showcase identifies the registration authority and contains the policy applied to requests."
     },
     {
-      "title": "Device terminal",
-      "body": "The terminal plays the device, the EST client. It is a real shell in a disposable container with Bash, OpenSSL and curl, shown through an SSH web terminal; nothing in it is simulated.",
-      "note": "The account and password of that container are public and only valid for this throwaway demo environment."
+      "title": "Automatic registration",
+      "body": "Just-in-time provisioning creates a record for an unknown identifier at enrollment. The CSR CN is the identifier in this example."
     },
     {
-      "title": "Registration Authorities",
-      "body": "A Registration Authority is the DMS: it defines the enrollment protocol, how devices are admitted and which CA signs their certificates."
-    },
-    {
-      "title": "The EST Showcase DMS",
-      "body": "The page shows the ID est-showcase, the protocol EST · RFC 7030, the registration mode JITP, the authentication mode and the enrollment CA, Acme Device CA.",
-      "note": "The ID, not the display name, is the part that appears in the EST URL."
-    },
-    {
-      "title": "Registration mode",
-      "body": "Just-in-time provisioning creates an unknown device automatically the first time it enrolls. Pre-registration would only admit devices registered beforehand.",
-      "note": "Allow replaceable enrollment is off, so enrolling again with an existing device ID is rejected: the demo uses a new ID."
-    },
-    {
-      "title": "Enrollment CA and profile",
-      "body": "Acme Device CA, the Enrollment CA, signs every certificate issued through this DMS. The Device Certificates profile sets 365 days of validity, Digital Signature and Key Encipherment as key usage, and Client Auth and Server Auth as extended key usage.",
-      "note": "The profile enforces the extensions; the subject is copied from the CSR."
+      "title": "EST protocol",
+      "body": "EST RFC 7030 provides the simpleenroll operation for certificate requests. The displayed CA and profile determine issuance."
     },
     {
       "title": "Initial authentication",
-      "body": "With neither Require client certificate nor Call external webhook enabled, any device can request a certificate: the CSR is enough. That is what allows this demo to run over plain HTTP.",
-      "note": "A real DMS should require a client certificate (bootstrap) or a webhook. The Enroll and connect your first device quickstart uses CLIENT_CERTIFICATE over HTTPS."
+      "body": "Both initial authentication methods are disabled in this synthetic environment. Any client that can reach it can request a certificate.",
+      "note": "NO_AUTH over HTTP is only for this isolated demonstration; the project quickstart uses HTTPS and a bootstrap certificate."
     },
     {
-      "title": "Private directory",
-      "body": "umask 077 makes every new file readable only by its owner, so the private key created next is not exposed. mkdir creates a directory named after the device and cd enters it."
+      "title": "Check the CSR",
+      "body": "Verify CSR signature controls whether the request signature is validated. It is changed temporarily to show the setting."
+    },
+    {
+      "title": "Enable verification",
+      "body": "The switch is enabled again before saving. An invalid signature should cause the request to be rejected."
+    },
+    {
+      "title": "Save policy",
+      "body": "Save changes applies the DMS configuration to future requests. JITP, EST and signature verification remain enabled in the recording."
+    },
+    {
+      "title": "Key and CSR",
+      "body": "An EC P-256 key is generated in a temporary client directory, a CSR is created with CN sensor-demo-930, and it is encoded as DER and Base64 for EST. The private key is never printed."
     },
     {
       "title": "EST endpoint",
-      "body": "The terminal is a container, so it reaches Lamassu through host.docker.internal:8080, the host where the gateway runs. The EST path ends with the DMS ID, est-showcase, followed by the operation name.",
-      "note": "This demo uses HTTP on a local disposable environment; use HTTPS and verify the server certificate in any real deployment."
+      "body": "The path includes the DMS ID est-showcase. The address 172.17.0.1 is specific to the Docker host used for this recording."
     },
     {
-      "title": "Check cacerts",
-      "body": "The cacerts operation returns a Base64 PKCS#7 with the CAs the DMS distributes. Decoding it lists Acme Device CA and a second certificate of the gateway, because CA distribution includes the system CA.",
-      "note": "A successful answer shows the endpoint is alive; it does not prove that issuance works, and the bundle must not be trusted blindly."
+      "title": "Simpleenroll request",
+      "body": "curl sends the CSR with Content-Type application/pkcs10 and saves the response in enroll.b64. This laboratory DMS does not require initial credentials."
     },
     {
-      "title": "Device key pair",
-      "body": "openssl genpkey creates an EC P-256 key pair and writes it to device.key. The private key is never sent to Lamassu: only the CSR derived from it travels.",
-      "note": "Server-side key generation is disabled in this DMS, so the device must create its own key."
-    },
-    {
-      "title": "Create the CSR",
-      "body": "The CSR carries the public key and the subject CN=sensor-0421, signed with the private key. With JITP, that CN becomes the device ID.",
-      "note": "The profile copies the subject from the request, so check the CN before sending it."
-    },
-    {
-      "title": "Verify the CSR",
-      "body": "openssl req -verify checks that the self-signature matches the public key (it prints verify OK) and -subject shows the requested subject. The DMS repeats this check because Verify CSR signature is enabled."
-    },
-    {
-      "title": "Encode for EST",
-      "body": "EST expects the request body as Base64-encoded DER PKCS#10. openssl converts the PEM CSR to DER and base64 -A writes it on a single line into device.csr.b64."
-    },
-    {
-      "title": "Request the certificate",
-      "body": "A POST to simpleenroll with Content-Type application/pkcs10 sends the CSR. --fail-with-body makes curl fail on HTTP errors while saving the body, and the answer is written to enroll.b64. No client certificate is sent because initial authentication is disabled.",
-      "note": "After a timeout, do not repeat the request blindly: the certificate may already be issued, so check the device inventory first."
-    },
-    {
-      "title": "Extract the certificate",
-      "body": "The response is a Base64 DER PKCS#7 that contains the certificate. openssl base64 -d decodes it and openssl pkcs7 -print_certs writes the PEM certificate to device.crt.",
-      "note": "Only the public certificate is written; device.key is not touched."
-    },
-    {
-      "title": "Expand the terminal",
-      "body": "Expand makes the terminal pane use the full width without reloading either application, so long certificate lines stay on one line. Restore brings back the joint view.",
-      "note": "Both sessions stay alive; only the layout changes."
+      "title": "Server response",
+      "body": "HTTP 200 shows that the request completed successfully. The response contains a Base64-encoded certificate package."
     },
     {
       "title": "Inspect the certificate",
-      "body": "openssl x509 prints the subject, the issuer, the serial number, the validity dates and the Key Usage and Extended Key Usage extensions. They must match the Device Certificates profile seen in the dashboard.",
-      "note": "-noout avoids printing the PEM, and the private key is never involved."
+      "body": "OpenSSL extracts the certificate from the PKCS#7 response and displays its subject, issuer and serial number. The private key remains on the client."
     },
     {
-      "title": "Result of the enrollment",
-      "body": "The certificate has subject CN=sensor-0421, issuer Acme Device CA, Digital Signature and Key Encipherment, Client and Server Authentication, and a one-year validity. The serial is the value to compare in the dashboard.",
-      "note": "The terminal prints the serial in uppercase hexadecimal without separators; the dashboard shows it in lowercase pairs separated by colons."
+      "title": "Issued identity",
+      "body": "The subject contains the requested CN and the issuer is Acme Device CA. Note the serial number to compare it with the dashboard."
     },
     {
-      "title": "Restore the joint view",
-      "body": "Restore returns the dashboard and the terminal side by side, so the serial printed by the terminal stays visible while you check the dashboard."
+      "title": "Device inventory",
+      "body": "The Devices view lets you find the record created by JITP during issuance."
     },
     {
-      "title": "Devices inventory",
-      "body": "Devices lists every device Lamassu manages. The one that just enrolled appears here without anyone having created it in the console."
-    },
-    {
-      "title": "Filter by device ID",
-      "body": "The device ID is the CN of the CSR, sensor-0421. Typing it in the filter narrows the inventory to that device."
+      "title": "Search by CN",
+      "body": "The filter uses the same identifier that appears in the CSR and certificate subject."
     },
     {
       "title": "Open the device",
-      "body": "The record was created automatically when the DMS accepted the CSR; its Device ID is the CN you put in it. The page shows its status, its Registration Authority and its identity."
+      "body": "The detail view shows the newly created record and its associated identity."
     },
     {
-      "title": "Owner and identity",
-      "body": "The device belongs to the EST Showcase registration authority and its identity is ACTIVE at version v0, the first certificate issued to it. The page also shows when that identity expires."
+      "title": "Registration authority",
+      "body": "The device detail shows its owning DMS. It should be EST Showcase."
     },
     {
       "title": "Associated certificate",
-      "body": "View certificate opens the certificate currently bound to the device identity, with its issuer, validity period and chain."
+      "body": "View certificate opens the certificate linked to the device identity."
     },
     {
       "title": "Compare the serial",
-      "body": "The serial in the dashboard is the one openssl printed in the terminal, and the subject and issuer match too: the certificate the device obtained is the one Lamassu associated with it.",
-      "note": "This proves the association in Lamassu. It does not prove that the device installed or uses the key; the key never left the terminal."
+      "body": "The dashboard and OpenSSL output show the same serial value; the interface adds separators and changes letter casing."
     }
   ]
 }

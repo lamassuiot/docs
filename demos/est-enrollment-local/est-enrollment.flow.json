@@ -1,0 +1,350 @@
+{
+  "title": "Enrolamiento inicial por EST",
+  "url": "http://localhost:33032/registration-authorities",
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "steps": [
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "EST Showcase",
+        "exact": true
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Collapse",
+        "exact": true
+      },
+      "tooltip": "Preparamos la vista: colapsamos el sidebar y abrimos la terminal del dispositivo."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Terminal",
+        "exact": true
+      },
+      "hotspot": false
+    },
+    {
+      "action": "wait",
+      "ms": 5000
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "EST Showcase",
+        "exact": true
+      },
+      "tooltip": "Abrimos el DMS que recibirá la solicitud EST."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "radio",
+        "name": "EST (RFC 7030)",
+        "exact": true
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "Just-in-time provisioning",
+        "exact": true
+      },
+      "tooltip": "JITP crea el dispositivo al recibir su primer enrolamiento."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "radio",
+        "name": "EST (RFC 7030)",
+        "exact": true
+      },
+      "tooltip": "Seleccionamos EST como protocolo de enrolamiento."
+    },
+    {
+      "action": "click",
+      "target": {
+        "text": "No authentication: any device can request a certificate."
+      },
+      "tooltip": "La autenticación inicial está desactivada solo para esta demo aislada."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "switch",
+        "name": "Verify CSR signature",
+        "exact": true
+      },
+      "tooltip": "Revisamos la verificación de la firma de la CSR."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "switch",
+        "name": "Verify CSR signature",
+        "exact": true
+      },
+      "tooltip": "Dejamos activada la verificación de la firma."
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Save changes",
+        "exact": true
+      },
+      "tooltip": "Guardamos las opciones de enrolamiento para las próximas solicitudes."
+    },
+    {
+      "action": "wait",
+      "ms": 2500
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": ".term-grid"
+      },
+      "tooltip": "Generamos la clave, creamos la CSR y la codificamos para la solicitud EST."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Terminal",
+        "exact": true
+      },
+      "value": "clear; umask 077; mkdir -p /tmp/sensor-demo-930; cd /tmp/sensor-demo-930; openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out device.key"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": ".term-grid"
+      },
+      "hotspot": false
+    },
+    {
+      "action": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Terminal",
+        "exact": true
+      },
+      "value": "openssl req -new -sha256 -key device.key -subj /CN=sensor-demo-930 -out device.csr"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": ".term-grid"
+      },
+      "hotspot": false
+    },
+    {
+      "action": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Terminal",
+        "exact": true
+      },
+      "value": "openssl req -in device.csr -outform DER | openssl base64 -A > device.csr.b64"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": ".term-grid"
+      },
+      "tooltip": "Indicamos la dirección EST del DMS en este entorno."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Terminal",
+        "exact": true
+      },
+      "value": "EST=http://172.17.0.1:8080/api/dmsmanager/.well-known/est/est-showcase"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": ".term-grid"
+      },
+      "tooltip": "Enviamos la CSR a simpleenroll y comprobamos la respuesta HTTP."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Terminal",
+        "exact": true
+      },
+      "value": "curl -sS --fail-with-body -H 'Content-Type: application/pkcs10' --data-binary @device.csr.b64 -o enroll.b64 -w 'HTTP %{http_code}\\n' $EST/simpleenroll"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": ".term-grid"
+      },
+      "tooltip": "HTTP 200 confirma que la solicitud se ha completado."
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": ".term-grid"
+      },
+      "tooltip": "Extraemos el certificado y mostramos su identidad y número de serie."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Terminal",
+        "exact": true
+      },
+      "value": "clear; openssl base64 -d -in enroll.b64 | openssl pkcs7 -inform DER -print_certs -quiet -out device.crt; openssl x509 -in device.crt -noout -subject -issuer -serial"
+    },
+    {
+      "action": "press",
+      "key": "Enter"
+    },
+    {
+      "action": "wait",
+      "ms": 1800
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": ".term-grid"
+      },
+      "tooltip": "La respuesta HTTP y el certificado confirman la emisión para este dispositivo."
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "a[href=\"/devices\"]"
+      },
+      "tooltip": "Abrimos Devices para localizar el registro creado por JITP."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "css": "input[placeholder=\"Filter by device ID...\"]"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "input[placeholder=\"Filter by device ID...\"]"
+      },
+      "tooltip": "Buscamos el identificador usado en la CSR."
+    },
+    {
+      "action": "fill",
+      "target": {
+        "css": "input[placeholder=\"Filter by device ID...\"]"
+      },
+      "value": "sensor-demo-930"
+    },
+    {
+      "action": "wait",
+      "for": {
+        "role": "button",
+        "name": "sensor-demo-930",
+        "exact": true
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "sensor-demo-930",
+        "exact": true
+      },
+      "tooltip": "Abrimos el dispositivo enrolado."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "text": "View certificate"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "css": "p:text-is(\"Registration Authority\")"
+      },
+      "tooltip": "Comprobamos el DMS asociado a la identidad del dispositivo."
+    },
+    {
+      "action": "click",
+      "target": {
+        "text": "View certificate"
+      },
+      "tooltip": "Abrimos el certificado asociado a la identidad."
+    },
+    {
+      "action": "wait",
+      "for": {
+        "text": "Serial number",
+        "nth": 0
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "text": "Serial number",
+        "nth": 0
+      },
+      "tooltip": "Comparamos la serie con la que mostró la terminal."
+    }
+  ]
+}

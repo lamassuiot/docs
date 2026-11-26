@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>La confianza en la PKI de Lamassu</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #ffffff;
+      --ink: #171718;
+      --muted: #55565e;
+      --rule: #e3e3e8;
+      --accent: #0100f8;
+      --font-sans: "Inter", system-ui, sans-serif;
+      --font-mono: "Geist Mono", ui-monospace, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      color: var(--ink);
+      background: var(--paper);
+      font-family: var(--font-sans);
+      margin: 0;
+    }
+
+    main {
+      max-width: 1080px;
+      margin-inline: auto;
+      padding: clamp(1rem, 4vw, 2.5rem);
+    }
+
+    header {
+      border-block-start: 2px solid var(--accent);
+      border-block-end: 1px solid var(--rule);
+      padding-block: 1.15rem 1rem;
+    }
+
+    h1 {
+      font-size: clamp(1.75rem, 4vw, 2.6rem);
+      font-weight: 650;
+      letter-spacing: -.045em;
+      line-height: 1.1;
+      margin: 0;
+    }
+
+    header p {
+      color: var(--muted);
+      line-height: 1.5;
+      margin: .55rem 0 0;
+    }
+
+    figure { margin: 0; }
+    .diagram { max-width: 100%; overflow-x: auto; }
+    .diagram:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    svg { display: block; width: 100%; min-width: 1000px; }
+    .paper { fill: var(--paper); }
+    .diagram--compact { display: none; }
+
+    @media (max-width: 860px) {
+      .diagram--wide { display: none; }
+      .diagram--compact { display: block; }
+      .diagram--compact svg { max-width: 520px; min-width: 0; margin-inline: auto; }
+    }
+
+    .trace { stroke: #aaaab6; stroke-width: 1; stroke-dasharray: 4 5; }
+    .layer {
+      --top: #fff;
+      --left: #efeff1;
+      --right: #dfdfe5;
+      --edge: #30303a;
+      --detail: #747483;
+      --sheet: #fff;
+      --back-sheet: #ececf0;
+      --channel: #f9f9fa;
+      --token: #30303a;
+    }
+    .layer[data-focal] {
+      --top: #f2f2ff;
+      --left: #e1e1ff;
+      --right: #ceceff;
+      --edge: #2929d7;
+      --detail: #5b5ba1;
+      --sheet: #fff;
+      --channel: #e9e9ff;
+      --token: var(--accent);
+    }
+    .slab-top { fill: var(--top); }
+    .slab-left { fill: var(--left); }
+    .slab-right { fill: var(--right); }
+    .slab-outline, .slab-rim { fill: none; stroke: var(--edge); }
+    .slab-outline { stroke-width: 1.3; stroke-linejoin: round; }
+    .slab-rim { stroke-width: .85; opacity: .62; }
+    .surface-art { stroke-linecap: round; stroke-linejoin: round; }
+
+    .inset { fill: var(--channel); stroke: var(--detail); stroke-width: .85; }
+    .sheet, .back-sheet { stroke: var(--edge); stroke-width: 1.1; }
+    .sheet { fill: var(--sheet); }
+    .back-sheet { fill: var(--back-sheet); }
+    .detail, .strong { fill: none; }
+    .detail { stroke: var(--detail); stroke-width: 1.5; }
+    .strong { stroke: var(--edge); stroke-width: 2; }
+    .ink-token { fill: var(--token); }
+    .token-check { fill: none; stroke: var(--paper); stroke-width: 1.9; }
+    .module, .module-depth { stroke: var(--edge); stroke-width: 1.25; }
+    .module { fill: #e8e8ed; }
+    .module-depth { fill: #b0b0bc; }
+    .module-inset { fill: #fbfbfc; stroke: var(--detail); stroke-width: .85; }
+
+    .leader { stroke: #a0a0ac; stroke-width: 1; }
+    .leader-dot { fill: var(--edge); }
+    .part-name { fill: var(--ink); font: 650 20px var(--font-sans); }
+    .part-detail { fill: var(--muted); font: 14px var(--font-sans); }
+    [data-focal] .leader { stroke: var(--edge); }
+    [data-focal] .part-detail { fill: #2424bc; }
+    .diagram--compact .part-name { font-size: 14px; }
+    .diagram--compact .part-detail { font-size: 11px; }
+
+    .status-box { fill: #fafafb; stroke: #bdbdc7; }
+    .status-line { stroke: #91919f; stroke-dasharray: 3 3; }
+    .status-name { fill: var(--ink); font: 600 12px var(--font-mono); }
+    .status-detail { fill: var(--muted); font: 11px var(--font-sans); }
+
+    figcaption {
+      color: var(--muted);
+      border-block-start: 1px solid var(--rule);
+      padding-block-start: 1rem;
+      font-size: .92rem;
+      line-height: 1.6;
+    }
+
+    details { margin-block-start: .65rem; }
+    summary { color: var(--ink); cursor: pointer; }
+    dl { max-width: 65ch; }
+    dt { color: var(--ink); font-weight: 650; }
+    dd { margin: 0 0 .75rem; }
+
+    @media print {
+      main { padding: 0; }
+      .diagram { overflow: visible; }
+      .diagram--wide { display: block; }
+      .diagram--compact { display: none; }
+      svg { min-width: 0; }
+      details { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1 id="pki-lamassu-heading">La confianza en la PKI de Lamassu</h1>
+      <p>De la clave de firma a la autenticación de un cliente por mTLS.</p>
+    </header>
+    <figure>
+      <div class="diagram diagram--wide" role="region" aria-label="Vista axonométrica desplazable" tabindex="0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 725" role="img" aria-labelledby="pki-lamassu-title pki-lamassu-desc">
+          <title id="pki-lamassu-title">Las cinco capas de la PKI de Lamassu</title>
+          <desc id="pki-lamassu-desc">La custodia de claves y la jerarquía de autoridades permiten emitir un certificado X.509 según un perfil, y el servicio consumidor verifica la identidad con su propia raíz de confianza y el estado que publica Lamassu.</desc>
+          <rect class="paper" width="1000" height="725"/>
+          <g data-exploded="" data-origin="351 494" data-gap="100" data-scale="1">
+          <line data-role="trace" class="trace" x1="186.03" y1="580.00" x2="186.03" y2="132.00"/>
+          <line data-role="trace" class="trace" x1="547.97" y1="596.00" x2="547.97" y2="148.00"/>
+          <g class="layer" data-part="custodia" data-name="Custodia de claves" data-rect="0 0 204 172 12" data-z="0" data-t="16" data-level="0">
+            <path data-role="silhouette" class="slab-top" d="M 186.03 580 A 16.97 8.49 0 0 1 191 574 L 339 500 A 16.97 8.49 0 0 1 363 500 L 543 590 A 16.97 8.49 0 0 1 547.97 596 L 547.97 612 A 16.97 8.49 0 0 1 543 618 L 395 692 A 16.97 8.49 0 0 1 371 692 L 191 602 A 16.97 8.49 0 0 1 186.03 596 Z"/>
+            <path class="slab-left" d="M 186.03 580 A 16.97 8.49 0 0 0 191 586 L 371 676 A 16.97 8.49 0 0 0 383 678.49 L 383 694.49 A 16.97 8.49 0 0 1 371 692 L 191 602 A 16.97 8.49 0 0 1 186.03 596 Z"/>
+            <path class="slab-right" d="M 383 678.49 A 16.97 8.49 0 0 0 395 676 L 543 602 A 16.97 8.49 0 0 0 547.97 596 L 547.97 612 A 16.97 8.49 0 0 1 543 618 L 395 692 A 16.97 8.49 0 0 1 383 694.49 Z"/>
+            <path class="slab-rim" d="M 186.03 580 A 16.97 8.49 0 0 0 191 586 L 371 676 A 16.97 8.49 0 0 0 395 676 L 543 602 A 16.97 8.49 0 0 0 547.97 596"/>
+            <path class="slab-outline" d="M 186.03 580 A 16.97 8.49 0 0 1 191 574 L 339 500 A 16.97 8.49 0 0 1 363 500 L 543 590 A 16.97 8.49 0 0 1 547.97 596 L 547.97 612 A 16.97 8.49 0 0 1 543 618 L 395 692 A 16.97 8.49 0 0 1 371 692 L 191 602 A 16.97 8.49 0 0 1 186.03 596 Z"/>
+            <g class="surface-art" transform="matrix(1 0.5 -1 0.5 351 494)">
+              <rect class="inset" x="32" y="81" width="142" height="67" rx="7"/>
+              <rect class="module-depth" x="65" y="93" width="82" height="45" rx="5"/>
+              <rect class="module" x="65" y="87" width="82" height="45" rx="5"/>
+              <rect class="module-inset" x="72" y="94" width="68" height="31" rx="3"/>
+              <circle class="strong" cx="96" cy="109" r="7"/>
+              <path class="strong" d="M 103 109 H 119 V 115 M 113 109 V 113"/>
+              <path class="detail" d="M 82 87 V 81 M 82 138 V 144"/>
+              <path class="detail" d="M 98 87 V 81 M 98 138 V 144"/>
+              <path class="detail" d="M 114 87 V 81 M 114 138 V 144"/>
+              <path class="detail" d="M 130 87 V 81 M 130 138 V 144"/>
+              <path class="detail" d="M 43 95 H 55 M 43 103 H 55 M 43 111 H 55 M 154 111 H 164 M 154 119 H 164"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="553.97" y1="604.00" x2="616.00" y2="604.00"/>
+              <circle class="leader-dot" cx="547.97" cy="604.00" r="2.5"/>
+              <text class="part-name" data-role="name" x="628" y="599.00">Custodia de claves</text>
+              <text class="part-detail" x="628" y="619.00">KMS y motor criptográfico</text>
+              <text class="part-detail" x="628" y="637.00">Custodian la clave de la CA o ejecutan la firma</text>
+            </g>
+          </g>
+          <g class="layer" data-part="autoridades" data-name="Autoridades de certificación" data-rect="0 0 204 172 12" data-z="116" data-t="16" data-level="1">
+            <path data-role="silhouette" class="slab-top" d="M 186.03 464 A 16.97 8.49 0 0 1 191 458 L 339 384 A 16.97 8.49 0 0 1 363 384 L 543 474 A 16.97 8.49 0 0 1 547.97 480 L 547.97 496 A 16.97 8.49 0 0 1 543 502 L 395 576 A 16.97 8.49 0 0 1 371 576 L 191 486 A 16.97 8.49 0 0 1 186.03 480 Z"/>
+            <path class="slab-left" d="M 186.03 464 A 16.97 8.49 0 0 0 191 470 L 371 560 A 16.97 8.49 0 0 0 383 562.49 L 383 578.49 A 16.97 8.49 0 0 1 371 576 L 191 486 A 16.97 8.49 0 0 1 186.03 480 Z"/>
+            <path class="slab-right" d="M 383 562.49 A 16.97 8.49 0 0 0 395 560 L 543 486 A 16.97 8.49 0 0 0 547.97 480 L 547.97 496 A 16.97 8.49 0 0 1 543 502 L 395 576 A 16.97 8.49 0 0 1 383 578.49 Z"/>
+            <path class="slab-rim" d="M 186.03 464 A 16.97 8.49 0 0 0 191 470 L 371 560 A 16.97 8.49 0 0 0 395 560 L 543 486 A 16.97 8.49 0 0 0 547.97 480"/>
+            <path class="slab-outline" d="M 186.03 464 A 16.97 8.49 0 0 1 191 458 L 339 384 A 16.97 8.49 0 0 1 363 384 L 543 474 A 16.97 8.49 0 0 1 547.97 480 L 547.97 496 A 16.97 8.49 0 0 1 543 502 L 395 576 A 16.97 8.49 0 0 1 371 576 L 191 486 A 16.97 8.49 0 0 1 186.03 480 Z"/>
+            <g class="surface-art" transform="matrix(1 0.5 -1 0.5 351 378)">
+              <rect class="inset" x="33" y="75" width="146" height="77" rx="7"/>
+              <path class="strong" d="M 97 115 H 122"/>
+              <rect class="sheet" x="47" y="88" width="55" height="54" rx="4"/>
+              <rect class="sheet" x="120" y="88" width="48" height="54" rx="4"/>
+              <circle class="ink-token" cx="74" cy="107" r="11"/>
+              <path class="token-check" d="M 69 107 L 73 111 L 79 103"/>
+              <path class="detail" d="M 60 125 H 88 M 65 131 H 83"/>
+              <circle class="detail" cx="144" cy="107" r="10"/>
+              <path class="detail" d="M 139 107 H 149 M 144 102 V 112 M 132 125 H 156 M 135 131 H 153"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="553.97" y1="488.00" x2="616.00" y2="488.00"/>
+              <circle class="leader-dot" cx="547.97" cy="488.00" r="2.5"/>
+              <text class="part-name" data-role="name" x="628" y="483.00">Autoridades de certificación</text>
+              <text class="part-detail" x="628" y="503.00">La raíz firma a la CA intermedia</text>
+              <text class="part-detail" x="628" y="521.00">La intermedia emite el certificado final</text>
+            </g>
+          </g>
+          <g class="layer" data-part="emision" data-name="Política y emisión" data-rect="0 0 204 172 12" data-z="232" data-t="16" data-level="2" data-focal="">
+            <path data-role="silhouette" class="slab-top" d="M 186.03 348 A 16.97 8.49 0 0 1 191 342 L 339 268 A 16.97 8.49 0 0 1 363 268 L 543 358 A 16.97 8.49 0 0 1 547.97 364 L 547.97 380 A 16.97 8.49 0 0 1 543 386 L 395 460 A 16.97 8.49 0 0 1 371 460 L 191 370 A 16.97 8.49 0 0 1 186.03 364 Z"/>
+            <path class="slab-left" d="M 186.03 348 A 16.97 8.49 0 0 0 191 354 L 371 444 A 16.97 8.49 0 0 0 383 446.49 L 383 462.49 A 16.97 8.49 0 0 1 371 460 L 191 370 A 16.97 8.49 0 0 1 186.03 364 Z"/>
+            <path class="slab-right" d="M 383 446.49 A 16.97 8.49 0 0 0 395 444 L 543 370 A 16.97 8.49 0 0 0 547.97 364 L 547.97 380 A 16.97 8.49 0 0 1 543 386 L 395 460 A 16.97 8.49 0 0 1 383 462.49 Z"/>
+            <path class="slab-rim" d="M 186.03 348 A 16.97 8.49 0 0 0 191 354 L 371 444 A 16.97 8.49 0 0 0 395 444 L 543 370 A 16.97 8.49 0 0 0 547.97 364"/>
+            <path class="slab-outline" d="M 186.03 348 A 16.97 8.49 0 0 1 191 342 L 339 268 A 16.97 8.49 0 0 1 363 268 L 543 358 A 16.97 8.49 0 0 1 547.97 364 L 547.97 380 A 16.97 8.49 0 0 1 543 386 L 395 460 A 16.97 8.49 0 0 1 371 460 L 191 370 A 16.97 8.49 0 0 1 186.03 364 Z"/>
+            <g class="surface-art" transform="matrix(1 0.5 -1 0.5 351 262)">
+              <rect class="inset" x="31" y="73" width="149" height="82" rx="7"/>
+              <rect class="sheet" x="44" y="86" width="56" height="57" rx="4"/>
+              <rect class="sheet" x="110" y="86" width="58" height="57" rx="4"/>
+              <path class="detail" d="M 100 114 H 110 M 54 99 H 74 M 54 106 H 89 M 54 113 H 82"/>
+              <path class="strong" d="M 56 127 L 60 123 L 64 127 L 68 123 L 73 127 H 85"/>
+              <path class="detail" d="M 121 99 H 153 M 121 109 H 147 M 121 119 H 140"/>
+              <circle class="ink-token" cx="153" cy="129" r="10"/>
+              <path class="token-check" d="M 148 129 L 152 133 L 158 125"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="553.97" y1="372.00" x2="616.00" y2="372.00"/>
+              <circle class="leader-dot" cx="547.97" cy="372.00" r="2.5"/>
+              <text class="part-name" data-role="name" x="628" y="367.00">Política y emisión</text>
+              <text class="part-detail" x="628" y="387.00">CSR del cliente y perfil ClientAuth</text>
+              <text class="part-detail" x="628" y="405.00">La CA aplica las reglas y firma</text>
+            </g>
+          </g>
+          <g class="layer" data-part="identidad" data-name="Identidad del cliente" data-rect="0 0 204 172 12" data-z="348" data-t="16" data-level="3">
+            <path data-role="silhouette" class="slab-top" d="M 186.03 232 A 16.97 8.49 0 0 1 191 226 L 339 152 A 16.97 8.49 0 0 1 363 152 L 543 242 A 16.97 8.49 0 0 1 547.97 248 L 547.97 264 A 16.97 8.49 0 0 1 543 270 L 395 344 A 16.97 8.49 0 0 1 371 344 L 191 254 A 16.97 8.49 0 0 1 186.03 248 Z"/>
+            <path class="slab-left" d="M 186.03 232 A 16.97 8.49 0 0 0 191 238 L 371 328 A 16.97 8.49 0 0 0 383 330.49 L 383 346.49 A 16.97 8.49 0 0 1 371 344 L 191 254 A 16.97 8.49 0 0 1 186.03 248 Z"/>
+            <path class="slab-right" d="M 383 330.49 A 16.97 8.49 0 0 0 395 328 L 543 254 A 16.97 8.49 0 0 0 547.97 248 L 547.97 264 A 16.97 8.49 0 0 1 543 270 L 395 344 A 16.97 8.49 0 0 1 383 346.49 Z"/>
+            <path class="slab-rim" d="M 186.03 232 A 16.97 8.49 0 0 0 191 238 L 371 328 A 16.97 8.49 0 0 0 395 328 L 543 254 A 16.97 8.49 0 0 0 547.97 248"/>
+            <path class="slab-outline" d="M 186.03 232 A 16.97 8.49 0 0 1 191 226 L 339 152 A 16.97 8.49 0 0 1 363 152 L 543 242 A 16.97 8.49 0 0 1 547.97 248 L 547.97 264 A 16.97 8.49 0 0 1 543 270 L 395 344 A 16.97 8.49 0 0 1 371 344 L 191 254 A 16.97 8.49 0 0 1 186.03 248 Z"/>
+            <g class="surface-art" transform="matrix(1 0.5 -1 0.5 351 146)">
+              <rect class="inset" x="32" y="72" width="150" height="83" rx="7"/>
+              <rect class="back-sheet" x="54" y="82" width="68" height="52" rx="4"/>
+              <rect class="sheet" x="43" y="94" width="68" height="53" rx="4"/>
+              <path class="detail" d="M 54 107 H 92 M 54 115 H 86 M 54 123 H 75"/>
+              <circle class="ink-token" cx="94" cy="130" r="8"/>
+              <rect class="back-sheet" x="129" y="105" width="43" height="32" rx="4"/>
+              <circle class="strong" cx="140" cy="121" r="7"/>
+              <path class="strong" d="M 147 121 H 163 V 127 M 157 121 V 125"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="553.97" y1="256.00" x2="616.00" y2="256.00"/>
+              <circle class="leader-dot" cx="547.97" cy="256.00" r="2.5"/>
+              <text class="part-name" data-role="name" x="628" y="251.00">Identidad del cliente</text>
+              <text class="part-detail" x="628" y="271.00">Certificado X.509 e intermedia</text>
+              <text class="part-detail" x="628" y="289.00">Con CSR local, conserva su clave privada</text>
+            </g>
+          </g>
+          <g class="layer" data-part="verificacion" data-name="Verificación en el consumidor" data-rect="0 0 204 172 12" data-z="464" data-t="16" data-level="4">
+            <path data-role="silhouette" class="slab-top" d="M 186.03 116 A 16.97 8.49 0 0 1 191 110 L 339 36 A 16.97 8.49 0 0 1 363 36 L 543 126 A 16.97 8.49 0 0 1 547.97 132 L 547.97 148 A 16.97 8.49 0 0 1 543 154 L 395 228 A 16.97 8.49 0 0 1 371 228 L 191 138 A 16.97 8.49 0 0 1 186.03 132 Z"/>
+            <path class="slab-left" d="M 186.03 116 A 16.97 8.49 0 0 0 191 122 L 371 212 A 16.97 8.49 0 0 0 383 214.49 L 383 230.49 A 16.97 8.49 0 0 1 371 228 L 191 138 A 16.97 8.49 0 0 1 186.03 132 Z"/>
+            <path class="slab-right" d="M 383 214.49 A 16.97 8.49 0 0 0 395 212 L 543 138 A 16.97 8.49 0 0 0 547.97 132 L 547.97 148 A 16.97 8.49 0 0 1 543 154 L 395 228 A 16.97 8.49 0 0 1 383 230.49 Z"/>
+            <path class="slab-rim" d="M 186.03 116 A 16.97 8.49 0 0 0 191 122 L 371 212 A 16.97 8.49 0 0 0 395 212 L 543 138 A 16.97 8.49 0 0 0 547.97 132"/>
+            <path class="slab-outline" d="M 186.03 116 A 16.97 8.49 0 0 1 191 110 L 339 36 A 16.97 8.49 0 0 1 363 36 L 543 126 A 16.97 8.49 0 0 1 547.97 132 L 547.97 148 A 16.97 8.49 0 0 1 543 154 L 395 228 A 16.97 8.49 0 0 1 371 228 L 191 138 A 16.97 8.49 0 0 1 186.03 132 Z"/>
+            <g class="surface-art" transform="matrix(1 0.5 -1 0.5 351 30)">
+              <rect class="inset" x="29" y="37" width="148" height="107" rx="7"/>
+              <rect class="back-sheet" x="41" y="52" width="57" height="78" rx="5"/>
+              <rect class="sheet" x="47" y="56" width="45" height="66" rx="4"/>
+              <circle class="ink-token" cx="69" cy="78" r="11"/>
+              <path class="token-check" d="M 64 78 L 68 82 L 74 74"/>
+              <path class="detail" d="M 55 98 H 82 M 57 105 H 80"/>
+              <rect class="sheet" x="113" y="49" width="50" height="84" rx="4"/>
+              <path class="detail" d="M 121 66 L 124 69 L 130 62 M 136 66 H 154"/>
+              <path class="detail" d="M 121 78 L 124 81 L 130 74 M 136 78 H 154"/>
+              <path class="detail" d="M 121 90 L 124 93 L 130 86 M 136 90 H 154"/>
+              <path class="detail" d="M 121 102 L 124 105 L 130 98 M 136 102 H 154"/>
+              <path class="detail" d="M 121 114 L 124 117 L 130 110 M 136 114 H 154"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="553.97" y1="140.00" x2="616.00" y2="140.00"/>
+              <circle class="leader-dot" cx="547.97" cy="140.00" r="2.5"/>
+              <text class="part-name" data-role="name" x="628" y="135.00">Verificación en el consumidor</text>
+              <text class="part-detail" x="628" y="155.00">Raíz de confianza configurada</text>
+              <text class="part-detail" x="628" y="173.00">Cadena, identidad, fechas, usos y revocación</text>
+            </g>
+          </g>
+          </g>
+        <g class="status-callout">
+          <rect class="status-box" x="24" y="99.00" width="126" height="50" rx="4"/>
+          <line class="status-line" x1="150.00" y1="124.00" x2="181.03" y2="124.00"/>
+          <text class="status-name" x="35" y="119.00">OCSP / CRL</text>
+          <text class="status-detail" x="35" y="136.00">Publica Lamassu</text>
+        </g>
+        </svg>
+      </div>
+      <div class="diagram diagram--compact">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 510" role="img" aria-labelledby="pki-lamassu-compact-title pki-lamassu-compact-desc">
+          <title id="pki-lamassu-compact-title">Las cinco capas de la PKI de Lamassu</title>
+          <desc id="pki-lamassu-compact-desc">La custodia de claves y la jerarquía de autoridades permiten emitir un certificado X.509 según un perfil, y el servicio consumidor verifica la identidad con su propia raíz de confianza y el estado que publica Lamassu.</desc>
+          <rect class="paper" width="360" height="510"/>
+          <g data-exploded="" data-origin="74 420" data-gap="260" data-scale="0.36">
+          <line data-role="trace" class="trace" x1="14.61" y1="450.96" x2="14.61" y2="59.28"/>
+          <line data-role="trace" class="trace" x1="144.91" y1="456.72" x2="144.91" y2="65.04"/>
+          <g class="layer" data-part="custodia" data-name="Custodia de claves" data-rect="0 0 204 172 12" data-z="0" data-t="16" data-level="0">
+            <path data-role="silhouette" class="slab-top" d="M 14.61 450.96 A 6.11 3.05 0 0 1 16.4 448.8 L 69.68 422.16 A 6.11 3.05 0 0 1 78.32 422.16 L 143.12 454.56 A 6.11 3.05 0 0 1 144.91 456.72 L 144.91 462.48 A 6.11 3.05 0 0 1 143.12 464.64 L 89.84 491.28 A 6.11 3.05 0 0 1 81.2 491.28 L 16.4 458.88 A 6.11 3.05 0 0 1 14.61 456.72 Z"/>
+            <path class="slab-left" d="M 14.61 450.96 A 6.11 3.05 0 0 0 16.4 453.12 L 81.2 485.52 A 6.11 3.05 0 0 0 85.52 486.41 L 85.52 492.17 A 6.11 3.05 0 0 1 81.2 491.28 L 16.4 458.88 A 6.11 3.05 0 0 1 14.61 456.72 Z"/>
+            <path class="slab-right" d="M 85.52 486.41 A 6.11 3.05 0 0 0 89.84 485.52 L 143.12 458.88 A 6.11 3.05 0 0 0 144.91 456.72 L 144.91 462.48 A 6.11 3.05 0 0 1 143.12 464.64 L 89.84 491.28 A 6.11 3.05 0 0 1 85.52 492.17 Z"/>
+            <path class="slab-rim" d="M 14.61 450.96 A 6.11 3.05 0 0 0 16.4 453.12 L 81.2 485.52 A 6.11 3.05 0 0 0 89.84 485.52 L 143.12 458.88 A 6.11 3.05 0 0 0 144.91 456.72"/>
+            <path class="slab-outline" d="M 14.61 450.96 A 6.11 3.05 0 0 1 16.4 448.8 L 69.68 422.16 A 6.11 3.05 0 0 1 78.32 422.16 L 143.12 454.56 A 6.11 3.05 0 0 1 144.91 456.72 L 144.91 462.48 A 6.11 3.05 0 0 1 143.12 464.64 L 89.84 491.28 A 6.11 3.05 0 0 1 81.2 491.28 L 16.4 458.88 A 6.11 3.05 0 0 1 14.61 456.72 Z"/>
+            <g class="surface-art" transform="matrix(0.36 0.18 -0.36 0.18 74 420.0)">
+              <rect class="inset" x="32" y="81" width="142" height="67" rx="7"/>
+              <rect class="module-depth" x="65" y="93" width="82" height="45" rx="5"/>
+              <rect class="module" x="65" y="87" width="82" height="45" rx="5"/>
+              <rect class="module-inset" x="72" y="94" width="68" height="31" rx="3"/>
+              <circle class="strong" cx="96" cy="109" r="7"/>
+              <path class="strong" d="M 103 109 H 119 V 115 M 113 109 V 113"/>
+              <path class="detail" d="M 82 87 V 81 M 82 138 V 144"/>
+              <path class="detail" d="M 98 87 V 81 M 98 138 V 144"/>
+              <path class="detail" d="M 114 87 V 81 M 114 138 V 144"/>
+              <path class="detail" d="M 130 87 V 81 M 130 138 V 144"/>
+              <path class="detail" d="M 43 95 H 55 M 43 103 H 55 M 43 111 H 55 M 154 111 H 164 M 154 119 H 164"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="150.91" y1="459.60" x2="161.00" y2="459.60"/>
+              <circle class="leader-dot" cx="144.91" cy="459.60" r="1.5"/>
+              <text class="part-name" data-role="name" x="173" y="454.60">Custodia de claves</text>
+              <text class="part-detail" x="173" y="471.60">KMS y motor criptográfico</text>
+              <text class="part-detail" x="173" y="486.60">Clave de firma de la CA</text>
+            </g>
+          </g>
+          <g class="layer" data-part="autoridades" data-name="Autoridades" data-rect="0 0 204 172 12" data-z="276" data-t="16" data-level="1">
+            <path data-role="silhouette" class="slab-top" d="M 14.61 351.6 A 6.11 3.05 0 0 1 16.4 349.44 L 69.68 322.8 A 6.11 3.05 0 0 1 78.32 322.8 L 143.12 355.2 A 6.11 3.05 0 0 1 144.91 357.36 L 144.91 363.12 A 6.11 3.05 0 0 1 143.12 365.28 L 89.84 391.92 A 6.11 3.05 0 0 1 81.2 391.92 L 16.4 359.52 A 6.11 3.05 0 0 1 14.61 357.36 Z"/>
+            <path class="slab-left" d="M 14.61 351.6 A 6.11 3.05 0 0 0 16.4 353.76 L 81.2 386.16 A 6.11 3.05 0 0 0 85.52 387.05 L 85.52 392.81 A 6.11 3.05 0 0 1 81.2 391.92 L 16.4 359.52 A 6.11 3.05 0 0 1 14.61 357.36 Z"/>
+            <path class="slab-right" d="M 85.52 387.05 A 6.11 3.05 0 0 0 89.84 386.16 L 143.12 359.52 A 6.11 3.05 0 0 0 144.91 357.36 L 144.91 363.12 A 6.11 3.05 0 0 1 143.12 365.28 L 89.84 391.92 A 6.11 3.05 0 0 1 85.52 392.81 Z"/>
+            <path class="slab-rim" d="M 14.61 351.6 A 6.11 3.05 0 0 0 16.4 353.76 L 81.2 386.16 A 6.11 3.05 0 0 0 89.84 386.16 L 143.12 359.52 A 6.11 3.05 0 0 0 144.91 357.36"/>
+            <path class="slab-outline" d="M 14.61 351.6 A 6.11 3.05 0 0 1 16.4 349.44 L 69.68 322.8 A 6.11 3.05 0 0 1 78.32 322.8 L 143.12 355.2 A 6.11 3.05 0 0 1 144.91 357.36 L 144.91 363.12 A 6.11 3.05 0 0 1 143.12 365.28 L 89.84 391.92 A 6.11 3.05 0 0 1 81.2 391.92 L 16.4 359.52 A 6.11 3.05 0 0 1 14.61 357.36 Z"/>
+            <g class="surface-art" transform="matrix(0.36 0.18 -0.36 0.18 74 320.64)">
+              <rect class="inset" x="33" y="75" width="146" height="77" rx="7"/>
+              <path class="strong" d="M 97 115 H 122"/>
+              <rect class="sheet" x="47" y="88" width="55" height="54" rx="4"/>
+              <rect class="sheet" x="120" y="88" width="48" height="54" rx="4"/>
+              <circle class="ink-token" cx="74" cy="107" r="11"/>
+              <path class="token-check" d="M 69 107 L 73 111 L 79 103"/>
+              <path class="detail" d="M 60 125 H 88 M 65 131 H 83"/>
+              <circle class="detail" cx="144" cy="107" r="10"/>
+              <path class="detail" d="M 139 107 H 149 M 144 102 V 112 M 132 125 H 156 M 135 131 H 153"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="150.91" y1="360.24" x2="161.00" y2="360.24"/>
+              <circle class="leader-dot" cx="144.91" cy="360.24" r="1.5"/>
+              <text class="part-name" data-role="name" x="173" y="355.24">Autoridades</text>
+              <text class="part-detail" x="173" y="372.24">La raíz firma a la intermedia</text>
+              <text class="part-detail" x="173" y="387.24">La intermedia emite</text>
+            </g>
+          </g>
+          <g class="layer" data-part="emision" data-name="Política y emisión" data-rect="0 0 204 172 12" data-z="552" data-t="16" data-level="2" data-focal="">
+            <path data-role="silhouette" class="slab-top" d="M 14.61 252.24 A 6.11 3.05 0 0 1 16.4 250.08 L 69.68 223.44 A 6.11 3.05 0 0 1 78.32 223.44 L 143.12 255.84 A 6.11 3.05 0 0 1 144.91 258 L 144.91 263.76 A 6.11 3.05 0 0 1 143.12 265.92 L 89.84 292.56 A 6.11 3.05 0 0 1 81.2 292.56 L 16.4 260.16 A 6.11 3.05 0 0 1 14.61 258 Z"/>
+            <path class="slab-left" d="M 14.61 252.24 A 6.11 3.05 0 0 0 16.4 254.4 L 81.2 286.8 A 6.11 3.05 0 0 0 85.52 287.69 L 85.52 293.45 A 6.11 3.05 0 0 1 81.2 292.56 L 16.4 260.16 A 6.11 3.05 0 0 1 14.61 258 Z"/>
+            <path class="slab-right" d="M 85.52 287.69 A 6.11 3.05 0 0 0 89.84 286.8 L 143.12 260.16 A 6.11 3.05 0 0 0 144.91 258 L 144.91 263.76 A 6.11 3.05 0 0 1 143.12 265.92 L 89.84 292.56 A 6.11 3.05 0 0 1 85.52 293.45 Z"/>
+            <path class="slab-rim" d="M 14.61 252.24 A 6.11 3.05 0 0 0 16.4 254.4 L 81.2 286.8 A 6.11 3.05 0 0 0 89.84 286.8 L 143.12 260.16 A 6.11 3.05 0 0 0 144.91 258"/>
+            <path class="slab-outline" d="M 14.61 252.24 A 6.11 3.05 0 0 1 16.4 250.08 L 69.68 223.44 A 6.11 3.05 0 0 1 78.32 223.44 L 143.12 255.84 A 6.11 3.05 0 0 1 144.91 258 L 144.91 263.76 A 6.11 3.05 0 0 1 143.12 265.92 L 89.84 292.56 A 6.11 3.05 0 0 1 81.2 292.56 L 16.4 260.16 A 6.11 3.05 0 0 1 14.61 258 Z"/>
+            <g class="surface-art" transform="matrix(0.36 0.18 -0.36 0.18 74 221.28)">
+              <rect class="inset" x="31" y="73" width="149" height="82" rx="7"/>
+              <rect class="sheet" x="44" y="86" width="56" height="57" rx="4"/>
+              <rect class="sheet" x="110" y="86" width="58" height="57" rx="4"/>
+              <path class="detail" d="M 100 114 H 110 M 54 99 H 74 M 54 106 H 89 M 54 113 H 82"/>
+              <path class="strong" d="M 56 127 L 60 123 L 64 127 L 68 123 L 73 127 H 85"/>
+              <path class="detail" d="M 121 99 H 153 M 121 109 H 147 M 121 119 H 140"/>
+              <circle class="ink-token" cx="153" cy="129" r="10"/>
+              <path class="token-check" d="M 148 129 L 152 133 L 158 125"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="150.91" y1="260.88" x2="161.00" y2="260.88"/>
+              <circle class="leader-dot" cx="144.91" cy="260.88" r="1.5"/>
+              <text class="part-name" data-role="name" x="173" y="255.88">Política y emisión</text>
+              <text class="part-detail" x="173" y="272.88">CSR y perfil ClientAuth</text>
+              <text class="part-detail" x="173" y="287.88">La CA aplica reglas y firma</text>
+            </g>
+          </g>
+          <g class="layer" data-part="identidad" data-name="Identidad del cliente" data-rect="0 0 204 172 12" data-z="828" data-t="16" data-level="3">
+            <path data-role="silhouette" class="slab-top" d="M 14.61 152.88 A 6.11 3.05 0 0 1 16.4 150.72 L 69.68 124.08 A 6.11 3.05 0 0 1 78.32 124.08 L 143.12 156.48 A 6.11 3.05 0 0 1 144.91 158.64 L 144.91 164.4 A 6.11 3.05 0 0 1 143.12 166.56 L 89.84 193.2 A 6.11 3.05 0 0 1 81.2 193.2 L 16.4 160.8 A 6.11 3.05 0 0 1 14.61 158.64 Z"/>
+            <path class="slab-left" d="M 14.61 152.88 A 6.11 3.05 0 0 0 16.4 155.04 L 81.2 187.44 A 6.11 3.05 0 0 0 85.52 188.33 L 85.52 194.09 A 6.11 3.05 0 0 1 81.2 193.2 L 16.4 160.8 A 6.11 3.05 0 0 1 14.61 158.64 Z"/>
+            <path class="slab-right" d="M 85.52 188.33 A 6.11 3.05 0 0 0 89.84 187.44 L 143.12 160.8 A 6.11 3.05 0 0 0 144.91 158.64 L 144.91 164.4 A 6.11 3.05 0 0 1 143.12 166.56 L 89.84 193.2 A 6.11 3.05 0 0 1 85.52 194.09 Z"/>
+            <path class="slab-rim" d="M 14.61 152.88 A 6.11 3.05 0 0 0 16.4 155.04 L 81.2 187.44 A 6.11 3.05 0 0 0 89.84 187.44 L 143.12 160.8 A 6.11 3.05 0 0 0 144.91 158.64"/>
+            <path class="slab-outline" d="M 14.61 152.88 A 6.11 3.05 0 0 1 16.4 150.72 L 69.68 124.08 A 6.11 3.05 0 0 1 78.32 124.08 L 143.12 156.48 A 6.11 3.05 0 0 1 144.91 158.64 L 144.91 164.4 A 6.11 3.05 0 0 1 143.12 166.56 L 89.84 193.2 A 6.11 3.05 0 0 1 81.2 193.2 L 16.4 160.8 A 6.11 3.05 0 0 1 14.61 158.64 Z"/>
+            <g class="surface-art" transform="matrix(0.36 0.18 -0.36 0.18 74 121.92000000000002)">
+              <rect class="inset" x="32" y="72" width="150" height="83" rx="7"/>
+              <rect class="back-sheet" x="54" y="82" width="68" height="52" rx="4"/>
+              <rect class="sheet" x="43" y="94" width="68" height="53" rx="4"/>
+              <path class="detail" d="M 54 107 H 92 M 54 115 H 86 M 54 123 H 75"/>
+              <circle class="ink-token" cx="94" cy="130" r="8"/>
+              <rect class="back-sheet" x="129" y="105" width="43" height="32" rx="4"/>
+              <circle class="strong" cx="140" cy="121" r="7"/>
+              <path class="strong" d="M 147 121 H 163 V 127 M 157 121 V 125"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="150.91" y1="161.52" x2="161.00" y2="161.52"/>
+              <circle class="leader-dot" cx="144.91" cy="161.52" r="1.5"/>
+              <text class="part-name" data-role="name" x="173" y="156.52">Identidad del cliente</text>
+              <text class="part-detail" x="173" y="173.52">Certificado X.509 e intermedia</text>
+              <text class="part-detail" x="173" y="188.52">Clave privada en el cliente</text>
+              <text class="part-detail" x="173" y="203.52">si genera la CSR localmente</text>
+            </g>
+          </g>
+          <g class="layer" data-part="verificacion" data-name="Servicio consumidor" data-rect="0 0 204 172 12" data-z="1104" data-t="16" data-level="4">
+            <path data-role="silhouette" class="slab-top" d="M 14.61 53.52 A 6.11 3.05 0 0 1 16.4 51.36 L 69.68 24.72 A 6.11 3.05 0 0 1 78.32 24.72 L 143.12 57.12 A 6.11 3.05 0 0 1 144.91 59.28 L 144.91 65.04 A 6.11 3.05 0 0 1 143.12 67.2 L 89.84 93.84 A 6.11 3.05 0 0 1 81.2 93.84 L 16.4 61.44 A 6.11 3.05 0 0 1 14.61 59.28 Z"/>
+            <path class="slab-left" d="M 14.61 53.52 A 6.11 3.05 0 0 0 16.4 55.68 L 81.2 88.08 A 6.11 3.05 0 0 0 85.52 88.97 L 85.52 94.73 A 6.11 3.05 0 0 1 81.2 93.84 L 16.4 61.44 A 6.11 3.05 0 0 1 14.61 59.28 Z"/>
+            <path class="slab-right" d="M 85.52 88.97 A 6.11 3.05 0 0 0 89.84 88.08 L 143.12 61.44 A 6.11 3.05 0 0 0 144.91 59.28 L 144.91 65.04 A 6.11 3.05 0 0 1 143.12 67.2 L 89.84 93.84 A 6.11 3.05 0 0 1 85.52 94.73 Z"/>
+            <path class="slab-rim" d="M 14.61 53.52 A 6.11 3.05 0 0 0 16.4 55.68 L 81.2 88.08 A 6.11 3.05 0 0 0 89.84 88.08 L 143.12 61.44 A 6.11 3.05 0 0 0 144.91 59.28"/>
+            <path class="slab-outline" d="M 14.61 53.52 A 6.11 3.05 0 0 1 16.4 51.36 L 69.68 24.72 A 6.11 3.05 0 0 1 78.32 24.72 L 143.12 57.12 A 6.11 3.05 0 0 1 144.91 59.28 L 144.91 65.04 A 6.11 3.05 0 0 1 143.12 67.2 L 89.84 93.84 A 6.11 3.05 0 0 1 81.2 93.84 L 16.4 61.44 A 6.11 3.05 0 0 1 14.61 59.28 Z"/>
+            <g class="surface-art" transform="matrix(0.36 0.18 -0.36 0.18 74 22.560000000000002)">
+              <rect class="inset" x="29" y="37" width="148" height="107" rx="7"/>
+              <rect class="back-sheet" x="41" y="52" width="57" height="78" rx="5"/>
+              <rect class="sheet" x="47" y="56" width="45" height="66" rx="4"/>
+              <circle class="ink-token" cx="69" cy="78" r="11"/>
+              <path class="token-check" d="M 64 78 L 68 82 L 74 74"/>
+              <path class="detail" d="M 55 98 H 82 M 57 105 H 80"/>
+              <rect class="sheet" x="113" y="49" width="50" height="84" rx="4"/>
+              <path class="detail" d="M 121 66 L 124 69 L 130 62 M 136 66 H 154"/>
+              <path class="detail" d="M 121 78 L 124 81 L 130 74 M 136 78 H 154"/>
+              <path class="detail" d="M 121 90 L 124 93 L 130 86 M 136 90 H 154"/>
+              <path class="detail" d="M 121 102 L 124 105 L 130 98 M 136 102 H 154"/>
+              <path class="detail" d="M 121 114 L 124 117 L 130 110 M 136 114 H 154"/>
+            </g>
+            <g data-role="label">
+              <line data-role="leader" class="leader" x1="150.91" y1="62.16" x2="161.00" y2="62.16"/>
+              <circle class="leader-dot" cx="144.91" cy="62.16" r="1.5"/>
+              <text class="part-name" data-role="name" x="173" y="57.16">Servicio consumidor</text>
+              <text class="part-detail" x="173" y="74.16">Verifica cadena hasta su raíz,</text>
+              <text class="part-detail" x="173" y="89.16">identidad, fechas, usos y estado</text>
+              <text class="part-detail" x="173" y="104.16">OCSP y CRL · Lamassu</text>
+            </g>
+          </g>
+          </g>
+        </svg>
+      </div>
+      <figcaption>
+        Lamassu emite el certificado y publica su estado. El servicio consumidor aplica su propia política para decidir si lo acepta.
+        <details>
+          <summary>Descripción de las cinco capas</summary>
+          <dl>
+            <dt>Custodia de claves</dt>
+            <dd>El KMS delega la custodia o la operación de firma de la CA en el motor criptográfico configurado.</dd>
+            <dt>Autoridades de certificación</dt>
+            <dd>En esta jerarquía de ejemplo, la raíz firma el certificado de la CA intermedia, que emite el certificado del cliente.</dd>
+            <dt>Política y emisión</dt>
+            <dd>La solicitud de firma (CSR) contiene la clave pública. El perfil define las reglas de identidad, vigencia y uso. La CA aplica el perfil y firma el certificado.</dd>
+            <dt>Identidad del cliente</dt>
+            <dd>El cliente presenta su certificado X.509 y el de la CA intermedia. Si generó la solicitud localmente, la clave privada queda en el cliente.</dd>
+            <dt>Verificación en el consumidor</dt>
+            <dd>El servicio consumidor ancla la cadena en la raíz que configuró y comprueba la identidad, las fechas, los usos y el estado de revocación. Lamassu publica ese estado mediante OCSP y CRL.</dd>
+          </dl>
+        </details>
+      </figcaption>
+    </figure>
+  </main>
+</body>
+</html>

@@ -1,6 +1,6 @@
 ---
-title: Identidad inicial y autenticación
-description: Prepara confianza del servidor y pruebas de admisión para enroll y reenroll.
+title: Autenticación y confianza
+description: Prepara las credenciales, la autenticación y la distribución de confianza para EST.
 ---
 
 Esta guía conecta al administrador DMS con quien fabrica o integra el dispositivo. Antes de solicitar su identidad operativa, el cliente debe poder autenticar al servidor EST y demostrar que tiene derecho a solicitar el ID previsto.
@@ -21,13 +21,13 @@ En el primer enrolamiento, la validación mTLS no compara por sí sola el CN del
 
 ## Modos por operación
 
-Los cuatro modos se seleccionan independientemente para enrolamiento y reenrolamiento en [DMS](/docs/platform/iot-fleets/enrollment/dms#autenticación-por-operación). La credencial utilizada al renovar depende de ese bloque; no presupongas que siempre será el bootstrap o que el webhook desaparezca.
+Los cuatro modos se seleccionan independientemente para enrolamiento y reenrolamiento en [DMS](/docs/platform/iot-fleets/est/configuration#autenticación-por-operación). La credencial utilizada al renovar depende de ese bloque; no presupongas que siempre será el bootstrap o que el webhook desaparezca.
 
 Un token OIDC de administración no es un modo EST nativo. Un webhook puede interpretar una cabecera de credencial que acuerdes con él; en ese caso la autorización la realiza ese servicio. En NO_AUTH, enviar un token no añade autenticación al DMS.
 
 ## Contrato del webhook
 
-El DMS envía el contexto de la operación al servicio configurado. El método procede de la configuración; acuerda su contrato antes de seleccionar POST o PUT. La espera de autorización tiene un valor inicial de 10 segundos, sustituido por un timeout positivo configurado. El DMS verifica el certificado del receptor salvo que se active `insecure_skip_verify` en la configuración del webhook — por defecto se verifica — y no sigue redirecciones, así que la URL configurada debe ser la final. La respuesta de autorización debe ser JSON de como máximo 1 MiB. Con la autenticación de Lamassu hacia el webhook configurada sobre `http://`, la API key o el bearer token viajan en texto claro, y mTLS no tiene efecto porque no hay handshake TLS, así que el certificado de cliente nunca se presenta; prefiere `https://`. Configura esas opciones en los [ajustes del webhook externo](/docs/platform/iot-fleets/enrollment/dms#ajustes-del-webhook-externo) de la guía DMS.
+El DMS envía el contexto de la operación al servicio configurado. El método procede de la configuración; acuerda su contrato antes de seleccionar POST o PUT. La espera de autorización tiene un valor inicial de 10 segundos, sustituido por un timeout positivo configurado. El DMS verifica el certificado del receptor salvo que se active `insecure_skip_verify` en la configuración del webhook (por defecto se verifica) y no sigue redirecciones, así que la URL configurada debe ser la final. La respuesta de autorización debe ser JSON de como máximo 1 MiB. Con la autenticación de Lamassu hacia el webhook configurada sobre `http://`, la API key o el bearer token viajan en texto claro, y mTLS no tiene efecto porque no hay handshake TLS, así que el certificado de cliente nunca se presenta; prefiere `https://`. Configura esas opciones en los [ajustes del webhook externo](/docs/platform/iot-fleets/est/configuration#ajustes-del-webhook-externo) de la guía DMS.
 
 Ejemplo de cuerpo:
 
@@ -57,10 +57,10 @@ Un `204` sin cuerpo no cumple el contrato. Rechazo, error de transporte, respues
 
 ## Revocación y comprobaciones
 
-El DMS busca primero el certificado presentado en Lamassu; los certificados que emitió y gestiona se comprueban con su estado almacenado. Los certificados externos se comprueban mediante sus servidores OCSP y, después, sus puntos de distribución CRL. Por defecto, una revocación no verificable es un rechazo, no una aceptación: un certificado que no gestiona Lamassu y no lista ningún endpoint OCSP o CRL se rechaza, salvo que se active `allow_unverifiable_revocation` en el bloque de esa operación (consulta [Autenticación por operación](/docs/platform/iot-fleets/enrollment/dms#autenticación-por-operación)).
+El DMS busca primero el certificado presentado en Lamassu; los certificados que emitió y gestiona se comprueban con su estado almacenado. Los certificados externos se comprueban mediante sus servidores OCSP y, después, sus puntos de distribución CRL. Por defecto, una revocación no verificable es un rechazo, no una aceptación: un certificado que no gestiona Lamassu y no lista ningún endpoint OCSP o CRL se rechaza, salvo que se active `allow_unverifiable_revocation` en el bloque de esa operación (consulta [Autenticación por operación](/docs/platform/iot-fleets/est/configuration#autenticación-por-operación)).
 
-Un certificado que sí lista endpoints se exige con un estándar más estricto, con o sin la opción: los endpoints que no responden, la evidencia caducada o inválida o un estado no concluyente (desconocido) rechazan el certificado. La evidencia debe estar fresca — `thisUpdate` no en el futuro, `nextUpdate` no superado, y una respuesta sin `nextUpdate` solo se acepta mientras tenga menos de unas 24 horas — y las respuestas OCSP deben estar firmadas por el propio emisor del certificado o por un responder delegado que lleve el EKU `id-kp-OCSPSigning` y esté dentro de su validez. Un veredicto de revocado se respeta con independencia de su antigüedad. Cada solicitud OCSP o CRL tiene un timeout de 10 segundos.
+Un certificado que sí lista endpoints se exige con un estándar más estricto, con o sin la opción: los endpoints que no responden, la evidencia caducada o inválida o un estado no concluyente (desconocido) rechazan el certificado. La evidencia debe estar fresca (`thisUpdate` no en el futuro, `nextUpdate` no superado, y una respuesta sin `nextUpdate` solo se acepta mientras tenga menos de unas 24 horas) y las respuestas OCSP deben estar firmadas por el propio emisor del certificado o por un responder delegado que lleve el EKU `id-kp-OCSPSigning` y esté dentro de su validez. Un veredicto de revocado se respeta con independencia de su antigüedad. Cada solicitud OCSP o CRL tiene un timeout de 10 segundos.
 
 Queda un matiz: una respuesta OCSP Good o una CRL firmadas y capturadas antes de una revocación siguen validando hasta su `nextUpdate` (hasta unas 24 horas sin `nextUpdate`). La revocación se propaga a los dispositivos al ritmo con que los responders publican evidencia, no en el momento de la revocación.
 
-Prueba certificado permitido, certificado incorrecto, CN ajeno, webhook denegado, timeout y reenrolamiento bajo su propia política. Conserva el resultado y programa la retirada de las credenciales bootstrap cuando corresponda. Continúa con [Cliente EST](/docs/platform/iot-fleets/enrollment/est-client).
+Prueba certificado permitido, certificado incorrecto, CN ajeno, webhook denegado, timeout y reenrolamiento bajo su propia política. Conserva el resultado y programa la retirada de las credenciales bootstrap cuando corresponda. Continúa con [Cliente EST](/docs/platform/iot-fleets/est/configuration).

@@ -10,7 +10,7 @@ test("moved pages preserve locale, query and device integration anchors", () => 
       ),
       "/docs",
     ),
-    "/docs/es/platform/iot-fleets/enrollment/est-client?client=firmware#solicita-la-identidad",
+    "/docs/es/platform/iot-fleets/est/configuration?client=firmware#solicita-la-identidad",
   );
   assert.equal(
     resolveDocRedirect(
@@ -63,7 +63,7 @@ test("extracted troubleshooting sections keep their destination and locale", () 
       ),
       "/docs",
     ),
-    "/docs/platform/iot-fleets/enrollment/troubleshooting#est-enrollment-fails",
+    "/docs/platform/iot-fleets/est/troubleshooting#est-enrollment-fails",
   );
 });
 
@@ -121,7 +121,7 @@ test("split EST sections resolve from canonical and legacy paths at versioned mo
           ),
           base,
         ),
-        `${base}/platform/iot-fleets/enrollment/est-reference?client=firmware#serverkeygen`,
+        `${base}/platform/iot-fleets/est/configuration?client=firmware#serverkeygen`,
       );
       assert.equal(
         resolveDocRedirect(
@@ -130,8 +130,30 @@ test("split EST sections resolve from canonical and legacy paths at versioned mo
           ),
           base,
         ),
-        `${base}/es/platform/iot-fleets/enrollment/renewal-and-recovery?client=firmware#solicita-el-certificado-sucesor`,
+        `${base}/es/platform/iot-fleets/est/configuration?client=firmware#solicita-el-certificado-sucesor`,
       );
     }
+  }
+});
+
+test("moved EST reference keeps endpoint and extracted ServerKeyGen anchors", () => {
+  const base = "/docs/v4.0.0";
+  const oldPath = "platform/iot-fleets/enrollment/est-reference";
+  for (const [locale, anchor, destination] of [
+    ["", "cacerts", "configuration#cacerts"],
+    ["", "response-format", "configuration#response-format"],
+    [
+      "es/",
+      "solicitud-y-extracción",
+      "configuration#solicitud-y-extracci%C3%B3n",
+    ],
+  ]) {
+    assert.equal(
+      resolveDocRedirect(
+        new URL(`https://docs.example${base}/${locale}${oldPath}#${anchor}`),
+        base,
+      ),
+      `${base}/${locale}platform/iot-fleets/est/${destination}`,
+    );
   }
 });

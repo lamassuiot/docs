@@ -23,7 +23,7 @@ Finding any device owned by the same DMS triggers the `enable_replaceable_enroll
 
 Enabling the flag permits repeated `/simpleenroll` for an existing ID. The backend schedules a deferred attempt to revoke the previous certificate with `Superseded`; it can also run if later issuance or binding fails. Without an identity, that attempt can fail because no serial exists. The flag does not provide a replacement transaction or guarantee restoration of previous state.
 
-Test the exact case on your version before enabling it for a population. For an operational identity with authorized renewal, use `/simplereenroll`; for recovery, follow [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) and check persisted state before retrying.
+Test the exact case on your version before enabling it for a population. For an operational identity with authorized renewal, use `/simplereenroll`; for recovery, follow [Renewal and recovery](/docs/platform/iot-fleets/est/configuration) and check persisted state before retrying.
 
 ## Choose authentication
 
@@ -34,7 +34,7 @@ Decide initial enrollment and re-enrollment separately:
 - **Certificate and webhook:** requires both controls in the configured operation.
 - **NO_AUTH:** does not establish requester identity; appropriate only when admission is deliberately controlled outside that DMS.
 
-Authenticating an initial certificate does not itself establish entitlement to choose any CSR CN. Define that authorization in [Bootstrap identity and authentication](/docs/platform/iot-fleets/enrollment/bootstrap-identity).
+Authenticating an initial certificate does not itself establish entitlement to choose any CSR CN. Define that authorization in [Bootstrap identity and authentication](/docs/platform/iot-fleets/est/bootstrap-identity).
 
 ## Choose custody
 
@@ -44,7 +44,7 @@ Authenticating an initial certificate does not itself establish entitlement to c
 | Existing device key | CSR signed with that key and a new certificate. |
 | ServerKeyGen | Private PKCS#8 key and certificate in a TLS-protected multipart response. |
 
-ServerKeyGen does not automatically use the CA’s HSM or KMS for the device key. Review its [contract and extraction](/docs/platform/iot-fleets/enrollment/est-reference#serverkeygen) and the device’s ability to install the material.
+ServerKeyGen does not automatically use the CA’s HSM or KMS for the device key. Review its [contract and extraction](/docs/platform/iot-fleets/est/configuration#serverkeygen) and the device’s ability to install the material.
 
 ## Check the decision
 

@@ -24,6 +24,52 @@ export const DOC_REDIRECTS: Readonly<Record<string, string>> = Object.freeze({
   "platform/iot-fleets/quickstarts":
     "platform/iot-fleets/quickstarts/register-device",
   "platform/iot-fleets/enrollment": "platform/iot-fleets/enrollment/overview",
+  "platform/iot-fleets/enrollment/bootstrap-identity":
+    "platform/iot-fleets/est/bootstrap-identity",
+  "platform/iot-fleets/enrollment/est-client":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/renewal-and-recovery":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/trust-distribution":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/est-reference":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/troubleshooting":
+    "platform/iot-fleets/est/troubleshooting",
+  "platform/enrollment-protocols/est": "platform/iot-fleets/est",
+  "platform/enrollment-protocols/est/bootstrap-identity":
+    "platform/iot-fleets/est/bootstrap-identity",
+  "platform/enrollment-protocols/est/client":
+    "platform/iot-fleets/est/configuration",
+  "platform/enrollment-protocols/est/renewal-and-recovery":
+    "platform/iot-fleets/est/configuration",
+  "platform/enrollment-protocols/est/trust-distribution":
+    "platform/iot-fleets/est/configuration",
+  "platform/enrollment-protocols/est/reference":
+    "platform/iot-fleets/est/configuration",
+  "platform/enrollment-protocols/est/serverkeygen":
+    "platform/iot-fleets/est/configuration",
+  "platform/enrollment-protocols/est/troubleshooting":
+    "platform/iot-fleets/est/troubleshooting",
+  "platform/iot-fleets/enrollment/protocols/est/trust-distribution":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/protocols/est/renewal-and-recovery":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/protocols/est/serverkeygen":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/protocols/est": "platform/iot-fleets/est",
+  "platform/iot-fleets/enrollment/protocols/est/configuration":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/protocols/est/bootstrap-identity":
+    "platform/iot-fleets/est/bootstrap-identity",
+  "platform/iot-fleets/enrollment/protocols/est/client":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/protocols/est/reference":
+    "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/enrollment/protocols/est/troubleshooting":
+    "platform/iot-fleets/est/troubleshooting",
+  "platform/iot-fleets/est/reference": "platform/iot-fleets/est/configuration",
+  "platform/iot-fleets/est/client": "platform/iot-fleets/est/configuration",
   "platform/iot-fleets/integrations":
     "platform/iot-fleets/integrations/aws-iot-core",
   "platform/administration": "platform/administration/access-control",
@@ -63,6 +109,90 @@ export const DOC_REDIRECTS: Readonly<Record<string, string>> = Object.freeze({
 export const DOC_ANCHOR_REDIRECTS: Readonly<
   Record<string, Readonly<Record<string, string>>>
 > = {
+  "en/platform/iot-fleets/enrollment/dms": {
+    "enrollment-configuration":
+      "platform/iot-fleets/est/configuration#enrollment-configuration",
+    "enrollment-device-registration":
+      "platform/iot-fleets/est/configuration#enrollment-device-registration",
+    "enrollment-settings":
+      "platform/iot-fleets/est/configuration#enrollment-settings",
+    "authentication-per-operation":
+      "platform/iot-fleets/est/configuration#authentication-per-operation",
+    "external-webhook-settings":
+      "platform/iot-fleets/est/configuration#external-webhook-settings",
+    "issuance-profile":
+      "platform/iot-fleets/est/configuration#issuance-profile",
+    "re-enrollment-configuration":
+      "platform/iot-fleets/est/configuration#re-enrollment-configuration",
+    serverkeygen: "platform/iot-fleets/est/configuration#serverkeygen",
+    "trust-distribution":
+      "platform/iot-fleets/est/configuration#trust-distribution",
+  },
+  "es/platform/iot-fleets/enrollment/dms": {
+    "configuración-de-enrollment":
+      "platform/iot-fleets/est/configuration#configuración-de-enrollment",
+    "enrollment-device-registration":
+      "platform/iot-fleets/est/configuration#enrollment-device-registration",
+    "enrollment-settings":
+      "platform/iot-fleets/est/configuration#enrollment-settings",
+    "autenticación-por-operación":
+      "platform/iot-fleets/est/configuration#autenticación-por-operación",
+    "ajustes-del-webhook-externo":
+      "platform/iot-fleets/est/configuration#ajustes-del-webhook-externo",
+    "perfil-de-emisión":
+      "platform/iot-fleets/est/configuration#perfil-de-emisión",
+    "configuración-de-re-enrollment":
+      "platform/iot-fleets/est/configuration#configuración-de-re-enrollment",
+    serverkeygen: "platform/iot-fleets/est/configuration#serverkeygen",
+    "distribución-de-confianza":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+  },
+  "en/platform/iot-fleets/est/bootstrap-identity": {
+    "three-trust-relationships":
+      "platform/iot-fleets/est/configuration#trust-distribution",
+    "what-cacerts-returns":
+      "platform/iot-fleets/est/configuration#what-cacerts-returns",
+    "install-the-required-material":
+      "platform/iot-fleets/est/configuration#trust-distribution",
+    "migrate-trust": "platform/iot-fleets/est/configuration#trust-distribution",
+    "check-the-update":
+      "platform/iot-fleets/est/configuration#trust-distribution",
+  },
+  "es/platform/iot-fleets/est/bootstrap-identity": {
+    "tres-relaciones-de-confianza":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+    "qué-devuelve-cacerts":
+      "platform/iot-fleets/est/configuration#qué-devuelve-cacerts",
+    "instala-lo-necesario":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+    "migra-la-confianza":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+    "comprueba-la-actualización":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+  },
+  "en/platform/iot-fleets/est/configuration": {
+    "use-and-rotate-distributed-certificates":
+      "platform/iot-fleets/est/configuration#trust-distribution",
+    "three-trust-relationships":
+      "platform/iot-fleets/est/configuration#trust-distribution",
+    "install-the-required-material":
+      "platform/iot-fleets/est/configuration#trust-distribution",
+    "migrate-trust": "platform/iot-fleets/est/configuration#trust-distribution",
+    "check-the-update":
+      "platform/iot-fleets/est/configuration#trust-distribution",
+  },
+  "es/platform/iot-fleets/est/configuration": {
+    "uso-y-rotación-de-los-certificados-distribuidos":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+    "tres-relaciones-de-confianza":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+    "instala-lo-necesario":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+    "migra-la-confianza":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+    "comprueba-la-actualización":
+      "platform/iot-fleets/est/configuration#distribución-de-confianza",
+  },
   "en/platform/pki/troubleshooting": {
     "reproduce-a-single-operation":
       "deployment/troubleshooting#reproduce-a-single-operation",
@@ -82,7 +212,7 @@ export const DOC_ANCHOR_REDIRECTS: Readonly<
       "deployment/troubleshooting#everything-returns-403-or-5xx",
     "a-pod-is-not-ready": "deployment/troubleshooting#a-pod-is-not-ready",
     "est-enrollment-fails":
-      "platform/iot-fleets/enrollment/troubleshooting#est-enrollment-fails",
+      "platform/iot-fleets/est/troubleshooting#est-enrollment-fails",
     "events-are-not-arriving":
       "deployment/troubleshooting#events-are-not-arriving",
     observability: "deployment/troubleshooting#observability",
@@ -108,7 +238,7 @@ export const DOC_ANCHOR_REDIRECTS: Readonly<
       "deployment/troubleshooting#todo-devuelve-403-o-5xx",
     "un-pod-no-está-ready": "deployment/troubleshooting#un-pod-no-está-ready",
     "el-enrolamiento-est-falla":
-      "platform/iot-fleets/enrollment/troubleshooting#el-enrolamiento-est-falla",
+      "platform/iot-fleets/est/troubleshooting#el-enrolamiento-est-falla",
     "los-eventos-no-llegan": "deployment/troubleshooting#los-eventos-no-llegan",
     observabilidad: "deployment/troubleshooting#observabilidad",
   },
@@ -135,48 +265,48 @@ export const DOC_ANCHOR_REDIRECTS: Readonly<
     "dms-configuration": "platform/iot-fleets/enrollment/dms#configure-a-dms",
     prerequisites: "platform/iot-fleets/enrollment/dms#before-you-begin",
     "enrollment-configuration":
-      "platform/iot-fleets/enrollment/dms#enrollment-configuration",
+      "platform/iot-fleets/est/configuration#enrollment-configuration",
     "enrollment-device-registration":
-      "platform/iot-fleets/enrollment/dms#enrollment-device-registration",
+      "platform/iot-fleets/est/configuration#enrollment-device-registration",
     "enrollment-settings":
-      "platform/iot-fleets/enrollment/dms#enrollment-settings",
-    "issuance-profile": "platform/iot-fleets/enrollment/dms#issuance-profile",
+      "platform/iot-fleets/est/configuration#enrollment-settings",
+    "issuance-profile":
+      "platform/iot-fleets/est/configuration#issuance-profile",
     "re-enrollment-configuration":
-      "platform/iot-fleets/enrollment/dms#re-enrollment-configuration",
+      "platform/iot-fleets/est/configuration#re-enrollment-configuration",
     "serverkeygen-configuration":
-      "platform/iot-fleets/enrollment/dms#serverkeygen",
+      "platform/iot-fleets/est/configuration#serverkeygen",
     "verify-the-configuration":
       "platform/iot-fleets/enrollment/dms#verify-the-endpoints",
     "device-integration":
-      "platform/iot-fleets/enrollment/est-client#request-the-identity",
+      "platform/iot-fleets/est/configuration#request-the-identity",
     "before-you-begin":
-      "platform/iot-fleets/enrollment/est-client#before-you-begin",
+      "platform/iot-fleets/est/configuration#before-you-begin",
     "flow-overview": "platform/iot-fleets/enrollment/overview#the-journey",
     "client-authentication-model":
-      "platform/iot-fleets/enrollment/bootstrap-identity#modes-per-operation",
+      "platform/iot-fleets/est/bootstrap-identity#modes-per-operation",
     "endpoint-reference":
-      "platform/iot-fleets/enrollment/est-reference#endpoint-reference",
-    cacerts: "platform/iot-fleets/enrollment/est-reference#cacerts",
-    simpleenroll: "platform/iot-fleets/enrollment/est-reference#simpleenroll",
-    simplereenroll:
-      "platform/iot-fleets/enrollment/est-reference#simplereenroll",
-    serverkeygen: "platform/iot-fleets/enrollment/est-reference#serverkeygen",
+      "platform/iot-fleets/est/configuration#endpoint-reference",
+    cacerts: "platform/iot-fleets/est/configuration#cacerts",
+    simpleenroll: "platform/iot-fleets/est/configuration#simpleenroll",
+    simplereenroll: "platform/iot-fleets/est/configuration#simplereenroll",
+    serverkeygen: "platform/iot-fleets/est/configuration#serverkeygen",
     "full-flows":
       "platform/iot-fleets/quickstarts/enroll-device#enroll-the-device",
     "end-to-end-example-enroll":
       "platform/iot-fleets/quickstarts/enroll-device#enroll-the-device",
     "end-to-end-example-reenroll":
-      "platform/iot-fleets/enrollment/renewal-and-recovery#request-the-successor-certificate",
+      "platform/iot-fleets/est/configuration#request-the-successor-certificate",
     "next-steps-after-enrollment":
       "platform/iot-fleets/quickstarts/enroll-device#result-and-continuity",
     "diagnostics-and-compatibility":
-      "platform/iot-fleets/enrollment/troubleshooting#diagnostics-and-compatibility",
+      "platform/iot-fleets/est/troubleshooting#diagnostics-and-compatibility",
     "error-codes-and-diagnostics":
-      "platform/iot-fleets/enrollment/troubleshooting#error-codes-and-diagnostics",
+      "platform/iot-fleets/est/troubleshooting#error-codes-and-diagnostics",
     "compatibility-notes":
-      "platform/iot-fleets/enrollment/est-reference#compatibility-notes",
+      "platform/iot-fleets/est/configuration#compatibility-notes",
     "est-enrollment-fails":
-      "platform/iot-fleets/enrollment/troubleshooting#est-enrollment-fails",
+      "platform/iot-fleets/est/troubleshooting#est-enrollment-fails",
   },
   "es/platform/iot-fleets/enrollment/overview": {
     "est-enrollment-over-secure-transport":
@@ -185,48 +315,48 @@ export const DOC_ANCHOR_REDIRECTS: Readonly<
       "platform/iot-fleets/enrollment/dms#configura-un-dms",
     "requisitos-previos": "platform/iot-fleets/enrollment/dms#antes-de-empezar",
     "configuración-de-enrollment":
-      "platform/iot-fleets/enrollment/dms#configuración-de-enrollment",
+      "platform/iot-fleets/est/configuration#configuración-de-enrollment",
     "enrollment-device-registration":
-      "platform/iot-fleets/enrollment/dms#enrollment-device-registration",
+      "platform/iot-fleets/est/configuration#enrollment-device-registration",
     "enrollment-settings":
-      "platform/iot-fleets/enrollment/dms#enrollment-settings",
-    "perfil-de-emisión": "platform/iot-fleets/enrollment/dms#perfil-de-emisión",
+      "platform/iot-fleets/est/configuration#enrollment-settings",
+    "perfil-de-emisión":
+      "platform/iot-fleets/est/configuration#perfil-de-emisión",
     "configuración-de-re-enrollment":
-      "platform/iot-fleets/enrollment/dms#configuración-de-re-enrollment",
+      "platform/iot-fleets/est/configuration#configuración-de-re-enrollment",
     "configuración-de-serverkeygen":
-      "platform/iot-fleets/enrollment/dms#serverkeygen",
+      "platform/iot-fleets/est/configuration#serverkeygen",
     "verificar-la-configuración":
       "platform/iot-fleets/enrollment/dms#verifica-los-endpoints",
     "integración-de-dispositivos":
-      "platform/iot-fleets/enrollment/est-client#solicita-la-identidad",
+      "platform/iot-fleets/est/configuration#solicita-la-identidad",
     "antes-de-empezar":
-      "platform/iot-fleets/enrollment/est-client#antes-de-empezar",
+      "platform/iot-fleets/est/configuration#antes-de-empezar",
     "resumen-del-flujo": "platform/iot-fleets/enrollment/overview#el-recorrido",
     "modelo-de-autenticación-del-cliente":
-      "platform/iot-fleets/enrollment/bootstrap-identity#modos-por-operación",
+      "platform/iot-fleets/est/bootstrap-identity#modos-por-operación",
     "referencia-de-endpoints":
-      "platform/iot-fleets/enrollment/est-reference#referencia-de-endpoints",
-    cacerts: "platform/iot-fleets/enrollment/est-reference#cacerts",
-    simpleenroll: "platform/iot-fleets/enrollment/est-reference#simpleenroll",
-    simplereenroll:
-      "platform/iot-fleets/enrollment/est-reference#simplereenroll",
-    serverkeygen: "platform/iot-fleets/enrollment/est-reference#serverkeygen",
+      "platform/iot-fleets/est/configuration#referencia-de-endpoints",
+    cacerts: "platform/iot-fleets/est/configuration#cacerts",
+    simpleenroll: "platform/iot-fleets/est/configuration#simpleenroll",
+    simplereenroll: "platform/iot-fleets/est/configuration#simplereenroll",
+    serverkeygen: "platform/iot-fleets/est/configuration#serverkeygen",
     "flujos-completos":
       "platform/iot-fleets/quickstarts/enroll-device#enrola-el-dispositivo",
     "ejemplo-end-to-end-enroll":
       "platform/iot-fleets/quickstarts/enroll-device#enrola-el-dispositivo",
     "ejemplo-end-to-end-reenroll":
-      "platform/iot-fleets/enrollment/renewal-and-recovery#solicita-el-certificado-sucesor",
+      "platform/iot-fleets/est/configuration#solicita-el-certificado-sucesor",
     "próximos-pasos-tras-el-enrolamiento":
       "platform/iot-fleets/quickstarts/enroll-device#resultado-y-continuidad",
     "diagnóstico-y-compatibilidad":
-      "platform/iot-fleets/enrollment/troubleshooting#diagnóstico-y-compatibilidad",
+      "platform/iot-fleets/est/troubleshooting#diagnóstico-y-compatibilidad",
     "códigos-de-error-y-diagnóstico":
-      "platform/iot-fleets/enrollment/troubleshooting#códigos-de-error-y-diagnóstico",
+      "platform/iot-fleets/est/troubleshooting#códigos-de-error-y-diagnóstico",
     "notas-de-compatibilidad":
-      "platform/iot-fleets/enrollment/est-reference#notas-de-compatibilidad",
+      "platform/iot-fleets/est/configuration#notas-de-compatibilidad",
     "el-enrolamiento-est-falla":
-      "platform/iot-fleets/enrollment/troubleshooting#el-enrolamiento-est-falla",
+      "platform/iot-fleets/est/troubleshooting#el-enrolamiento-est-falla",
   },
 };
 

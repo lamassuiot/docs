@@ -56,7 +56,7 @@ Una cadena válida no garantiza por sí sola que el certificado deba aceptarse. 
 
 El estado `Good` de OCSP tampoco sustituye la comprobación de cadena, fechas, uso e identidad; [Validación](/docs/platform/pki/certificate-validation) reúne esos criterios.
 
-Durante la autenticación mTLS de un DMS, Lamassu comprueba la revocación y falla cerrada: un certificado cuya revocación no puede verificarse se rechaza por defecto. La opción `allow_unverifiable_revocation` del DMS (consulta [DMS](/docs/platform/iot-fleets/enrollment/dms#autenticación-por-operación)) es la excepción, y solo relaja los certificados que no llevan ningún endpoint OCSP/CRL. Diseña los perfiles y puntos de distribución para que la comprobación tenga éxito.
+Durante la autenticación mTLS de un DMS, Lamassu comprueba la revocación y falla cerrada: un certificado cuya revocación no puede verificarse se rechaza por defecto. La opción `allow_unverifiable_revocation` del DMS (consulta [DMS](/docs/platform/iot-fleets/est/configuration#autenticación-por-operación)) es la excepción, y solo relaja los certificados que no llevan ningún endpoint OCSP/CRL. Diseña los perfiles y puntos de distribución para que la comprobación tenga éxito.
 
 ## Límites de custodia
 

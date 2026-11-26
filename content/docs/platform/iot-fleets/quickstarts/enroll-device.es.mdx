@@ -17,7 +17,7 @@ Prepararás un DMS de evaluación, enrolarás `est-device-001` desde el cliente 
 
 Emite un certificado final bootstrap con `CN=est-device-001`, clave propia y uso Client Authentication. Puedes seguir [Emite y verifica un certificado](/docs/platform/pki/quickstarts/issue-certificate), sustituyendo su CN y guardando el resultado como `bootstrap.crt` y `bootstrap.key`. Elige una validez que cubra esta prueba y comprueba la pareja y la cadena.
 
-Para esta evaluación aislada puede emitirlo la misma CA raíz. La identidad operativa tendrá una clave y un certificado distintos. El CN igual facilita la lectura del ejemplo; la autenticación inicial por certificado no vincula por sí sola el CN del bootstrap con el ID pedido. Revisa la [admisión](/docs/platform/iot-fleets/enrollment/bootstrap-identity) antes de aplicar la política a una población.
+Para esta evaluación aislada puede emitirlo la misma CA raíz. La identidad operativa tendrá una clave y un certificado distintos. El CN igual facilita la lectura del ejemplo; la autenticación inicial por certificado no vincula por sí sola el CN del bootstrap con el ID pedido. Revisa la [admisión](/docs/platform/iot-fleets/est/bootstrap-identity) antes de aplicar la política a una población.
 
 ## Configura el DMS de evaluación
 
@@ -90,7 +90,7 @@ openssl base64 -d -in enroll.b64 -out enroll.p7b
 openssl pkcs7 -inform DER -in enroll.p7b -print_certs -quiet -out device.crt
 ```
 
-Si curl falla, consulta [Diagnóstico](/docs/platform/iot-fleets/enrollment/troubleshooting) con el cuerpo guardado. No ejecutes la conversión ni repitas la solicitud sin consultar el inventario: un timeout o error puede seguir a una emisión persistida.
+Si curl falla, consulta [Diagnóstico](/docs/platform/iot-fleets/est/troubleshooting) con el cuerpo guardado. No ejecutes la conversión ni repitas la solicitud sin consultar el inventario: un timeout o error puede seguir a una emisión persistida.
 
 ## Verifica la identidad obtenida
 
@@ -156,6 +156,6 @@ El rechazo debe corresponder a la falta de certificado en el servidor, no a un s
 | Inventario | Serie recibida visible como identidad actual y en el historial. |
 | Consumidor | mTLS responde 200 con la identidad y rechaza falta de certificado. |
 
-Continúa con [Renovación y recuperación](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) para solicitar una pareja sucesora dentro de la ventana, instalarla y repetir la comprobación mTLS. El consumidor debe utilizar los archivos nuevos en esa prueba. Después de comprobar el sucesor, retira el certificado anterior según la política PKI; el ejemplo no lo revoca automáticamente.
+Continúa con [Renovación y recuperación](/docs/platform/iot-fleets/est/configuration) para solicitar una pareja sucesora dentro de la ventana, instalarla y repetir la comprobación mTLS. El consumidor debe utilizar los archivos nuevos en esa prueba. Después de comprobar el sucesor, retira el certificado anterior según la política PKI; el ejemplo no lo revoca automáticamente.
 
 [Dispositivos e identidades](/docs/platform/iot-fleets/device-management) explica la retirada y los límites de revocación del historial. Para un destino real, prepara confianza, validación y permisos del consumidor; [AWS IoT Core](/docs/platform/iot-fleets/integrations/aws-iot-core) es una integración disponible.

@@ -33,6 +33,8 @@ Issue and control certificates [#issue-and-control-certificates]
 
 A [profile](/docs/platform/pki/certificate-profiles) establishes subject, validity, usage and key restrictions. The CA applies issuance configuration and signs the certificate. In the [inventory](/docs/platform/pki/certificates), you can inspect the result, download it and manage its status.
 
+[Enrollment protocols](/docs/platform/pki/enrollment-protocols) let clients obtain and renew certificates from a Lamassu CA.
+
 Publish validation status [#publish-validation-status]
 
 [Validation](/docs/platform/pki/certificate-validation) covers the chain, validity, usages and revocation status. Lamassu publishes status through [OCSP](/docs/platform/pki/ocsp) and [CRL](/docs/platform/pki/crl); the consumer configures which issuers it recognizes and how it checks that status.

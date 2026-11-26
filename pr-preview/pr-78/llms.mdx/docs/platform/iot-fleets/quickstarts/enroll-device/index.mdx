@@ -16,7 +16,7 @@ Prepare the bootstrap credential [#prepare-the-bootstrap-credential]
 
 Issue a bootstrap leaf certificate with `CN=est-device-001`, its own key and Client Authentication use. Follow [Issue and verify a certificate](/docs/platform/pki/quickstarts/issue-certificate), changing its CN and saving the result as `bootstrap.crt` and `bootstrap.key`. Choose validity that covers this test and check the pair and chain.
 
-The same root CA can issue it for this isolated evaluation. The operational identity will have a different key and certificate. The matching CN makes the example easier to read; initial certificate authentication does not itself bind the bootstrap CN to the requested ID. Review [admission](/docs/platform/iot-fleets/enrollment/bootstrap-identity) before applying the policy to a population.
+The same root CA can issue it for this isolated evaluation. The operational identity will have a different key and certificate. The matching CN makes the example easier to read; initial certificate authentication does not itself bind the bootstrap CN to the requested ID. Review [admission](/docs/platform/iot-fleets/est/bootstrap-identity) before applying the policy to a population.
 
 Configure the evaluation DMS [#configure-the-evaluation-dms]
 
@@ -90,7 +90,7 @@ openssl base64 -d -in enroll.b64 -out enroll.p7b
 openssl pkcs7 -inform DER -in enroll.p7b -print_certs -quiet -out device.crt
 ```
 
-If curl fails, use [Troubleshooting](/docs/platform/iot-fleets/enrollment/troubleshooting) with the saved body. Do not convert it or repeat the request without querying inventory: a timeout or error can follow persisted issuance.
+If curl fails, use [Troubleshooting](/docs/platform/iot-fleets/est/troubleshooting) with the saved body. Do not convert it or repeat the request without querying inventory: a timeout or error can follow persisted issuance.
 
 Verify the obtained identity [#verify-the-obtained-identity]
 
@@ -156,6 +156,6 @@ Result and continuity [#result-and-continuity]
 | Inventory    | Received serial visible as the current identity and in history.        |
 | Consumer     | mTLS responds 200 with the identity and rejects a missing certificate. |
 
-Continue with [Renewal and recovery](/docs/platform/iot-fleets/enrollment/renewal-and-recovery) to request a successor pair within the window, install it and repeat the mTLS check. The consumer must use the new files in that test. After checking the successor, retire the previous certificate according to PKI policy; the example does not revoke it automatically.
+Continue with [Renewal and recovery](/docs/platform/iot-fleets/est/configuration) to request a successor pair within the window, install it and repeat the mTLS check. The consumer must use the new files in that test. After checking the successor, retire the previous certificate according to PKI policy; the example does not revoke it automatically.
 
 [Devices and identities](/docs/platform/iot-fleets/device-management) explains retirement and the limits of historical revocation. For a real destination, prepare consumer trust, validation and permissions; [AWS IoT Core](/docs/platform/iot-fleets/integrations/aws-iot-core) is an available integration.

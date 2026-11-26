@@ -15,15 +15,13 @@
 - [Platform architecture](/docs/pr-preview/pr-78/platform/concepts/architecture): Lamassu components and how control, keys, issuance and devices relate.
 - [How Lamassu works](/docs/pr-preview/pr-78/platform/concepts/overview): The mental model of trust, keys, certificates and devices.
 - [Devices and identities](/docs/pr-preview/pr-78/platform/iot-fleets/device-management): Register, inspect and retire devices while checking their current identity and history.
-- [Bootstrap identity and authentication](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/bootstrap-identity): Prepare server trust and admission proofs for enroll and reenroll.
 - [Configure and operate the DMS](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/dms): Define registration, authentication per operation, issuance, renewal and distributed trust.
-- [Integrate the EST client](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/est-client): Prepare trust, send a CSR and check the identity you receive.
-- [EST reference](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/est-reference): Look up Lamassu routes, formats, authentication and multipart responses.
-- [Enrollment with PKI](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/overview): Choose admission policy and connect DMS, initial trust and the EST client.
+- [Enrollment with PKI](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/overview): Prepare device admission, registration policy and certificate issuance.
 - [Provisioning strategies](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/provisioning-strategies): Choose device registration, identity authorization and key generation.
-- [Renewal and recovery](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/renewal-and-recovery): Renew without losing the identity and recover devices according to their actual state.
-- [Enrollment troubleshooting](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/troubleshooting): Locate transport, authentication, registration, issuance and installation failures.
-- [Trust distribution and updates](/docs/pr-preview/pr-78/platform/iot-fleets/enrollment/trust-distribution): Separate roots, intermediates and initial TLS trust when distributing or migrating certificates.
+- [Authentication and trust](/docs/pr-preview/pr-78/platform/iot-fleets/est/bootstrap-identity): Prepare credentials, authentication and trust distribution for EST.
+- [EST in Lamassu](/docs/pr-preview/pr-78/platform/iot-fleets/est/configuration): Configure EST operations, authentication and trust distribution.
+- [EST Reference](/docs/pr-preview/pr-78/platform/iot-fleets/est): The Enrollment over Secure Transport protocol defined by RFC 7030.
+- [Enrollment troubleshooting](/docs/pr-preview/pr-78/platform/iot-fleets/est/troubleshooting): Locate transport, authentication, registration, issuance and installation failures.
 - [AWS IoT Core](/docs/pr-preview/pr-78/platform/iot-fleets/integrations/aws-iot-core): Lamassu's connector for AWS IoT Core syncs device identities with the AWS platform, handling CA registration, Thing provisioning and certificate lifecycle automatically and event-driven.
 - [IoT Fleets](/docs/pr-preview/pr-78/platform/iot-fleets/overview): Organize devices and their identities, prepare enrollment and integrate consumers.
 - [Enroll and connect your first device](/docs/pr-preview/pr-78/platform/iot-fleets/quickstarts/enroll-device): Obtain an identity through EST, verify its association and use it in an mTLS connection.
@@ -37,6 +35,7 @@
 - [Certificate lifecycle](/docs/pr-preview/pr-78/platform/pki/concepts/certificate-lifecycle): Issuance, use, renewal, revocation and retirement of certificates in Lamassu.
 - [Trust model](/docs/pr-preview/pr-78/platform/pki/concepts/trust-model): Understand where trust originates, how it is distributed and what each component validates.
 - [Revocation lists (CRL)](/docs/pr-preview/pr-78/platform/pki/crl): Generate and distribute signed lists to validate certificates offline.
+- [Enrollment protocols](/docs/pr-preview/pr-78/platform/pki/enrollment-protocols): Request and renew certificates from a Lamassu CA.
 - [Keys and cryptographic engines](/docs/pr-preview/pr-78/platform/pki/key-management): Generate, import and operate keys without coupling the PKI to a specific provider.
 - [Online validation with OCSP](/docs/pr-preview/pr-78/platform/pki/ocsp): Query signed status and verify the responder’s response.
 - [PKI](/docs/pr-preview/pr-78/platform/pki/overview): Administer keys and authorities, define issuance and verify the resulting certificates.
@@ -45,4 +44,4 @@
 - [PKI getting started](/docs/pr-preview/pr-78/platform/pki/quickstarts/overview): Create a CA, issue a client certificate and check its chain and key.
 - [PKI troubleshooting](/docs/pr-preview/pr-78/platform/pki/troubleshooting): Diagnose certificate issuance, OCSP and CRL.
 - [Security](/docs/pr-preview/pr-78/security): How to report a security vulnerability in Lamassu privately, what to include in a report and which releases receive security fixes.
-- [3.8.0 to 4.0.0](/docs/pr-preview/pr-78/upgrades/3-8-0-to-4-0-0): What changes in the 4.0.0 architecture, which changes break a 3.8.0 deployment, how to upgrade a Helm release step by step and how to validate the result.
+- [3.8.0 to 4.0.0](/docs/pr-preview/pr-78/upgrades/3-8-0-to-4-0-0): What changes in 4.0.0, which changes break 3.8.0 API clients, event consumers and devices, how to upgrade a Helm release step by step and how to validate the result.

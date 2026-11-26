@@ -192,6 +192,12 @@ El cliente AMQP carga los certificados al arrancar, así que reinicia los pods c
   Según la guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: en 3.8.0 `amqp.tls` no se aplicaba y los clientes del bus de eventos usaban AMQP en claro; desde 4.0.0, `amqp.tls: true` los cambia a AMQPS. Define `amqp.port` con el listener TLS del broker antes del upgrade, o usa `amqp.tls: false` para mantener AMQP en claro. `amqp.tls: false` envía las credenciales del broker y todo el tráfico del bus de eventos en claro.
 </Callout>
 
+Flujo de eventos de dispositivo (SSE) [#flujo-de-eventos-de-dispositivo-sse]
+
+`services.deviceManager.sseEnabled` (por defecto `true`) controla si Device Manager sirve su flujo de eventos de dispositivo mediante Server-Sent Events (SSE). Con el valor por defecto, el chart renderiza una regla de gateway dedicada para el endpoint de eventos de dispositivo con un timeout de petición de 11 minutos, porque el timeout de petición por defecto del Gateway es demasiado corto para estos flujos, que el servicio mantiene abiertos hasta unos diez minutos. Las llamadas a Device Manager que no son peticiones SSE conservan el timeout por defecto del Gateway.
+
+Defínelo como `false` para deshabilitar el flujo: el chart renderiza entonces `sse_enabled: false` en la configuración de Device Manager y omite la regla de gateway, y las peticiones SSE al endpoint de eventos de dispositivo fallan. Consulta [Eventos de dispositivo](/docs/upgrades/3-8-0-to-4-0-0#eventos-de-dispositivo) en la guía de actualización de 3.8.0 a 4.0.0.
+
 Provisiona el primer administrador [#provisiona-el-primer-administrador]
 
 No existe un superusuario implícito. Crea en el proveedor OIDC el rol o grupo esperado por `services.authz.bootstrap` y asígnalo al menos a un administrador antes de exponer Lamassu.

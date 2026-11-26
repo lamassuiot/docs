@@ -233,7 +233,7 @@ The `events` field no longer appears in the device representation. Point consume
 * `GET /v1/devices/:id/events` returns a device's events.
 * `POST /v1/devices/:id/events` creates an event.
 
-When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Each Device Manager instance binds a durable AMQP queue named after its service ID, `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until removed, so configure an expiration or cleanup policy on the broker.
+When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Each Device Manager instance binds a durable AMQP queue named after its service ID, `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until removed, so configure an expiration or cleanup policy on the broker. In a Helm deployment, set `services.deviceManager.sseEnabled` to `false` to disable SSE (default `true`); see [Device event stream (SSE)](/docs/deployment/self-hosted/helm#device-event-stream-sse).
 
 CRL signer field [#crl-signer-field]
 

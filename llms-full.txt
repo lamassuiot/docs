@@ -465,6 +465,12 @@ The AMQP client loads certificates at startup, so restart the consuming pods aft
   Per the migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: in 3.8.0 `amqp.tls` was not applied and event-bus clients used plaintext AMQP; from 4.0.0, `amqp.tls: true` switches them to AMQPS. Set `amqp.port` to the broker TLS listener before upgrading, or set `amqp.tls: false` to keep plaintext AMQP. `amqp.tls: false` sends the broker credentials and all event-bus traffic in cleartext.
 </Callout>
 
+Device event stream (SSE) [#device-event-stream-sse]
+
+`services.deviceManager.sseEnabled` (default `true`) controls whether Device Manager serves its device-event stream over Server-Sent Events (SSE). With the default, the chart renders a dedicated gateway rule for the device-events endpoint with an 11-minute request timeout, because the Gateway's default request timeout is too short for these streams, which the service keeps open for up to about ten minutes. Device Manager calls that are not SSE requests keep the Gateway's default timeout.
+
+Set it to `false` to disable the stream: the chart then renders `sse_enabled: false` in the Device Manager configuration and omits the gateway rule, and SSE requests to the device-events endpoint fail. See [Device events](/docs/upgrades/3-8-0-to-4-0-0#device-events) in the 3.8.0 to 4.0.0 upgrade guide.
+
 Provision the first administrator [#provision-the-first-administrator]
 
 There is no implicit superuser. Create the role or group expected by `services.authz.bootstrap` in the OIDC provider and assign it to at least one administrator before exposing Lamassu.
@@ -1784,7 +1790,7 @@ Inspect a device [#inspect-a-device]
 Filter the inventory by ID, tags and status. Open details and record the owning DMS, active version and current certificate serial.
 
 * **Certificate History** relates previous and current versions. Replacing the slot does not by itself revoke every previous version.
-* **Device Event Timeline** helps reconstruct registration, provisioning, renewal and status changes. A change may be saved even if event persistence fails; also inspect the record and certificates.
+* **Device Event Timeline** helps reconstruct registration, provisioning, renewal and status changes. In **Live** mode it follows new events and device changes (such as status or owner) automatically without reloading the page, and shows a **Connected** or **Disconnected** indicator. After an interruption it reconnects and recovers without gaps or duplicates, so **Live** shows the same content a page reload would. When live updates cannot be used — no permission, device not found, or live updates not enabled on the server — the timeline shows `Live updates unavailable: ...` with the reason, while history browsing (**Load more**) still works. A change may be saved even if event persistence fails; also inspect the record and certificates.
 
 Compare these values with the identity installed on the device. Updating a Lamassu slot does not install files on the remote equipment.
 
@@ -5320,7 +5326,7 @@ The `events` field no longer appears in the device representation. Point consume
 * `GET /v1/devices/:id/events` returns a device's events.
 * `POST /v1/devices/:id/events` creates an event.
 
-When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Each Device Manager instance binds a durable AMQP queue named after its service ID, `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until removed, so configure an expiration or cleanup policy on the broker.
+When the request `Accept` header includes `text/event-stream`, the events endpoint streams over SSE with a keepalive every 15 seconds, and returns `501` when SSE is disabled in the deployment. Each Device Manager instance binds a durable AMQP queue named after its service ID, `device-manager-sse-<uuid>`. Queues from crashed or replaced instances linger until removed, so configure an expiration or cleanup policy on the broker. In a Helm deployment, set `services.deviceManager.sseEnabled` to `false` to disable SSE (default `true`); see [Device event stream (SSE)](/docs/deployment/self-hosted/helm#device-event-stream-sse).
 
 CRL signer field [#crl-signer-field]
 

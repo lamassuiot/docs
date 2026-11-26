@@ -26,7 +26,7 @@ Los estados de dispositivo, slot y [certificado](/docs/platform/pki/concepts/cer
 Filtra el inventario por ID, etiquetas y estado. Abre el detalle y registra DMS propietario, versión activa y serie del certificado actual.
 
 - **Certificate History** relaciona versiones anteriores y actuales. Sustituir el slot no revoca por sí solo todas las versiones anteriores.
-- **Device Event Timeline** ayuda a reconstruir altas, aprovisionamientos, renovaciones y cambios de estado. Un cambio puede haberse guardado aunque falle la persistencia de su evento; contrasta también el registro y los certificados.
+- **Device Event Timeline** ayuda a reconstruir altas, aprovisionamientos, renovaciones y cambios de estado. En el modo **Live**, sigue automáticamente los eventos nuevos y los cambios del dispositivo (como el estado o el propietario) sin recargar la página, y muestra un indicador **Connected** o **Disconnected**. Tras una interrupción se reconecta y recupera sin huecos ni duplicados, de modo que **Live** muestra el mismo contenido que una recarga de la página. Cuando las actualizaciones en vivo no pueden usarse — falta de permisos, dispositivo no encontrado o actualizaciones en vivo no habilitadas en el servidor —, la línea de tiempo muestra `Live updates unavailable: ...` con el motivo, y la navegación por el historial (**Load more**) sigue funcionando. Un cambio puede haberse guardado aunque falle la persistencia de su evento; contrasta también el registro y los certificados.
 
 Compara esos datos con la identidad instalada en el dispositivo. Un slot actualizado en Lamassu no instala archivos en el equipo remoto.
 

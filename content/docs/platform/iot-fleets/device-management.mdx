@@ -26,7 +26,7 @@ Device, slot and [certificate](/docs/platform/pki/concepts/certificate-lifecycle
 Filter the inventory by ID, tags and status. Open details and record the owning DMS, active version and current certificate serial.
 
 - **Certificate History** relates previous and current versions. Replacing the slot does not by itself revoke every previous version.
-- **Device Event Timeline** helps reconstruct registration, provisioning, renewal and status changes. A change may be saved even if event persistence fails; also inspect the record and certificates.
+- **Device Event Timeline** helps reconstruct registration, provisioning, renewal and status changes. In **Live** mode it follows new events and device changes (such as status or owner) automatically without reloading the page, and shows a **Connected** or **Disconnected** indicator. After an interruption it reconnects and recovers without gaps or duplicates, so **Live** shows the same content a page reload would. When live updates cannot be used — no permission, device not found, or live updates not enabled on the server — the timeline shows `Live updates unavailable: ...` with the reason, while history browsing (**Load more**) still works. A change may be saved even if event persistence fails; also inspect the record and certificates.
 
 Compare these values with the identity installed on the device. Updating a Lamassu slot does not install files on the remote equipment.
 

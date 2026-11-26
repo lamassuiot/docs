@@ -193,6 +193,12 @@ The AMQP client loads certificates at startup, so restart the consuming pods aft
   Per the migration guide `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md`: in 3.8.0 `amqp.tls` was not applied and event-bus clients used plaintext AMQP; from 4.0.0, `amqp.tls: true` switches them to AMQPS. Set `amqp.port` to the broker TLS listener before upgrading, or set `amqp.tls: false` to keep plaintext AMQP. `amqp.tls: false` sends the broker credentials and all event-bus traffic in cleartext.
 </Callout>
 
+### Device event stream (SSE)
+
+`services.deviceManager.sseEnabled` (default `true`) controls whether Device Manager serves its device-event stream over Server-Sent Events (SSE). With the default, the chart renders a dedicated gateway rule for the device-events endpoint with an 11-minute request timeout, because the Gateway's default request timeout is too short for these streams, which the service keeps open for up to about ten minutes. Device Manager calls that are not SSE requests keep the Gateway's default timeout.
+
+Set it to `false` to disable the stream: the chart then renders `sse_enabled: false` in the Device Manager configuration and omits the gateway rule, and SSE requests to the device-events endpoint fail. See [Device events](/docs/upgrades/3-8-0-to-4-0-0#device-events) in the 3.8.0 to 4.0.0 upgrade guide.
+
 ### Provision the first administrator
 
 There is no implicit superuser. Create the role or group expected by `services.authz.bootstrap` in the OIDC provider and assign it to at least one administrator before exposing Lamassu.

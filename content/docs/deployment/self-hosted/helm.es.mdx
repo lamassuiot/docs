@@ -138,6 +138,8 @@ Si Keycloak es externo y ya tiene una URL accesible, apunta la configuración OI
 
 Si tu archivo de valores aún contiene los ajustes heredados de validación JWT del Gateway — `auth.oidc.apiGateway.jwks`, `auth.authorization.rolesClaim` o `auth.authorization.roles.admin` — elimínalos. La guía de migración `charts/lamassu/CHANGELOG/3.8.0->4.0.0.md` documenta su eliminación sin alias de compatibilidad, y `values.schema.json` rechaza los bloques residuales en lugar de ignorarlos silenciosamente. Los reemplazos son `services.authz.jwkUrl` y `services.authz.bootstrap`, que ya aparecen en el ejemplo anterior.
 
+El chart ejecuta las cargas con `65532:65532`, el perfil seccomp `RuntimeDefault` y sin capabilities. Crea una ServiceAccount dedicada y no monta su token por defecto. Asegura que los volúmenes montados sean accesibles para esa identidad.
+
 ### Credenciales en Secrets de Kubernetes
 
 El chart lee las credenciales de PostgreSQL, AMQP y SMTP de Secrets de Kubernetes en el namespace del release. Referéncialas con `existingSecret` más las claves de datos `usernameKey` y `passwordKey`; los valores inline `username` y `password` se han eliminado y `values.schema.json` los rechaza.

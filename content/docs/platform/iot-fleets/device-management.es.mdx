@@ -30,6 +30,14 @@ Filtra el inventario por ID, etiquetas y estado. Abre el detalle y registra DMS 
 
 Compara esos datos con la identidad instalada en el dispositivo. Un slot actualizado en Lamassu no instala archivos en el equipo remoto.
 
+## API de eventos y flujo en vivo
+
+`GET /v1/devices/:id/events` consulta los eventos de un dispositivo y `POST /v1/devices/:id/events` crea uno.
+
+Cuando la cabecera `Accept` de la petición incluye `text/event-stream`, el endpoint de eventos emite por SSE con un keepalive cada 15 segundos, y responde `501` cuando SSE está deshabilitado en el despliegue. La entrega es de tipo best effort: los eventos emitidos mientras no hay ningún cliente conectado no se reenvían en la siguiente conexión. El servidor cierra cada stream tras un tiempo de vida máximo, 10 minutos por omisión y configurable con la opción `sse_max_stream_duration` de Device Manager, y el cliente se reconecta para seguir recibiendo eventos. Cuando una instancia alcanza su límite de suscriptores, configurado con la opción `sse_max_subscribers` de Device Manager (1000 por omisión y compartido por todos los streams de la instancia), los nuevos streams reciben una respuesta `503` con una cabecera `Retry-After`. Cada stream vuelve a comprobar el permiso de lectura del dispositivo mientras está activo, y lo cierra cuando el permiso se revoca o no se puede verificar; la reconexión vuelve a pasar por las comprobaciones de autorización habituales. En un despliegue con Helm, define `services.deviceManager.sseEnabled` como `false` para deshabilitar SSE (por defecto `true`); consulta [Flujo de eventos de dispositivo (SSE)](/docs/deployment/self-hosted/helm#flujo-de-eventos-de-dispositivo-sse).
+
+En AMQP, cada instancia de Device Manager enlaza una cola de suscriptores con el nombre de su ID de servicio, `device-manager-sse-<uuid>`. La cola es duradera y auto-delete, con una expiración de una hora (`x-expires`), de modo que el broker la elimina cuando la instancia se detiene o su conexión muere, y no hace falta ninguna política de limpieza. Solo en proveedores de event bus sin soporte de suscriptores efímeros puede quedar una cola duradera por proceso tras detenerse su instancia; revisa esos proveedores si observas colas residuales.
+
 ## Registra un dispositivo manualmente
 
 Utiliza este flujo para preparar inventario o asignar una identidad desde la consola. Necesitas un DMS existente.

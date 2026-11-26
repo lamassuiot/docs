@@ -352,11 +352,9 @@ body {
   background-color: var(--lm-accent-soft);
 }
 
-/* No active-item marker or nested-folder guide line. */
+/* Keep the current-page marker hidden; nested folder guides show hierarchy. */
 #nd-sidebar a[data-active="true"]::before,
-#nd-sidebar-mobile a[data-active="true"]::before,
-#nd-sidebar [class*="before:bg-fd-border"]::before,
-#nd-sidebar-mobile [class*="before:bg-fd-border"]::before {
+#nd-sidebar-mobile a[data-active="true"]::before {
   display: none;
 }
 
@@ -939,6 +937,118 @@ article {
 
 .dark #nd-toc a[data-active="true"] {
   color: var(--color-fd-primary);
+}
+
+/* The page outline mirrors heading depth and lets each branch close independently. */
+.lm-outline-desktop {
+  position: sticky;
+  top: var(--fd-docs-row-3);
+  height: calc(var(--fd-docs-height) - var(--fd-docs-row-3));
+  grid-area: toc;
+  width: var(--fd-toc-width);
+  display: flex;
+  flex-direction: column;
+  padding: 3rem 1rem 0.5rem 0;
+}
+.lm-outline-title,
+.lm-outline-mobile summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-fd-muted-foreground);
+}
+.lm-outline-title svg,
+.lm-outline-mobile summary svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+.lm-outline-list,
+.lm-outline-children {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.lm-outline-children {
+  margin-inline-start: 0.75rem;
+  padding-inline-start: 0.4rem;
+  border-inline-start: 1px solid var(--color-fd-border);
+}
+.lm-outline-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+.lm-outline-row button,
+.lm-outline-spacer {
+  flex: none;
+  width: 1.5rem;
+  min-height: 1.75rem;
+}
+.lm-outline-row button {
+  display: grid;
+  place-items: center;
+  color: var(--color-fd-muted-foreground);
+  border-radius: 0.25rem;
+}
+.lm-outline-row button:hover {
+  background: var(--color-fd-accent);
+  color: var(--color-fd-foreground);
+}
+.lm-outline-row button svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.lm-outline-chevron-open {
+  transform: rotate(90deg);
+}
+.lm-outline-row a {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.25rem;
+  line-height: 1.35;
+  color: var(--color-fd-muted-foreground);
+}
+.lm-outline-row a:hover {
+  color: var(--color-fd-foreground);
+}
+.lm-outline-row a[data-active="true"] {
+  color: var(--color-fd-primary);
+  font-weight: 600;
+}
+.lm-outline-row button:focus-visible,
+.lm-outline-row a:focus-visible,
+.lm-outline-mobile summary:focus-visible {
+  outline: 2px solid var(--color-fd-primary);
+  outline-offset: 2px;
+}
+.lm-outline-mobile {
+  display: none;
+}
+@media (max-width: 1279px) {
+  .lm-outline-desktop {
+    display: none;
+  }
+  .lm-outline-mobile {
+    display: block;
+    position: sticky;
+    top: var(--fd-docs-row-2);
+    z-index: 10;
+    grid-area: toc-popover;
+    background: var(--color-fd-background);
+    border-bottom: 1px solid var(--color-fd-border);
+  }
+  .lm-outline-mobile summary {
+    min-height: 2.5rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+  }
+  .lm-outline-mobile > div {
+    max-height: min(60vh, 30rem);
+    padding-inline: 1rem;
+  }
 }
 
 /* ── API reference ─────────────────────────────────────────────────────────

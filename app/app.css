@@ -121,7 +121,7 @@ body {
 }
 
 /* Search entry: a soft, rounded grey field. */
-#nd-subnav [data-header-body] > div > button,
+#nd-subnav [data-header-body] > div > button:not([data-theme-toggle]),
 #nd-subnav [data-header-body] button[data-search-full] {
   border: 1px solid transparent;
   border-radius: 0.75rem;
@@ -141,7 +141,7 @@ body {
   border-radius: 0.375rem;
 }
 
-.dark #nd-subnav [data-header-body] > div > button,
+.dark #nd-subnav [data-header-body] > div > button:not([data-theme-toggle]),
 .dark #nd-subnav [data-header-body] button[data-search-full] {
   background-color: rgb(255 255 255 / 0.05);
 }
@@ -149,6 +149,7 @@ body {
 /* Language selector and GitHub link: same small radius. The popover is the
    only [aria-haspopup] button in the bar's body. */
 #nd-subnav [data-header-body] button[aria-haspopup],
+#nd-subnav [data-header-body] button[data-theme-toggle],
 #nd-subnav [data-header-body] a[href*="github.com"] {
   border-radius: 0.375rem;
 }

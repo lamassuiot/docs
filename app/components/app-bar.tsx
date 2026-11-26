@@ -1,13 +1,13 @@
 import { buttonVariants } from "fumadocs-ui/components/ui/button";
 import { useI18n } from "fumadocs-ui/contexts/i18n";
 import { useSearchContext } from "fumadocs-ui/contexts/search";
-import { Airplay, Moon, Search, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
-import { type ReactNode, useEffect, useState } from "react";
+import { Search } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { docsPath } from "@/lib/base-path";
 import { cn } from "@/lib/cn";
 import { baseOptions } from "@/lib/layout.shared";
+import { ThemeToggle } from "./theme-toggle";
 
 export type AppBarTab = { title: string; url: string; active?: boolean };
 
@@ -135,44 +135,6 @@ function SearchIconButton() {
     >
       <Search />
     </button>
-  );
-}
-
-const THEMES = [
-  ["light", Sun],
-  ["dark", Moon],
-  ["system", Airplay],
-] as const;
-
-function ThemeToggle({ className }: { className?: string }) {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const value = mounted ? theme : null;
-
-  return (
-    <div
-      data-theme-toggle=""
-      className={cn(
-        "inline-flex items-center rounded-full border p-1 *:rounded-full",
-        className,
-      )}
-    >
-      {THEMES.map(([key, Icon]) => (
-        <button
-          key={key}
-          type="button"
-          aria-label={key}
-          onClick={() => setTheme(key)}
-          className={cn(
-            "size-6.5 p-1.5 text-fd-muted-foreground",
-            value === key && "bg-fd-accent text-fd-accent-foreground",
-          )}
-        >
-          <Icon className="size-full" fill="currentColor" />
-        </button>
-      ))}
-    </div>
   );
 }
 
